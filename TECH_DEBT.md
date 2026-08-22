@@ -1,0 +1,1711 @@
+# TECH_DEBT — Tender Analysis System
+
+**Статус:** Active backlog  
+**Последнее обновление:** 2026-08-22  
+**Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
+
+---
+
+# 1. Как пользоваться этим документом
+
+Этот файл не дублирует подробное описание каждой проблемы из workflow-документов.
+
+Он отвечает на четыре вопроса:
+
+```text
+1. Что реально может сломать MVP?
+2. Что может оставить run/document в зависшем состоянии?
+3. Что влияет на качество анализа?
+4. В каком порядке это исправлять?
+```
+
+Подробности реализации остаются в:
+
+```text
+workflows/orchestrator.md
+workflows/document-worker.md
+workflows/aggregator.md
+workflows/targeted-recheck.md
+workflows/error-workflow.md
+DATA_MODEL.md
+FIELD_CATALOG.md
+```
+
+---
+
+# 2. Уровни приоритета
+
+## P0 — Critical
+
+Может:
+
+- ломать end-to-end pipeline;
+- оставлять run/document в зависшем состоянии;
+- приводить к неправильному FINAL;
+- блокировать 27/27;
+- ломать произвольные поля.
+
+Исправлять до production и желательно до первого стабильного MVP.
+
+---
+
+## P1 — High
+
+Не всегда ломает happy path, но:
+
+- делает retry ненадёжным;
+- создаёт silent failure;
+- снижает качество анализа;
+- создаёт опасные edge cases;
+- усложняет диагностику.
+
+Исправлять сразу после P0.
+
+---
+
+## P2 — Medium
+
+Не блокирует текущий MVP, но:
+
+- ухудшает поддержку;
+- создаёт semantic drift;
+- увеличивает стоимость ошибок;
+- делает систему менее безопасной или менее наблюдаемой.
+
+---
+
+## P3 — Low
+
+Naming, comments, cleanup, future hardening.
+
+Не должно отвлекать от end-to-end MVP.
+
+---
+
+# 3. Сводка по приоритетам
+
+## P0 — Critical
+
+| ID | Проблема | Компонент |
+|---|---|---|
+| `TR-0` | existing candidate + no retrieval context ломает Targeted Recheck path | Targeted Recheck |
+| `TR-1` | existing candidate + all new rejected ломает Targeted Recheck path | Targeted Recheck |
+| `TR-2` | Round 2 rules есть только для 4/27 полей | Targeted Recheck |
+| `TR-3` | child workflow ссылается на parent node для `tender_meta` | Targeted Recheck |
+| `DW-14 / EW-3` | handled evidence error может тихо закончить ветку и не вызвать Error Workflow | Document Worker / Error Workflow |
+| `DW-15` | реальный false-confirmed факт `customer="не указан"` | Document Worker / semantic safety |
+| `DW-3` | Docling terminal failure statuses не обработаны | Document Worker |
+| `DW-8` | stale analysis units после retry могут блокировать completion | Document Worker |
+| `OR-0` | unsupported documents регистрируются, но не получают terminal status | Orchestrator |
+| `AG-0` | нет DB-backed 27/27 completion barrier | Aggregator |
+
+---
+
+## P1 — High
+
+| ID | Проблема | Компонент |
+|---|---|---|
+| `DW-4` | polling Docling без лимита / deadline | Document Worker |
+| `DW-16` | AI Validator видит только Extractor-selected evidence blocks | Document Worker |
+| `EW-0` | failed document не переводит run в terminal/error policy | Error Workflow |
+| `EW-1` | Error Workflow может UPDATE 0 rows и завершиться без явной ошибки | Error Workflow |
+| `EW-2` | ошибка до claim не может быть привязана к document через execution id | Error Workflow |
+| `AG-1` | нет selective retry для Round 1 AI | Aggregator |
+| `TR-6` | нет selective retry для Recheck AI anomaly | Targeted Recheck |
+
+---
+
+## P2 — Medium
+
+| ID | Проблема | Компонент |
+|---|---|---|
+| `OR-1` | zero-documents edge case | Orchestrator |
+| `OR-4` | поддерживаются только pdf/docx/xlsx | Orchestrator / Worker |
+| `OR-5` | Orchestrator без Error Workflow | Orchestrator |
+| `OR-6` | TenderPlan HTTP без retry/backoff policy | Orchestrator |
+| `DW-2` | proxy auth хранится в node config | Document Worker |
+| `DW-11` | visual content не анализируется | Document Worker |
+| `AG-2 / TR-5` | дублируются Normalize FINAL + Save | Aggregator / Recheck |
+| `AG-3` | TenderMeta mappings захардкожены отдельно | Aggregator |
+| `AG-4` | unknown run может тихо завершить Aggregator | Aggregator |
+| `AG-5 / TR-8` | semantic rules размазаны между несколькими слоями | System-wide |
+| `TR-7` | requires_review fallback может брать произвольный candidate | Targeted Recheck |
+| `DM-0` | `field_results` не имеет FK на run | Data model |
+| `EW-5` | нет alert/notification на document failure | Error Workflow |
+| `EW-4` | сохраняется только короткий `error_message` | Error Workflow |
+
+---
+
+## P3 — Low
+
+| ID | Проблема | Компонент |
+|---|---|---|
+| `OR-2` | manual trigger + hardcoded tender_id | Orchestrator |
+| `OR-3` | `raw_source` нормализуется, но не сохраняется | Orchestrator |
+| `OR-7` | policy повторных runs одного tender не зафиксирована | Orchestrator |
+| `DW-0` | node `Проверить вход Worker` не валидирует input строго | Document Worker |
+| `DW-1` | claim false может выражаться как 0 items | Document Worker |
+| `DW-5` | stale comment про Limit | Document Worker |
+| `DW-6` | stale reference на старую Docling node | Document Worker |
+| `DW-7` | artifact URLs временные | Document Worker |
+| `DW-9` | stale comment про 600 tokens | Document Worker |
+| `DW-10` | approximate tokenizer `chars/3` | Document Worker |
+| `DW-12` | provider не enforce-ит JSON Schema | Document Worker |
+| `DW-13` | `verified_facts` — слишком сильное название | Document Worker |
+| `AG-6` | stale comment в Round 1 FIELD_RULES | Aggregator |
+| `TR-9` | keyword top-N retrieval | Targeted Recheck |
+| `DM-1` | дублирующий UNIQUE index | Data model |
+| `DM-2` | field_results.field_key без CHECK каталога | Data model |
+| `DM-3` | version field не связан с физическим catalog | Data model |
+| `DM-4` | JSONB contracts валидируются application-side | Data model |
+| `EW-6` | timestamps failed-state не полностью формализованы | Error Workflow |
+
+---
+
+# 4. Consolidated Issue Groups
+
+Ниже одинаковые или связанные проблемы объединены в системные группы.
+
+---
+
+# 5. GROUP A — Targeted Recheck correctness
+
+## A1 — `TR-0`
+
+### Проблема
+
+Сценарий:
+
+```text
+existing candidate
++
+targeted retrieval не нашёл context
+```
+
+текущий path уходит в not_found finalizer, guard которого ожидает:
+
+```text
+no_initial_candidates
++
+existing_candidates = []
+```
+
+Это неверно.
+
+### Правильная семантика
+
+Если старый candidate уже есть:
+
+```text
+нет нового context
+≠
+not_found
+```
+
+Желаемое:
+
+```text
+requires_review
+resolution_method =
+targeted_recheck_unresolved_existing_candidate
+```
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## A2 — `TR-1`
+
+### Проблема
+
+Сценарий:
+
+```text
+existing candidate
++
+новые recheck candidates
++
+все новые rejected
+```
+
+сейчас может уйти в not_found branch и сломать guard.
+
+### Правильная семантика
+
+Старый candidate всё ещё существует.
+
+Желаемое:
+
+```text
+requires_review
+```
+
+а не:
+
+```text
+not_found
+```
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## A3 — `TR-2`
+
+### Проблема
+
+Round 2 field-specific rules есть только для:
+
+```text
+procurement_subject
+nm_price_with_vat
+delivery_term
+warranty_obligations_guarantee
+```
+
+Остальные 23 field_key могут упасть при попадании в Round 2.
+
+### Приоритет
+
+```text
+P0
+```
+
+### Требование
+
+Расширить Round 2 на все 27 полей в соответствии с:
+
+```text
+FIELD_CATALOG.md
+```
+
+Не придумывать новые semantics отдельно от каталога.
+
+---
+
+## A4 — `TR-3`
+
+### Проблема
+
+Child workflow обращается к parent node:
+
+```javascript
+$('Загрузить факты закупки').first().json
+```
+
+для получения:
+
+```text
+tender_meta
+```
+
+Это ненадёжно через sub-workflow boundary.
+
+### Допустимые решения
+
+#### Вариант A — parent передаёт `tender_meta`
+
+Плюсы:
+
+```text
+просто
+дёшево
+без DB query
+```
+
+Минус:
+
+```text
+контракт child становится шире
+```
+
+#### Вариант B — child загружает TenderMeta по `analysis_run_id`
+
+Плюсы:
+
+```text
+child автономен
+DB source of truth
+```
+
+Минус:
+
+```text
+дополнительный query
+```
+
+### Рекомендация
+
+Для надёжной модульности предпочтительнее:
+
+```text
+child DB load by analysis_run_id
+```
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+# 6. GROUP B — Silent-stuck document paths
+
+## B1 — `DW-14 / EW-3`
+
+### Проблема
+
+Нода:
+
+```text
+Проверить и привязать evidence
+```
+
+использует:
+
+```text
+onError = continueErrorOutput
+```
+
+но Error output:
+
+```text
+никуда не подключён
+```
+
+В результате:
+
+```text
+document уже processing
+→ node error converted to error output
+→ branch ends
+→ workflow может не считаться failed
+→ Error Workflow может не запуститься
+→ document остаётся processing
+```
+
+### Почему критично
+
+Это silent stuck state.
+
+Run затем никогда не станет:
+
+```text
+ready_for_aggregation
+```
+
+### Правильная архитектура
+
+Handled error должен приводить к одному из двух вариантов:
+
+```text
+A. явно mark document failed
+```
+
+или:
+
+```text
+B. rethrow real workflow error
+→ Error Workflow
+→ mark document failed
+```
+
+### Рекомендация
+
+Для простоты:
+
+```text
+не гасить критическую validation error
+```
+
+а давать ей падать в workflow-level Error Workflow.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## B2 — `DW-3`
+
+### Проблема
+
+Docling Switch знает:
+
+```text
+success
+processing
+pending
+```
+
+но не имеет terminal failure branch.
+
+### Риск
+
+```text
+Docling = failed/error
+→ no branch
+→ document processing forever
+```
+
+### Требуемое поведение
+
+```text
+terminal Docling error
+→ workflow failure
+→ Error Workflow
+→ document failed
+```
+
+или явный DB fail path.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## B3 — `OR-0`
+
+### Проблема
+
+Порядок:
+
+```text
+register ALL docs
+→ filter extensions
+→ Worker only pdf/docx/xlsx
+```
+
+Unsupported document остаётся:
+
+```text
+pending
+```
+
+навсегда.
+
+### Нельзя просто исключить его из регистрации
+
+Потому что это скрывает реальный документ закупки.
+
+### Нужна terminal semantics
+
+Варианты:
+
+```text
+unsupported → skipped
+```
+
+или:
+
+```text
+unsupported → failed
+```
+
+Но текущий readiness требует:
+
+```text
+completed = documents_total
+```
+
+поэтому `skipped` надо проектировать вместе с readiness.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+# 7. GROUP C — Semantic false positives
+
+## C1 — `DW-15`
+
+### Реальный observed case
+
+Extractor создал:
+
+```text
+field_key = customer
+value_text = "не указан"
+```
+
+с evidence:
+
+```text
+delivery address
+```
+
+AI Validator затем подтвердил:
+
+```text
+confirmed
+confidence = 0.95
+```
+
+хотя prompt прямо запрещает:
+
+```text
+absence → negative fact
+```
+
+### Почему это критично
+
+Это не malformed JSON.
+
+Это семантически неправильный факт, который прошёл:
+
+```text
+Extractor
+Evidence Validator
+AI Validator
+Validator Response Checker
+DB persistence
+```
+
+### Главный вывод
+
+Два LLM-прохода не заменяют deterministic business guards.
+
+### Возможный deterministic guard
+
+До persistence / до Validator запрещать pseudo-values вроде:
+
+```text
+не указан
+не указано
+не найден
+нет данных
+отсутствует информация
+```
+
+если это значение не является прямым утверждением источника.
+
+### Важно
+
+Нельзя просто глобально запрещать слово:
+
+```text
+"нет"
+```
+
+потому что некоторые поля имеют legitimate direct negative evidence:
+
+```text
+"Аналоги не допускаются"
+```
+
+Guard должен быть semantic-aware.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## C2 — `DW-16`
+
+### Проблема
+
+Validator видит только:
+
+```text
+semantic blocks,
+которые Extractor сам выбрал как evidence
+```
+
+Он может не увидеть соседний block с:
+
+```text
+qualification
+exception
+conflict
+```
+
+### Возможное улучшение
+
+Передавать Validator:
+
+```text
+full analysis_unit ai_segments
+```
+
+или:
+
+```text
+evidence blocks
++
+adjacent/relevant context
+```
+
+### Приоритет
+
+```text
+P1
+```
+
+---
+
+# 8. GROUP D — Retry correctness
+
+## D1 — `DW-8`
+
+### Проблема
+
+Analysis units сохраняются UPSERT-ом, но stale units не удаляются.
+
+Пример:
+
+```text
+attempt 1:
+au_1
+au_2
+au_3
+
+attempt 2:
+au_1
+au_2
+```
+
+В БД остаётся:
+
+```text
+au_3
+```
+
+Document completion затем видит:
+
+```text
+units_total = 2
+stored_units_count = 3
+```
+
+и блокирует:
+
+```text
+completed
+```
+
+### Почему P0
+
+Retry уже поддерживается через:
+
+```text
+failed → processing
+```
+
+но persistence layer пока не полностью retry-safe.
+
+### Требуемое решение
+
+После сохранения текущего набора units:
+
+```text
+DELETE stale units
+WHERE document_id = ...
+AND analysis_unit_id NOT IN current set
+```
+
+С учётом FK cascade это также может очищать stale facts.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## D2 — `AG-1 / TR-6`
+
+Одинаковый паттерн на разных AI-этапах:
+
+```text
+finish_reason=stop
+content=""
+```
+
+или другой transient invalid model response.
+
+### Текущая проблема
+
+Один плохой AI response может уронить:
+
+```text
+целый batch / execution
+```
+
+### Желаемое поведение
+
+```text
+retry только конкретного field/item
+```
+
+с:
+
+```text
+max attempts
+backoff
+final hard error
+```
+
+### Никогда не делать
+
+```text
+reasoning_content
+→ считать финальным JSON
+```
+
+### Приоритет
+
+```text
+P1
+```
+
+---
+
+# 9. GROUP E — Run lifecycle completeness
+
+## E1 — `AG-0`
+
+### Проблема
+
+Aggregator начинает:
+
+```text
+ready_for_aggregation
+→ aggregating
+```
+
+но после всех field UPSERT нет:
+
+```text
+27/27?
+→ completed
+```
+
+### Следствие
+
+Даже если все поля уже записаны:
+
+```text
+run.status = aggregating
+```
+
+может остаться навсегда.
+
+### Это главный следующий архитектурный milestone
+
+После любого FINAL field persistence:
+
+```text
+UPSERT
+→ DB readiness check
+→ 27 unique fields?
+```
+
+Только один claimant должен сделать:
+
+```text
+aggregating
+→ completed
+completed_at = NOW()
+```
+
+а затем запустить report stage.
+
+### Приоритет
+
+```text
+P0
+```
+
+---
+
+## E2 — `EW-0`
+
+### Проблема
+
+После:
+
+```text
+document = failed
+```
+
+run остаётся:
+
+```text
+processing
+```
+
+### Пока не определено
+
+- сколько retry допустимо;
+- когда run считается failed;
+- может ли часть документов быть skipped.
+
+### Нужна explicit policy
+
+Пример:
+
+```text
+attempts < MAX
+→ retryable failed
+
+attempts >= MAX
+→ run failed
+```
+
+или manual retry policy.
+
+### Приоритет
+
+```text
+P1
+```
+
+---
+
+## E3 — `OR-1`
+
+### Zero documents
+
+Если:
+
+```text
+documents_total = 0
+```
+
+Worker не запускается.
+
+Текущий readiness требует:
+
+```text
+documents_total > 0
+```
+
+Run потенциально остаётся:
+
+```text
+processing
+```
+
+### Нужно решить семантику
+
+```text
+0 documents
+→ failed?
+→ completed with no docs?
+→ continue using TenderMeta only?
+```
+
+На MVP решение должно быть явным.
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+# 10. GROUP F — Error observability
+
+## F1 — `EW-1`
+
+### Проблема
+
+Error Workflow:
+
+```sql
+UPDATE ...
+WHERE n8n_execution_id = ...
+AND status='processing'
+```
+
+может вернуть 0 rows.
+
+Но handler не проверяет, что document реально найден.
+
+### Желаемое
+
+```text
+updated row count = 0
+→ explicit diagnostic failure / alert
+```
+
+### Приоритет
+
+```text
+P1
+```
+
+---
+
+## F2 — `EW-2`
+
+Ошибка до successful claim:
+
+```text
+execution.id есть
+document.n8n_execution_id ещё нет
+```
+
+Поэтому Error Workflow не может найти document.
+
+### Возможные решения
+
+- передавать `document_id` в execution context/log;
+- более ранняя correlation запись;
+- separate error log independent of document update.
+
+### Приоритет
+
+```text
+P1
+```
+
+---
+
+## F3 — `EW-4`
+
+Сейчас сохраняется только:
+
+```text
+error_message
+```
+
+Но Error Trigger знает:
+
+```text
+lastNodeExecuted
+stack
+execution.url
+lineNumber
+parentExecutionId
+```
+
+### Future
+
+Отдельная:
+
+```text
+tender_analysis_errors
+```
+
+или structured JSON error log.
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+## F4 — `EW-5`
+
+Нет alert:
+
+```text
+Telegram
+email
+Slack
+```
+
+### Для production
+
+Нужен alert как минимум для:
+
+```text
+terminal run failure
+exhausted retries
+handler failure
+```
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+# 11. GROUP G — Semantic source duplication
+
+## G1 — `AG-5 / TR-8`
+
+Field semantics сейчас распределены по:
+
+```text
+Extractor FIELD_CATALOG
+Aggregator Round 1 FIELD_RULES
+TenderMeta Resolver
+Targeted Recheck RECHECK_PROFILES
+Round 2 FIELD_RULES
+```
+
+### Риск
+
+Один field можно исправить в одном месте и забыть другое.
+
+### Сейчас источник истины
+
+```text
+FIELD_CATALOG.md
+```
+
+### Future architecture
+
+Один runtime versioned catalog:
+
+```javascript
+FIELD_CATALOG = {
+  field_key: {
+    definition,
+    extractor_rules,
+    round1_rules,
+    metadata_mapping,
+    recheck_profile,
+    round2_rules
+  }
+}
+```
+
+### Не делать прямо сейчас
+
+Это refactor, а не MVP blocker.
+
+Сначала:
+
+```text
+TR-2
+и critical correctness
+```
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+# 12. GROUP H — Duplicate FINAL persistence
+
+## H1 — `AG-2 / TR-5`
+
+Сейчас несколько веток имеют копии:
+
+```text
+Normalize FINAL
+→ Save FINAL
+```
+
+### Риск
+
+При изменении contract можно обновить одну копию и забыть другую.
+
+### Future
+
+Sub-workflow:
+
+```text
+TENDER - Persist Final Field
+```
+
+который делает:
+
+```text
+Normalize
+→ validate
+→ UPSERT
+→ optional 27/27 readiness
+```
+
+### Важное ограничение
+
+Не пытаться решать это обычным Merge conditional branches.
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+# 13. GROUP I — Data model integrity
+
+## I1 — `DM-0`
+
+`field_results.analysis_run_id` логически относится к:
+
+```text
+runs.id
+```
+
+но физический FK отсутствует.
+
+### Риск
+
+Orphan FINAL results.
+
+### Future migration
+
+```sql
+FOREIGN KEY (analysis_run_id)
+REFERENCES tender_analysis_runs(id)
+ON DELETE CASCADE
+```
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+## I2 — `DM-1`
+
+Дублирующий unique index:
+
+```text
+PK (analysis_run_id, field_key)
+```
+
+и отдельный:
+
+```text
+UNIQUE INDEX (analysis_run_id, field_key)
+```
+
+### Результат
+
+Лишняя стоимость INSERT/UPDATE.
+
+### Приоритет
+
+```text
+P3
+```
+
+---
+
+## I3 — `DM-2`
+
+Facts имеют DB CHECK на 27 field_key.
+
+Field results — нет.
+
+### Риск
+
+DB может принять typo field_key при валидном field_index.
+
+### Future
+
+- CHECK;
+- или отдельная catalog table.
+
+### Приоритет
+
+```text
+P3
+```
+
+---
+
+# 14. GROUP J — Infrastructure / security
+
+## J1 — `DW-2`
+
+Proxy credentials находятся непосредственно в HTTP node configuration.
+
+### Future
+
+```text
+Credentials
+или
+environment secrets
+```
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+## J2 — `OR-5`
+
+Orchestrator не имеет Error Workflow.
+
+### Риск
+
+TenderPlan / DB error остаётся только на execution-level.
+
+### Future
+
+Подключить central handler после определения run-level error policy.
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+## J3 — `OR-6`
+
+TenderPlan FullInfo не имеет explicit retry/backoff.
+
+### Важно
+
+Retry должен происходить:
+
+```text
+до создания analysis_run
+```
+
+чтобы transient HTTP failure не создавал лишние runs.
+
+### Приоритет
+
+```text
+P2
+```
+
+---
+
+# 15. Known non-blocking limitations
+
+Эти пункты не должны отвлекать от MVP.
+
+---
+
+## `OR-2` — manual trigger
+
+Текущий hardcoded input допустим для разработки.
+
+---
+
+## `OR-3` — raw TenderPlan snapshot не хранится
+
+Полезно для audit, но не блокирует анализ.
+
+---
+
+## `DW-10` — approximate token count
+
+```text
+chars / 3
+```
+
+достаточно безопасен при текущем budget 3200.
+
+---
+
+## `DW-11` — visual content
+
+Изображения пока не анализируются напрямую.
+
+Это capability expansion, не текущий blocker.
+
+---
+
+## `DW-12` — provider-side JSON Schema
+
+Application-side validators уже существуют.
+
+---
+
+## `TR-9` — keyword retrieval
+
+Для MVP приемлемо, если retrieval regression проходит.
+
+---
+
+# 16. Что исправлять до первого стабильного end-to-end MVP
+
+Минимальный обязательный пакет:
+
+```text
+TR-0
+TR-1
+TR-2
+TR-3
+
+DW-14 / EW-3
+DW-15
+DW-8
+DW-3
+
+OR-0
+
+AG-0
+```
+
+После этого система уже должна значительно надёжнее проходить:
+
+```text
+tender_id
+→ 27 FINAL
+→ completed
+```
+
+---
+
+# 17. Рекомендуемый порядок реализации
+
+## Этап 1 — закончить Targeted Recheck
+
+```text
+1. TR-0
+2. TR-1
+3. TR-2
+4. TR-3
+```
+
+Причина:
+
+Aggregator уже зависит от него для значительной части 27 полей.
+
+---
+
+## Этап 2 — закрыть silent Worker failures
+
+```text
+5. DW-14 / EW-3
+6. DW-3
+```
+
+Цель:
+
+> ни одна ошибка после claim не должна оставлять document в `processing` молча.
+
+---
+
+## Этап 3 — semantic safety Worker
+
+```text
+7. DW-15
+```
+
+Добавить deterministic protection против known absence-as-fact класса.
+
+---
+
+## Этап 4 — retry correctness
+
+```text
+8. DW-8
+```
+
+После этого:
+
+```text
+failed → retry
+```
+
+становится существенно безопаснее.
+
+---
+
+## Этап 5 — unsupported documents
+
+```text
+9. OR-0
+```
+
+Одновременно определить:
+
+```text
+skipped vs failed
+```
+
+и обновить readiness semantics, если используется skipped.
+
+---
+
+## Этап 6 — завершение run
+
+```text
+10. AG-0
+```
+
+Реализовать:
+
+```text
+FINAL UPSERT
+→ 27/27
+→ completed
+```
+
+---
+
+## Этап 7 — MVP report
+
+```text
+11. Load ordered FINAL 1..27
+12. Build Markdown
+13. Build XLSX
+14. Telegram
+```
+
+После этого end-to-end MVP достигнут.
+
+---
+
+# 18. Что НЕ делать до завершения MVP
+
+Не тратить время сейчас на:
+
+```text
+единый runtime field catalog refactor
+frontend
+Bitrix integration
+perfect retry framework
+full monitoring stack
+real tokenizer
+image AI analysis
+source snapshots
+идеальный refactor всех duplicate nodes
+```
+
+Если конкретная проблема не блокирует:
+
+```text
+27 FINAL + report
+```
+
+она должна ждать.
+
+---
+
+# 19. Definition of Done для P0 issue
+
+Любой Critical считается закрытым только если выполнены все три пункта:
+
+```text
+1. Код/SQL исправлен.
+2. Есть regression scenario.
+3. Документация обновлена.
+```
+
+Просто изменение Code Node без теста не считается закрытием.
+
+---
+
+# 20. Regression policy
+
+Для каждого fix использовать короткий сценарий.
+
+Пример:
+
+```text
+TR-0
+
+Input:
+existing candidate
+retrieval_context = none
+
+Expected:
+requires_review
+NOT not_found
+NO guard crash
+```
+
+---
+
+# 21. Изменение приоритета
+
+Priority можно менять только если появился новый факт:
+
+```text
+реальный execution
+новый failure mode
+новая бизнес-семантика
+integration test
+```
+
+Не по ощущению.
+
+---
+
+# 22. Текущий критический путь MVP
+
+```text
+Targeted Recheck correctness
+        ↓
+Worker cannot silently stick
+        ↓
+Worker semantic false-positive guard
+        ↓
+Retry-safe units
+        ↓
+Unsupported document terminal state
+        ↓
+27/27 DB barrier
+        ↓
+Report
+```
+
+---
+
+# 23. Dependency graph
+
+```text
+TR-0
+TR-1
+TR-2
+TR-3
+  |
+  v
+Targeted Recheck stable
+  |
+  +-------------------------+
+  |                         |
+  v                         v
+DW-14 / DW-3             DW-15
+  |                         |
+  v                         v
+document failures       semantic safety
+don't silently stick
+  |
+  v
+DW-8
+retry-safe units
+  |
+  v
+OR-0
+all registered docs reach terminal state
+  |
+  v
+AG-0
+27/27 completion
+  |
+  v
+Markdown / XLSX / Telegram
+```
+
+---
+
+# 24. Quick Backlog
+
+## Critical
+
+```text
+[ ] TR-0
+[ ] TR-1
+[ ] TR-2
+[ ] TR-3
+[ ] DW-14 / EW-3
+[ ] DW-15
+[ ] DW-3
+[ ] DW-8
+[ ] OR-0
+[ ] AG-0
+```
+
+## High
+
+```text
+[ ] DW-4
+[ ] DW-16
+[ ] EW-0
+[ ] EW-1
+[ ] EW-2
+[ ] AG-1
+[ ] TR-6
+```
+
+## Medium
+
+```text
+[ ] OR-1
+[ ] OR-4
+[ ] OR-5
+[ ] OR-6
+[ ] DW-2
+[ ] DW-11
+[ ] AG-2 / TR-5
+[ ] AG-3
+[ ] AG-4
+[ ] AG-5 / TR-8
+[ ] TR-7
+[ ] DM-0
+[ ] EW-4
+[ ] EW-5
+```
+
+## Low
+
+```text
+[ ] OR-2
+[ ] OR-3
+[ ] OR-7
+[ ] DW-0
+[ ] DW-1
+[ ] DW-5
+[ ] DW-6
+[ ] DW-9
+[ ] DW-12
+[ ] DW-13
+[ ] AG-6
+[ ] TR-9
+[ ] DM-1
+[ ] DM-2
+[ ] DM-3
+[ ] DM-4
+[ ] EW-6
+```
+
+---
+
+# 25. Краткое резюме
+
+Главная проблема проекта сейчас не в отсутствии ещё одного AI-слоя.
+
+Основной долг находится в:
+
+```text
+1. корректности Targeted Recheck;
+2. отсутствии silent-stuck paths;
+3. deterministic semantic safety;
+4. retry-safe persistence;
+5. финальной DB synchronization 27/27.
+```
+
+После закрытия этих пунктов архитектура уже достаточно зрелая, чтобы закончить MVP без большого redesign.
+
+Главный финальный milestone:
+
+```text
+tender_id
+→ all documents terminal
+→ 27 FINAL fields
+→ run completed
+→ Markdown
+→ XLSX
+→ Telegram
+```
