@@ -5,34 +5,36 @@
 **Тип:** sub-workflow n8n  
 **Вызывается:** другим workflow после готовности всех документов  
 **Вызывает:** `TENDER - Targeted Recheck`  
-**Финальный контракт поля:** `tender_field_final_v1`  
-**Каталог полей:** `tender_fields_v1`  
+**Финальный контракт поля:** `tender\_field\_final\_v1`  
+**Каталог полей:** `tender\_fields\_v1`  
 **Основная модель Semantic Aggregator:** `deepseek-v4-pro`
 
----
+\---
 
-## 1. Назначение
+## 1\. Назначение
 
-`TENDER — Агрегация закупки` собирает результаты анализа всех документов одного `analysis_run`, раскладывает candidate facts по 27 полям каталога `tender_fields_v1` и определяет финальный путь разрешения каждого поля.
+`TENDER — Агрегация закупки` собирает результаты анализа всех документов одного `analysis\_run`, раскладывает candidate facts по 27 полям каталога `tender\_fields\_v1` и определяет финальный путь разрешения каждого поля.
 
 Workflow не извлекает новые facts из документов.
 
 Его задача:
 
-1. атомарно захватить готовый `analysis_run` для агрегации;
+1. атомарно захватить готовый `analysis\_run` для агрегации;
 2. загрузить документы, TenderMeta и candidate facts;
 3. создать **ровно 27 field items**;
 4. для полей с candidates выполнить Semantic Aggregator Round 1;
 5. для полей без candidates попробовать deterministic TenderMeta Resolver;
 6. при необходимости передать поле в `TENDER - Targeted Recheck`;
-7. для полей, закрытых внутри Aggregator, сформировать `tender_field_final_v1`;
+7. для полей, закрытых внутри Aggregator, сформировать `tender\_field\_final\_v1`;
 8. сохранить FINAL field в PostgreSQL.
+
+&#x20;   	Для полей, переданных в Targeted Recheck, дальнейшая финализация происходит вне текущего execution Aggregator через отдельный sub-workflow.
 
 Текущая версия Aggregator **не выполняет финальную синхронизацию всего run после записи 27 полей**. См. `AG-0`.
 
----
+\---
 
-## 2. Место в общей системе
+## 2\. Место в общей системе
 
 ```text
 Orchestrator / Document Workers
@@ -41,7 +43,7 @@ Orchestrator / Document Workers
 Все документы зарегистрированы и обработаны
         |
         v
-run.status = ready_for_aggregation
+run.status = ready\_for\_aggregation
         |
         v
 TENDER — Агрегация закупки
@@ -56,7 +58,7 @@ TENDER — Агрегация закупки
         |      |     v
         |      |   FINAL -> DB
         |      |
-        |      `-- requires_recheck
+        |      `-- requires\_recheck
         |            |
         |            v
         |      TENDER - Targeted Recheck
@@ -77,38 +79,80 @@ TENDER — Агрегация закупки
                `-- unresolved
                      |
                      v
-               TENDER - Targeted Recheck
-                     |
-                     v
-                    DB
-```
+              TENDER - Targeted Recheck
 
----
+&#x20;                    |
 
-## 3. Текущая граница ответственности
+&#x20;       	     +-- direct FINAL
+
+&#x20;       	     |
+
+&#x20;        	     +-- Semantic Aggregator Round 2
+
+&#x20;        	     |
+
+&#x20;       	     +-- requires\_review
+
+&#x20;       	     |
+
+&#x20;       	     +-- not\_found
+
+&#x20;       	     |
+
+&#x20;       	     v
+
+&#x09;	tender\_field\_final\_v1
+
+&#x20;       	     |
+
+&#x20;       	     v
+
+&#x09;  	 UPSERT DB
+
+\---
+
+## 3\. Текущая граница ответственности
 
 Aggregator отвечает за:
 
-- захват run;
-- загрузку агрегируемых данных;
-- fan-out в 27 полей;
-- Round 1 semantic aggregation;
-- deterministic TenderMeta fallback;
-- отправку проблемных полей в Targeted Recheck;
-- локальную финализацию resolved-полей;
-- сохранение своих FINAL-полей в `tender_analysis_field_results`.
+* захват run;
+* загрузку агрегируемых данных;
+* fan-out в 27 полей;
+* Round 1 semantic aggregation;
+* deterministic TenderMeta fallback;
+* отправку проблемных полей в Targeted Recheck;
+* локальную финализацию resolved-полей;
+* сохранение своих FINAL-полей в `tender\_analysis\_field\_results`.
 
 Aggregator **не отвечает в текущей версии** за:
 
-- ожидание завершения всех Targeted Recheck executions;
-- проверку, что в БД появилось ровно 27 FINAL-полей;
-- перевод `analysis_run` из `aggregating` в `completed`;
-- генерацию Markdown/XLSX отчёта;
-- отправку отчёта в Telegram.
+* ожидание завершения всех Targeted Recheck executions;
+* проверку, что в БД появилось ровно 27 FINAL-полей;
+* перевод `analysis\_run` из `aggregating` в `completed`;
+* генерацию Markdown/XLSX отчёта;
+* отправку отчёта в Telegram.
 
----
 
-## 4. RAW INPUT CONTRACT
+
+Важно:
+
+
+
+После передачи field item в Targeted Recheck текущий execution Aggregator больше не ожидает ответ.
+
+
+
+Targeted Recheck самостоятельно:
+
+\- выполняет дополнительный анализ;
+
+\- формирует FINAL;
+
+\- сохраняет результат через UPSERT.
+
+\---
+
+## 4\. RAW INPUT CONTRACT
 
 Workflow запускается через `When Executed by Another Workflow`.
 
@@ -116,33 +160,33 @@ Workflow запускается через `When Executed by Another Workflow`.
 
 ```json
 {
-  "analysis_run_id": "18f3eaee-528d-4bc1-8d72-a1ea2f313df2",
-  "previous_run_status": "processing",
-  "run_status": "ready_for_aggregation",
-  "documents_total": 3,
-  "registered_documents_count": 3,
-  "completed_documents_count": 3,
-  "pending_documents_count": 0,
-  "processing_documents_count": 0,
-  "failed_documents_count": 0,
-  "skipped_documents_count": 0,
-  "ready_at": "2026-08-21T15:12:48.500Z",
-  "should_start_aggregation": true,
-  "readiness_reason": "all_documents_completed"
+  "analysis\_run\_id": "18f3eaee-528d-4bc1-8d72-a1ea2f313df2",
+  "previous\_run\_status": "processing",
+  "run\_status": "ready\_for\_aggregation",
+  "documents\_total": 3,
+  "registered\_documents\_count": 3,
+  "completed\_documents\_count": 3,
+  "pending\_documents\_count": 0,
+  "processing\_documents\_count": 0,
+  "failed\_documents\_count": 0,
+  "skipped\_documents\_count": 0,
+  "ready\_at": "2026-08-21T15:12:48.500Z",
+  "should\_start\_aggregation": true,
+  "readiness\_reason": "all\_documents\_completed"
 }
 ```
 
 Для текущего Aggregator реально критичен прежде всего:
 
 ```text
-analysis_run_id
+analysis\_run\_id
 ```
 
 Остальная readiness-информация приходит от upstream и полезна для provenance/debugging, но сам Aggregator повторно защищает запуск через atomic claim в PostgreSQL.
 
----
+\---
 
-## 5. Полная архитектура workflow
+## 5\. Полная архитектура workflow
 
 ```text
 When Executed by Another Workflow
@@ -152,7 +196,7 @@ When Executed by Another Workflow
         |
         v
 Продолжать агрегацию?
-    /             \
+    /             \\
  FALSE            TRUE
    |                |
  конец              v
@@ -163,7 +207,7 @@ When Executed by Another Workflow
                     |
                     v
               Есть кандидаты?
-             /              \
+             /              \\
           TRUE              FALSE
            |                  |
            v                  v
@@ -173,14 +217,14 @@ When Executed by Another Workflow
            v                  v
   Semantic Aggregator   Поле закрыто
            |             из TenderMeta?
-           v               /        \
+           v               /        \\
   Проверить ответ       TRUE        FALSE
   Semantic Aggregator    |            |
            |             v            v
            v         FINAL Meta   TENDER -
    Нужен Targeted        |         Targeted
       Recheck?           v         Recheck
-      /     \         Normalize        |
+      /     \\         Normalize        |
    TRUE     FALSE        |             v
     |         |          v            DB
     |         v         DB
@@ -199,32 +243,32 @@ TENDER - Targeted Recheck
    DB
 ```
 
----
+\---
 
-## 6. Stage 0 — Trigger
+## 6\. Stage 0 — Trigger
 
 ### `When Executed by Another Workflow`
 
 **Получает:** один run item от upstream workflow.
 
-**Назначение:** передать контекст текущего `analysis_run` в Aggregator.
+**Назначение:** передать контекст текущего `analysis\_run` в Aggregator.
 
 **Ключевое поле:**
 
 ```text
-analysis_run_id
+analysis\_run\_id
 ```
 
----
+\---
 
-## 7. Stage 1 — Atomic Run Claim
+## 7\. Stage 1 — Atomic Run Claim
 
 ### `Захватить run для агрегации`
 
 PostgreSQL-нода атомарно переводит run:
 
 ```text
-ready_for_aggregation
+ready\_for\_aggregation
 →
 aggregating
 ```
@@ -233,40 +277,40 @@ aggregating
 
 ```sql
 WHERE id = $1::uuid
-  AND status = 'ready_for_aggregation'
+  AND status = 'ready\_for\_aggregation'
 ```
 
 При успешном claim возвращается:
 
 ```text
-aggregation_claimed = true
+aggregation\_claimed = true
 ```
 
 Если другой execution уже захватил run или run имеет другой статус:
 
 ```text
-aggregation_claimed = false
+aggregation\_claimed = false
 ```
 
 Также заполняется:
 
 ```text
-aggregation_started_at
-updated_at
+aggregation\_started\_at
+updated\_at
 ```
 
 ### Зачем нужен claim
 
-Защита от конкурентного двойного запуска Aggregator для одного `analysis_run`.
+Защита от конкурентного двойного запуска Aggregator для одного `analysis\_run`.
 
----
+\---
 
 ### `Продолжать агрегацию?`
 
 Проверяет:
 
 ```text
-aggregation_claimed === true
+aggregation\_claimed === true
 ```
 
 #### TRUE
@@ -277,9 +321,9 @@ aggregation_claimed === true
 
 Execution заканчивается без дальнейшей обработки.
 
----
+\---
 
-## 8. Stage 2 — Load Aggregation Dataset
+## 8\. Stage 2 — Load Aggregation Dataset
 
 ### `Загрузить факты закупки`
 
@@ -288,39 +332,39 @@ Execution заканчивается без дальнейшей обработ�
 ### Читает
 
 ```text
-tender_analysis_runs
-tender_analysis_documents
-tender_analysis_facts
+tender\_analysis\_runs
+tender\_analysis\_documents
+tender\_analysis\_facts
 ```
 
-### Из `tender_analysis_runs`
+### Из `tender\_analysis\_runs`
 
 Получает:
 
 ```text
-analysis_run_id
-tender_id
-tender_number
-tender_external_id
-run_status
-documents_total
-tender_meta
+analysis\_run\_id
+tender\_id
+tender\_number
+tender\_external\_id
+run\_status
+documents\_total
+tender\_meta
 ```
 
-`tender_meta` является структурированным источником данных для deterministic Metadata Resolver.
+`tender\_meta` является структурированным источником данных для deterministic Metadata Resolver.
 
-### Из `tender_analysis_documents`
+### Из `tender\_analysis\_documents`
 
-Формирует `documents[]` с данными о каждом документе.
+Формирует `documents\[]` с данными о каждом документе.
 
-### Из `tender_analysis_facts`
+### Из `tender\_analysis\_facts`
 
-В массив `facts[]` попадают только facts с:
+В массив `facts\[]` попадают только facts с:
 
 ```text
-validator_verdict = confirmed
+validator\_verdict = confirmed
 или
-validator_verdict = requires_review
+validator\_verdict = requires\_review
 ```
 
 Rejected facts в Semantic Aggregator не передаются.
@@ -330,30 +374,30 @@ Rejected facts в Semantic Aggregator не передаются.
 Рассчитываются:
 
 ```text
-facts_total
-confirmed_count
-requires_review_count
-rejected_count
-aggregation_candidates_count
+facts\_total
+confirmed\_count
+requires\_review\_count
+rejected\_count
+aggregation\_candidates\_count
 ```
 
 Важно:
 
 ```text
-facts_total
+facts\_total
 ```
 
 включает все facts run, а:
 
 ```text
-aggregation_candidates_count
+aggregation\_candidates\_count
 ```
 
 равен числу facts, реально допущенных в агрегацию.
 
----
+\---
 
-## 9. Stage 3 — Expand to 27 Field Items
+## 9\. Stage 3 — Expand to 27 Field Items
 
 ### `Сгруппировать факты по полям`
 
@@ -374,38 +418,38 @@ N candidate facts
 по фиксированному каталогу:
 
 ```text
-tender_fields_v1
+tender\_fields\_v1
 ```
 
-### 27 field_key
+### 27 field\_key
 
-1. `procurement_subject`
-2. `nm_price_with_vat`
+1. `procurement\_subject`
+2. `nm\_price\_with\_vat`
 3. `platform`
-4. `procedure_type`
-5. `application_deadline`
-6. `application_review_date`
-7. `results_date`
+4. `procedure\_type`
+5. `application\_deadline`
+6. `application\_review\_date`
+7. `results\_date`
 8. `customer`
-9. `customer_contacts`
-10. `participation_cost`
-11. `participation_guarantee`
-12. `evaluation_criteria`
-13. `delivery_term`
-14. `payment_terms`
-15. `special_account_or_treasury`
-16. `bank_support`
-17. `government_contract`
+9. `customer\_contacts`
+10. `participation\_cost`
+11. `participation\_guarantee`
+12. `evaluation\_criteria`
+13. `delivery\_term`
+14. `payment\_terms`
+15. `special\_account\_or\_treasury`
+16. `bank\_support`
+17. `government\_contract`
 18. `rebidding`
-19. `national_regime`
-20. `advance_contract_guarantee`
-21. `warranty_obligations_guarantee`
-22. `licenses_certificates`
-23. `required_official_certificates`
-24. `similar_supply_experience`
-25. `analog_allowed`
-26. `analog_definition`
-27. `application_documents`
+19. `national\_regime`
+20. `advance\_contract\_guarantee`
+21. `warranty\_obligations\_guarantee`
+22. `licenses\_certificates`
+23. `required\_official\_certificates`
+24. `similar\_supply\_experience`
+25. `analog\_allowed`
+26. `analog\_definition`
+27. `application\_documents`
 
 Группы создаются заранее, поэтому поле без facts не исчезает.
 
@@ -413,34 +457,34 @@ tender_fields_v1
 
 ```json
 {
-  "analysis_run_id": "uuid",
-  "field_catalog_version": "tender_fields_v1",
-  "field_index": 16,
-  "field_key": "bank_support",
-  "has_candidates": false,
-  "candidates_count": 0,
-  "confirmed_count": 0,
-  "requires_review_count": 0,
-  "source_documents_count": 0,
-  "source_documents": [],
-  "candidates": []
+  "analysis\_run\_id": "uuid",
+  "field\_catalog\_version": "tender\_fields\_v1",
+  "field\_index": 16,
+  "field\_key": "bank\_support",
+  "has\_candidates": false,
+  "candidates\_count": 0,
+  "confirmed\_count": 0,
+  "requires\_review\_count": 0,
+  "source\_documents\_count": 0,
+  "source\_documents": \[],
+  "candidates": \[]
 }
 ```
 
 ### Guards
 
-Неизвестный `field_key` в загруженных facts вызывает hard error.
+Неизвестный `field\_key` в загруженных facts вызывает hard error.
 
----
+\---
 
-## 10. Stage 4 — First Routing
+## 10\. Stage 4 — First Routing
 
 ### `Есть кандидаты?`
 
 Условие:
 
 ```text
-has_candidates === true
+has\_candidates === true
 ```
 
 ### TRUE
@@ -451,26 +495,26 @@ has_candidates === true
 
 Поле идёт в deterministic TenderMeta Resolver.
 
----
+\---
 
-## 11. Stage 5 — Semantic Aggregator Round 1
+## 11\. Stage 5 — Semantic Aggregator Round 1
 
 ### `Подготовить запрос Semantic Aggregator`
 
-**Получает:** один field item с `candidates[]`.
+**Получает:** один field item с `candidates\[]`.
 
 ### Проверяет
 
 ```text
-analysis_run_id
-field_key
+analysis\_run\_id
+field\_key
 candidates должен быть массивом
-fact_id должен существовать у каждого candidate
+fact\_id должен существовать у каждого candidate
 ```
 
-### FIELD_RULES
+### FIELD\_RULES
 
-Round 1 `FIELD_RULES` содержит правила для всех 27 полей.
+Round 1 `FIELD\_RULES` содержит правила для всех 27 полей.
 
 Структура одного field rule:
 
@@ -478,7 +522,7 @@ Round 1 `FIELD_RULES` содержит правила для всех 27 пол�
 {
   "title": "...",
   "definition": "...",
-  "rules": ["..."]
+  "rules": \["..."]
 }
 ```
 
@@ -492,15 +536,15 @@ Round 1 `FIELD_RULES` содержит правила для всех 27 пол�
 quote
 type
 role
-page_from
-page_to
-sheet_name
-semantic_block_id
+page\_from
+page\_to
+sheet\_name
+semantic\_block\_id
 ```
 
----
+\---
 
-## 12. Semantic Aggregator Round 1 — роль AI
+## 12\. Semantic Aggregator Round 1 — роль AI
 
 ### `Semantic Aggregator`
 
@@ -510,19 +554,19 @@ semantic_block_id
 
 ```text
 thinking = enabled
-reasoning_effort = low
-response_format = json_object
-max_tokens = 4096
+reasoning\_effort = low
+response\_format = json\_object
+max\_tokens = 4096
 timeout = 180000 ms
 ```
 
 Semantic Aggregator:
 
-- не извлекает новые facts;
-- работает только с переданными candidates;
-- классифицирует отношения между candidates;
-- формирует итоговое значение поля;
-- решает, достаточно ли evidence для resolved.
+* не извлекает новые facts;
+* работает только с переданными candidates;
+* классифицирует отношения между candidates;
+* формирует итоговое значение поля;
+* решает, достаточно ли evidence для resolved.
 
 ### Candidate roles
 
@@ -532,54 +576,54 @@ duplicate
 supporting
 complement
 conflict
-not_applicable
+not\_applicable
 ```
 
 ### Допустимые Round 1 statuses
 
 ```text
 resolved
-requires_recheck
+requires\_recheck
 ```
 
-### Допустимые `recheck_reason_code`
+### Допустимые `recheck\_reason\_code`
 
 ```text
-conflicting_candidates
-insufficient_evidence
-ambiguous_scope
-no_reliable_candidate
+conflicting\_candidates
+insufficient\_evidence
+ambiguous\_scope
+no\_reliable\_candidate
 other
 ```
 
----
+\---
 
-## 13. Round 1 AI output contract
+## 13\. Round 1 AI output contract
 
 ```json
 {
-  "field_key": "string",
-  "status": "resolved | requires_recheck",
-  "final_value_text": "string | null",
+  "field\_key": "string",
+  "status": "resolved | requires\_recheck",
+  "final\_value\_text": "string | null",
   "confidence": 0.0,
-  "candidate_decisions": [
+  "candidate\_decisions": \[
     {
-      "fact_id": "uuid",
-      "role": "primary | duplicate | supporting | complement | conflict | not_applicable",
+      "fact\_id": "uuid",
+      "role": "primary | duplicate | supporting | complement | conflict | not\_applicable",
       "reason": "..."
     }
   ],
-  "supporting_fact_ids": [],
-  "conflict_fact_ids": [],
-  "needs_recheck": false,
-  "recheck_reason_code": null,
-  "recheck_note": null
+  "supporting\_fact\_ids": \[],
+  "conflict\_fact\_ids": \[],
+  "needs\_recheck": false,
+  "recheck\_reason\_code": null,
+  "recheck\_note": null
 }
 ```
 
----
+\---
 
-## 14. Stage 6 — Deterministic Round 1 Validation
+## 14\. Stage 6 — Deterministic Round 1 Validation
 
 ### `Проверить ответ Semantic Aggregator`
 
@@ -588,64 +632,64 @@ other
 Проверяет:
 
 ```text
-choices[0] существует
-finish_reason = stop
+choices\[0] существует
+finish\_reason = stop
 message.content не пуст
 валидный JSON
-field_key не изменился
+field\_key не изменился
 status в allow-list
-confidence ∈ [0,1]
+confidence ∈ \[0,1]
 ```
 
 ### Candidate decisions
 
-Каждый входной `fact_id` обязан присутствовать ровно один раз.
+Каждый входной `fact\_id` обязан присутствовать ровно один раз.
 
 Запрещено:
 
-- придумывать новые `fact_id`;
-- терять входной fact;
-- повторять fact дважды.
+* придумывать новые `fact\_id`;
+* терять входной fact;
+* повторять fact дважды.
 
 ### Для `resolved`
 
 Обязательно:
 
 ```text
-final_value_text != empty
-needs_recheck = false
-recheck_reason_code = null
+final\_value\_text != empty
+needs\_recheck = false
+recheck\_reason\_code = null
 primaryCount = 1
-conflict_fact_ids.length = 0
+conflict\_fact\_ids.length = 0
 ```
 
-### Для `requires_recheck`
+### Для `requires\_recheck`
 
 Обязательно:
 
 ```text
-needs_recheck = true
-valid recheck_reason_code
-recheck_note != empty
+needs\_recheck = true
+valid recheck\_reason\_code
+recheck\_note != empty
 primaryCount <= 1
 ```
 
 На выходе:
 
 ```text
-aggregation_validated = true
+aggregation\_validated = true
 ```
 
----
+\---
 
-## 15. Stage 7 — Round 1 Resolution Routing
+## 15\. Stage 7 — Round 1 Resolution Routing
 
 ### `Нужен Targeted Recheck?`
 
 Проверяет:
 
 ```text
-needs_recheck === true
+needs\_recheck === true
 ```
 
 ### TRUE
@@ -668,22 +712,22 @@ Aggregator больше его не финализирует.
 → Сохранить FINAL результат поля в БД1
 ```
 
----
+\---
 
-## 16. FINAL after Round 1
+## 16\. FINAL after Round 1
 
 ### `Сформировать FINAL после Round 1`
 
 Проверяет:
 
 ```text
-analysis_run_id
-field_key
-aggregation_validated = true
-aggregation_status = resolved
-needs_recheck = false
-final_value_text != empty
-confidence ∈ [0,1]
+analysis\_run\_id
+field\_key
+aggregation\_validated = true
+aggregation\_status = resolved
+needs\_recheck = false
+final\_value\_text != empty
+confidence ∈ \[0,1]
 ```
 
 ### Evidence
@@ -701,16 +745,16 @@ complement
 
 ```text
 conflict
-not_applicable
+not\_applicable
 ```
 
 Добавляется provenance:
 
 ```text
-candidate_ref = fact:<fact_id>
-candidate_role
-candidate_origin = initial_analysis
-candidate_value_text
+candidate\_ref = fact:<fact\_id>
+candidate\_role
+candidate\_origin = initial\_analysis
+candidate\_value\_text
 ```
 
 Conflict evidence сохраняется отдельно в audit.
@@ -718,17 +762,17 @@ Conflict evidence сохраняется отдельно в audit.
 ### Результат
 
 ```text
-aggregation_status = resolved
-needs_recheck = false
-aggregation_validated = true
-requires_human_review = false
-resolution_method = semantic_aggregator_round_1
-aggregation_round = 1
+aggregation\_status = resolved
+needs\_recheck = false
+aggregation\_validated = true
+requires\_human\_review = false
+resolution\_method = semantic\_aggregator\_round\_1
+aggregation\_round = 1
 ```
 
----
+\---
 
-## 17. Stage 8 — TenderMeta Resolver
+## 17\. Stage 8 — TenderMeta Resolver
 
 FALSE-ветка `Есть кандидаты?`.
 
@@ -736,51 +780,51 @@ FALSE-ветка `Есть кандидаты?`.
 
 Это deterministic fallback.
 
-Отсутствие mapping или значения **не означает `not_found`**.
+Отсутствие mapping или значения **не означает `not\_found`**.
 
 Оно означает:
 
 ```text
-metadata_resolved = false
+metadata\_resolved = false
 → Targeted Recheck
 ```
 
 ### Текущие deterministic mappings
 
 ```text
-platform             → tender_meta.platform
-application_deadline → tender_meta.submission_close_at
-procurement_subject  → tender_meta.title
-customer             → tender_meta.primary_customer.name
+platform             → tender\_meta.platform
+application\_deadline → tender\_meta.submission\_close\_at
+procurement\_subject  → tender\_meta.title
+customer             → tender\_meta.primary\_customer.name
 ```
 
 При успешном resolution:
 
 ```text
-metadata_resolved = true
-aggregation_status = resolved
+metadata\_resolved = true
+aggregation\_status = resolved
 confidence = 1
-resolution_method = deterministic_metadata
+resolution\_method = deterministic\_metadata
 ```
 
 Metadata Resolver сохраняет:
 
 ```text
-original_field = input
+original\_field = input
 ```
 
-чтобы Targeted Recheck мог распознать `no_initial_candidates`.
+чтобы Targeted Recheck мог распознать `no\_initial\_candidates`.
 
----
+\---
 
-## 18. Stage 9 — TenderMeta Routing
+## 18\. Stage 9 — TenderMeta Routing
 
 ### `Поле закрыто из TenderMeta?`
 
 Условие:
 
 ```text
-metadata_resolved === true
+metadata\_resolved === true
 ```
 
 ### TRUE
@@ -797,87 +841,87 @@ metadata_resolved === true
 TENDER - Targeted Recheck
 ```
 
----
+\---
 
-## 19. FINAL from TenderMeta
+## 19\. FINAL from TenderMeta
 
 ### `Сформировать FINAL из TenderMeta`
 
 Проверяет:
 
 ```text
-analysis_run_id
-field_key
-metadata_resolved = true
-aggregation_status = resolved
-final_value_text != empty
-confidence ∈ [0,1]
+analysis\_run\_id
+field\_key
+metadata\_resolved = true
+aggregation\_status = resolved
+final\_value\_text != empty
+confidence ∈ \[0,1]
 evidence.length > 0
 ```
 
 Формирует:
 
 ```text
-aggregation_status = resolved
-needs_recheck = false
-aggregation_validated = true
-requires_human_review = false
-resolution_method = deterministic_metadata
-aggregation_round = null
+aggregation\_status = resolved
+needs\_recheck = false
+aggregation\_validated = true
+requires\_human\_review = false
+resolution\_method = deterministic\_metadata
+aggregation\_round = null
 ```
 
----
+\---
 
-## 20. Канонический FINAL — `tender_field_final_v1`
+## 20\. Канонический FINAL — `tender\_field\_final\_v1`
 
 Round 1 и TenderMeta ветки проходят через одинаковую логику нормализации.
 
 Основные поля:
 
 ```text
-result_contract_version
-analysis_run_id
-field_catalog_version
-field_index
-field_key
+result\_contract\_version
+analysis\_run\_id
+field\_catalog\_version
+field\_index
+field\_key
 status
-value_text
+value\_text
 confidence
-requires_human_review
-resolution_method
+requires\_human\_review
+resolution\_method
 evidence
 review
-not_found
+not\_found
 audit
 ```
 
 Aggregator сам создаёт главным образом `resolved` FINAL-поля.
 
-`requires_review` и `not_found` в текущей архитектуре обычно возникают внутри `TENDER - Targeted Recheck`.
+`requires\_review` и `not\_found` в текущей архитектуре обычно возникают внутри `TENDER - Targeted Recheck`.
 
----
+\---
 
-## 21. PostgreSQL — `tender_analysis_runs`
+## 21\. PostgreSQL — `tender\_analysis\_runs`
 
 Корневая сущность одного анализа.
 
-| Колонка | Тип | Nullable |
-|---|---|---:|
-| `id` | uuid | NO |
-| `source` | text | NO |
-| `tender_id` | text | NO |
-| `tender_number` | text | YES |
-| `tender_external_id` | text | YES |
-| `status` | text | NO |
-| `documents_total` | integer | NO |
-| `tender_meta` | jsonb | NO |
-| `error_message` | text | YES |
-| `created_at` | timestamptz | NO |
-| `started_at` | timestamptz | NO |
-| `updated_at` | timestamptz | NO |
-| `ready_at` | timestamptz | YES |
-| `aggregation_started_at` | timestamptz | YES |
-| `completed_at` | timestamptz | YES |
+|Колонка|Тип|Nullable|
+|-|-|-:|
+|`id`|uuid|NO|
+|`source`|text|NO|
+|`tender\_id`|text|NO|
+|`tender\_number`|text|YES|
+|`tender\_external\_id`|text|YES|
+|`status`|text|NO|
+|`documents\_total`|integer|NO|
+|`tender\_meta`|jsonb|NO|
+|`error\_message`|text|YES|
+|`created\_at`|timestamptz|NO|
+|`started\_at`|timestamptz|NO|
+|`updated\_at`|timestamptz|NO|
+|`ready\_at`|timestamptz|YES|
+|`aggregation\_started\_at`|timestamptz|YES|
+|`completed\_at`|timestamptz|YES|
 
 PK:
 
@@ -888,15 +932,15 @@ id
 Aggregator использует lifecycle:
 
 ```text
-ready_for_aggregation
+ready\_for\_aggregation
 → aggregating
 ```
 
 Текущий workflow не переводит run в `completed`.
 
----
+\---
 
-## 22. PostgreSQL — `tender_analysis_documents`
+## 22\. PostgreSQL — `tender\_analysis\_documents`
 
 Документы одного analysis run.
 
@@ -904,36 +948,36 @@ ready_for_aggregation
 
 ```text
 id
-analysis_run_id
-document_index
-file_name
-file_extension
-display_name
+analysis\_run\_id
+document\_index
+file\_name
+file\_extension
+display\_name
 status
 attempts
-units_total
-facts_count
-error_message
-started_at
-completed_at
+units\_total
+facts\_count
+error\_message
+started\_at
+completed\_at
 ```
 
 FK:
 
 ```text
-analysis_run_id
-→ tender_analysis_runs.id
+analysis\_run\_id
+→ tender\_analysis\_runs.id
 ```
 
 Уникальность документа внутри run:
 
 ```text
-(analysis_run_id, document_index)
+(analysis\_run\_id, document\_index)
 ```
 
----
+\---
 
-## 23. PostgreSQL — `tender_analysis_facts`
+## 23\. PostgreSQL — `tender\_analysis\_facts`
 
 Candidate facts до Aggregator.
 
@@ -941,118 +985,118 @@ Candidate facts до Aggregator.
 
 ```text
 id
-analysis_run_id
-document_id
-analysis_unit_id
-fact_index
-field_catalog_version
-field_key
-value_text
+analysis\_run\_id
+document\_id
+analysis\_unit\_id
+fact\_index
+field\_catalog\_version
+field\_key
+value\_text
 
-extractor_status
-extractor_confidence
-extractor_review_reason_code
-extractor_review_note
+extractor\_status
+extractor\_confidence
+extractor\_review\_reason\_code
+extractor\_review\_note
 
-validator_verdict
-validator_confidence
-validator_reason_code
-validator_reason_note
+validator\_verdict
+validator\_confidence
+validator\_reason\_code
+validator\_reason\_note
 
 evidence
-extractor_meta
-validator_meta
+extractor\_meta
+validator\_meta
 ```
 
 FK:
 
 ```text
-analysis_run_id
-→ tender_analysis_runs.id
+analysis\_run\_id
+→ tender\_analysis\_runs.id
 ```
 
-Также существует composite связь с `tender_analysis_units`.
+Также существует composite связь с `tender\_analysis\_units`.
 
----
+\---
 
-## 24. PostgreSQL — `tender_analysis_field_results`
+## 24\. PostgreSQL — `tender\_analysis\_field\_results`
 
 Финальное хранилище результатов 27 полей.
 
-| Колонка | Тип | Nullable |
-|---|---|---:|
-| `analysis_run_id` | uuid | NO |
-| `field_catalog_version` | text | NO |
-| `result_contract_version` | text | NO |
-| `field_index` | smallint | NO |
-| `field_key` | text | NO |
-| `status` | text | NO |
-| `value_text` | text | YES |
-| `confidence` | numeric | YES |
-| `requires_human_review` | boolean | NO |
-| `resolution_method` | text | NO |
-| `result_json` | jsonb | NO |
-| `created_at` | timestamptz | NO |
-| `updated_at` | timestamptz | NO |
+|Колонка|Тип|Nullable|
+|-|-|-:|
+|`analysis\_run\_id`|uuid|NO|
+|`field\_catalog\_version`|text|NO|
+|`result\_contract\_version`|text|NO|
+|`field\_index`|smallint|NO|
+|`field\_key`|text|NO|
+|`status`|text|NO|
+|`value\_text`|text|YES|
+|`confidence`|numeric|YES|
+|`requires\_human\_review`|boolean|NO|
+|`resolution\_method`|text|NO|
+|`result\_json`|jsonb|NO|
+|`created\_at`|timestamptz|NO|
+|`updated\_at`|timestamptz|NO|
 
 UPSERT:
 
 ```text
-ON CONFLICT (analysis_run_id, field_key)
+ON CONFLICT (analysis\_run\_id, field\_key)
 DO UPDATE
 ```
 
-`result_json` содержит полный `tender_field_final_v1`.
+`result\_json` содержит полный `tender\_field\_final\_v1`.
 
----
+\---
 
-## 25. Основные инварианты Aggregator
+## 25\. Основные инварианты Aggregator
 
-1. Один execution Aggregator работает с одним `analysis_run_id`.
+1. Один execution Aggregator работает с одним `analysis\_run\_id`.
 2. Run должен быть атомарно захвачен перед агрегацией.
-3. Продолжение допускается только при `aggregation_claimed=true`.
-4. В Semantic Aggregator попадают только `confirmed` и `requires_review`.
+3. Продолжение допускается только при `aggregation\_claimed=true`.
+4. В Semantic Aggregator попадают только `confirmed` и `requires\_review`.
 5. `rejected` facts не участвуют в candidate aggregation.
 6. Перед первым бизнес-ветвлением создаются ровно 27 field items.
-7. Каждый field item имеет стабильные `field_index` и `field_key`.
-8. Неизвестный `field_key` является hard error.
+7. Каждый field item имеет стабильные `field\_index` и `field\_key`.
+8. Неизвестный `field\_key` является hard error.
 9. Поле без candidates не исчезает.
 10. Semantic Aggregator Round 1 не извлекает новые facts.
 11. Каждый input candidate получает ровно одну semantic role.
 12. `resolved` Round 1 требует ровно одного `primary`.
 13. `resolved` Round 1 не допускает unresolved conflicts.
 14. Недостаточный evidence должен приводить к Targeted Recheck, а не к выдуманному resolved.
-15. TenderMeta Resolver не превращает отсутствие mapping/value в `not_found`.
+15. TenderMeta Resolver не превращает отсутствие mapping/value в `not\_found`.
 16. Targeted Recheck вызывается только для незакрытого поля.
 17. Поле, переданное в Targeted Recheck, больше не финализируется Aggregator.
-18. Все локально resolved поля нормализуются в `tender_field_final_v1`.
+18. Все локально resolved поля нормализуются в `tender\_field\_final\_v1`.
 19. FINAL field сохраняется идемпотентно через UPSERT.
 20. Отсутствие candidate или metadata не является доказательством отрицательного факта.
 
----
+\---
 
-## 26. Проверенные сценарии
+## 26\. Проверенные сценарии
 
-| Сценарий | Статус | Путь |
-|---|---|---|
-| run успешно захвачен | ✅ | `ready_for_aggregation → aggregating` |
-| duplicate Aggregator execution | ✅ архитектурно | `aggregation_claimed=false → stop` |
-| candidate facts есть | ✅ | Round 1 |
-| facts отсутствуют для поля | ✅ | TenderMeta |
-| Round 1 resolved | ✅ | FINAL → DB |
-| Round 1 requires_recheck | ✅ | Targeted Recheck |
-| TenderMeta resolved | ✅ | FINAL → DB |
-| TenderMeta unresolved | ✅ | Targeted Recheck |
-| 27 field items создаются заранее | ✅ | grouped field contract |
-| Round 1 FIELD_RULES на все 27 | ✅ | текущая реализация |
-| FINAL contract `tender_field_final_v1` | ✅ | Round 1 / Metadata |
-| completion barrier 27/27 | ❌ | `AG-0` |
-| selective retry DeepSeek | ❌ | `AG-1` |
-| missing run guard | ⚠️ не проверено | `AG-4` |
+|Сценарий|Статус|Путь|
+|-|-|-|
+|run успешно захвачен|✅|`ready\_for\_aggregation → aggregating`|
+|duplicate Aggregator execution|✅ архитектурно|`aggregation\_claimed=false → stop`|
+|candidate facts есть|✅|Round 1|
+|facts отсутствуют для поля|✅|TenderMeta|
+|Round 1 resolved|✅|FINAL → DB|
+|Round 1 requires\_recheck|✅|Targeted Recheck|
+|TenderMeta resolved|✅|FINAL → DB|
+|TenderMeta unresolved|✅|Targeted Recheck|
+|27 field items создаются заранее|✅|grouped field contract|
+|Round 1 FIELD\_RULES на все 27|✅|текущая реализация|
+|FINAL contract `tender\_field\_final\_v1`|✅|Round 1 / Metadata|
+|completion barrier 27/27|❌|`AG-0`|
+|selective retry DeepSeek|❌|`AG-1`|
+|missing run guard|⚠️ не проверено|`AG-4`|
 
----
+\---
 
-## 27. Known Technical Debt
+## 27\. Known Technical Debt
 
 ### AG-0 — отсутствует completion barrier для 27 FINAL fields
 
@@ -1062,7 +1106,7 @@ DO UPDATE
 В начале Aggregator переводит:
 
 ```text
-ready_for_aggregation
+ready\_for\_aggregation
 → aggregating
 ```
 
@@ -1081,7 +1125,7 @@ aggregating
 → completed
 ```
 
-Колонка `completed_at` существует, но текущим Aggregator не заполняется.
+Колонка `completed\_at` существует, но текущим Aggregator не заполняется.
 
 Желаемое будущее поведение:
 
@@ -1097,14 +1141,14 @@ aggregating
        YES
         |
         v
-analysis_run.status = completed
-completed_at = NOW()
+analysis\_run.status = completed
+completed\_at = NOW()
         |
         v
 report generation
 ```
 
----
+\---
 
 ### AG-1 — отсутствует selective retry для Semantic Aggregator AI
 
@@ -1122,7 +1166,7 @@ invalid AI response
 → hard fail
 ```
 
----
+\---
 
 ### AG-2 — дублирование Normalize + Save
 
@@ -1152,7 +1196,7 @@ Normalize
 UPSERT
 ```
 
----
+\---
 
 ### AG-3 — TenderMeta mappings захардкожены отдельно
 
@@ -1163,18 +1207,18 @@ Mappings:
 
 ```text
 platform
-application_deadline
-procurement_subject
+application\_deadline
+procurement\_subject
 customer
 ```
 
 живут отдельно от остальных field semantics.
 
-Будущее направление — единый versioned `FIELD_CATALOG`.
+Будущее направление — единый versioned `FIELD\_CATALOG`.
 
----
+\---
 
-### AG-4 — нет явного guard для несуществующего `analysis_run_id`
+### AG-4 — нет явного guard для несуществующего `analysis\_run\_id`
 
 **Severity:** Medium  
 **Status:** To verify
@@ -1184,11 +1228,11 @@ customer
 Желаемое поведение:
 
 ```text
-unknown analysis_run_id
+unknown analysis\_run\_id
 → explicit hard error
 ```
 
----
+\---
 
 ### AG-5 — field semantics распределены по нескольким workflow
 
@@ -1198,26 +1242,74 @@ unknown analysis_run_id
 Правила одного поля сейчас могут находиться в:
 
 ```text
-Aggregator Round 1 FIELD_RULES
+Aggregator Round 1 FIELD\_RULES
 Aggregator TenderMeta Resolver
-Targeted Recheck RECHECK_PROFILES
-Targeted Recheck Round 2 FIELD_RULES
+Targeted Recheck RECHECK\_PROFILES
+Targeted Recheck Round 2 FIELD\_RULES
 ```
 
 Целевое направление — единый versioned field catalog.
 
----
+\---
 
-### AG-6 — устаревший комментарий в Round 1 FIELD_RULES
+### AG-6 — устаревший комментарий в Round 1 FIELD\_RULES
 
 **Severity:** Low  
 **Status:** Open
 
-Комментарий говорит, что отлаживаются только `procurement_subject` и `delivery_term`, хотя фактически правила уже есть для всех 27 полей.
+Комментарий говорит, что отлаживаются только `procurement\_subject` и `delivery\_term`, хотя фактически правила уже есть для всех 27 полей.
 
----
 
-## 28. Safe Modification Checklist
+
+\## AG-7 — отсутствие механизма ожидания Targeted Recheck
+
+
+
+Severity: Medium
+
+
+
+Status: Open
+
+
+
+Aggregator запускает Targeted Recheck, но текущий execution не знает момент завершения всех дочерних обработок.
+
+
+
+После внедрения completion barrier потребуется определить механизм:
+
+
+
+\- polling PostgreSQL;
+
+\- event callback;
+
+\- отдельный orchestration workflow.
+
+
+
+Цель:
+
+
+
+analysis\_run должен перейти:
+
+
+
+aggregating
+
+→ completed
+
+
+
+только после получения всех FINAL fields.
+
+
+
+\---
+
+## 28\. Safe Modification Checklist
 
 Перед изменением Aggregator проверить:
 
@@ -1225,27 +1317,27 @@ Targeted Recheck Round 2 FIELD_RULES
 2. Не может ли один run начать два Aggregator execution.
 3. Сохраняется ли правило `27 field items`.
 4. Не попадают ли rejected facts в Round 1.
-5. Не меняется ли `field_key`.
+5. Не меняется ли `field\_key`.
 6. Каждый ли candidate получает semantic decision.
 7. Не разрешается ли `resolved` с unresolved conflict.
 8. Не превращается ли отсутствие candidates/TenderMeta в ложный отрицательный факт.
-9. Поля `needs_recheck=true` действительно уходят только в Targeted Recheck.
+9. Поля `needs\_recheck=true` действительно уходят только в Targeted Recheck.
 10. Поле, переданное в Targeted Recheck, не финализируется повторно Aggregator.
-11. Локальный FINAL соответствует `tender_field_final_v1`.
+11. Локальный FINAL соответствует `tender\_field\_final\_v1`.
 12. UPSERT остаётся идемпотентным.
 13. При изменении field semantics проверить Round 1 / Metadata / Recheck / Round 2.
-14. После появления completion barrier проверять ровно 27 уникальных `field_key`.
+14. После появления completion barrier проверять ровно 27 уникальных `field\_key`.
 
----
+\---
 
-## 29. Regression Checklist
+## 29\. Regression Checklist
 
 ### A1 — normal claim
 
 Ожидание:
 
 ```text
-aggregation_claimed=true
+aggregation\_claimed=true
 run.status=aggregating
 ```
 
@@ -1254,7 +1346,7 @@ run.status=aggregating
 Ожидание:
 
 ```text
-aggregation_claimed=false
+aggregation\_claimed=false
 дальнейшая агрегация не запускается
 ```
 
@@ -1263,8 +1355,8 @@ aggregation_claimed=false
 Ожидание:
 
 ```text
-facts[] содержит только confirmed/requires_review
-rejected_count считается отдельно
+facts\[] содержит только confirmed/requires\_review
+rejected\_count считается отдельно
 ```
 
 ### A4 — grouping
@@ -1273,10 +1365,10 @@ rejected_count считается отдельно
 
 ```text
 ровно 27 output items
-field_index = 1..27
+field\_index = 1..27
 ```
 
-### A5 — unknown field_key
+### A5 — unknown field\_key
 
 Ожидание:
 
@@ -1297,8 +1389,8 @@ Round 1 Semantic Aggregator
 Ожидание:
 
 ```text
-semantic_aggregator_round_1
-→ tender_field_final_v1
+semantic\_aggregator\_round\_1
+→ tender\_field\_final\_v1
 → UPSERT
 ```
 
@@ -1315,7 +1407,7 @@ TENDER - Targeted Recheck
 Ожидание:
 
 ```text
-deterministic_metadata
+deterministic\_metadata
 → resolved
 → UPSERT
 ```
@@ -1325,7 +1417,7 @@ deterministic_metadata
 Ожидание:
 
 ```text
-metadata_resolved=false
+metadata\_resolved=false
 → TENDER - Targeted Recheck
 ```
 
@@ -1336,7 +1428,7 @@ metadata_resolved=false
 ```text
 27 unique FINAL fields
 → run.status=completed
-→ completed_at set
+→ completed\_at set
 ```
 
 ### A12 — transient DeepSeek response
@@ -1347,32 +1439,35 @@ metadata_resolved=false
 retry только проблемного field item
 ```
 
----
+\---
 
-## 30. Ближайший план работ
+## 30\. Ближайший план работ
 
 1. Закрыть критичные `TR-0`, `TR-1`, `TR-2`, `TR-3`.
 2. Реализовать `AG-0` — readiness/completion barrier 27/27.
 3. После `AG-0`:
-   - собрать 27 FINAL fields;
-   - сформировать tender result object;
-   - Markdown;
-   - XLSX;
-   - Telegram.
+
+   * собрать 27 FINAL fields;
+   * сформировать tender result object;
+   * Markdown;
+   * XLSX;
+   * Telegram.
 4. Добавить selective retries:
-   - `AG-1`;
-   - `TR-6`.
+
+   * `AG-1`;
+   * `TR-6`.
 5. Затем технический refactoring:
-   - `AG-2`;
-   - `AG-3`;
-   - `AG-5`;
-   - связанные `TR-*`.
 
----
+   * `AG-2`;
+   * `AG-3`;
+   * `AG-5`;
+   * связанные `TR-\*`.
 
-## 31. Краткое резюме для быстрого восстановления контекста
+\---
 
-`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis_run`, атомарно захватывает его, загружает candidate facts и создаёт 27 field items.
+## 31\. Краткое резюме для быстрого восстановления контекста
+
+`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis\_run`, атомарно захватывает его, загружает candidate facts и создаёт 27 field items.
 
 Далее:
 
@@ -1389,13 +1484,13 @@ candidate нет
 Все resolved-поля приводятся к:
 
 ```text
-tender_field_final_v1
+tender\_field\_final\_v1
 ```
 
 и сохраняются в:
 
 ```text
-tender_analysis_field_results
+tender\_analysis\_field\_results
 ```
 
 Поля, требующие дополнительной проверки, передаются в:
@@ -1415,3 +1510,4 @@ run переводится в aggregating,
 ```
 
 Критичный следующий системный шаг после стабилизации Targeted Recheck — `AG-0`.
+

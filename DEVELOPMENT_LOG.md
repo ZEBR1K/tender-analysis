@@ -3974,3 +3974,148 @@ source document
 → completed
 → report
 ```
+
+
+# 22.08.2026 — Targeted Recheck Round 2 stabilization
+
+## Закрытые задачи
+
+### TR-0 — existing candidate + no context
+
+Исправлено поведение сценария:
+
+- существующий candidate есть;
+- Targeted Recheck не нашёл новый релевантный контекст.
+
+Ранее риск:
+- неправильный переход в not_found.
+
+Новое поведение:
+
+- сохраняется existing candidate;
+- поле завершается через requires_review;
+- сохраняется evidence и audit.
+
+---
+
+### TR-1 — existing candidates + recheck candidates
+
+Проверен полный сценарий:
+
+Round 1:
+
+requires_recheck
+
+
+↓
+
+Targeted Recheck:
+
+
+new candidate / supporting evidence
+
+
+↓
+
+Validator #2
+
+↓
+
+Semantic Aggregator Round 2
+
+↓
+
+FINAL
+
+Проверено:
+- candidate_ref;
+- объединение candidates;
+- сохранение evidence;
+- корректный переход resolved/requires_review.
+
+---
+
+### TR-3 — child workflow references
+
+Исправлена проблема переноса workflow.
+
+Причина:
+дочерний workflow содержал ссылки на nodes из parent workflow.
+
+Решение:
+- убраны внешние node references;
+- данные передаются через входной JSON;
+- workflow стал автономным.
+
+---
+
+## Тестовый кейс
+
+Field:
+
+
+nm_price_with_vat
+
+
+Сценарий:
+
+Round 1:
+
+
+requires_recheck
+confidence=0.4
+
+
+Причина:
+
+Найдена сумма 85000 с НДС, но отсутствовало подтверждение связи с НМЦК.
+
+Targeted Recheck:
+
+Добавлены:
+
+- tender_metadata.max_price = 85000;
+- semantic block с суммой 85000.
+
+Round 2 Aggregator:
+
+Результат:
+
+
+status:
+resolved
+
+confidence:
+0.9
+
+resolution_method:
+semantic_aggregator_round_2
+
+
+Финальный результат успешно сохранён в:
+
+
+tender_analysis_field_results
+
+
+через:
+
+
+ON CONFLICT (analysis_run_id, field_key)
+DO UPDATE
+
+
+---
+
+## Следующий этап
+
+После стабилизации Targeted Recheck:
+
+1. Закрыть TR-2:
+   - определить стратегию расширения Round 2 на остальные поля.
+
+2. Перейти к AG-0:
+   - проверка полноты 27/27 fields;
+   - формирование итогового отчёта.
+
+
