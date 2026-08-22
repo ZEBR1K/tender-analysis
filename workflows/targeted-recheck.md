@@ -28,13 +28,16 @@ Workflow не анализирует тендер целиком. Он обра�
 4. попросить AI сформировать новые candidate facts;
 5. детерминированно проверить evidence;
 6. независимо проверить candidate через отдельный AI Validator;
-7. при необходимости сравнить старые и новые candidates в Semantic Aggregator Round 2;
+7. при необходимости отправить validated candidates в Semantic Aggregator Round 2;
 8. сформировать один из финальных статусов:
-   - `resolved`;
-   - `requires_review`;
-   - `not_found`;
-9. нормализовать результат в `tender_field_final_v1`;
-10. сохранить FINAL-поле в PostgreSQL.
+   - resolved;
+   - requires_review;
+   - not_found;
+9. нормализовать результат в tender_field_final_v1;
+10. выполнить UPSERT финального результата в PostgreSQL.
+
+Round 2 является последним semantic этапом.
+После Round 2 повторный Targeted Recheck не запускается.
 
 ---
 
@@ -140,6 +143,26 @@ Targeted Recheck не должен вызываться для поля, кот�
 2. либо завершиться явной ошибкой.
 
 Молчаливая потеря поля недопустима.
+
+
+### Финальные ветки завершения
+
+Targeted Recheck должен завершаться одним из вариантов:
+
+| Ветка | Итог |
+|---|---|
+| direct_final | resolved |
+| semantic_aggregator_round_2 | resolved / requires_review |
+| existing_candidate_preserved | requires_review |
+| no usable evidence | not_found |
+
+Каждая ветка обязана привести результат к контракту:
+
+`tender_field_final_v1`
+
+и сохранить его через UPSERT:
+
+`tender_analysis_field_results`
 
 Финальный UPSERT выполняется по ключу:
 
@@ -1008,6 +1031,15 @@ resolution_method = semantic_aggregator_round_2
 
 ## 9. Финализация `not_found`
 
+### Ограничение
+
+`not_found` нельзя использовать, если до Targeted Recheck существовал пригодный initial candidate.
+
+В таком случае итог:
+
+```text
+requires_review
+
 Сейчас в workflow несколько физических копий `Сформировать not_found после Targeted Recheck...`, но логика у них одна.
 
 `not_found` допустим только когда до Targeted Recheck не существовало usable initial candidate.
@@ -1817,3 +1849,16 @@ TR-3
 ```
 
 После их закрытия Targeted Recheck можно считать архитектурно завершённым для MVP.
+
+## 16. Последнее изменение архитектуры (2026-08-22)
+
+После внедрения Round 2 Targeted Recheck изменил роль.
+
+Ранее:
+
+```text
+Targeted Recheck
+    |
+    v
+возврат результата в Aggregator
+
