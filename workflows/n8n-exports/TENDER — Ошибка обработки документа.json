@@ -1,0 +1,129 @@
+{
+  "name": "TENDER — Ошибка обработки документа",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "19b8799b-257e-4f9f-b110-93d3bfbfdd39",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_documents\nSET\n    status = 'failed',\n    error_message = $2\nWHERE n8n_execution_id = $1\n  AND status = 'processing'\n\nRETURNING\n    id AS document_id,\n    analysis_run_id,\n    document_index,\n    file_name,\n    status,\n    attempts,\n    n8n_execution_id,\n    error_message,\n    updated_at;",
+        "options": {
+          "queryReplacement": "={{ [   String($json.execution?.id ?? ''),   String(     $json.execution?.error?.message ??     $json.execution?.error?.description ??     'Unknown Document Worker error'   ) ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b0bf21c1-bdcb-4cdc-81eb-aa093fd3ec73",
+      "name": "Пометить документ failed",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Error Trigger": [
+      {
+        "json": {
+          "execution": {
+            "id": "13663",
+            "url": "https://n8nworkup.ru/workflow/1Pw61ZY3HgBSvcUr/executions/13663",
+            "error": {
+              "level": "info",
+              "shouldReport": false,
+              "description": "facts[1]",
+              "tags": {},
+              "lineNumber": 92,
+              "message": "для status=found review_reason_code должен быть null. [line 92]",
+              "stack": "Error: [Проверить и привязать evidence] Item 6: facts[1]: для status=found review_reason_code должен быть null.\n    at fail (evalmachine.<anonymous>:92:9)\n    at evalmachine.<anonymous>:582:13\n    at Array.forEach (<anonymous>)\n    at evalmachine.<anonymous>:489:18\n    at Proxy.map (<anonymous>)\n    at VmCodeWrapper (evalmachine.<anonymous>:288:23)\n    at evalmachine.<anonymous>:1166:2\n    at Script.runInContext (node:vm:149:12)\n    at runInContext (node:vm:301:6)\n    at result (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+task-runner@file+packages+@n8n+task-runner_@opentelemetry+api@1.9.1_@opentelemetry_9b355fdefbbcd3a94c6b6a0f8d71b658/node_modules/@n8n/task-runner/dist/js-task-runner/js-task-runner.js:209:61)"
+            },
+            "lastNodeExecuted": "Проверить и привязать evidence",
+            "mode": "integrated",
+            "executionContext": {
+              "version": 1,
+              "establishedAt": 1787324335330,
+              "source": "integrated",
+              "triggerNode": {
+                "name": "When clicking ‘Execute workflow’",
+                "type": "n8n-nodes-base.manualTrigger"
+              },
+              "redaction": {
+                "version": 2,
+                "production": false,
+                "manual": false
+              },
+              "parentExecutionId": "13661",
+              "credentials": "U2FsdGVkX19A0Hu/HKF7wcztJDJ5KJn2kZzhXlR4pBKp5/ci9AUROnTwUg5ZMIZi/TBi4byvkj4Lh2ceCll0aBTv9Ajk2L82pH8Kb2UIj/y9+PB273HWIPJNm9H8b3IWUJLQnrJGGtgW1Qnsc04qLDS1pSzdbjLEBqA3P4f33BJBau4VJCosWMLsfz8kbKwXWZZK5kTQfxV3tFMSCpCjWEx1EWDvwb2IxniLJnjgGtYJ1IBxUBR2y23xjz8r8FR2DgKs+ZxEsLucLL6cO9qF809WK8tEDFXQ0LoQYikuq6HSAPXbsf8ILOPB4kcx29D7Gbymy8H2RW7xgZRJ4TMdrZDPxDYmZOX1eI/CuLIEb9t1ZLJ5ZweIBkPlZVO0vhghbaLswlemm/FQw6vXgDtVWqWfi3ok/LOjDBMCJ4BbD+V22Qr0qv4TumXez0+JZ5dAtZYXOlwNFobOeSASs70RSatI9TjRQFLtzAlq3NNfkMBjETH1JLqILYTfdvlFS10bIMN/9fZhpo1HT5/INnzyBw=="
+            }
+          },
+          "workflow": {
+            "id": "1Pw61ZY3HgBSvcUr",
+            "name": "TENDER — Обработать документ"
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Пометить документ failed": [
+      {
+        "json": {
+          "document_id": "088d5c39-364f-4561-a3d1-170410dd31c2",
+          "analysis_run_id": "d18b9f15-3191-4eb3-a731-92872c5634ca",
+          "document_index": 2,
+          "file_name": "Проект договора.pdf",
+          "status": "failed",
+          "attempts": 1,
+          "n8n_execution_id": "13663",
+          "error_message": "для status=found review_reason_code должен быть null. [line 92]",
+          "updated_at": "2026-08-21T14:59:12.794Z"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Пометить документ failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8a481030-c0b8-4ea4-b446-f4f669e07f48",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
+  },
+  "nodeGroups": [],
+  "id": "jYzQ8RtNmnTM2PGz",
+  "tags": []
+}
