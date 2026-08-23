@@ -115,11 +115,23 @@ id тендера 2
 TENDER — Обработать документ
 ```
 
-Всего:
+### Productive path
+
+Показанный выше исполняемый productive path содержит:
 
 ```text
 9 nodes
 ```
+
+### Physical inventory
+
+По актуальному JSON workflow физически содержит:
+
+```text
+43 nodes
+```
+
+При этом workflow имеет `active=false`. Отдельно существует trigger-connected dead-end node `id тендера 1`; ещё 33 nodes являются trigger-unreachable / legacy, из них 7 disabled. Назначение этих unreachable legacy nodes в этой документации не фиксируется.
 
 ---
 

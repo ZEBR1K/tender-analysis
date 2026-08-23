@@ -266,7 +266,7 @@ original_field.candidates.length = 0
 }
 ```
 
-Обязательные признаки:
+Ожидаемый upstream contract:
 
 ```text
 aggregation_status = requires_recheck
@@ -274,6 +274,14 @@ needs_recheck = true
 aggregation_validated = true
 aggregation_input.candidates = [...]
 ```
+
+Фактически adapter выбирает сценарий `aggregation_recheck` только по:
+
+```text
+needs_recheck === true
+```
+
+Остальные признаки относятся к expected upstream contract и не усиливаются фактическим guard.
 
 `final_value_text` в этом сценарии **может быть строкой или null**. Это предварительное значение, а не гарантированный FINAL.
 
@@ -445,6 +453,9 @@ application_deadline  -> submission_close_at
 When Executed by Another Workflow
         |
         v
+Загрузить tender_meta для Targeted Recheck
+        |
+        v
 Подготовить #2 Targeted Recheck Request
         |
         v
@@ -487,7 +498,7 @@ FALSE                              TRUE
  |                   |          |       Validator Targeted Recheck
  |                   |          |             |
  |                   |          |             v
- |                   |          |       Есть пригодные candidates
+ |                   |          |       Есть принятые candidates
  |                   |          |       после Validator?
  |                   |          |          /          \
  |                   |          |       FALSE         TRUE
@@ -497,7 +508,7 @@ FALSE                              TRUE
  |                   |          |         |       после Validator
  |                   |          |         |             |
  |                   |          |         |             v
- |                   |          |         |       Путь = direct_final?
+ |                   |          |         |       Можно завершить без Round 2?
  |                   |          |         |          /        \
  |                   |          |         |       TRUE        FALSE
  |                   |          |         |        |            |
@@ -527,6 +538,26 @@ not_found        requires_review / not_found / direct FINAL / Round 2 FINAL
 
 Примечание: физически в workflow сейчас несколько копий `Normalize FINAL` и `Save FINAL`, поэтому схема выше показывает **логическую**, а не буквально одну общую ноду.
 
+### Physical inventory
+
+Актуальный JSON содержит:
+
+```text
+50 nodes total
+47 enabled/reachable
+3 disabled legacy nodes
+```
+
+Disabled legacy chain:
+
+```text
+Сформировать not_found после Targeted Recheck
+→ Нормализовать FINAL поле8
+→ Сохранить FINAL результат поля в БД8
+```
+
+Эта цепочка физически существует, но не описывается как активное production behavior.
+
 ---
 
 ## 8. Этапы и ключевые ноды
@@ -536,7 +567,7 @@ not_found        requires_review / not_found / direct FINAL / Round 2 FINAL
 #### `When Executed by Another Workflow`
 
 **Получает:** массив field items из `TENDER — Агрегация закупки`.  
-**Делает:** передаёт items дальше без собственной бизнес-логики.  
+**Делает:** сначала загружает `tender_meta` из `tender_analysis_runs`, затем передаёт обогащённые items в preparation.
 **Выход:** RAW input одного из двух допустимых форматов.
 
 ---
@@ -591,10 +622,13 @@ Targeted Recheck получает необходимые данные через
 
 - читает `tender_analysis_units`;
 - ищет units по ключевым терминам;
-- учитывает metadata values;
+- в SQL metadata parameter сейчас передаётся только `tender_metadata.max_price`;
+- `platform` и `submission_close_at` добавляются позже при подготовке structured metadata / AI context;
 - повышает приоритет units, в которых находилось existing evidence;
 - ранжирует найденные units;
 - ограничивает объём контекста.
+
+Следовательно, не все разрешённые metadata values участвуют непосредственно в SQL ranking.
 
 **Выход:** релевантные analysis units для поля.
 
@@ -849,7 +883,7 @@ rejected_count
 
 ### Stage 8 — Проверка usable candidates
 
-#### `Есть пригодные candidates после Validator?`
+#### `Есть принятые candidates после Validator?`
 
 TRUE если:
 
@@ -897,7 +931,7 @@ round_2
 
 ---
 
-#### `Путь = direct_final?`
+#### `Можно завершить без Round 2?`
 
 ##### TRUE -> direct FINAL
 
@@ -992,6 +1026,8 @@ candidate_stats = ...
 любой field_key из tender_fields_v1
 → имеет Round 2 semantic rule
 → не должен падать с ошибкой "Пока нет правил для field_key"
+```
+
 ---
 
 #### `Semantic Aggregator1`
@@ -1201,6 +1237,18 @@ not_found.note != null
 
 ## 11. PostgreSQL
 
+### 11.0. DB read footprint
+
+Targeted Recheck читает данные из:
+
+```text
+tender_analysis_runs
+tender_analysis_units
+tender_analysis_documents
+```
+
+`tender_analysis_runs` используется для initial `tender_meta` load; retrieval работает с units и связанными documents.
+
 ### 11.1. Чтение — `tender_analysis_units`
 
 Targeted Retrieval читает units текущего анализа.
@@ -1300,8 +1348,8 @@ confirmed / requires_review / rejected
 | `Контекст для Targeted Recheck найден?` | AI Extractor | existing candidate → `requires_review`; без candidate → `not_found` |
 | `Есть candidate после Targeted Recheck?` | Independent Validator | проверить existing candidate |
 | `Есть исходный candidate после неудачного Recheck?` | `requires_review` | `not_found` |
-| `Есть пригодные candidates после Validator?` | route selection | existing candidate → `requires_review`; без candidate → `not_found` |
-| `Путь = direct_final?` | direct `resolved` | Semantic Aggregator Round 2 |
+| `Есть принятые candidates после Validator?` | route selection | existing candidate → `requires_review`; без candidate → `not_found` |
+| `Можно завершить без Round 2?` | direct `resolved` | Semantic Aggregator Round 2 |
 
 Edge cases `TR-0` и `TR-1` закрыты: existing candidate не теряется ни при отсутствии нового context, ни при отклонении всех новых Recheck candidates.
 
@@ -1385,13 +1433,11 @@ TR-2 — Round 2 semantic rules для всех 27 полей
 Severity: Critical
 Status: ✅ Closed (MVP)
 В FIELD_RULES Semantic Aggregator Round 2 добавлены правила для всех 27 field_key.
-Устранён архитектурный failure:
-Пока нет правил для field_key=...
-для полей каталога tender_fields_v1.
+Исторический failure `Пока нет правил для field_key=...` устранён для каталога `tender_fields_v1`.
 Что ещё остаётся как quality work:
 отдельный regression каждого field_key через Round 2
 → проверка качества resolved / requires_review
-Это больше не блокирует текущий MVP.
+Полный per-field regression ещё не выполнен; это не меняет закрытый статус TR-2 на уровне code coverage.
 TR-3 — зависимость child workflow от parent nodes
 Severity: Critical / architectural
 Status: ✅ Closed
@@ -1577,7 +1623,7 @@ field-aware ranking
 
 Профили Targeted Recheck уже существуют для всех 27 `field_key`.
 
-Открытая проблема относится не к ним, а к Round 2 `FIELD_RULES`.
+Round 2 `FIELD_RULES` уже существуют для всех 27 `field_key`. Текущий quality gap — отсутствие полного per-field regression через Round 2.
 
 ---
 

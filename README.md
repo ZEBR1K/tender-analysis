@@ -446,7 +446,7 @@ Run readiness
 ✓
 
 Aggregator atomic claim
-✓
+⚠ prerequisite gap: claim nodes существуют, но текущий production execution graph их обходит
 
 Exactly 27 field items
 ✓
@@ -486,11 +486,12 @@ Full E2E aggregation run
 
 ## Ещё не завершено
 
-```text
-
 Текущая последовательность до первого законченного MVP:
 
 ```text
+восстановить reachable atomic aggregation claim
+ready_for_aggregation → aggregating
+        ↓
 AG-0
 DB-backed 27/27 completion barrier
         ↓
@@ -502,7 +503,8 @@ Markdown report
         ↓
 XLSX
         ↓
-Telegram```
+Telegram
+```
 
 ---
 
@@ -524,7 +526,8 @@ TR-3 ✅ Closed
 
 
 Текущий путь до законченного MVP:
-AG-0
+восстановить reachable atomic aggregation claim
+→ ready_for_aggregation → aggregating
 → DB-backed 27/27 barrier
 → run completed
 → Markdown
@@ -542,6 +545,9 @@ AG-0
 AG-0
 Нужно реализовать DB-backed финализацию всего analysis_run.
 Целевая схема:
+сначала восстановить reachable atomic aggregation claim
+ready_for_aggregation → aggregating
+        ↓
 любой FINAL field UPSERT
         ↓
 проверка PostgreSQL

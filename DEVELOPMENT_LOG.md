@@ -4136,3 +4136,55 @@ Validator
 tender_analysis_field_results
 
 
+
+## 2026-08-23 — Documentation reconciliation with current workflow exports
+
+### Completed
+
+Синхронизирована проектная документация с актуальными n8n workflow exports.
+
+Проверены и обновлены:
+
+- `workflows/orchestrator.md`
+- `workflows/document-worker.md`
+- `workflows/error-workflow.md`
+- `workflows/aggregator.md`
+- `workflows/targeted-recheck.md`
+- `README.md`
+- `ARCHITECTURE.md`
+- `TECH_DEBT.md`
+
+### Fixed discrepancies
+
+- Orchestrator:
+  - разделены productive path и полный physical inventory workflow;
+  - уточнено наличие legacy/unreachable nodes.
+
+- Document Worker:
+  - исправлена модель AI Extractor:
+    - было: `deepseek-v4-flash`
+    - стало: `deepseek-v4-pro`.
+
+- Document Worker / Error Workflow:
+  - исправлено описание error handling;
+  - убрано неподтверждённое утверждение про `continueErrorOutput`;
+  - runtime validation оставлена как отдельная задача.
+
+- Aggregator:
+  - исправлено описание atomic claim;
+  - зафиксировано различие между intended architecture и текущей production topology;
+  - atomic claim обозначен как prerequisite для дальнейшего развития.
+
+- Targeted Recheck:
+  - уточнена topology workflow;
+  - исправлены metadata retrieval assumptions;
+  - уточнён фактический guard для recheck routing;
+  - исправлены имена routing nodes;
+  - обновлён статус Round 2.
+
+### Current state
+
+Документация теперь соответствует фактической структуре workflow exports.
+
+Следующий архитектурный этап:
+анализ вариантов реализации DB-backed 27/27 FINAL field completion barrier.

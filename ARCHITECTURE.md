@@ -247,7 +247,7 @@ completed
 failed
 ```
 
-Ожидаемый happy path:
+Intended happy path:
 
 ```text
 created
@@ -261,13 +261,13 @@ aggregating
 completed
 ```
 
-Текущая реализация фактически доходит до:
+В current production topology claim nodes существуют, но execution graph их обходит и идёт напрямую к загрузке фактов. Поэтому фактическое выполнение перехода:
 
 ```text
-aggregating
+ready_for_aggregation → aggregating
 ```
 
-и может записать все FINAL fields, но пока не выполняет переход:
+через Aggregator claim не подтверждено текущим export. Система может записывать FINAL fields, но пока не выполняет переход:
 
 ```text
 aggregating → completed
@@ -1005,23 +1005,9 @@ Error Trigger
 
 Error Workflow ловит только workflow-level failure.
 
-Handled error:
+В актуальном export у ноды `Проверить и привязать evidence` отсутствуют `onError` и `continueOnFail`; regular output подключён к `AI Validator v1`.
 
-```text
-onError = continueErrorOutput
-```
-
-может не подняться до Error Trigger.
-
-Подтверждённый gap:
-
-```text
-Проверить и привязать evidence
-→ Error output
-→ nowhere
-```
-
-Это `DW-14 / EW-3`.
+Механизм configuration-level bypass через `continueErrorOutput` не подтверждается актуальным export. Поведение invalid/error response требует runtime regression; это остаётся вопросом `DW-14 / EW-3`.
 
 ---
 
@@ -1038,14 +1024,14 @@ should_start_aggregation
 readiness_reason
 ```
 
-и дополнительно делает собственный atomic claim:
+В intended architecture Aggregator должен дополнительно делать собственный atomic claim:
 
 ```text
 ready_for_aggregation
 → aggregating
 ```
 
-Это второй concurrency barrier.
+Это intended второй concurrency barrier. Current production state: nodes claim физически существуют, но execution graph их обходит; trigger подключён напрямую к загрузке фактов. Восстановление reachable claim является prerequisite для `AG-0`.
 
 ---
 
@@ -1537,14 +1523,16 @@ processing
 
 только один последний Worker.
 
-### Aggregator claim
+### Aggregator claim — intended invariant и current production state
 
 ```text
 ready_for_aggregation
 → aggregating
 ```
 
-только один Aggregator.
+только один Aggregator в intended topology.
+
+Current production state: claim nodes существуют и включены, но не входят в reachable execution graph. Поэтому текущий production execution не подтверждает фактическое выполнение перехода `ready_for_aggregation → aggregating` через этот claim.
 
 ### Final completion
 
@@ -1698,7 +1686,8 @@ but Worker not started
 
 ```text
 DW-14 / EW-3
-continueErrorOutput can silently bypass Error Workflow
+configuration-level bypass not confirmed by current export;
+invalid/error response behavior requires runtime regression
 ```
 
 ## Worker semantic safety

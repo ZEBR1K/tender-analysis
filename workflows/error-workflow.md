@@ -345,29 +345,20 @@ Run останется незавершённым до retry или отдель
 
 ---
 
-# 12. Важное ограничение — handled node errors
+# 12. Важное ограничение — invalid/error behavior
 
 Этот Error Workflow ловит workflow-level failures.
 
-Но если внутри Worker нода настроена:
+В актуальном export у ноды `Проверить и привязать evidence` отсутствуют:
 
 ```text
-onError = continueErrorOutput
+onError
+continueOnFail
 ```
 
-то ошибка может быть перехвачена самой нодой и не стать failed execution.
+Её regular output подключён к `AI Validator v1`. Поэтому configuration-level silent bypass через `continueErrorOutput` текущим export не подтверждается.
 
-Подтверждённый случай:
-
-```text
-Проверить и привязать evidence
-→ Error output
-→ output никуда не подключён
-```
-
-В таком случае `TENDER — Ошибка обработки документа` может вообще не запуститься.
-
-Это cross-workflow issue `DW-14`.
+При этом поведение invalid/error response требует runtime regression. Это cross-workflow issue `DW-14 / EW-3` и оно не считается полностью закрытым.
 
 ---
 
@@ -381,7 +372,7 @@ onError = continueErrorOutput
 6. `failed` document должен оставаться retryable.
 7. Error message сохраняется в `tender_analysis_documents.error_message`.
 8. Один document failure не должен запускать Aggregator.
-9. Workflow-level handler не гарантирует обработку ошибок, перехваченных `continueErrorOutput`.
+9. Поведение invalid/error response требует отдельного runtime regression; configuration-level bypass через `continueErrorOutput` текущим export не подтверждён.
 
 ---
 
@@ -493,36 +484,16 @@ Error Trigger есть
 
 ---
 
-## EW-3 — handled errors могут обходить Error Workflow
+## EW-3 — runtime behavior invalid/error response требует regression
 
 **Severity:** Critical / cross-workflow  
 **Status:** Open
 
 Связано с `DW-14`.
 
-Нода:
+В актуальном export у ноды `Проверить и привязать evidence` нет `onError` и `continueOnFail`; regular output подключён к `AI Validator v1`.
 
-```text
-Проверить и привязать evidence
-```
-
-использует:
-
-```text
-continueErrorOutput
-```
-
-а Error output не подключён.
-
-Следствие:
-
-```text
-ошибка уже считается обработанной node-level
-→ workflow Error Trigger может не запуститься
-→ document остаётся processing
-```
-
-Это необходимо исправить раньше production.
+Следовательно, configuration-level silent bypass через `continueErrorOutput` не подтверждён. Остаётся незакрытым вопрос фактического поведения invalid/error response — его нужно проверить runtime regression до production.
 
 ---
 
@@ -788,7 +759,7 @@ document.n8n_execution_id
 1. run после failed document остаётся processing;
 2. UPDATE 0 rows не считается ошибкой;
 3. ошибки до claim не могут быть связаны с document;
-4. continueErrorOutput может полностью обойти этот Error Workflow;
+4. configuration-level bypass через continueErrorOutput не подтверждён текущим export; invalid/error behavior требует runtime regression;
 5. нет alert/retry policy.
 ```
 

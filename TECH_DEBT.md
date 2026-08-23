@@ -97,7 +97,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
-|`AG-0`|🟡 In progress<br />нет DB-backed 27/27 completion barrier|Round 1 Aggregator успешно создаёт final candidates.<br /><br />Проверено вручную:<br />- полный прогон закупки;<br />- 27/27 field\_results сохранены.<br /><br />Осталось:<br />- создать DB-backed финализатор run;<br />- автоматическая проверка 27/27;<br />- перевод run в completed;<br />- генерация отчёта.|
+|`AG-0`|🟡 In progress<br />нет исполняемого atomic aggregation claim и DB-backed 27/27 completion barrier|Prerequisite: восстановить reachable переход `ready_for_aggregation → aggregating` через atomic claim; claim nodes физически существуют, но текущий production graph их обходит.<br /><br />После этого:<br />- создать DB-backed финализатор run;<br />- автоматическая проверка 27/27;<br />- перевод run в completed;<br />- генерация отчёта.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 
 \---
@@ -171,9 +171,11 @@ Naming, comments, cleanup, future hardening.
 
 # 5\. GROUP A — Targeted Recheck correctness
 
-## A1 — `TR-0`
+## A1 — `TR-0` (historical / resolved)
 
-### Проблема
+**Status:** ✅ Closed
+
+### Историческая проблема
 
 Сценарий:
 
@@ -183,7 +185,7 @@ existing candidate
 targeted retrieval не нашёл context
 ```
 
-текущий path уходит в not\_found finalizer, guard которого ожидает:
+Исторически path уходил в not\_found finalizer, guard которого ожидал:
 
 ```text
 no\\\\\\\\\\\\\\\_initial\\\\\\\\\\\\\\\_candidates
@@ -219,9 +221,11 @@ P0
 
 \---
 
-## A2 — `TR-1`
+## A2 — `TR-1` (historical / resolved)
 
-### Проблема
+**Status:** ✅ Closed
+
+### Историческая проблема
 
 Сценарий:
 
@@ -233,7 +237,7 @@ existing candidate
 все новые rejected
 ```
 
-сейчас может уйти в not\_found branch и сломать guard.
+Исторически path мог уйти в not\_found branch и сломать guard.
 
 ### Правильная семантика
 
@@ -259,11 +263,13 @@ P0
 
 \---
 
-## A3 — `TR-2`
+## A3 — `TR-2` (historical / resolved)
 
-### Проблема
+**Status:** ✅ Closed (MVP)
 
-Round 2 field-specific rules есть только для:
+### Историческая проблема
+
+Исторически Round 2 field-specific rules были только для:
 
 ```text
 procurement\\\\\\\\\\\\\\\_subject
@@ -272,7 +278,7 @@ delivery\\\\\\\\\\\\\\\_term
 warranty\\\\\\\\\\\\\\\_obligations\\\\\\\\\\\\\\\_guarantee
 ```
 
-Остальные 23 field\_key могут упасть при попадании в Round 2.
+Остальные 23 field\_key могли упасть при попадании в Round 2. Сейчас rules существуют для всех 27 `field_key`; полный per-field regression ещё не выполнен.
 
 ### Приоритет
 
@@ -280,9 +286,9 @@ warranty\\\\\\\\\\\\\\\_obligations\\\\\\\\\\\\\\\_guarantee
 P0
 ```
 
-### Требование
+### Историческое требование
 
-Расширить Round 2 на все 27 полей в соответствии с:
+Исторически требовалось расширить Round 2 на все 27 полей в соответствии с:
 
 ```text
 FIELD\\\\\\\\\\\\\\\_CATALOG.md
@@ -290,13 +296,17 @@ FIELD\\\\\\\\\\\\\\\_CATALOG.md
 
 Не придумывать новые semantics отдельно от каталога.
 
+Требование выполнено; незакрытым остаётся только полный per-field regression.
+
 \---
 
-## A4 — `TR-3`
+## A4 — `TR-3` (historical / resolved)
 
-### Проблема
+**Status:** ✅ Closed
 
-Child workflow обращается к parent node:
+### Историческая проблема
+
+Исторически child workflow обращался к parent node:
 
 ```javascript
 $('Загрузить факты закупки').first().json
@@ -308,9 +318,9 @@ $('Загрузить факты закупки').first().json
 tender\\\\\\\\\\\\\\\_meta
 ```
 
-Это ненадёжно через sub-workflow boundary.
+Это было ненадёжно через sub-workflow boundary. Сейчас необходимые данные передаются через входной JSON, и child workflow может выполняться автономно.
 
-### Допустимые решения
+### Исторические варианты решения
 
 #### Вариант A — parent передаёт `tender\\\\\\\\\\\\\\\_meta`
 
@@ -343,9 +353,9 @@ DB source of truth
 дополнительный query
 ```
 
-### Рекомендация
+### Принятое решение
 
-Для надёжной модульности предпочтительнее:
+Для надёжной модульности принято:
 
 ```text
 child DB load by analysis\\\\\\\\\\\\\\\_run\\\\\\\\\\\\\\\_id
@@ -371,32 +381,13 @@ P0
 Проверить и привязать evidence
 ```
 
-использует:
+В актуальном export у ноды отсутствуют `onError` и `continueOnFail`; её regular output подключён к `AI Validator v1`.
 
-```text
-onError = continueErrorOutput
-```
-
-но Error output:
-
-```text
-никуда не подключён
-```
-
-В результате:
-
-```text
-document уже processing
-→ node error converted to error output
-→ branch ends
-→ workflow может не считаться failed
-→ Error Workflow может не запуститься
-→ document остаётся processing
-```
+Поэтому configuration-level silent bypass через `continueErrorOutput` не подтверждён текущей реализацией. Остаётся runtime risk: invalid/error behavior требует regression и может привести к silent-stuck состоянию, если фактическая ошибка не будет обработана корректно.
 
 ### Почему критично
 
-Это silent stuck state.
+Это возможный runtime silent-stuck state, который требует regression.
 
 Run затем никогда не станет:
 
@@ -788,14 +779,23 @@ P1
 
 ### Проблема
 
-Aggregator начинает:
+В intended architecture Aggregator должен начинать:
 
 ```text
 ready\\\\\\\\\\\\\\\_for\\\\\\\\\\\\\\\_aggregation
 → aggregating
 ```
 
-но после всех field UPSERT нет:
+В current production topology nodes atomic claim существуют, но disconnected от reachable execution graph; trigger подключён напрямую к загрузке фактов. Поэтому восстановление исполняемого перехода
+
+```text
+ready_for_aggregation
+→ aggregating
+```
+
+является prerequisite AG-0.
+
+После восстановления claim и после всех field UPSERT ещё нужна проверка:
 
 ```text
 27/27?
@@ -814,7 +814,7 @@ run.status = aggregating
 
 ### Это главный следующий архитектурный milestone
 
-После любого FINAL field persistence:
+После восстановления claim и любого FINAL field persistence:
 
 ```text
 UPSERT
@@ -1372,14 +1372,11 @@ tender_analysis_field_results
 
 # 16\. Что исправлять до первого стабильного end-to-end MVP
 
-Минимальный обязательный пакет:
+TR-0…TR-3 уже закрыты и не являются текущими открытыми пунктами. Полный per-field Round 2 regression остаётся отдельной quality-задачей.
+
+Минимальный текущий обязательный пакет:
 
 ```text
-TR-0
-TR-1
-TR-2
-TR-3
-
 DW-14 / EW-3
 DW-15
 DW-8
@@ -1402,18 +1399,16 @@ tender\\\\\\\\\\\\\\\_id
 
 # 17\. Рекомендуемый порядок реализации
 
-## Этап 1 — закончить Targeted Recheck
+## Этап 1 — Targeted Recheck correctness (completed)
 
 ```text
-1. TR-0
-2. TR-1
-3. TR-2
-4. TR-3
+1. TR-0 ✅
+2. TR-1 ✅
+3. TR-2 ✅ (MVP)
+4. TR-3 ✅
 ```
 
-Причина:
-
-Aggregator уже зависит от него для значительной части 27 полей.
+TR-0…TR-3 закрыты. Aggregator уже зависит от этого стабильного Targeted Recheck для значительной части 27 полей; полный per-field Round 2 regression остаётся quality work.
 
 \---
 
@@ -1478,7 +1473,14 @@ skipped vs failed
 10. AG-0
 ```
 
-Реализовать:
+Сначала восстановить prerequisite — reachable atomic aggregation claim:
+
+```text
+ready_for_aggregation
+→ aggregating
+```
+
+Затем реализовать:
 
 ```text
 FINAL UPSERT
@@ -1590,6 +1592,8 @@ Retry-safe units
         ↓
 Unsupported document terminal state
         ↓
+Reachable Aggregator atomic claim
+        ↓
 27/27 DB barrier
         ↓
 Report
@@ -1624,8 +1628,11 @@ retry-safe units
   v
 OR-0
 all registered docs reach terminal state
-  |
-  v
+   |
+   v
+restore reachable Aggregator atomic claim
+   |
+   v
 AG-0
 27/27 completion
   |
@@ -1640,10 +1647,10 @@ Markdown / XLSX / Telegram
 ## Critical
 
 ```text
-\\\\\\\\\\\\\\\[ ] TR-0
-\\\\\\\\\\\\\\\[ ] TR-1
-\\\\\\\\\\\\\\\[ ] TR-2
-\\\\\\\\\\\\\\\[ ] TR-3
+\\\\\\\\\\\\\\\[x] TR-0 — resolved
+\\\\\\\\\\\\\\\[x] TR-1 — resolved
+\\\\\\\\\\\\\\\[x] TR-2 — resolved (MVP; per-field regression pending)
+\\\\\\\\\\\\\\\[x] TR-3 — resolved
 \\\\\\\\\\\\\\\[ ] DW-14 / EW-3
 \\\\\\\\\\\\\\\[ ] DW-15
 \\\\\\\\\\\\\\\[ ] DW-3
@@ -1734,4 +1741,3 @@ tender\\\\\\\\\\\\\\\_id
 → XLSX
 → Telegram
 ```
-

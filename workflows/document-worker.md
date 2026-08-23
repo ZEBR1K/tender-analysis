@@ -10,7 +10,7 @@
 **Error Workflow:** `TENDER — Ошибка обработки документа`  
 **PostgreSQL credential:** `KITATEH Tenders`  
 **Docling:** IBM Docling async API  
-**AI Extractor:** `deepseek-v4-flash`  
+**AI Extractor:** `deepseek-v4-pro`
 **AI Validator:** `deepseek-v4-pro`
 
 ---
@@ -665,7 +665,7 @@ Quote должна быть непрерывной дословной подст
 Model:
 
 ```text
-deepseek-v4-flash
+deepseek-v4-pro
 ```
 
 Настройки:
@@ -758,29 +758,18 @@ verified_facts = evidence-grounded candidates
 
 ---
 
-## 23. Error output evidence validator
+## 23. Error behavior evidence validator
 
-Нода настроена:
-
-```text
-onError = continueErrorOutput
-```
-
-но Error output **никуда не подключён**.
-
-Это критично даже при настроенном Workflow Error Handler.
-
-Поскольку ошибка перехвачена самой нодой, она может не считаться workflow-level failure:
+В актуальном export у ноды `Проверить и привязать evidence` отсутствуют:
 
 ```text
-invalid Extractor response
-→ Error output
-→ branch ends
-→ document может остаться processing
-→ внешний Error Workflow может не запуститься
+onError
+continueOnFail
 ```
 
-См. `DW-14`.
+Её regular output подключён к `AI Validator v1`.
+
+Следовательно, configuration-level silent bypass через `continueErrorOutput` текущим export не подтверждается. При этом invalid-response/error behavior требует runtime regression; риск `DW-14` не считается полностью закрытым.
 
 ---
 
@@ -1103,7 +1092,7 @@ TENDER — Ошибка обработки документа
 
 Его внутреннее поведение в этом документе не описывается и должно быть зафиксировано отдельно в `error-workflow.md`.
 
-Важно: handled node errors с `continueErrorOutput` не гарантированно попадут в этот workflow. Поэтому наличие Error Workflow **не закрывает `DW-14`**.
+Важно: актуальный export не подтверждает configuration-level bypass через `continueErrorOutput`. Поведение invalid/error response требует runtime regression, поэтому наличие Error Workflow **не закрывает `DW-14`**.
 
 ---
 
@@ -1157,7 +1146,7 @@ TENDER — Ошибка обработки документа
 | `DW-11` | Medium | visual content не анализируется |
 | `DW-12` | Low | JSON Schema не enforced provider-side |
 | `DW-13` | Low | `verified_facts` = grounded candidates, а не final semantic truth |
-| `DW-14` | **Critical** | Error output evidence validator никуда не подключён |
+| `DW-14` | **Critical** | configuration-level bypass не подтверждён export; invalid/error behavior требует runtime regression |
 | `DW-15` | **Critical / observed** | Validator реально подтвердил `customer="не указан"` по absence |
 | `DW-16` | Medium | Validator видит только Extractor-selected evidence blocks |
 
@@ -1406,8 +1395,8 @@ DB identity
 
 ```text
 DW-14
-перехваченная ошибка evidence validator может не попасть в Error Workflow
-и оставить document=processing
+configuration-level bypass не подтверждён актуальным export;
+invalid/error behavior требует runtime regression
 
 DW-15
 реальный false-confirmed fact: customer="не указан"

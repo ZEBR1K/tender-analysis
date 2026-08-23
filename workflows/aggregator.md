@@ -19,7 +19,7 @@ Workflow не извлекает новые facts из документов.
 
 Его задача:
 
-1. атомарно захватить готовый `analysis\\\_run` для агрегации;
+1. в intended architecture атомарно захватить готовый `analysis\\\_run` для агрегации;
 2. загрузить документы, TenderMeta и candidate facts;
 3. создать **ровно 27 field items**;
 4. для полей с candidates выполнить Semantic Aggregator Round 1;
@@ -30,7 +30,7 @@ Workflow не извлекает новые facts из документов.
 
 &#x20;   	Для полей, переданных в Targeted Recheck, дальнейшая финализация происходит вне текущего execution Aggregator через отдельный sub-workflow.
 
-Текущая версия Aggregator **не выполняет финальную синхронизацию всего run после записи 27 полей**. См. `AG-0`.
+В intended architecture atomic claim должен предшествовать агрегации. В current production topology claim nodes физически существуют, но не входят в reachable execution graph; текущий gap и последующая финализация описаны в `AG-0`.
 
 \---
 
@@ -115,7 +115,7 @@ TENDER — Агрегация закупки
 
 Aggregator отвечает за:
 
-\* захват run;
+\* intended atomic claim run;
 \* загрузку агрегируемых данных;
 \* fan-out в 27 полей;
 \* Round 1 semantic aggregation;
@@ -182,7 +182,7 @@ Workflow запускается через `When Executed by Another Workflow`.
 analysis\\\_run\\\_id
 ```
 
-Остальная readiness-информация приходит от upstream и полезна для provenance/debugging, но сам Aggregator повторно защищает запуск через atomic claim в PostgreSQL.
+Остальная readiness-информация приходит от upstream и полезна для provenance/debugging. Atomic claim остаётся intended invariant, но текущий production execution graph его обходит.
 
 \---
 
@@ -192,17 +192,9 @@ analysis\\\_run\\\_id
 When Executed by Another Workflow
         |
         v
-Захватить run для агрегации
-        |
-        v
-Продолжать агрегацию?
-    /             \\\\
- FALSE            TRUE
-   |                |
- конец              v
-           Загрузить факты закупки
-                    |
-                    v
+Загрузить факты закупки
+                     |
+                     v
            Сгруппировать факты по полям
                     |
                     v
@@ -261,11 +253,15 @@ analysis\\\_run\\\_id
 
 \---
 
-## 7\. Stage 1 — Atomic Run Claim
+## 7\. Intended Stage 1 — Atomic Run Claim
+
+`Захватить run для агрегации` и `Продолжать агрегацию?` физически существуют и включены, но в актуальном production topology disconnected от исполняемого графа. Текущий trigger подключён напрямую к `Загрузить факты закупки`.
+
+Описанный ниже claim — intended architecture и prerequisite для текущего AG-0, а не подтверждённый reachable production behavior.
 
 ### `Захватить run для агрегации`
 
-PostgreSQL-нода атомарно переводит run:
+В intended architecture PostgreSQL-нода атомарно переводит run:
 
 ```text
 ready\\\_for\\\_aggregation
@@ -305,7 +301,7 @@ updated\\\_at
 
 \---
 
-### `Продолжать агрегацию?`
+### `Продолжать агрегацию?` (intended architecture)
 
 Проверяет:
 
@@ -929,14 +925,14 @@ PK:
 id
 ```
 
-Aggregator использует lifecycle:
+Intended Aggregator lifecycle:
 
 ```text
 ready\\\_for\\\_aggregation
 → aggregating
 ```
 
-Текущий workflow не переводит run в `completed`.
+Current production topology не подтверждает выполнение claim-перехода; текущий workflow также не переводит run в `completed`.
 
 \---
 
@@ -1053,8 +1049,8 @@ DO UPDATE
 ## 25\. Основные инварианты Aggregator
 
 1. Один execution Aggregator работает с одним `analysis\\\_run\\\_id`.
-2. Run должен быть атомарно захвачен перед агрегацией.
-3. Продолжение допускается только при `aggregation\\\_claimed=true`.
+2. Intended invariant: run должен быть атомарно захвачен перед агрегацией.
+3. Intended continuation допускается только при `aggregation\\\_claimed=true`; текущий reachable graph claim не выполняет.
 4. В Semantic Aggregator попадают только `confirmed` и `requires\\\_review`.
 5. `rejected` facts не участвуют в candidate aggregation.
 6. Перед первым бизнес-ветвлением создаются ровно 27 field items.
@@ -1079,8 +1075,8 @@ DO UPDATE
 
 |Сценарий|Статус|Путь|
 |-|-|-|
-|run успешно захвачен|✅|`ready\\\_for\\\_aggregation → aggregating`|
-|duplicate Aggregator execution|✅ архитектурно|`aggregation\\\_claimed=false → stop`|
+|intended atomic claim|⚠️ не подтверждён текущим topology|`ready\\\_for\\\_aggregation → aggregating`|
+|duplicate Aggregator execution guard|⚠️ не подтверждён текущим topology|`aggregation\\\_claimed=false → stop`|
 |candidate facts есть|✅|Round 1|
 |facts отсутствуют для поля|✅|TenderMeta|
 |Round 1 resolved|✅|FINAL → DB|
@@ -1104,11 +1100,14 @@ DO UPDATE
 **Severity:** Critical  
 **Status:** In progress
 
-В начале Aggregator переводит:
+В intended architecture до начала основной агрегации должен выполняться переход:
 
 ```text
 ready_for_aggregation
 → aggregating
+```
+
+Current production state: claim nodes enabled, но disconnected от reachable execution graph; trigger идёт напрямую в `Загрузить факты закупки`. Поэтому восстановление исполняемого atomic aggregation claim — prerequisite для AG-0.
 
 \---
 ### AG-1 — отсутствует selective retry для Semantic Aggregator AI
@@ -1188,7 +1187,7 @@ customer
 **Severity:** Medium  
 **Status:** To verify
 
-Если run отсутствует, atomic claim может вернуть 0 rows, и execution потенциально тихо закончится.
+Если run отсутствует, будущий atomic claim может вернуть 0 rows, и execution потенциально тихо закончится.
 
 Желаемое поведение:
 
@@ -1245,7 +1244,7 @@ Aggregator
 
 Перед изменением Aggregator проверить:
 
-1. Не ломается ли atomic claim run.
+1. После восстановления reachable topology не ломается ли atomic claim run.
 2. Не может ли один run начать два Aggregator execution.
 3. Сохраняется ли правило `27 field items`.
 4. Не попадают ли rejected facts в Round 1.
@@ -1264,7 +1263,7 @@ Aggregator
 
 ## 29\. Regression Checklist
 
-### A1 — normal claim
+### A1 — intended normal claim
 
 Ожидание:
 
@@ -1273,7 +1272,7 @@ aggregation\\\_claimed=true
 run.status=aggregating
 ```
 
-### A2 — duplicate claim
+### A2 — intended duplicate claim
 
 Ожидание:
 
@@ -1412,7 +1411,7 @@ TR-8
 
 ## 31\. Краткое резюме для быстрого восстановления контекста
 
-`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis\\\_run`, атомарно захватывает его, загружает candidate facts и создаёт 27 field items.
+`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis\\\_run`, в intended architecture атомарно захватывает его, загружает candidate facts и создаёт 27 field items. В current production topology claim nodes существуют, но execution graph их обходит.
 
 Далее:
 
@@ -1460,10 +1459,10 @@ TENDER - Targeted Recheck
 Главный незакрытый lifecycle gap Aggregator:
 
 ```text
-run переводится в aggregating,
-но пока нет barrier:
+intended: ready_for_aggregation → aggregating
+current: claim nodes disconnected от reachable execution graph
+после восстановления claim всё ещё нужен barrier:
 27 FINAL fields → completed.
 ```
 
 Критичный следующий системный шаг после стабилизации Targeted Recheck — `AG-0`.
-
