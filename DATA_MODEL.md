@@ -306,7 +306,7 @@ tender_analysis_runs_pkey (id)
 - Document Worker;
 - Aggregator;
 - Targeted Recheck;
-- будущий report pipeline;
+- Report Generation V2;
 - error handling.
 
 ---
@@ -1219,10 +1219,9 @@ tender_analysis_field_results_unique
 ### Читают / будут читать
 
 - Finalization workflow для 27/27 completion barrier;
-- report builder;
-- Markdown generation;
-- XLSX generation;
-- Telegram delivery;
+- Report Generation V2 для immutable snapshot и Report Model;
+- будущие PDF/DOCX/XLSX builders;
+- будущая delivery-интеграция;
 - future audit/frontend.
 
 ---
@@ -1390,12 +1389,17 @@ facts / existing candidates
 TenderMeta
 ```
 
-## Future Report Builder
+## Report Generation V2
 
 ```text
 runs
 field_results
+documents
+facts
+units
 ```
+
+Workflow читает эти таблицы одним read-only snapshot query. PDF/DOCX/XLSX и delivery остаются future consumers.
 
 ---
 

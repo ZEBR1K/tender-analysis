@@ -83,7 +83,9 @@ TENDER — Агрегация закупки
 TENDER — Финализация анализа
         |
         v
-report generation stub
+Report Generation V2
+        v
+HTML artifact
 ```
 
 ---

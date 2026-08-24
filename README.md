@@ -128,9 +128,11 @@ DB-backed 27/27 barrier
     ↓
 run.status = completed
     ↓
-TENDER — Генерация отчета (stub)
+TENDER — Генерация отчета V2
     ↓
-будущие Markdown / XLSX / Telegram
+self-contained HTML + binary report_html
+    ↓
+будущие PDF / DOCX / XLSX / delivery
 ```
 
 ---
@@ -256,7 +258,7 @@ workflows/targeted-recheck.md
 27 уникальных FINAL fields
 → atomic completion claim
 → aggregating → completed
-→ вызов report generation stub
+→ вызов Report Generation V2
 ```
 
 Workflow ID: `cSsh9yjpS7t5p0OO`.
@@ -265,9 +267,11 @@ Workflow ID: `cSsh9yjpS7t5p0OO`.
 
 ## `TENDER — Генерация отчета`
 
-Текущий workflow является stub: фиксирует вызов report stage, но ещё не создаёт Markdown/XLSX и не отправляет Telegram.
+Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Он не отправляет файл наружу и не создаёт PDF, DOCX, XLSX или Telegram delivery.
 
 Workflow ID: `ckPnP3hRhKu4Mf9u`.
+
+Подробный фактический контракт: `workflows/report-generation.md`.
 
 ---
 
@@ -519,9 +523,11 @@ TENDER — Финализация анализа
         ↓
 run.status = completed
         ↓
-report generation stub
+Report Generation V2
         ↓
-реальная генерация Markdown / XLSX / Telegram — следующий этап
+HTML artifact (`report_html`)
+        ↓
+future: PDF / DOCX / XLSX / delivery
 ```
 
 ---
@@ -543,12 +549,10 @@ TR-2 ✅ Closed (MVP)
 TR-3 ✅ Closed
 
 
-Текущий путь до законченного MVP:
-report generation stage
-→ ordered FINAL 1..27
-→ Markdown
-→ XLSX
-→ Telegram
+Текущий реализованный report path:
+ordered FINAL 1..27
+→ validated Report Model
+→ HTML artifact
 ```
 
 ---
@@ -558,11 +562,8 @@ report generation stage
 Текущая точка продолжения:
 
 ```text
-реализовать фактический report stage:
-load ordered FINAL 1..27
-→ Markdown
-→ XLSX
-→ Telegram
+расширить Report Generation только по отдельному согласованию:
+PDF / DOCX / XLSX / delivery
 ```
 
 DB-backed completion уже подтверждён execution `13863`: `27/27`, `completion_claimed=true`, `run.status=completed`.

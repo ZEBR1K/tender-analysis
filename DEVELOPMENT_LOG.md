@@ -4240,3 +4240,44 @@ run.status = completed
 ```
 
 Report workflow был вызван успешно, но остаётся stub: реальные Markdown/XLSX/Telegram outputs ещё не формируются.
+
+---
+
+## 2026-08-24 — Report Generation V2 завершён
+
+### Реализованная цепочка
+
+```text
+Report Snapshot
+→ Snapshot validation
+→ Adapter
+→ Report Model
+→ Model validation
+→ HTML Renderer
+→ HTML artifact
+```
+
+- `canonical analysis_result` сохраняется без изменений как internal audit data.
+- Source resolution выполняется только в Adapter.
+- Renderer читает validated Report Model, не обращается к PostgreSQL и не интерпретирует `result_json`.
+- Формируется скачиваемый UTF-8 HTML artifact.
+
+### Reference regression
+
+```text
+analysis_run_id = f9d8e1d7-f01a-4d91-8eac-89c8376535c2
+total = 27
+resolved = 11
+requires_review = 3
+not_found = 13
+attention = [2, 17, 21]
+sources = 29
+internal data leaks = 0
+HTML escaping test = passed
+```
+
+### Ограничения и следующий этап
+
+PDF, DOCX и delivery пока не реализованы.
+
+Следующий крупный этап — calibration на новой закупке клиента с большим пакетом документов.

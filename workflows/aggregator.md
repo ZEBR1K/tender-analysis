@@ -32,7 +32,7 @@ Workflow не извлекает новые facts из документов.
 
 &#x20;   	Для полей, переданных в Targeted Recheck, дальнейшая финализация происходит вне текущего execution Aggregator через отдельный sub-workflow.
 
-Atomic claim фактически исполняется перед загрузкой фактов: execution `13856` подтвердил `aggregation_claimed=true`. После независимых FINAL UPSERT Aggregator вызывает `TENDER — Финализация анализа`, который выполняет DB-backed 27/27 barrier и atomic completion claim. Report stage вызывается отдельным workflow и пока является stub.
+Atomic claim фактически исполняется перед загрузкой фактов: execution `13856` подтвердил `aggregation_claimed=true`. После независимых FINAL UPSERT Aggregator вызывает `TENDER — Финализация анализа`, который выполняет DB-backed 27/27 barrier и atomic completion claim. Downstream Report Generation V2 — отдельный read-only workflow, создающий HTML artifact; подробный контракт находится в `workflows/report-generation.md`.
 
 ### Downstream finalization
 
@@ -42,10 +42,10 @@ Aggregator / Targeted Recheck
 → TENDER — Финализация анализа
 → COUNT(unique field_key) = 27
 → atomic aggregating → completed
-→ TENDER — Генерация отчета (stub)
+→ TENDER — Генерация отчета (Report Generation V2)
 ```
 
-Finalization workflow ID: `cSsh9yjpS7t5p0OO`. Report stub workflow ID: `ckPnP3hRhKu4Mf9u`.
+Finalization workflow ID: `cSsh9yjpS7t5p0OO`. Report Generation workflow ID: `ckPnP3hRhKu4Mf9u`.
 
 \---
 
@@ -1108,7 +1108,7 @@ DO UPDATE
 \---
 
 ## 27\. Known Technical Debt
-### AG-0 — закрыт для MVP; report stage остаётся stub
+### AG-0 — закрыт для MVP; downstream Report Generation V2 реализован
 
 **Severity:** Critical  
 **Status:** ✅ Verified 23.08.2026
@@ -1122,7 +1122,7 @@ ready_for_aggregation
 
 Live execution `13856` подтвердил reachable atomic claim. Finalization executions `13858–13863` выполнили DB-backed 27/27 check; execution `13863` подтвердил `completion_claimed=true` и `run.status=completed`.
 
-Execution `13864` вызвал `TENDER — Генерация отчета`, но этот workflow пока только фиксирует stub success.
+Execution `13864` исторически вызвал прежний stub. Текущий `TENDER — Генерация отчета` формирует validated Report Model, self-contained HTML и binary `report_html`.
 
 \---
 ### AG-1 — отсутствует selective retry для Semantic Aggregator AI
@@ -1398,17 +1398,14 @@ FINAL UPSERT
 → DB-backed 27/27 validation
 → atomic run completion claim
 → aggregating → completed
-→ report generation stub
+→ Report Generation V2 HTML artifact
 ```
 
-2. Реализовать report stage:
+2. Future report extensions:
 
 ```text
-load ordered FINAL fields 1..27
-→ build report dataset
-→ Markdown
-→ XLSX
-→ Telegram
+PDF / DOCX / XLSX
+→ manual upload / delivery
 ```
 
 3. После первого законченного report E2E:
@@ -1478,7 +1475,7 @@ TENDER - Targeted Recheck
 → exactly 27 FINAL field results
 → Finalization `27/27` + atomic completion claim
 → `run.status=completed`
-→ report generation stub
+→ Report Generation V2 HTML artifact
 
 
-AG-0 закрыт для проверенного MVP execution. Следующий этап — фактическая генерация Markdown/XLSX/Telegram вместо текущего report stub.
+AG-0 закрыт для проверенного MVP execution. HTML report path реализован; PDF/DOCX/XLSX/delivery остаются отдельным future work.

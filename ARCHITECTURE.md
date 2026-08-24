@@ -22,9 +22,7 @@ tender_id
 → для каждого поля получить:
    resolved / not_found / requires_review
 → сохранить 27 FINAL field results
-→ Markdown
-→ XLSX
-→ Telegram
+→ HTML artifact
 ```
 
 По состоянию на 23.08.2026 live execution подтвердил:
@@ -34,10 +32,10 @@ tender_id
 → DB-backed 27/27 completion barrier
 → atomic run completion
 → run.status = completed
-→ report generation stub
+→ Report Generation V2 HTML artifact
 ```
 
-Реальная генерация Markdown/XLSX и отправка Telegram остаются следующим этапом.
+Текущий Report Generation V2 строит self-contained HTML и binary `report_html`. PDF, DOCX, XLSX и external delivery остаются будущими этапами. Детальный актуальный контракт: `workflows/report-generation.md`.
 
 AI transport в актуальном production execution — Polza AI. Используемая модель:
 
@@ -78,7 +76,7 @@ Company matching — отдельный будущий слой.
 4. TENDER — Агрегация закупки
 5. TENDER - Targeted Recheck
 6. TENDER — Финализация анализа
-7. TENDER — Генерация отчета (текущий stub)
+7. TENDER — Генерация отчета (Report Generation V2)
 ```
 
 И пяти основных PostgreSQL таблиц:
@@ -163,10 +161,10 @@ tender_analysis_field_results
                  run.status=completed
                            │
                            v
-                Генерация отчёта (stub)
+                Report Generation V2
                            │
                            v
-              Markdown / XLSX / Telegram
+              HTML artifact
 
 ---
 
@@ -180,7 +178,7 @@ tender_analysis_field_results
 | `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
 | `TENDER - Targeted Recheck` | Повторно проверить проблемное поле | Не является глобальным Aggregator |
 | `TENDER — Финализация анализа` | Проверить 27/27 и атомарно перевести run в `completed` | Не формирует содержимое отчёта |
-| `TENDER — Генерация отчета` | Зафиксировать вызов report stage (stub) | Пока не создаёт Markdown/XLSX и не отправляет Telegram |
+| `TENDER — Генерация отчета` | Построить validated Report Model, self-contained HTML и binary `report_html` | Не создаёт PDF/DOCX/XLSX и не отправляет файл наружу |
 
 ---
 
@@ -284,7 +282,7 @@ ready_for_aggregation → aggregating
 → completed_at установлен
 ```
 
-Таким образом, `AG-0` закрыт для текущего MVP. Report stage пока вызывается как stub.
+Таким образом, `AG-0` закрыт для текущего MVP. После successful completion вызывается Report Generation V2; текущий продуктовый artifact — HTML, без PDF/DOCX/XLSX/delivery.
 
 ---
 
@@ -1631,19 +1629,19 @@ COUNT(unique FINAL fields) = 27?
 
 ---
 
-# 63. Next report stage
+# 63. Current report stage and future work
 
 После completion:
 
 ```text
-load 27 FINAL fields
-→ deterministic tender result object
-→ Markdown report
-→ XLSX table
-→ Telegram
+load immutable Report Snapshot
+→ Report Adapter
+→ validated Report Model
+→ self-contained HTML
+→ binary report_html
 ```
 
-Report generator не должен повторно интерпретировать документы AI-моделью.
+Report generator не повторно интерпретирует документы AI-моделью. PDF, DOCX, XLSX и delivery не реализованы.
 
 Он должен использовать уже финальные:
 
@@ -1738,7 +1736,7 @@ child workflow больше не зависит от parent-node references```
 AG-0 ✅ verified 23.08.2026
 27/27 completion barrier
 atomic completion claim
-report generation stub
+Report Generation V2 HTML artifact
 ```
 
 ---
@@ -1756,14 +1754,13 @@ TenderPlan
 → Aggregator
 → Targeted Recheck
 → 27 / 27 FINAL field results
-Поэтому текущий MVP-critical путь:
-1. Load ordered FINAL fields 1..27
+Текущий report path уже реализован:
 
-2. Markdown report
+1. Load immutable Report Snapshot.
 
-3. XLSX
+2. Build and validate Report Model.
 
-4. Telegram
+3. Generate HTML artifact.
 
 После первого законченного end-to-end report:
 5. regression dataset на нескольких закупках
@@ -2201,7 +2198,7 @@ Aggregator / Targeted Recheck
 → Finalization workflow
 → 27/27 DB barrier
 → run completed
-→ report generation stub
+→ Report Generation V2 HTML artifact
 ```
 
 Следующая граница MVP:
@@ -2240,14 +2237,14 @@ single completion claimant
 run.status = completed
         ↓
 single report generation
-В результате уже замкнут lifecycle до report stub:
+В результате lifecycle замкнут до HTML artifact:
 tender_id
 → analysis
 → 27 FINAL
 → completed
-→ report generation stub
+→ report_html
 
-Остаётся реализовать фактические Markdown / XLSX / Telegram.
+Остаются future work: PDF, DOCX, XLSX, manual upload и automatic delivery.
 ---
 
 # 81. Краткая схема будущего завершённого MVP

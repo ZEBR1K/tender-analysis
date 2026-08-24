@@ -1,5 +1,7 @@
 # Report Generation V2 — архитектура
 
+> **Legacy / superseded implementation design.** Документ фиксирует согласованную архитектуру и beta-переход. Фактический основной workflow документирован в [workflows/report-generation.md](workflows/report-generation.md); source of truth реализации — `workflows/n8n-exports/TENDER — Генерация отчета.json`.
+
 Дата проектирования: 24.08.2026  
 Рабочая ветка: `feature/report-generation-docx-v2`  
 Статус: проектирование; workflow, Code Nodes и PostgreSQL не изменялись
@@ -574,4 +576,3 @@ When Executed by Another Workflow
 8. HTML Renderer является полностью детерминированным.
 9. В HTML нет internal audit identifiers.
 10. Реализация workflow начинается только после отдельного согласования этой архитектуры.
-

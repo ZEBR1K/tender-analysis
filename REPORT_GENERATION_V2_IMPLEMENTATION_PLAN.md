@@ -1,5 +1,7 @@
 # Report Generation V2 — план реализации
 
+> **Legacy / completed implementation plan.** План относится к beta export и не описывает текущее runtime-состояние. Актуальная документация: [workflows/report-generation.md](workflows/report-generation.md).
+
 Дата: 24.08.2026  
 Статус: план; не разрешает немедленное изменение workflow  
 Целевой workflow: `workflows/n8n-exports/beta/TENDER — Генерация отчета beta v2.json`
@@ -596,4 +598,3 @@ FIELD_CATALOG.md
 8. runtime regression выполнен на указанном run;
 9. upstream workflow и PostgreSQL не изменены;
 10. execution IDs и результаты зафиксированы в документации после проверки.
-

@@ -125,7 +125,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
-|`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Report stage вызывается, но текущий workflow остаётся stub.|
+|`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 
 \---
@@ -843,12 +843,12 @@ aggregating
 completed\\\\\\\\\\\\\\\_at = NOW()
 ```
 
-a затем запускается report stage. Execution `13863` подтвердил успешный completion claim; execution `13864` подтвердил вызов report stub.
+a затем запускается report stage. Execution `13863` подтвердил успешный completion claim; execution `13864` исторически подтвердил вызов тогдашнего stub. Текущая реализация Report Generation V2 создаёт HTML artifact; подробности — `workflows/report-generation.md`.
 
 ### Приоритет
 
 ```text
-P2 — report implementation и regression hardening
+P2 — report extensions и regression hardening
 ```
 
 \---
@@ -1492,21 +1492,22 @@ skipped vs failed
 FINAL UPSERT
 → 27/27
 → completed
-→ report stub
+→ Report Generation V2 HTML artifact
 ```
 
 \---
 
-## Этап 7 — MVP report
+## Этап 7 — Report extensions
 
 ```text
-11. Load ordered FINAL 1..27
-12. Build Markdown
-13. Build XLSX
-14. Telegram
+✅ Load immutable Report Snapshot → Report Model → HTML artifact
+future: PDF
+future: DOCX
+future: XLSX
+future: manual upload / automatic delivery
 ```
 
-После этого end-to-end MVP достигнут.
+HTML report path реализован. Завершение полного delivery-MVP зависит от отдельных будущих интеграций.
 
 \---
 
@@ -1639,7 +1640,10 @@ AG-0 ✅
 27/27 completion + run completed
   |
   v
-Report stub → Markdown / XLSX / Telegram
+Report Generation V2 HTML artifact
+  |
+  v
+future: PDF / DOCX / XLSX / delivery
 ```
 
 \---

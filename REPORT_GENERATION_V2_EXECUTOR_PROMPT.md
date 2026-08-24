@@ -1,5 +1,7 @@
 # Executor Prompt — Report Generation V2
 
+> **Legacy executor instruction.** Этот файл использовался для поэтапной реализации beta workflow. Для фактического основного workflow используйте [workflows/report-generation.md](workflows/report-generation.md).
+
 ## Роль
 
 Ты — исполнитель n8n с ограниченным контекстом. Работай только по этой инструкции. Не улучшай систему вне указанного scope.
@@ -376,4 +378,3 @@ no internal data leak
 - требуется изменить upstream workflow;
 - production write access не был явно предоставлен;
 - в worktree есть пересекающиеся пользовательские изменения, которые нельзя сохранить.
-
