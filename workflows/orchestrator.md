@@ -1,7 +1,7 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **Тип:** root workflow / orchestrator  
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`  
 **Точка входа:** manual trigger  
@@ -78,6 +78,12 @@ ready_for_aggregation
         |
         v
 TENDER — Агрегация закупки
+        |
+        v
+TENDER — Финализация анализа
+        |
+        v
+report generation stub
 ```
 
 ---

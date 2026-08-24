@@ -1,7 +1,7 @@
 # DATA_MODEL — Tender Analysis
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **База данных:** PostgreSQL  
 **Основной credential в n8n:** `KITATEH Tenders`  
 **Назначение:** зафиксировать физическую модель данных тендерного анализа, связи между таблицами, lifecycle сущностей, ограничения и индексы.
@@ -9,6 +9,24 @@
 ---
 
 # 1. Общая модель
+
+## Live verification snapshot — 23.08.2026
+
+Read-only audit run `f9d8e1d7-f01a-4d91-8eac-89c8376535c2` подтвердил текущую физическую модель и lifecycle:
+
+```text
+documents = 3
+units = 18
+facts = 38
+FINAL rows = 27
+run.status = completed
+completed_at заполнен Finalization workflow
+```
+
+Распределение facts: `20 confirmed`, `10 requires_review`, `8 rejected`.
+Распределение FINAL: `11 resolved`, `3 requires_review`, `13 not_found`.
+
+Все 27 FINAL rows в проверенном run имели `field_catalog_version=tender_fields_v1`, `result_contract_version=tender_field_final_v1` и audit metadata.
 
 Текущая модель данных состоит из пяти основных таблиц:
 
@@ -236,7 +254,7 @@ completed_at
 → полный анализ завершён
 ```
 
-На текущем этапе `completed_at` ещё не заполняется существующим Aggregator, потому что отсутствует 27/27 completion barrier.
+`completed_at` заполняется Finalization workflow после успешной DB-backed проверки 27/27 уникальных FINAL fields и atomic completion claim.
 
 ---
 
@@ -279,7 +297,7 @@ tender_analysis_runs_pkey (id)
 - Aggregator:
   - `ready_for_aggregation → aggregating`;
   - выставляет `aggregation_started_at`.
-- Future completion barrier:
+- Finalization workflow:
   - `aggregating → completed`;
   - `completed_at = NOW()`.
 
@@ -1198,9 +1216,9 @@ tender_analysis_field_results_unique
   - not_found;
   - requires_review.
 
-### Будут читать
+### Читают / будут читать
 
-- 27/27 completion barrier;
+- Finalization workflow для 27/27 completion barrier;
 - report builder;
 - Markdown generation;
 - XLSX generation;
@@ -1328,11 +1346,11 @@ UPDATE run → aggregating
    ↓
 UPSERT tender_analysis_field_results
 
-10. Future 27/27 barrier
+10. Finalization workflow
    ↓
 COUNT(unique FINAL fields) = 27
 
-11. Future completion
+11. Atomic completion claim
    ↓
 UPDATE run → completed
 completed_at = NOW()

@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -10,8 +10,9 @@
 **Error Workflow:** `TENDER — Ошибка обработки документа`  
 **PostgreSQL credential:** `KITATEH Tenders`  
 **Docling:** IBM Docling async API  
-**AI Extractor:** `deepseek-v4-pro`
-**AI Validator:** `deepseek-v4-pro`
+**AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
+**AI Extractor:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=none`
+**AI Validator:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low`
 
 ---
 

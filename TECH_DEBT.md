@@ -49,6 +49,34 @@ FIELD\\\\\\\\\\\\\\\_CATALOG.md
 
 \---
 
+## Accuracy improvements
+
+### `nm_price_with_vat`
+
+**Проблема:** поле сейчас объединяет несколько разных сущностей:
+
+- НМЦК;
+- цену договора;
+- наличие НДС.
+
+**Текущее поведение:** система корректно переводит поле в `requires_review`, если найдено значение цены с НДС, но нет прямого подтверждения, что это именно НМЦК.
+
+**Будущее улучшение:** рассмотреть разделение на:
+
+- `nm_price`;
+- `contract_price`;
+- `vat_status`.
+
+### `government_contract`
+
+Упоминания ЕАИСТ, реестров договоров и государственных заказчиков не считаются доказательством наличия государственного контракта. Текущая строгая логика считается корректной.
+
+### `warranty_obligations_guarantee`
+
+Текущая логика корректно разделяет гарантийные обязательства по качеству товара и обеспечение гарантийных обязательств. Изменение не требуется.
+
+---
+
 ## P1 — High
 
 Не всегда ломает happy path, но:
@@ -97,7 +125,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
-|`AG-0`|🟡 In progress<br />нет исполняемого atomic aggregation claim и DB-backed 27/27 completion barrier|Prerequisite: восстановить reachable переход `ready_for_aggregation → aggregating` через atomic claim; claim nodes физически существуют, но текущий production graph их обходит.<br /><br />После этого:<br />- создать DB-backed финализатор run;<br />- автоматическая проверка 27/27;<br />- перевод run в completed;<br />- генерация отчёта.|
+|`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Report stage вызывается, но текущий workflow остаётся stub.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 
 \---
@@ -779,42 +807,27 @@ P1
 
 ### Проблема
 
-В intended architecture Aggregator должен начинать:
+В intended architecture Aggregator начинает:
 
 ```text
 ready\\\\\\\\\\\\\\\_for\\\\\\\\\\\\\\\_aggregation
 → aggregating
 ```
 
-В current production topology nodes atomic claim существуют, но disconnected от reachable execution graph; trigger подключён напрямую к загрузке фактов. Поэтому восстановление исполняемого перехода
-
-```text
-ready_for_aggregation
-→ aggregating
-```
-
-является prerequisite AG-0.
-
-После восстановления claim и после всех field UPSERT ещё нужна проверка:
+Live execution `13856` подтвердил исполняемый переход через atomic claim. После всех field UPSERT выполняется проверка:
 
 ```text
 27/27?
 → completed
 ```
 
-### Следствие
+### Историческое следствие
 
-Даже если все поля уже записаны:
+До внедрения Finalization workflow run мог остаться в `aggregating` даже после записи всех FINAL fields. Это закрыто для проверенного MVP execution; сценарий остаётся regression case.
 
-```text
-run.status = aggregating
-```
+### Текущий статус
 
-может остаться навсегда.
-
-### Это главный следующий архитектурный milestone
-
-После восстановления claim и любого FINAL field persistence:
+После любого FINAL field persistence:
 
 ```text
 UPSERT
@@ -830,12 +843,12 @@ aggregating
 completed\\\\\\\\\\\\\\\_at = NOW()
 ```
 
-а затем запустить report stage.
+a затем запускается report stage. Execution `13863` подтвердил успешный completion claim; execution `13864` подтвердил вызов report stub.
 
 ### Приоритет
 
 ```text
-P0
+P2 — report implementation и regression hardening
 ```
 
 \---
@@ -1467,25 +1480,19 @@ skipped vs failed
 
 \---
 
-## Этап 6 — завершение run
+## Этап 6 — завершение run (закрыт для MVP)
 
 ```text
-10. AG-0
+10. AG-0 ✅ verified 23.08.2026
 ```
 
-Сначала восстановить prerequisite — reachable atomic aggregation claim:
-
-```text
-ready_for_aggregation
-→ aggregating
-```
-
-Затем реализовать:
+Реализованный путь:
 
 ```text
 FINAL UPSERT
 → 27/27
 → completed
+→ report stub
 ```
 
 \---
@@ -1592,11 +1599,9 @@ Retry-safe units
         ↓
 Unsupported document terminal state
         ↓
-Reachable Aggregator atomic claim
+AG-0 ✅ reachable claim + 27/27 DB barrier
         ↓
-27/27 DB barrier
-        ↓
-Report
+Report implementation
 ```
 
 \---
@@ -1630,14 +1635,11 @@ OR-0
 all registered docs reach terminal state
    |
    v
-restore reachable Aggregator atomic claim
-   |
-   v
-AG-0
-27/27 completion
+AG-0 ✅
+27/27 completion + run completed
   |
   v
-Markdown / XLSX / Telegram
+Report stub → Markdown / XLSX / Telegram
 ```
 
 \---
@@ -1656,7 +1658,7 @@ Markdown / XLSX / Telegram
 \\\\\\\\\\\\\\\[ ] DW-3
 \\\\\\\\\\\\\\\[ ] DW-8
 \\\\\\\\\\\\\\\[ ] OR-0
-\\\\\\\\\\\\\\\[ ] AG-0
+\\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
 ## High

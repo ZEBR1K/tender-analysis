@@ -1,11 +1,13 @@
 # TENDER - Targeted Recheck
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **Тип:** sub-workflow n8n  
 **Родительский workflow:** `TENDER — Агрегация закупки`  
 **Финальный контракт поля:** `tender_field_final_v1`  
-**Основная модель:** `deepseek-v4-pro`
+**AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
+**Основная модель:** `deepseek/deepseek-v4-pro-0813`
+**Reasoning:** через alias модели `@reasoning_effort=none|low`
 
 ---
 
@@ -715,7 +717,7 @@ user_prompt
 
 #### `#2 AI Targeted Recheck v1`
 
-**Модель:** `deepseek-v4-pro`.
+**Модель:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=none` через Polza AI.
 
 **Задача:** Extractor.
 
@@ -836,7 +838,7 @@ resolution_method = targeted_recheck_unresolved_existing_candidate
 
 #### `#2 AI Validator Targeted Recheck`
 
-**Модель:** `deepseek-v4-pro`.
+**Модель:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low` через Polza AI.
 
 **Задача:** проверить, действительно ли реальное evidence доказывает именно целевое поле.
 
@@ -1032,7 +1034,7 @@ candidate_stats = ...
 
 #### `Semantic Aggregator1`
 
-**Модель:** `deepseek-v4-pro`.
+**Модель:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low` через Polza AI.
 
 Сопоставляет старые и новые candidates и решает их роли:
 
@@ -1787,11 +1789,12 @@ TR-2
 TR-3
 закрыты.
 На текущем этапе Targeted Recheck не требует новых архитектурных изменений перед следующим системным milestone.
+AG-0 и DB-backed 27/27 completion barrier подтверждены live execution `13863`.
 Следующий общий шаг проекта находится уже вне этого workflow:
-AG-0
-→ DB-backed 27/27 completion barrier
-→ run completed
-→ report
+report implementation
+→ Markdown
+→ XLSX
+→ Telegram
 После первого законченного MVP вернуться к hardening Targeted Recheck:
 1. TR-6 — selective AI retry.
 2. TR-7 — убрать недетерминированный fallback existingCandidates[0].
@@ -1846,7 +1849,5 @@ TR-7
 TR-8
 TR-9
 и не должен блокировать следующий системный milestone:
-AG-0
-→ 27/27 DB barrier
-→ run completed
-→ report
+report implementation
+→ Markdown / XLSX / Telegram

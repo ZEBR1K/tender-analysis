@@ -8,8 +8,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -304,
-        -288
+        -368,
+        -320
       ],
       "id": "4b4f2cc1-8acd-4dc0-8111-425627f51ee1",
       "name": "When Executed by Another Workflow"
@@ -25,7 +25,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -64,
+        -112,
         -112
       ],
       "id": "7552ce31-bcd9-4eb1-b9a1-db17b87c8c7b",
@@ -65,7 +65,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        160,
+        96,
         -112
       ],
       "id": "28a71cf5-75a5-4801-b1bf-8b8320449f86",
@@ -402,12 +402,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://api.deepseek.com/chat/completions",
+        "url": "https://polza.ai/api/v1/chat/completions",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{\n{\n  model: 'deepseek-v4-pro',\n\n  messages: [\n    {\n      role: 'system',\n      content: $json.system_prompt\n    },\n    {\n      role: 'user',\n      content: $json.user_prompt\n    }\n  ],\n\n  thinking: {\n    type: 'enabled'\n  },\n\n  reasoning_effort: 'low',\n\n  response_format: {\n    type: 'json_object'\n  },\n\n  max_tokens: 8192,\n\n  stream: false\n}\n}}",
+        "jsonBody": "={{\n{\n  model: 'deepseek/deepseek-v4-pro-0813@reasoning_effort=low',\n\n  messages: [\n    {\n      role: 'system',\n      content: $json.system_prompt\n    },\n    {\n      role: 'user',\n      content: $json.user_prompt\n    }\n  ],\n\n\n  response_format: {\n    type: 'json_object'\n  },\n\n  max_tokens: 8192,\n\n  stream: false\n}\n}}",
         "options": {
           "response": {
             "response": {
@@ -425,10 +425,12 @@
       ],
       "id": "a4d1f19f-8f73-4d89-ba8c-262c91fb59d4",
       "name": "Semantic Aggregator",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "httpHeaderAuth": {
-          "id": "H2u4ZrtZTrdGirme",
-          "name": "DeepSeek основа"
+          "id": "XaaCIUSKLJgqt16X",
+          "name": "Polza AI"
         }
       }
     },
@@ -618,7 +620,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO tender_analysis_field_results (\n    analysis_run_id,\n    field_catalog_version,\n    result_contract_version,\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\n)\nVALUES (\n    $1::uuid,\n    $2::text,\n    $3::text,\n    $4::smallint,\n    $5::text,\n    $6::text,\n    $7::text,\n    $8::numeric,\n    $9::boolean,\n    $10::text,\n    $11::jsonb\n)\nON CONFLICT (analysis_run_id, field_key)\nDO UPDATE SET\n    field_catalog_version = EXCLUDED.field_catalog_version,\n    result_contract_version = EXCLUDED.result_contract_version,\n    field_index = EXCLUDED.field_index,\n    status = EXCLUDED.status,\n    value_text = EXCLUDED.value_text,\n    confidence = EXCLUDED.confidence,\n    requires_human_review = EXCLUDED.requires_human_review,\n    resolution_method = EXCLUDED.resolution_method,\n    result_json = EXCLUDED.result_json,\n    updated_at = NOW();",
+        "query": "INSERT INTO tender_analysis_field_results (\n    analysis_run_id,\n    field_catalog_version,\n    result_contract_version,\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\n)\nVALUES (\n    $1::uuid,\n    $2::text,\n    $3::text,\n    $4::smallint,\n    $5::text,\n    $6::text,\n    $7::text,\n    $8::numeric,\n    $9::boolean,\n    $10::text,\n    $11::jsonb\n)\nON CONFLICT (analysis_run_id, field_key)\nDO UPDATE SET\n    field_catalog_version = EXCLUDED.field_catalog_version,\n    result_contract_version = EXCLUDED.result_contract_version,\n    field_index = EXCLUDED.field_index,\n    status = EXCLUDED.status,\n    value_text = EXCLUDED.value_text,\n    confidence = EXCLUDED.confidence,\n    requires_human_review = EXCLUDED.requires_human_review,\n    resolution_method = EXCLUDED.resolution_method,\n    result_json = EXCLUDED.result_json,\n    updated_at = NOW()\nRETURNING\n  analysis_run_id,\n  field_key,\n  field_index;",
         "options": {
           "queryReplacement": "={{[   $json.analysis_run_id,   $json.field_catalog_version,   $json.result_contract_version,   $json.field_index,   $json.field_key,   $json.status,   $json.value_text,   $json.confidence,   $json.requires_human_review,   $json.resolution_method,   JSON.stringify($json) ]}}"
         }
@@ -641,7 +643,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO tender_analysis_field_results (\n    analysis_run_id,\n    field_catalog_version,\n    result_contract_version,\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\n)\nVALUES (\n    $1::uuid,\n    $2::text,\n    $3::text,\n    $4::smallint,\n    $5::text,\n    $6::text,\n    $7::text,\n    $8::numeric,\n    $9::boolean,\n    $10::text,\n    $11::jsonb\n)\nON CONFLICT (analysis_run_id, field_key)\nDO UPDATE SET\n    field_catalog_version = EXCLUDED.field_catalog_version,\n    result_contract_version = EXCLUDED.result_contract_version,\n    field_index = EXCLUDED.field_index,\n    status = EXCLUDED.status,\n    value_text = EXCLUDED.value_text,\n    confidence = EXCLUDED.confidence,\n    requires_human_review = EXCLUDED.requires_human_review,\n    resolution_method = EXCLUDED.resolution_method,\n    result_json = EXCLUDED.result_json,\n    updated_at = NOW();",
+        "query": "INSERT INTO tender_analysis_field_results (\n    analysis_run_id,\n    field_catalog_version,\n    result_contract_version,\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\n)\nVALUES (\n    $1::uuid,\n    $2::text,\n    $3::text,\n    $4::smallint,\n    $5::text,\n    $6::text,\n    $7::text,\n    $8::numeric,\n    $9::boolean,\n    $10::text,\n    $11::jsonb\n)\nON CONFLICT (analysis_run_id, field_key)\nDO UPDATE SET\n    field_catalog_version = EXCLUDED.field_catalog_version,\n    result_contract_version = EXCLUDED.result_contract_version,\n    field_index = EXCLUDED.field_index,\n    status = EXCLUDED.status,\n    value_text = EXCLUDED.value_text,\n    confidence = EXCLUDED.confidence,\n    requires_human_review = EXCLUDED.requires_human_review,\n    resolution_method = EXCLUDED.resolution_method,\n    result_json = EXCLUDED.result_json,\n    updated_at = NOW()\nRETURNING\n  analysis_run_id,\n  field_key,\n  field_index;",
         "options": {
           "queryReplacement": "={{[   $json.analysis_run_id,   $json.field_catalog_version,   $json.result_contract_version,   $json.field_index,   $json.field_key,   $json.status,   $json.value_text,   $json.confidence,   $json.requires_human_review,   $json.resolution_method,   JSON.stringify($json) ]}}"
         }
@@ -716,6 +718,88 @@
       ],
       "id": "e05a20bc-94d8-4619-b093-35b50229832e",
       "name": "Вызов #2 'TENDER - Targeted Recheck'1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cSsh9yjpS7t5p0OO",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/cSsh9yjpS7t5p0OO",
+          "cachedResultName": "TENDER — Финализация анализа"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3424,
+        -752
+      ],
+      "id": "8d6a5138-0532-4ef5-94fc-95ef93b17b84",
+      "name": "Call 'TENDER — Финализация анализа'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  throw new Error(\n    '[Подготовить вызов Finalizer] FINAL UPSERT не вернул ни одной строки'\n  );\n}\n\nconst runIds = [\n  ...new Set(\n    items\n      .map(item => item.json.analysis_run_id)\n      .filter(Boolean)\n  ),\n];\n\nif (runIds.length !== 1) {\n  throw new Error(\n    `[Подготовить вызов Finalizer] Ожидался один analysis_run_id, получено: ${JSON.stringify(runIds)}`\n  );\n}\n\nconst fieldKeys = items\n  .map(item => item.json.field_key)\n  .filter(Boolean);\n\nreturn [\n  {\n    json: {\n      analysis_run_id: runIds[0],\n      trigger_source: 'aggregator',\n      trigger_field_keys: fieldKeys,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3232,
+        -752
+      ],
+      "id": "51f9a79c-518b-4654-87d0-5fbbab10c19f",
+      "name": "Подготовить вызов Finalizer"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cSsh9yjpS7t5p0OO",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/cSsh9yjpS7t5p0OO",
+          "cachedResultName": "TENDER — Финализация анализа"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3184,
+        -272
+      ],
+      "id": "0ee2b857-d4df-405d-8fc6-de1e6735fa6e",
+      "name": "Call 'TENDER — Финализация анализа'1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  throw new Error(\n    '[Подготовить вызов Finalizer] FINAL UPSERT не вернул ни одной строки'\n  );\n}\n\nconst runIds = [\n  ...new Set(\n    items\n      .map(item => item.json.analysis_run_id)\n      .filter(Boolean)\n  ),\n];\n\nif (runIds.length !== 1) {\n  throw new Error(\n    `[Подготовить вызов Finalizer] Ожидался один analysis_run_id, получено: ${JSON.stringify(runIds)}`\n  );\n}\n\nconst fieldKeys = items\n  .map(item => item.json.field_key)\n  .filter(Boolean);\n\nreturn [\n  {\n    json: {\n      analysis_run_id: runIds[0],\n      trigger_source: 'aggregator',\n      trigger_field_keys: fieldKeys,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        -272
+      ],
+      "id": "265ec8cd-f01c-4c85-91af-85e60cda8972",
+      "name": "Подготовить вызов Finalizer1"
     }
   ],
   "pinData": {
@@ -740,6 +824,21 @@
           "item": 0
         }
       }
+    ],
+    "Захватить run для агрегации": [
+      {
+        "json": {
+          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
+          "run_status": "aggregating",
+          "documents_total": 3,
+          "ready_at": "2026-08-22T17:15:39.826Z",
+          "aggregation_started_at": "2026-08-23T15:12:30.262Z",
+          "aggregation_claimed": true
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
     ]
   },
   "connections": {
@@ -747,7 +846,7 @@
       "main": [
         [
           {
-            "node": "Загрузить факты закупки",
+            "node": "Захватить run для агрегации",
             "type": "main",
             "index": 0
           }
@@ -1043,6 +1142,50 @@
           }
         ]
       ]
+    },
+    "Сохранить FINAL результат поля в БД1": {
+      "main": [
+        [
+          {
+            "node": "Подготовить вызов Finalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить вызов Finalizer": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Финализация анализа'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить вызов Finalizer1": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Финализация анализа'1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить FINAL результат поля в БД2": {
+      "main": [
+        [
+          {
+            "node": "Подготовить вызов Finalizer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -1050,7 +1193,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "12216e6a-6dc3-487f-95da-96e98e653033",
+  "versionId": "1c9019de-8180-454d-a1e0-f69debdc5b9a",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"

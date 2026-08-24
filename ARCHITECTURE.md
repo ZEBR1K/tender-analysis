@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 ---
@@ -27,21 +27,25 @@ tender_id
 → Telegram
 ```
 
-На текущем этапе реализовано всё до:
+По состоянию на 23.08.2026 live execution подтвердил:
 
 ```text
-27 FINAL field results сохраняются в PostgreSQL
+27 FINAL field results
+→ DB-backed 27/27 completion barrier
+→ atomic run completion
+→ run.status = completed
+→ report generation stub
 ```
 
-Но ещё не реализованы:
+Реальная генерация Markdown/XLSX и отправка Telegram остаются следующим этапом.
+
+AI transport в актуальном production execution — Polza AI. Используемая модель:
 
 ```text
-27/27 completion barrier
-→ run completed
-→ Markdown
-→ XLSX
-→ Telegram
+deepseek/deepseek-v4-pro-0813
 ```
+
+`reasoning_effort` задаётся через alias модели (`none` для Extractor, `low` для Validator/Semantic Aggregator). В audit metadata provider сохраняется как `deepseek`, что относится к модели, а не к transport endpoint.
 
 ---
 
@@ -65,7 +69,7 @@ Company matching — отдельный будущий слой.
 
 # 3. Основные компоненты
 
-Система состоит из пяти n8n workflow:
+Система состоит из семи n8n workflow:
 
 ```text
 1. ТЕНДЕРЫ ОРКЕСТРАТОР
@@ -73,6 +77,8 @@ Company matching — отдельный будущий слой.
 3. TENDER — Ошибка обработки документа
 4. TENDER — Агрегация закупки
 5. TENDER - Targeted Recheck
+6. TENDER — Финализация анализа
+7. TENDER — Генерация отчета (текущий stub)
 ```
 
 И пяти основных PostgreSQL таблиц:
@@ -147,20 +153,20 @@ tender_analysis_field_results
                  27 / 27 FINAL fields
                            │
                            v
-                     CURRENT GAP
                            │
                            v
-               DB-backed completion
-                       barrier
+                TENDER — Финализация
+                           │
+                DB-backed 27/27 barrier
                            │
                            v
                  run.status=completed
                            │
                            v
-                    Markdown / XLSX
+                Генерация отчёта (stub)
                            │
                            v
-                       Telegram
+              Markdown / XLSX / Telegram
 
 ---
 
@@ -171,8 +177,10 @@ tender_analysis_field_results
 | `ТЕНДЕРЫ ОРКЕСТРАТОР` | Создать run, зарегистрировать документы, запустить Workers | Не анализирует содержимое документов |
 | `TENDER — Обработать документ` | Полностью обработать один документ и сохранить facts | Не агрегирует факты между документами |
 | `TENDER — Ошибка обработки документа` | Пометить упавший processing-document как failed | Не решает retry policy всего run |
-| `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items | Пока не завершает run после 27 FINAL |
+| `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
 | `TENDER - Targeted Recheck` | Повторно проверить проблемное поле | Не является глобальным Aggregator |
+| `TENDER — Финализация анализа` | Проверить 27/27 и атомарно перевести run в `completed` | Не формирует содержимое отчёта |
+| `TENDER — Генерация отчета` | Зафиксировать вызов report stage (stub) | Пока не создаёт Markdown/XLSX и не отправляет Telegram |
 
 ---
 
@@ -261,19 +269,22 @@ aggregating
 completed
 ```
 
-В current production topology claim nodes существуют, но execution graph их обходит и идёт напрямую к загрузке фактов. Поэтому фактическое выполнение перехода:
+Live execution `13856` подтвердил atomic Aggregator claim:
 
 ```text
 ready_for_aggregation → aggregating
 ```
 
-через Aggregator claim не подтверждено текущим export. Система может записывать FINAL fields, но пока не выполняет переход:
+Затем executions `13858–13863` выполняли DB-backed finalization. Последний финализатор подтвердил:
 
 ```text
-aggregating → completed
+27 unique FINAL fields
+→ completion_claimed=true
+→ aggregating → completed
+→ completed_at установлен
 ```
 
-Это `AG-0`.
+Таким образом, `AG-0` закрыт для текущего MVP. Report stage пока вызывается как stub.
 
 ---
 
@@ -1024,14 +1035,14 @@ should_start_aggregation
 readiness_reason
 ```
 
-В intended architecture Aggregator должен дополнительно делать собственный atomic claim:
+Aggregator дополнительно делает собственный atomic claim:
 
 ```text
 ready_for_aggregation
 → aggregating
 ```
 
-Это intended второй concurrency barrier. Current production state: nodes claim физически существуют, но execution graph их обходит; trigger подключён напрямую к загрузке фактов. Восстановление reachable claim является prerequisite для `AG-0`.
+Это второй concurrency barrier. Live execution `13856` подтвердил `aggregation_claimed=true`; для старых export-описаний о disconnected nodes см. audit report.
 
 ---
 
@@ -1523,20 +1534,18 @@ processing
 
 только один последний Worker.
 
-### Aggregator claim — intended invariant и current production state
+### Aggregator claim — подтверждённый invariant
 
 ```text
 ready_for_aggregation
 → aggregating
 ```
 
-только один Aggregator в intended topology.
-
-Current production state: claim nodes существуют и включены, но не входят в reachable execution graph. Поэтому текущий production execution не подтверждает фактическое выполнение перехода `ready_for_aggregation → aggregating` через этот claim.
+только один Aggregator в текущей topology. Execution `13856` подтвердил выполнение перехода.
 
 ### Final completion
 
-Следующий незавершённый concurrency barrier:
+Текущий concurrency barrier:
 
 ```text
 ANY FINAL UPSERT
@@ -1548,7 +1557,7 @@ atomic completion claim
 aggregating → completed
 ```
 
-только один completion claimant после 27/27.
+только один completion claimant после 27/27. Execution `13863` подтвердил успешный claim и `run.status=completed`.
 
 ---
 
@@ -1572,7 +1581,7 @@ PostgreSQL state
 
 ---
 
-# 61. Current finalization gap
+# 61. Finalization stage
 
 После сохранения одного FINAL field:
 
@@ -1580,29 +1589,21 @@ PostgreSQL state
 UPSERT tender_analysis_field_results
 ```
 
-ветка заканчивается.
+ветка передаёт управление Finalization workflow.
 
-Нет общей логики:
+Общая логика:
 
 ```text
 COUNT(unique field_key)=27?
 ```
 
-Это `AG-0`.
-
-Следствие:
-
-```text
-run может оставаться aggregating
-```
-
-даже когда фактически все 27 FINAL уже существуют.
+Execution `13863` подтвердил `COUNT(unique field_key)=27`, `completion_claimed=true` и переход `aggregating → completed`.
 
 ---
 
-# 62. Planned 27/27 barrier
+# 62. Implemented 27/27 barrier
 
-Целевая архитектура:
+Актуальная архитектура:
 
 ```text
 ANY FINAL FIELD UPSERT
@@ -1630,7 +1631,7 @@ COUNT(unique FINAL fields) = 27?
 
 ---
 
-# 63. Planned report stage
+# 63. Next report stage
 
 После completion:
 
@@ -1734,8 +1735,10 @@ child workflow больше не зависит от parent-node references```
 ## Aggregator completion
 
 ```text
-AG-0
-no 27/27 completion barrier
+AG-0 ✅ verified 23.08.2026
+27/27 completion barrier
+atomic completion claim
+report generation stub
 ```
 
 ---
@@ -1754,21 +1757,16 @@ TenderPlan
 → Targeted Recheck
 → 27 / 27 FINAL field results
 Поэтому текущий MVP-critical путь:
-1. AG-0
-   DB-backed 27/27 completion barrier
+1. Load ordered FINAL fields 1..27
 
-2. atomic:
-   aggregating → completed
+2. Markdown report
 
-3. Load ordered FINAL fields 1..27
+3. XLSX
 
-4. Markdown report
+4. Telegram
 
-5. XLSX
-
-6. Telegram
 После первого законченного end-to-end report:
-7. regression dataset на нескольких закупках
+5. regression dataset на нескольких закупках
 
 8. ручная проверка качества 27 полей
 
@@ -2010,7 +2008,7 @@ recheck audit
 17. FINAL contract всегда `tender_field_final_v1`.
 18. Один run имеет максимум один FINAL на field_key.
 19. Run readiness определяется DB state.
-20. Future completion должен определяться DB count 27/27.
+20. Completion определяется DB count 27/27 и atomic claim; это подтверждено execution `13863`.
 
 ---
 
@@ -2162,18 +2160,21 @@ TenderPlan
 → Targeted Recheck where required
 → tender_field_final_v1
 → tender_analysis_field_results
-Фактический результат PostgreSQL:
+Фактический результат PostgreSQL в execution `13852`:
 documents = 3
 
-persisted facts = 36
+analysis units = 18
 
-validator verdicts = 36 / 36
+persisted facts = 38
 
-confirmed = 23
-requires_review = 0
-rejected = 13
+confirmed = 20
+requires_review = 10
+rejected = 8
 
 FINAL field results = 27 / 27
+resolved = 11
+requires_review = 3
+not_found = 13
 Это подтверждает работоспособность:
 document processing
 → fact persistence
@@ -2192,15 +2193,18 @@ $input.all()
 
 # 79. Текущая граница end-to-end
 
-Сейчас реальная система заканчивается примерно здесь:
+Текущий live pipeline заканчивается так:
 
 ```text
 Aggregator / Targeted Recheck
 → UPSERT FINAL field result
-→ branch end
+→ Finalization workflow
+→ 27/27 DB barrier
+→ run completed
+→ report generation stub
 ```
 
-Целевая следующая граница:
+Следующая граница MVP:
 
 ```text
 UPSERT FINAL
@@ -2223,10 +2227,8 @@ TR-3
 закрыты.
 Полный integration run уже дал:
 27 / 27 FINAL field results
-Следующий архитектурный milestone:
-AG-0
-Final Field Completion Barrier
-Он должен стать системной точкой перехода:
+AG-0 / Final Field Completion Barrier закрыт live execution `13863`.
+Текущая системная точка перехода:
 fan-out field processing
         ↓
 independent FINAL UPSERTs
@@ -2238,14 +2240,14 @@ single completion claimant
 run.status = completed
         ↓
 single report generation
-После этого впервые появится полностью замкнутый lifecycle:
+В результате уже замкнут lifecycle до report stub:
 tender_id
 → analysis
 → 27 FINAL
 → completed
-→ Markdown
-→ XLSX
-→ Telegram
+→ report generation stub
+
+Остаётся реализовать фактические Markdown / XLSX / Telegram.
 ---
 
 # 81. Краткая схема будущего завершённого MVP

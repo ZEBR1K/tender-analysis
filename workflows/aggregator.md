@@ -1,13 +1,15 @@
 # TENDER — Агрегация закупки
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
+**Последнее обновление:** 2026-08-23
 **Тип:** sub-workflow n8n  
 **Вызывается:** другим workflow после готовности всех документов  
 **Вызывает:** `TENDER - Targeted Recheck`  
 **Финальный контракт поля:** `tender\\\_field\\\_final\\\_v1`  
 **Каталог полей:** `tender\\\_fields\\\_v1`  
-**Основная модель Semantic Aggregator:** `deepseek-v4-pro`
+**AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
+**Основная модель Semantic Aggregator:** `deepseek/deepseek-v4-pro-0813`
+**Reasoning:** через alias модели `@reasoning_effort=low`
 
 \---
 
@@ -30,7 +32,20 @@ Workflow не извлекает новые facts из документов.
 
 &#x20;   	Для полей, переданных в Targeted Recheck, дальнейшая финализация происходит вне текущего execution Aggregator через отдельный sub-workflow.
 
-В intended architecture atomic claim должен предшествовать агрегации. В current production topology claim nodes физически существуют, но не входят в reachable execution graph; текущий gap и последующая финализация описаны в `AG-0`.
+Atomic claim фактически исполняется перед загрузкой фактов: execution `13856` подтвердил `aggregation_claimed=true`. После независимых FINAL UPSERT Aggregator вызывает `TENDER — Финализация анализа`, который выполняет DB-backed 27/27 barrier и atomic completion claim. Report stage вызывается отдельным workflow и пока является stub.
+
+### Downstream finalization
+
+```text
+Aggregator / Targeted Recheck
+→ UPSERT tender_analysis_field_results
+→ TENDER — Финализация анализа
+→ COUNT(unique field_key) = 27
+→ atomic aggregating → completed
+→ TENDER — Генерация отчета (stub)
+```
+
+Finalization workflow ID: `cSsh9yjpS7t5p0OO`. Report stub workflow ID: `ckPnP3hRhKu4Mf9u`.
 
 \---
 
@@ -255,9 +270,7 @@ analysis\\\_run\\\_id
 
 ## 7\. Intended Stage 1 — Atomic Run Claim
 
-`Захватить run для агрегации` и `Продолжать агрегацию?` физически существуют и включены, но в актуальном production topology disconnected от исполняемого графа. Текущий trigger подключён напрямую к `Загрузить факты закупки`.
-
-Описанный ниже claim — intended architecture и prerequisite для текущего AG-0, а не подтверждённый reachable production behavior.
+`Захватить run для агрегации` и `Продолжать агрегацию?` входят в актуальный исполняемый путь. Execution `13856` подтвердил `aggregation_claimed=true` и переход run в `aggregating`.
 
 ### `Захватить run для агрегации`
 
@@ -544,7 +557,7 @@ semantic\\\_block\\\_id
 
 ### `Semantic Aggregator`
 
-**Модель:** `deepseek-v4-pro`
+**Модель:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low` через Polza AI
 
 Настройки:
 
@@ -925,14 +938,14 @@ PK:
 id
 ```
 
-Intended Aggregator lifecycle:
+Актуальный Aggregator lifecycle:
 
 ```text
 ready\\\_for\\\_aggregation
 → aggregating
 ```
 
-Current production topology не подтверждает выполнение claim-перехода; текущий workflow также не переводит run в `completed`.
+После field UPSERT Aggregator передаёт управление Finalization workflow; сам Aggregator не является единственным completion claimant.
 
 \---
 
@@ -1075,8 +1088,8 @@ DO UPDATE
 
 |Сценарий|Статус|Путь|
 |-|-|-|
-|intended atomic claim|⚠️ не подтверждён текущим topology|`ready\\\_for\\\_aggregation → aggregating`|
-|duplicate Aggregator execution guard|⚠️ не подтверждён текущим topology|`aggregation\\\_claimed=false → stop`|
+|atomic claim|✅ подтверждён execution `13856`|`ready\\\_for\\\_aggregation → aggregating`|
+|duplicate Aggregator execution guard|✅ реализован в claim node|`aggregation\\\_claimed=false → stop`|
 |candidate facts есть|✅|Round 1|
 |facts отсутствуют для поля|✅|TenderMeta|
 |Round 1 resolved|✅|FINAL → DB|
@@ -1086,19 +1099,19 @@ DO UPDATE
 |27 field items создаются заранее|✅|grouped field contract|
 |Round 1 FIELD\_RULES на все 27|✅|текущая реализация|
 |FINAL contract `tender_field_final_v1`|✅|Round 1 / Metadata / Targeted Recheck|
-|полный E2E aggregation run|✅|3 documents → 36 facts → 27 FINAL rows|
+|полный E2E aggregation run|✅|3 documents → 38 facts → 27 FINAL rows|
 |в БД реально сохранено ровно 27 FINAL fields|✅ проверено вручную|`tender_analysis_field_results`|
-|completion barrier 27/27|❌|`AG-0`: автоматической проверки и `run → completed` ещё нет|
+|completion barrier 27/27|✅ execution `13863`|`barrier_ready=true`, `completion_claimed=true`, `run → completed`|
 |selective retry DeepSeek|❌|`AG-1`|
 |missing run guard|⚠️ не проверено|`AG-4`|
 
 \---
 
 ## 27\. Known Technical Debt
-### AG-0 — отсутствует DB-backed completion barrier для 27 FINAL fields
+### AG-0 — закрыт для MVP; report stage остаётся stub
 
 **Severity:** Critical  
-**Status:** In progress
+**Status:** ✅ Verified 23.08.2026
 
 В intended architecture до начала основной агрегации должен выполняться переход:
 
@@ -1107,7 +1120,9 @@ ready_for_aggregation
 → aggregating
 ```
 
-Current production state: claim nodes enabled, но disconnected от reachable execution graph; trigger идёт напрямую в `Загрузить факты закупки`. Поэтому восстановление исполняемого atomic aggregation claim — prerequisite для AG-0.
+Live execution `13856` подтвердил reachable atomic claim. Finalization executions `13858–13863` выполнили DB-backed 27/27 check; execution `13863` подтвердил `completion_claimed=true` и `run.status=completed`.
+
+Execution `13864` вызвал `TENDER — Генерация отчета`, но этот workflow пока только фиксирует stub success.
 
 \---
 ### AG-1 — отсутствует selective retry для Semantic Aggregator AI
@@ -1352,9 +1367,9 @@ metadata\\\_resolved=false
 → TENDER - Targeted Recheck
 ```
 
-### A11 — completion barrier
+### A11 — completion barrier (verified)
 
-После `AG-0`:
+После `AG-0`, execution `13863` подтвердил:
 
 ```text
 27 unique FINAL fields
@@ -1376,19 +1391,26 @@ retry только проблемного field item
 
 ### Следующий MVP milestone
 
-1. Реализовать `AG-0`:
+1. Использовать реализованный `AG-0`:
 
 ```text
 FINAL UPSERT
 → DB-backed 27/27 validation
 → atomic run completion claim
 → aggregating → completed
-2. После успешного completion:
+→ report generation stub
+```
+
+2. Реализовать report stage:
+
+```text
 load ordered FINAL fields 1..27
 → build report dataset
 → Markdown
 → XLSX
 → Telegram
+```
+
 3. После первого законченного report E2E:
 regression dataset
 → несколько реальных закупок
@@ -1411,7 +1433,7 @@ TR-8
 
 ## 31\. Краткое резюме для быстрого восстановления контекста
 
-`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis\\\_run`, в intended architecture атомарно захватывает его, загружает candidate facts и создаёт 27 field items. В current production topology claim nodes существуют, но execution graph их обходит.
+`TENDER — Агрегация закупки` — fan-out workflow, который принимает готовый `analysis\\\_run`, атомарно захватывает его, загружает candidate facts и создаёт 27 field items. После независимых FINAL UPSERT вызывается Finalization workflow.
 
 Далее:
 
@@ -1449,20 +1471,14 @@ TENDER - Targeted Recheck
 
 ```text
 3 documents
-→ 36 persisted candidate facts
-→ 36/36 получили validator_verdict
-→ 23 confirmed
-→ 13 rejected
+→ 38 persisted candidate facts
+→ 20 confirmed
+→ 10 requires_review
+→ 8 rejected
 → exactly 27 FINAL field results
+→ Finalization `27/27` + atomic completion claim
+→ `run.status=completed`
+→ report generation stub
 
 
-Главный незакрытый lifecycle gap Aggregator:
-
-```text
-intended: ready_for_aggregation → aggregating
-current: claim nodes disconnected от reachable execution graph
-после восстановления claim всё ещё нужен barrier:
-27 FINAL fields → completed.
-```
-
-Критичный следующий системный шаг после стабилизации Targeted Recheck — `AG-0`.
+AG-0 закрыт для проверенного MVP execution. Следующий этап — фактическая генерация Markdown/XLSX/Telegram вместо текущего report stub.

@@ -4188,3 +4188,55 @@ tender_analysis_field_results
 
 Следующий архитектурный этап:
 анализ вариантов реализации DB-backed 27/27 FINAL field completion barrier.
+
+---
+
+## 23.08.2026 — Polza AI migration and full E2E verification
+
+### AI provider
+
+AI transport в актуальных Extractor, Validator, Semantic Aggregator и Targeted Recheck переведён с DeepSeek API на Polza AI:
+
+```text
+https://polza.ai/api/v1/chat/completions
+```
+
+Используется модель:
+
+```text
+deepseek/deepseek-v4-pro-0813
+```
+
+Параметр `reasoning_effort` задаётся через alias модели:
+
+```text
+@reasoning_effort=none  — Extractor
+@reasoning_effort=low   — Validator / Semantic Aggregator
+```
+
+### Full end-to-end test
+
+Read-only audit execution от 23.08.2026, запуск около 20:13 MSK:
+
+```text
+Orchestrator: 13852
+Document Workers: 13853, 13854, 13855
+Aggregator: 13856
+Targeted Recheck: 13857, 13862
+Finalization: 13858–13863
+Report stub: 13864
+```
+
+Результат PostgreSQL для `analysis_run_id=f9d8e1d7-f01a-4d91-8eac-89c8376535c2`:
+
+```text
+3 documents
+18 analysis units
+38 facts: 20 confirmed, 10 requires_review, 8 rejected
+27 FINAL rows: 11 resolved, 3 requires_review, 13 not_found
+barrier_ready = true
+completion_claimed = true
+run.status = completed
+```
+
+Report workflow был вызван успешно, но остаётся stub: реальные Markdown/XLSX/Telegram outputs ещё не формируются.

@@ -1,8 +1,8 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-22  
-**Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + DeepSeek  
+**Последнее обновление:** 2026-08-23
+**Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI (модель DeepSeek)
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
 
@@ -122,16 +122,15 @@ tender_analysis_field_results
     ↓
 27 / 27 FINAL fields
     ↓
-[ТЕКУЩИЙ GAP]
-DB-backed completion barrier
+TENDER — Финализация анализа
+    ↓
+DB-backed 27/27 barrier
     ↓
 run.status = completed
     ↓
-Markdown
+TENDER — Генерация отчета (stub)
     ↓
-XLSX
-    ↓
-Telegram
+будущие Markdown / XLSX / Telegram
 ```
 
 ---
@@ -246,6 +245,29 @@ targeted retrieval
 ```text
 workflows/targeted-recheck.md
 ```
+
+---
+
+## `TENDER — Финализация анализа`
+
+Проверяет PostgreSQL-backed barrier для одного `analysis_run`:
+
+```text
+27 уникальных FINAL fields
+→ atomic completion claim
+→ aggregating → completed
+→ вызов report generation stub
+```
+
+Workflow ID: `cSsh9yjpS7t5p0OO`.
+
+---
+
+## `TENDER — Генерация отчета`
+
+Текущий workflow является stub: фиксирует вызов report stage, но ещё не создаёт Markdown/XLSX и не отправляет Telegram.
+
+Workflow ID: `ckPnP3hRhKu4Mf9u`.
 
 ---
 
@@ -446,7 +468,7 @@ Run readiness
 ✓
 
 Aggregator atomic claim
-⚠ prerequisite gap: claim nodes существуют, но текущий production execution graph их обходит
+✓ подтверждён execution `13856`
 
 Exactly 27 field items
 ✓
@@ -475,35 +497,31 @@ Full E2E aggregation run
 
 Проверенный результат:
 3 documents
-→ 36 persisted facts
-→ 36/36 validator verdicts
-→ 23 confirmed
-→ 13 rejected
+→ 38 persisted facts
+→ 20 confirmed
+→ 10 requires_review
+→ 8 rejected
 → 27/27 FINAL field results
 ```
 
 ---
 
-## Ещё не завершено
+## Текущий остаток MVP
 
-Текущая последовательность до первого законченного MVP:
+После закрытия AG-0 текущая последовательность выглядит так:
 
 ```text
-восстановить reachable atomic aggregation claim
-ready_for_aggregation → aggregating
+run.status = aggregating
         ↓
-AG-0
-DB-backed 27/27 completion barrier
+TENDER — Финализация анализа
         ↓
-atomic run completion
+27/27 + atomic run completion
         ↓
 run.status = completed
         ↓
-Markdown report
+report generation stub
         ↓
-XLSX
-        ↓
-Telegram
+реальная генерация Markdown / XLSX / Telegram — следующий этап
 ```
 
 ---
@@ -526,10 +544,8 @@ TR-3 ✅ Closed
 
 
 Текущий путь до законченного MVP:
-восстановить reachable atomic aggregation claim
-→ ready_for_aggregation → aggregating
-→ DB-backed 27/27 barrier
-→ run completed
+report generation stage
+→ ordered FINAL 1..27
 → Markdown
 → XLSX
 → Telegram
@@ -542,34 +558,16 @@ TR-3 ✅ Closed
 Текущая точка продолжения:
 
 ```text
-AG-0
-Нужно реализовать DB-backed финализацию всего analysis_run.
-Целевая схема:
-сначала восстановить reachable atomic aggregation claim
-ready_for_aggregation → aggregating
-        ↓
-любой FINAL field UPSERT
-        ↓
-проверка PostgreSQL
-        ↓
-ровно 27 уникальных FINAL fields?
-        ↓ YES
-atomic completion claim
-        ↓
-aggregating → completed
-completed_at = NOW()
-        ↓
-report stage
-Проверка должна быть основана на PostgreSQL, а не на Merge или $input.all(), потому что FINAL-поля могут сохраняться независимыми executions:
-Aggregator
-+
-Targeted Recheck
-После AG-0:
+реализовать фактический report stage:
 load ordered FINAL 1..27
 → Markdown
 → XLSX
 → Telegram
-После исправления обязательно добавить regression test и обновить:
+```
+
+DB-backed completion уже подтверждён execution `13863`: `27/27`, `completion_claimed=true`, `run.status=completed`.
+
+После этого добавить regression test и обновить:
 
 ```text
 TECH_DEBT.md

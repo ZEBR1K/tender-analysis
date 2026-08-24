@@ -1,0 +1,177 @@
+{
+  "name": "TENDER — Финализация анализа",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e409d40d-d064-4046-abc4-7fc5172d7feb",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH expected_fields(field_index, field_key) AS (\n    VALUES\n        (1,  'procurement_subject'),\n        (2,  'nm_price_with_vat'),\n        (3,  'platform'),\n        (4,  'procedure_type'),\n        (5,  'application_deadline'),\n        (6,  'application_review_date'),\n        (7,  'results_date'),\n        (8,  'customer'),\n        (9,  'customer_contacts'),\n        (10, 'participation_cost'),\n        (11, 'participation_guarantee'),\n        (12, 'evaluation_criteria'),\n        (13, 'delivery_term'),\n        (14, 'payment_terms'),\n        (15, 'special_account_or_treasury'),\n        (16, 'bank_support'),\n        (17, 'government_contract'),\n        (18, 'rebidding'),\n        (19, 'national_regime'),\n        (20, 'advance_contract_guarantee'),\n        (21, 'warranty_obligations_guarantee'),\n        (22, 'licenses_certificates'),\n        (23, 'required_official_certificates'),\n        (24, 'similar_supply_experience'),\n        (25, 'analog_allowed'),\n        (26, 'analog_definition'),\n        (27, 'application_documents')\n),\n\nrun_state AS (\n    SELECT\n        id,\n        status\n    FROM tender_analysis_runs\n    WHERE id = $1::uuid\n),\n\nactual_fields AS (\n    SELECT\n        field_index,\n        field_key,\n        field_catalog_version,\n        result_contract_version,\n        status\n    FROM tender_analysis_field_results\n    WHERE analysis_run_id = $1::uuid\n),\n\nstats AS (\n    SELECT\n        COUNT(*)::int AS final_count,\n\n        COUNT(*) FILTER (\n            WHERE status IN (\n                'resolved',\n                'requires_review',\n                'not_found'\n            )\n        )::int AS valid_status_count,\n\n        COUNT(*) FILTER (\n            WHERE field_catalog_version = 'tender_fields_v1'\n        )::int AS valid_catalog_count,\n\n        COUNT(*) FILTER (\n            WHERE result_contract_version = 'tender_field_final_v1'\n        )::int AS valid_contract_count\n    FROM actual_fields\n),\n\nmissing_fields AS (\n    SELECT ARRAY_AGG(\n        e.field_key\n        ORDER BY e.field_index\n    ) AS keys\n    FROM expected_fields e\n    LEFT JOIN actual_fields a\n        ON a.field_index = e.field_index\n       AND a.field_key = e.field_key\n    WHERE a.field_key IS NULL\n),\n\nunexpected_fields AS (\n    SELECT ARRAY_AGG(\n        a.field_key\n        ORDER BY a.field_index\n    ) AS keys\n    FROM actual_fields a\n    LEFT JOIN expected_fields e\n        ON e.field_index = a.field_index\n       AND e.field_key = a.field_key\n    WHERE e.field_key IS NULL\n),\n\ninvalid_status_fields AS (\n    SELECT ARRAY_AGG(\n        field_key\n        ORDER BY field_index\n    ) AS keys\n    FROM actual_fields\n    WHERE status NOT IN (\n        'resolved',\n        'requires_review',\n        'not_found'\n    )\n),\n\ninvalid_catalog_fields AS (\n    SELECT ARRAY_AGG(\n        field_key\n        ORDER BY field_index\n    ) AS keys\n    FROM actual_fields\n    WHERE field_catalog_version <> 'tender_fields_v1'\n),\n\ninvalid_contract_fields AS (\n    SELECT ARRAY_AGG(\n        field_key\n        ORDER BY field_index\n    ) AS keys\n    FROM actual_fields\n    WHERE result_contract_version <> 'tender_field_final_v1'\n),\n\nbarrier AS (\n    SELECT\n        EXISTS (\n            SELECT 1\n            FROM run_state\n        ) AS run_exists,\n\n        (SELECT status FROM run_state LIMIT 1) AS run_status_before,\n\n        s.final_count,\n\n        COALESCE(m.keys, ARRAY[]::text[]) AS missing_keys,\n        COALESCE(u.keys, ARRAY[]::text[]) AS unexpected_keys,\n        COALESCE(ist.keys, ARRAY[]::text[]) AS invalid_status_keys,\n        COALESCE(ic.keys, ARRAY[]::text[]) AS invalid_catalog_keys,\n        COALESCE(irc.keys, ARRAY[]::text[]) AS invalid_contract_keys,\n\n        (\n            s.final_count = 27\n            AND s.valid_status_count = 27\n            AND s.valid_catalog_count = 27\n            AND s.valid_contract_count = 27\n            AND COALESCE(cardinality(m.keys), 0) = 0\n            AND COALESCE(cardinality(u.keys), 0) = 0\n        ) AS barrier_ready\n\n    FROM stats s\n    CROSS JOIN missing_fields m\n    CROSS JOIN unexpected_fields u\n    CROSS JOIN invalid_status_fields ist\n    CROSS JOIN invalid_catalog_fields ic\n    CROSS JOIN invalid_contract_fields irc\n),\n\ncompletion_claim AS (\n    UPDATE tender_analysis_runs r\n    SET\n        status = 'completed',\n        completed_at = COALESCE(r.completed_at, NOW()),\n        updated_at = NOW()\n    FROM barrier b\n    WHERE r.id = $1::uuid\n      AND r.status = 'aggregating'\n      AND b.barrier_ready = true\n    RETURNING r.id\n)\n\nSELECT\n    $1::uuid AS analysis_run_id,\n\n    b.run_exists,\n    b.run_status_before,\n    b.final_count,\n    b.barrier_ready,\n\n    EXISTS (\n        SELECT 1\n        FROM completion_claim\n    ) AS completion_claimed,\n\n    b.missing_keys,\n    b.unexpected_keys,\n    b.invalid_status_keys,\n    b.invalid_catalog_keys,\n    b.invalid_contract_keys,\n\n    CASE\n        WHEN NOT b.run_exists\n            THEN 'run_not_found'\n\n        WHEN b.barrier_ready\n             AND b.run_status_before = 'ready_for_aggregation'\n            THEN 'invalid_lifecycle_ready_for_aggregation'\n\n        WHEN b.barrier_ready\n             AND b.run_status_before NOT IN ('aggregating', 'completed')\n            THEN 'invalid_lifecycle_status'\n\n        WHEN b.barrier_ready\n             AND b.run_status_before = 'completed'\n            THEN 'already_completed'\n\n        WHEN NOT b.barrier_ready\n            THEN 'waiting_for_final_fields'\n\n        WHEN EXISTS (\n            SELECT 1\n            FROM completion_claim\n        )\n            THEN 'completed_now'\n\n        ELSE 'completion_not_claimed'\n    END AS finalization_state\n\nFROM barrier b;",
+        "options": {
+          "queryReplacement": "={{ [$json.analysis_run_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "fc9f8ad5-03dd-4447-b9be-e0f6f6bb26dd",
+      "name": "Проверить 27 FINAL и завершить run",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\n\nif (!input.analysis_run_id) {\n  throw new Error(\n    '[Проверить результат финализации] Нет analysis_run_id'\n  );\n}\n\nif (typeof input.finalization_state !== 'string') {\n  throw new Error(\n    '[Проверить результат финализации] Нет finalization_state'\n  );\n}\n\n// ------------------------------------------------------------\n// Ошибочные состояния.\n// Их нельзя молча трактовать как \"ещё не готово\".\n// ------------------------------------------------------------\n\nconst hardErrors = new Set([\n  'run_not_found',\n  'invalid_lifecycle_ready_for_aggregation',\n  'invalid_lifecycle_status',\n  'completion_not_claimed',\n]);\n\nif (hardErrors.has(input.finalization_state)) {\n  throw new Error(\n    `[Проверить результат финализации] Ошибка финализации run ${input.analysis_run_id}: ` +\n    `${input.finalization_state}; ` +\n    `run_status_before=${input.run_status_before ?? 'null'}; ` +\n    `final_count=${input.final_count ?? 'null'}; ` +\n    `missing_keys=${JSON.stringify(input.missing_keys ?? [])}; ` +\n    `unexpected_keys=${JSON.stringify(input.unexpected_keys ?? [])}; ` +\n    `invalid_status_keys=${JSON.stringify(input.invalid_status_keys ?? [])}; ` +\n    `invalid_catalog_keys=${JSON.stringify(input.invalid_catalog_keys ?? [])}; ` +\n    `invalid_contract_keys=${JSON.stringify(input.invalid_contract_keys ?? [])}`\n  );\n}\n\n// ------------------------------------------------------------\n// Допустимые состояния.\n//\n// waiting_for_final_fields:\n//   пока не все 27 FINAL готовы.\n//\n// completed_now:\n//   именно этот execution атомарно завершил run.\n//\n// already_completed:\n//   повторный безопасный вызов Finalizer.\n// ------------------------------------------------------------\n\nconst allowedStates = new Set([\n  'waiting_for_final_fields',\n  'completed_now',\n  'already_completed',\n]);\n\nif (!allowedStates.has(input.finalization_state)) {\n  throw new Error(\n    `[Проверить результат финализации] Неизвестное состояние: ${input.finalization_state}`\n  );\n}\n\nreturn [\n  {\n    json: input,\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "92eb10e1-1232-4353-950f-dc0b9837612c",
+      "name": "Проверить результат финализации"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "598be6a0-1ac0-44d1-9937-86bb3639e0ca",
+              "leftValue": "={{ $json.completion_claimed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1cd377a3-7c6c-4375-8abf-4d635d16072d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ckPnP3hRhKu4Mf9u",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ckPnP3hRhKu4Mf9u",
+          "cachedResultName": "TENDER — Генерация отчета"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        -32
+      ],
+      "id": "7ff8e6cc-3085-4ff7-bd95-15862caaff85",
+      "name": "Call 'TENDER — Генерация отчета'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Проверить 27 FINAL и завершить run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить 27 FINAL и завершить run": {
+      "main": [
+        [
+          {
+            "node": "Проверить результат финализации",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить результат финализации": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Генерация отчета'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "742051fe-a58a-4e03-afa6-6233c0177247",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
+  },
+  "nodeGroups": [],
+  "id": "cSsh9yjpS7t5p0OO",
+  "tags": []
+}
