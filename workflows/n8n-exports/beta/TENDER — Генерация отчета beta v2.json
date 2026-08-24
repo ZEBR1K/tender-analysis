@@ -1,0 +1,402 @@
+{
+  "name": "TENDER — Генерация отчета",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d819afe8-49fb-461a-b4be-505991e127f9",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\n\n// Проверяем наличие analysis_run_id\nif (!input.analysis_run_id) {\n  throw new Error(\n    'Report Generation: отсутствует analysis_run_id'\n  );\n}\n\n// Проверяем, что финализация реально завершилась\nif (input.completion_claimed !== true) {\n  throw new Error(\n    'Report Generation: completion_claimed=false. Отчёт не создаётся'\n  );\n}\n\n// Проверяем barrier\nif (input.barrier_ready !== true) {\n  throw new Error(\n    'Report Generation: barrier_ready=false. Анализ не готов'\n  );\n}\n\n// Проверяем количество полей\nif (input.final_count !== 27) {\n  throw new Error(\n    `Report Generation: ожидалось 27 FINAL полей, получено ${input.final_count}`\n  );\n}\n\n\nreturn [\n  {\n    json: {\n      analysis_run_id: input.analysis_run_id,\n      final_count: input.final_count,\n      finalization_state: input.finalization_state,\n      report_generation_started: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "78ac2a9b-51de-4314-9cb4-6f3c3b62ebe9",
+      "name": "Проверить результат финализации"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH analysis_run AS (\n  SELECT\n    status,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    tender_meta\n  FROM tender_analysis_runs\n  WHERE id = $1::uuid\n),\nfield_results AS (\n  SELECT\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    result_json\n  FROM tender_analysis_field_results\n  WHERE analysis_run_id = $1::uuid\n),\ndocuments AS (\n  SELECT\n    id AS document_id,\n    document_index,\n    file_name,\n    display_name,\n    file_extension\n  FROM tender_analysis_documents\n  WHERE analysis_run_id = $1::uuid\n),\nfacts AS (\n  SELECT\n    id AS fact_id,\n    field_key,\n    document_id,\n    analysis_unit_id,\n    validator_verdict,\n    evidence\n  FROM tender_analysis_facts\n  WHERE analysis_run_id = $1::uuid\n),\nunits AS (\n  SELECT\n    document_id,\n    analysis_unit_id,\n    source_pages,\n    ai_segments,\n    provenance\n  FROM tender_analysis_units\n  WHERE analysis_run_id = $1::uuid\n)\nSELECT jsonb_build_object(\n  'snapshot_version', 'tender_report_snapshot_v2',\n  'analysis_run_id', $1::uuid,\n  'analysis_run', COALESCE(\n    (\n      SELECT jsonb_build_object(\n        'status', status,\n        'tender_id', tender_id,\n        'tender_number', tender_number,\n        'tender_external_id', tender_external_id,\n        'tender_meta', tender_meta\n      )\n      FROM analysis_run\n    ),\n    'null'::jsonb\n  ),\n  'field_results', COALESCE(\n    (\n      SELECT jsonb_agg(\n        jsonb_build_object(\n          'field_index', field_index,\n          'field_key', field_key,\n          'status', status,\n          'value_text', value_text,\n          'confidence', confidence,\n          'requires_human_review', requires_human_review,\n          'result_json', result_json\n        )\n        ORDER BY field_index\n      )\n      FROM field_results\n    ),\n    '[]'::jsonb\n  ),\n  'source_index', jsonb_build_object(\n    'documents', COALESCE(\n      (SELECT jsonb_agg(to_jsonb(documents) ORDER BY document_index) FROM documents),\n      '[]'::jsonb\n    ),\n    'facts', COALESCE(\n      (SELECT jsonb_agg(to_jsonb(facts) ORDER BY fact_id) FROM facts),\n      '[]'::jsonb\n    ),\n    'units', COALESCE(\n      (SELECT jsonb_agg(to_jsonb(units) ORDER BY analysis_unit_id) FROM units),\n      '[]'::jsonb\n    )\n  )\n) AS report_snapshot;",
+        "options": {
+          "queryReplacement": "={{ [$json.analysis_run_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "ec313c86-a3e2-4903-b0a8-8076f9b54a18",
+      "name": "Получить Report Snapshot",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const snapshot = $json.report_snapshot;\n\nconst EXPECTED_SNAPSHOT_VERSION = 'tender_report_snapshot_v2';\nconst EXPECTED_FIELD_CONTRACT_KEYS = [\n  'field_index',\n  'field_key',\n  'status',\n  'value_text',\n  'confidence',\n  'requires_human_review',\n  'result_json',\n];\nconst EXPECTED_FIELDS = [\n  [1, 'procurement_subject'],\n  [2, 'nm_price_with_vat'],\n  [3, 'platform'],\n  [4, 'procedure_type'],\n  [5, 'application_deadline'],\n  [6, 'application_review_date'],\n  [7, 'results_date'],\n  [8, 'customer'],\n  [9, 'customer_contacts'],\n  [10, 'participation_cost'],\n  [11, 'participation_guarantee'],\n  [12, 'evaluation_criteria'],\n  [13, 'delivery_term'],\n  [14, 'payment_terms'],\n  [15, 'special_account_or_treasury'],\n  [16, 'bank_support'],\n  [17, 'government_contract'],\n  [18, 'rebidding'],\n  [19, 'national_regime'],\n  [20, 'advance_contract_guarantee'],\n  [21, 'warranty_obligations_guarantee'],\n  [22, 'licenses_certificates'],\n  [23, 'required_official_certificates'],\n  [24, 'similar_supply_experience'],\n  [25, 'analog_allowed'],\n  [26, 'analog_definition'],\n  [27, 'application_documents'],\n];\n\nif (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {\n  throw new Error('[Проверить Report Snapshot] REPORT_SNAPSHOT_SHAPE_INVALID: нет объекта report_snapshot');\n}\n\nif (snapshot.snapshot_version !== EXPECTED_SNAPSHOT_VERSION) {\n  throw new Error(\n    `[Проверить Report Snapshot] REPORT_SNAPSHOT_SHAPE_INVALID: snapshot_version=${snapshot.snapshot_version ?? 'null'}`\n  );\n}\n\nif (!snapshot.analysis_run || typeof snapshot.analysis_run !== 'object' || Array.isArray(snapshot.analysis_run)) {\n  throw new Error('[Проверить Report Snapshot] REPORT_RUN_NOT_COMPLETED: analysis_run отсутствует');\n}\n\nif (snapshot.analysis_run.status !== 'completed') {\n  throw new Error(\n    `[Проверить Report Snapshot] REPORT_RUN_NOT_COMPLETED: status=${snapshot.analysis_run.status ?? 'null'}`\n  );\n}\n\nif (!Array.isArray(snapshot.field_results)) {\n  throw new Error('[Проверить Report Snapshot] REPORT_SNAPSHOT_FIELD_COUNT_INVALID: field_results не массив');\n}\n\nif (snapshot.field_results.length !== EXPECTED_FIELDS.length) {\n  throw new Error(\n    `[Проверить Report Snapshot] REPORT_SNAPSHOT_FIELD_COUNT_INVALID: получено ${snapshot.field_results.length}, ожидалось ${EXPECTED_FIELDS.length}`\n  );\n}\n\nfor (let index = 0; index < EXPECTED_FIELDS.length; index += 1) {\n  const [expectedIndex, expectedKey] = EXPECTED_FIELDS[index];\n  const field = snapshot.field_results[index];\n\n  if (!field || field.field_index !== expectedIndex || field.field_key !== expectedKey) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: ожидалось ${expectedIndex}/${expectedKey}, получено ${field?.field_index ?? 'null'}/${field?.field_key ?? 'null'}`\n    );\n  }\n\n  const actualKeys = Object.keys(field).sort();\n  const expectedKeys = [...EXPECTED_FIELD_CONTRACT_KEYS].sort();\n  if (actualKeys.length !== expectedKeys.length || actualKeys.some((key, keyIndex) => key !== expectedKeys[keyIndex])) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: ${expectedKey} не содержит exact seven-field contract`\n    );\n  }\n\n  if (!['resolved', 'requires_review', 'not_found'].includes(field.status)) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: недопустимый status для ${expectedKey}`\n    );\n  }\n\n  const confidenceIsValid = field.confidence === null || (\n    typeof field.confidence === 'number'\n    && Number.isFinite(field.confidence)\n    && field.confidence >= 0\n    && field.confidence <= 1\n  );\n\n  if (!confidenceIsValid || typeof field.requires_human_review !== 'boolean') {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: confidence/requires_human_review для ${expectedKey}`\n    );\n  }\n\n  if (field.status === 'resolved' && (\n    typeof field.value_text !== 'string'\n    || !field.value_text.trim()\n    || field.confidence === null\n    || field.requires_human_review !== false\n  )) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: resolved invariant для ${expectedKey}`\n    );\n  }\n\n  if (field.status === 'requires_review' && field.requires_human_review !== true) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: requires_review invariant для ${expectedKey}`\n    );\n  }\n\n  if (field.status === 'not_found' && (\n    field.value_text !== null\n    || field.confidence !== null\n    || field.requires_human_review !== false\n  )) {\n    throw new Error(\n      `[Проверить Report Snapshot] REPORT_ANALYSIS_CONTRACT_CHANGED: not_found invariant для ${expectedKey}`\n    );\n  }\n}\n\nconst sourceIndex = snapshot.source_index;\nif (!sourceIndex || typeof sourceIndex !== 'object' || Array.isArray(sourceIndex)\n  || !Array.isArray(sourceIndex.documents)\n  || !Array.isArray(sourceIndex.facts)\n  || !Array.isArray(sourceIndex.units)) {\n  throw new Error('[Проверить Report Snapshot] REPORT_SNAPSHOT_SOURCE_INDEX_INVALID');\n}\n\nreturn [\n  {\n    json: {\n      report_snapshot: {\n        ...snapshot,\n        snapshot_validation: {\n          valid: true,\n          field_count: snapshot.field_results.length,\n          indexes_valid: true,\n          keys_valid: true,\n          contract_valid: true,\n        },\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "25f2a3fe-a926-4caa-8f66-5a5a3d175120",
+      "name": "Проверить Report Snapshot"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\nFROM tender_analysis_field_results\nWHERE analysis_run_id = $1\nORDER BY field_index;",
+        "options": {
+          "queryReplacement": "={{ $json.analysis_run_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "a8360e79-4ffd-4432-9973-3f868dc0f1c3",
+      "name": "Получить результаты анализа",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst snapshot = input.report_snapshot;\n\nconst PRESENTATION = {\n  procurement_subject: { title: 'Предмет закупки', section: 'Общая информация' },\n  nm_price_with_vat: { title: 'НМЦ (с НДС)', section: 'Общая информация' },\n  platform: { title: 'Площадка', section: 'Общая информация' },\n  procedure_type: { title: 'Тип процедуры', section: 'Общая информация' },\n  application_deadline: { title: 'Срок окончания приема заявок', section: 'Сроки' },\n  application_review_date: { title: 'Дата рассмотрения заявок', section: 'Сроки' },\n  results_date: { title: 'Дата подведения итогов', section: 'Сроки' },\n  customer: { title: 'Заказчик', section: 'Заказчик' },\n  customer_contacts: { title: 'Контактная информация Заказчика', section: 'Заказчик' },\n  participation_cost: { title: 'Стоимость участия', section: 'Условия участия' },\n  participation_guarantee: { title: 'БГ на участие', section: 'Условия участия' },\n  evaluation_criteria: { title: 'Критерии оценки', section: 'Условия участия' },\n  delivery_term: { title: 'Срок поставки (исполнения)', section: 'Исполнение договора' },\n  payment_terms: { title: 'Условия оплаты', section: 'Исполнение договора' },\n  special_account_or_treasury: { title: 'Спецсчет/казна', section: 'Исполнение договора' },\n  bank_support: { title: 'Банковское сопровождение', section: 'Исполнение договора' },\n  government_contract: { title: 'Госконтракт', section: 'Договор' },\n  rebidding: { title: 'Переторжка', section: 'Условия участия' },\n  national_regime: { title: 'Национальный режим', section: 'Требования' },\n  advance_contract_guarantee: { title: 'БГ аванс', section: 'Договор' },\n  warranty_obligations_guarantee: { title: 'БГ гарантийные обязательства', section: 'Договор' },\n  licenses_certificates: { title: 'Лицензии/сертификаты', section: 'Требования' },\n  required_official_certificates: { title: 'Необходимые справки', section: 'Требования' },\n  similar_supply_experience: { title: 'Опыт аналогичных поставок', section: 'Требования' },\n  analog_allowed: { title: 'Допускается ли аналог', section: 'Требования' },\n  analog_definition: { title: 'Что считается аналогом', section: 'Требования' },\n  application_documents: { title: 'Состав заявки', section: 'Требования' },\n};\n\nif (!snapshot || snapshot.snapshot_validation?.valid !== true) {\n  throw new Error('[Адаптировать поля отчёта] REPORT_SNAPSHOT_NOT_VALIDATED');\n}\n\nif (!Array.isArray(snapshot.field_results) || !snapshot.source_index) {\n  throw new Error('[Адаптировать поля отчёта] REPORT_SNAPSHOT_SHAPE_INVALID');\n}\n\nfunction asArray(value) {\n  return Array.isArray(value) ? value : [];\n}\n\nfunction asLookup(items, key) {\n  const lookup = new Map();\n  for (const item of asArray(items)) {\n    const value = item?.[key];\n    if (value === null || value === undefined) continue;\n    const normalized = String(value);\n    const matches = lookup.get(normalized) ?? [];\n    matches.push(item);\n    lookup.set(normalized, matches);\n  }\n  return lookup;\n}\n\nfunction documentName(document) {\n  if (typeof document === 'string' && document.trim()) return document;\n  if (!document || typeof document !== 'object') return null;\n  return document.file_name ?? document.display_name ?? document.name ?? null;\n}\n\nfunction nullable(value) {\n  return value === undefined || value === '' ? null : value;\n}\n\nfunction findSemanticBlockMatches(value, semanticBlockId, matches, visited = new Set()) {\n  if (!value || typeof value !== 'object' || visited.has(value)) return;\n  visited.add(value);\n  if (value.semantic_block_id === semanticBlockId) matches.add(true);\n  for (const nested of Object.values(value)) {\n    findSemanticBlockMatches(nested, semanticBlockId, matches, visited);\n  }\n}\n\nconst documentsById = asLookup(snapshot.source_index.documents, 'document_id');\nconst factsById = asLookup(snapshot.source_index.facts, 'fact_id');\nconst unitsByAnalysisUnitId = asLookup(snapshot.source_index.units, 'analysis_unit_id');\n\nfunction resolveUnitBySemanticBlock(semanticBlockId) {\n  const matches = [];\n  for (const unit of asArray(snapshot.source_index.units)) {\n    const found = new Set();\n    findSemanticBlockMatches(unit.ai_segments, semanticBlockId, found);\n    findSemanticBlockMatches(unit.provenance, semanticBlockId, found);\n    if (found.size > 0) matches.push(unit);\n  }\n  return matches;\n}\n\nfunction locationFromEvidence(evidence, unit) {\n  const pages = asArray(unit?.source_pages).filter(page => page !== null && page !== undefined);\n  return {\n    page: nullable(evidence.page_from ?? pages[0]),\n    page_to: nullable(evidence.page_to ?? pages[pages.length - 1]),\n    sheet: nullable(evidence.sheet_name ?? evidence.sheet),\n    quote: nullable(evidence.quote ?? evidence.text),\n  };\n}\n\nfunction sourceFromEvidence(evidence, field, diagnostics) {\n  if (evidence?.source_type === 'tender_metadata') {\n    return {\n      source: {\n        kind: 'tender_metadata',\n        document: 'TenderPlan — карточка закупки',\n        page: null,\n        page_to: null,\n        sheet: null,\n        quote: null,\n        location_status: 'not_applicable',\n      },\n      metadata: true,\n      documentResolved: false,\n    };\n  }\n\n  const diagnosticStart = diagnostics.length;\n  const embeddedDocument = documentName(evidence?.document);\n  const candidateRef = typeof evidence?.candidate_ref === 'string' ? evidence.candidate_ref : null;\n  const referencedFactId = candidateRef?.startsWith('fact:')\n    ? candidateRef.slice('fact:'.length)\n    : (typeof evidence?.fact_id === 'string' ? evidence.fact_id : null);\n\n  let fact = null;\n  let unit = null;\n  let resolvedDocument = embeddedDocument;\n\n  if (referencedFactId) {\n    const factMatches = factsById.get(referencedFactId) ?? [];\n    if (factMatches.length !== 1) {\n      diagnostics.push({\n        field_index: field.field_index,\n        field_key: field.field_key,\n        reason: factMatches.length === 0 ? 'fact_reference_not_found' : 'fact_reference_ambiguous',\n      });\n    } else {\n      fact = factMatches[0];\n      const factDocumentMatches = documentsById.get(String(fact.document_id)) ?? [];\n      if (!resolvedDocument && factDocumentMatches.length === 1) {\n        resolvedDocument = documentName(factDocumentMatches[0]);\n      }\n      if (factDocumentMatches.length > 1) {\n        diagnostics.push({ field_index: field.field_index, field_key: field.field_key, reason: 'fact_document_ambiguous' });\n      }\n      const factUnitMatches = unitsByAnalysisUnitId.get(String(fact.analysis_unit_id)) ?? [];\n      if (factUnitMatches.length === 1) unit = factUnitMatches[0];\n    }\n  }\n\n  if (!unit && typeof evidence?.analysis_unit_id === 'string') {\n    const unitMatches = unitsByAnalysisUnitId.get(evidence.analysis_unit_id) ?? [];\n    if (unitMatches.length === 1) {\n      unit = unitMatches[0];\n    } else {\n      diagnostics.push({\n        field_index: field.field_index,\n        field_key: field.field_key,\n        reason: unitMatches.length === 0 ? 'analysis_unit_not_found' : 'analysis_unit_ambiguous',\n      });\n    }\n  }\n\n  if (!unit && typeof evidence?.semantic_block_id === 'string') {\n    const semanticMatches = resolveUnitBySemanticBlock(evidence.semantic_block_id);\n    if (semanticMatches.length === 1) {\n      unit = semanticMatches[0];\n    } else if (!referencedFactId) {\n      diagnostics.push({\n        field_index: field.field_index,\n        field_key: field.field_key,\n        reason: semanticMatches.length === 0 ? 'semantic_block_not_found' : 'semantic_block_ambiguous',\n      });\n    }\n  }\n\n  if (!resolvedDocument && unit) {\n    const unitDocumentMatches = documentsById.get(String(unit.document_id)) ?? [];\n    if (unitDocumentMatches.length === 1) {\n      resolvedDocument = documentName(unitDocumentMatches[0]);\n    } else if (unitDocumentMatches.length > 1) {\n      diagnostics.push({ field_index: field.field_index, field_key: field.field_key, reason: 'unit_document_ambiguous' });\n    }\n  }\n\n  if (!resolvedDocument && !referencedFactId && !unit && !embeddedDocument) {\n    diagnostics.push({ field_index: field.field_index, field_key: field.field_key, reason: 'source_reference_missing' });\n  } else if (!resolvedDocument && referencedFactId) {\n    diagnostics.push({ field_index: field.field_index, field_key: field.field_key, reason: 'document_name_unresolved' });\n  }\n\n  const location = locationFromEvidence(evidence ?? {}, unit);\n  const hasAmbiguousLocation = diagnostics\n    .slice(diagnosticStart)\n    .some(diagnostic => diagnostic.reason.endsWith('_ambiguous'));\n\n  return {\n    source: {\n      kind: 'document',\n      document: resolvedDocument ?? null,\n      ...location,\n      location_status: resolvedDocument\n        ? (location.page !== null || location.sheet !== null ? 'exact' : 'unavailable')\n        : (hasAmbiguousLocation ? 'ambiguous' : 'unavailable'),\n    },\n    metadata: false,\n    documentResolved: Boolean(resolvedDocument),\n  };\n}\n\nconst unresolvedSourceReferences = [];\nconst metrics = {\n  evidence_processed: 0,\n  document_sources_resolved: 0,\n  metadata_sources: 0,\n};\n\nfunction statusText(status) {\n  switch (status) {\n    case 'resolved':\n      return 'Подтверждено';\n    case 'requires_review':\n      return 'Требует проверки';\n    case 'not_found':\n      return 'Не найдено';\n    default:\n      throw new Error(`[Адаптировать поля отчёта] REPORT_ANALYSIS_CONTRACT_MUTATED: status=${status}`);\n  }\n}\n\nconst adaptedFields = snapshot.field_results.map(field => {\n  const presentation = PRESENTATION[field.field_key];\n  if (!presentation) {\n    throw new Error(`[Адаптировать поля отчёта] REPORT_FIELD_MAPPING_INCOMPLETE: ${field.field_key}`);\n  }\n\n  const analysisResult = { ...field };\n  const evidence = field.status === 'not_found'\n    ? []\n    : asArray(field.result_json?.evidence);\n  const sources = [];\n  const sourceKeys = new Set();\n\n  for (const item of evidence) {\n    metrics.evidence_processed += 1;\n    const resolved = sourceFromEvidence(item, field, unresolvedSourceReferences);\n    if (resolved.metadata) metrics.metadata_sources += 1;\n    if (resolved.documentResolved) metrics.document_sources_resolved += 1;\n\n    const sourceKey = JSON.stringify(resolved.source);\n    if (!sourceKeys.has(sourceKey)) {\n      sourceKeys.add(sourceKey);\n      sources.push(resolved.source);\n    }\n  }\n\n  return {\n    analysis_result: analysisResult,\n    presentation: {\n      client_field_name: presentation.title,\n      section_name: presentation.section,\n      status_text: statusText(field.status),\n    },\n    sources,\n  };\n});\n\nreturn [\n  {\n    json: {\n      adapter_version: 'tender_report_adapter_v2',\n      analysis_run_id: snapshot.analysis_run_id,\n      analysis_run: snapshot.analysis_run,\n      adapted_fields: adaptedFields,\n      adapter_diagnostics: {\n        ...metrics,\n        unresolved_source_references: unresolvedSourceReferences,\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "f9ac15f2-3c87-45cc-9c13-338853537973",
+      "name": "Адаптировать поля отчёта"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\n\nif (input.adapter_version !== 'tender_report_adapter_v2') {\n  throw new Error('[Собрать Report Model] REPORT_MODEL_INVALID: adapter_version');\n}\n\nif (!input.analysis_run_id || !input.analysis_run || typeof input.analysis_run !== 'object') {\n  throw new Error('[Собрать Report Model] REPORT_MODEL_INVALID: analysis_run');\n}\n\nif (!Array.isArray(input.adapted_fields)) {\n  throw new Error('[Собрать Report Model] REPORT_MODEL_INVALID: adapted_fields');\n}\n\n// Metadata is presentation-only. Invalid or missing metadata is represented by null,\n// never by substituting a canonical FINAL result.\nconst tenderMeta = input.analysis_run.tender_meta\n  && typeof input.analysis_run.tender_meta === 'object'\n  && !Array.isArray(input.analysis_run.tender_meta)\n  ? input.analysis_run.tender_meta\n  : {};\n\nconst customer = tenderMeta.primary_customer?.name\n  ?? tenderMeta.customers?.[0]?.name\n  ?? null;\n\nconst procurement = {\n  number: tenderMeta.tender_number ?? null,\n  subject: tenderMeta.title ?? null,\n  customer,\n  platform: tenderMeta.platform?.name ?? null,\n  price: tenderMeta.max_price ?? null,\n  publication_at: tenderMeta.publication_at ?? null,\n};\n\nconst statistics = {\n  total: input.adapted_fields.length,\n  resolved: 0,\n  requires_review: 0,\n  not_found: 0,\n};\n\nfor (const field of input.adapted_fields) {\n  const status = field?.analysis_result?.status;\n  if (!Object.hasOwn(statistics, status)) {\n    throw new Error(\n      `[Собрать Report Model] REPORT_MODEL_INVALID: status=${status ?? 'null'}`\n    );\n  }\n  statistics[status] += 1;\n}\n\n// Preserve the adapted objects themselves. Report Model does not normalize\n// canonical analysis_result, presentation, or sources.\nconst fields = input.adapted_fields;\n\nconst attentionFieldIndexes = fields\n  .filter(field => field.analysis_result.requires_human_review === true)\n  .map(field => field.analysis_result.field_index);\n\nreturn [\n  {\n    json: {\n      report_model_version: 'tender_report_model_v2',\n      internal: {\n        analysis_run_id: input.analysis_run_id,\n        snapshot_version: 'tender_report_snapshot_v2',\n      },\n      procurement,\n      statistics,\n      fields,\n      attention_field_indexes: attentionFieldIndexes,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        496
+      ],
+      "id": "abb18040-4f09-4d11-a50d-5a4ea43f9d86",
+      "name": "Собрать Report Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "const model = $json;\n\nconst EXPECTED_FIELDS = [\n  [1, 'procurement_subject'],\n  [2, 'nm_price_with_vat'],\n  [3, 'platform'],\n  [4, 'procedure_type'],\n  [5, 'application_deadline'],\n  [6, 'application_review_date'],\n  [7, 'results_date'],\n  [8, 'customer'],\n  [9, 'customer_contacts'],\n  [10, 'participation_cost'],\n  [11, 'participation_guarantee'],\n  [12, 'evaluation_criteria'],\n  [13, 'delivery_term'],\n  [14, 'payment_terms'],\n  [15, 'special_account_or_treasury'],\n  [16, 'bank_support'],\n  [17, 'government_contract'],\n  [18, 'rebidding'],\n  [19, 'national_regime'],\n  [20, 'advance_contract_guarantee'],\n  [21, 'warranty_obligations_guarantee'],\n  [22, 'licenses_certificates'],\n  [23, 'required_official_certificates'],\n  [24, 'similar_supply_experience'],\n  [25, 'analog_allowed'],\n  [26, 'analog_definition'],\n  [27, 'application_documents'],\n];\nconst CANONICAL_KEYS = [\n  'field_index',\n  'field_key',\n  'status',\n  'value_text',\n  'confidence',\n  'requires_human_review',\n  'result_json',\n].sort();\nconst PRESENTATION_KEYS = [\n  'client_field_name',\n  'section_name',\n  'status_text',\n].sort();\nconst SOURCE_KEYS = [\n  'kind',\n  'document',\n  'page',\n  'page_to',\n  'sheet',\n  'quote',\n  'location_status',\n].sort();\n\nfunction hasExactKeys(value, expectedKeys) {\n  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;\n  const actualKeys = Object.keys(value).sort();\n  return actualKeys.length === expectedKeys.length\n    && actualKeys.every((key, index) => key === expectedKeys[index]);\n}\n\nfunction expectedStatusText(status) {\n  switch (status) {\n    case 'resolved':\n      return 'Подтверждено';\n    case 'requires_review':\n      return 'Требует проверки';\n    case 'not_found':\n      return 'Не найдено';\n    default:\n      return null;\n  }\n}\n\nif (model.report_model_version !== 'tender_report_model_v2') {\n  throw new Error('[Проверить Report Model] REPORT_MODEL_INVALID: report_model_version');\n}\n\nif (!model.internal || !model.internal.analysis_run_id) {\n  throw new Error('[Проверить Report Model] REPORT_MODEL_INVALID: internal');\n}\n\nif (!model.procurement || typeof model.procurement !== 'object' || Array.isArray(model.procurement)) {\n  throw new Error('[Проверить Report Model] REPORT_MODEL_INVALID: procurement');\n}\n\nif (!Array.isArray(model.fields) || model.fields.length !== EXPECTED_FIELDS.length) {\n  throw new Error(\n    `[Проверить Report Model] REPORT_MODEL_INVALID: fields=${model.fields?.length ?? 'null'}`\n  );\n}\n\nconst recomputedStatistics = {\n  total: model.fields.length,\n  resolved: 0,\n  requires_review: 0,\n  not_found: 0,\n};\nconst expectedAttentionIndexes = [];\n\nfor (let index = 0; index < EXPECTED_FIELDS.length; index += 1) {\n  const [expectedIndex, expectedKey] = EXPECTED_FIELDS[index];\n  const field = model.fields[index];\n  const analysisResult = field?.analysis_result;\n\n  if (!analysisResult\n    || analysisResult.field_index !== expectedIndex\n    || analysisResult.field_key !== expectedKey) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_ORDER_INVALID: expected ${expectedIndex}/${expectedKey}`\n    );\n  }\n\n  if (!hasExactKeys(analysisResult, CANONICAL_KEYS)) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_INVALID: canonical contract for ${expectedKey}`\n    );\n  }\n\n  if (!Object.hasOwn(recomputedStatistics, analysisResult.status)) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_INVALID: status for ${expectedKey}`\n    );\n  }\n  recomputedStatistics[analysisResult.status] += 1;\n\n  if (!hasExactKeys(field.presentation, PRESENTATION_KEYS)\n    || field.presentation.status_text !== expectedStatusText(analysisResult.status)) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_INVALID: presentation for ${expectedKey}`\n    );\n  }\n\n  if (!Array.isArray(field.sources)) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_INVALID: sources for ${expectedKey}`\n    );\n  }\n\n  if (analysisResult.status === 'not_found' && field.sources.length !== 0) {\n    throw new Error(\n      `[Проверить Report Model] REPORT_MODEL_INVALID: not_found sources for ${expectedKey}`\n    );\n  }\n\n  for (const source of field.sources) {\n    if (!hasExactKeys(source, SOURCE_KEYS)) {\n      throw new Error(\n        `[Проверить Report Model] REPORT_MODEL_INVALID: source contract for ${expectedKey}`\n      );\n    }\n  }\n\n  if (analysisResult.requires_human_review === true) {\n    expectedAttentionIndexes.push(analysisResult.field_index);\n  }\n}\n\nif (!model.statistics\n  || model.statistics.total !== recomputedStatistics.total\n  || model.statistics.resolved !== recomputedStatistics.resolved\n  || model.statistics.requires_review !== recomputedStatistics.requires_review\n  || model.statistics.not_found !== recomputedStatistics.not_found) {\n  throw new Error('[Проверить Report Model] REPORT_MODEL_STATISTICS_INVALID');\n}\n\nif (!Array.isArray(model.attention_field_indexes)\n  || JSON.stringify(model.attention_field_indexes) !== JSON.stringify(expectedAttentionIndexes)) {\n  throw new Error('[Проверить Report Model] REPORT_MODEL_INVALID: attention_field_indexes');\n}\n\nreturn [\n  {\n    json: {\n      ...model,\n      model_validation: {\n        valid: true,\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        496
+      ],
+      "id": "ff85eee8-4a18-49b0-9928-eacbbf1b3d47",
+      "name": "Проверить Report Model"
+    },
+    {
+      "parameters": {
+        "jsCode": "const model = $json;\n\nconst EXPECTED_MODEL_VERSION = 'tender_report_model_v2';\nconst EXPECTED_FIELD_COUNT = 27;\nconst NOT_FOUND_TEXT = 'Не удалось надёжно установить по доступным источникам';\n\nfunction escapeHtml(value) {\n  if (value === null || value === undefined) return '';\n  return String(value)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#39;');\n}\n\nfunction formatDate(value) {\n  if (value === null || value === undefined || value === '') return 'Не указана';\n  const date = new Date(value);\n  if (Number.isNaN(date.getTime())) return escapeHtml(value);\n  return new Intl.DateTimeFormat('ru-RU', {\n    timeZone: 'Europe/Moscow',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  }).format(date);\n}\n\nfunction formatPrice(value) {\n  if (value === null || value === undefined || value === '') return 'Не указана';\n  const numericValue = Number(value);\n  return Number.isFinite(numericValue)\n    ? `${new Intl.NumberFormat('ru-RU').format(numericValue)} ₽`\n    : escapeHtml(value);\n}\n\nfunction statusClass(status) {\n  return {\n    resolved: 'status-resolved',\n    requires_review: 'status-review',\n    not_found: 'status-not-found',\n  }[status] ?? 'status-unknown';\n}\n\nfunction renderSource(source) {\n  if (source.kind === 'tender_metadata') {\n    return `<li class=\"source source-metadata\"><strong>Данные площадки:</strong> ${escapeHtml(source.document)}</li>`;\n  }\n\n  const locations = [];\n  if (source.page !== null && source.page !== undefined) {\n    const pageTo = source.page_to !== null && source.page_to !== undefined\n      && source.page_to !== source.page\n      ? `–${escapeHtml(source.page_to)}`\n      : '';\n    locations.push(`стр. ${escapeHtml(source.page)}${pageTo}`);\n  }\n  if (source.sheet !== null && source.sheet !== undefined && source.sheet !== '') {\n    locations.push(`лист ${escapeHtml(source.sheet)}`);\n  }\n\n  const location = locations.length > 0\n    ? ` <span class=\"source-location\">(${locations.join(', ')})</span>`\n    : '';\n  const quote = source.quote === null || source.quote === undefined || source.quote === ''\n    ? ''\n    : `<blockquote>${escapeHtml(source.quote)}</blockquote>`;\n\n  return `<li class=\"source\"><strong>${escapeHtml(source.document)}</strong>${location}${quote}</li>`;\n}\n\nfunction renderFieldRow(field) {\n  const { analysis_result: analysisResult, presentation, sources } = field;\n  const value = analysisResult.status === 'not_found'\n    ? NOT_FOUND_TEXT\n    : (analysisResult.value_text ?? 'Требует проверки');\n  const sourceHtml = sources.length > 0\n    ? `<ul class=\"sources\">${sources.map(renderSource).join('')}</ul>`\n    : '<span class=\"source-empty\">—</span>';\n\n  return `<tr data-field-index=\"${analysisResult.field_index}\">\n    <th scope=\"row\"><span class=\"field-name\">${escapeHtml(presentation.client_field_name)}</span><span class=\"status ${statusClass(analysisResult.status)}\">${escapeHtml(presentation.status_text)}</span></th>\n    <td class=\"field-value\">${escapeHtml(value)}</td>\n    <td class=\"field-sources\">${sourceHtml}</td>\n  </tr>`;\n}\n\nfunction renderAttentionItem(field) {\n  const { analysis_result: analysisResult, presentation, sources } = field;\n  const sourceHtml = sources.length > 0\n    ? `<ul class=\"sources\">${sources.map(renderSource).join('')}</ul>`\n    : '<span class=\"source-empty\">—</span>';\n  return `<article class=\"attention-item\"><h3>${escapeHtml(presentation.client_field_name)}</h3><p>${escapeHtml(analysisResult.value_text ?? 'Требует проверки')}</p>${sourceHtml}</article>`;\n}\n\nif (model.report_model_version !== EXPECTED_MODEL_VERSION || model.model_validation?.valid !== true) {\n  throw new Error('[Сгенерировать HTML] REPORT_MODEL_NOT_VALIDATED');\n}\nif (!Array.isArray(model.fields) || model.fields.length !== EXPECTED_FIELD_COUNT) {\n  throw new Error(`[Сгенерировать HTML] REPORT_HTML_FIELD_COUNT_INVALID: fields=${model.fields?.length ?? 'null'}`);\n}\n\nconst fieldIndexes = model.fields.map(field => field?.analysis_result?.field_index);\nif (new Set(fieldIndexes).size !== EXPECTED_FIELD_COUNT\n  || fieldIndexes.some((fieldIndex, index) => fieldIndex !== index + 1)) {\n  throw new Error('[Сгенерировать HTML] REPORT_HTML_FIELD_COUNT_INVALID: field indexes');\n}\n\nconst attentionFields = model.fields.filter(\n  field => field.analysis_result.requires_human_review === true\n);\nconst attentionIndexes = attentionFields.map(\n  field => field.analysis_result.field_index\n);\nif (!Array.isArray(model.attention_field_indexes)\n  || JSON.stringify(model.attention_field_indexes) !== JSON.stringify(attentionIndexes)) {\n  throw new Error('[Сгенерировать HTML] REPORT_MODEL_NOT_VALIDATED: attention_field_indexes');\n}\n\nconst procurement = model.procurement ?? {};\nconst safeTenderNumber = String(procurement.number ?? 'без_номера')\n  .trim()\n  .replace(/[^\\p{L}\\p{N}._-]+/gu, '_')\n  .replace(/^[_-]+|[_-]+$/g, '') || 'без_номера';\n\nconst html = `<!doctype html>\n<html lang=\"ru\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>Анализ закупки №${escapeHtml(procurement.number ?? 'не указан')}</title>\n  <style>\n    :root { color-scheme: light; font-family: Arial, sans-serif; color: #172033; background: #f4f7fb; }\n    * { box-sizing: border-box; } body { margin: 0; padding: 28px; background: #f4f7fb; }\n    main { max-width: 1180px; margin: 0 auto; background: #fff; padding: 38px; box-shadow: 0 8px 26px rgba(28,39,59,.10); }\n    h1 { font-size: 28px; margin: 0 0 24px; } h2 { font-size: 20px; margin: 34px 0 14px; }\n    .procurement, .summary { display: grid; gap: 12px; } .procurement { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n    .summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } .procurement-item, .summary-item { margin: 0; padding: 14px; border: 1px solid #dbe3ee; border-radius: 6px; }\n    dt, .summary-label, .source-location, .source-empty, .statistics { color: #62708a; font-size: 12px; } dd { margin: 3px 0 0; font-weight: 600; overflow-wrap: anywhere; }\n    .summary-number { display: block; font-size: 24px; font-weight: 700; } table { border-collapse: collapse; width: 100%; font-size: 14px; }\n    th, td { border: 1px solid #dbe3ee; padding: 12px; text-align: left; vertical-align: top; overflow-wrap: anywhere; } thead th { background: #eef3f8; } tbody th { width: 24%; }\n    .field-value { width: 38%; white-space: pre-wrap; } .field-sources { width: 38%; } .field-name { display: block; margin-bottom: 7px; }\n    .status { display: inline-block; padding: 3px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; } .status-resolved { color: #12633a; background: #e2f5e9; } .status-review { color: #8a5600; background: #fff2d7; } .status-not-found { color: #5b6576; background: #edf0f4; }\n    .sources { margin: 0; padding-left: 18px; } .source { margin-bottom: 10px; } .source:last-child { margin-bottom: 0; } blockquote { margin: 7px 0 0; padding: 8px 10px; border-left: 3px solid #b8c7d9; background: #f7f9fc; white-space: pre-wrap; }\n    .attention-item { border-left: 4px solid #c98518; background: #fff9eb; padding: 15px; margin-bottom: 12px; } .attention-item h3 { font-size: 16px; margin: 0 0 8px; } .attention-item p { white-space: pre-wrap; }\n    @media print { body { padding: 0; background: #fff; } main { max-width: none; padding: 0; box-shadow: none; } tr { break-inside: avoid; } }\n    @media (max-width: 760px) { body { padding: 0; } main { padding: 18px; } .procurement, .summary { grid-template-columns: 1fr; } table { font-size: 12px; } th, td { padding: 8px; } }\n  </style>\n</head>\n<body>\n  <main>\n    <section id=\"title\">\n      <h1>Анализ закупки №${escapeHtml(procurement.number ?? 'не указан')}</h1>\n      <dl class=\"procurement\">\n        <div class=\"procurement-item\"><dt>Предмет закупки</dt><dd>${escapeHtml(procurement.subject ?? 'Не указан')}</dd></div>\n        <div class=\"procurement-item\"><dt>Заказчик</dt><dd>${escapeHtml(procurement.customer ?? 'Не указан')}</dd></div>\n        <div class=\"procurement-item\"><dt>Площадка</dt><dd>${escapeHtml(procurement.platform ?? 'Не указана')}</dd></div>\n        <div class=\"procurement-item\"><dt>Цена</dt><dd>${formatPrice(procurement.price)}</dd></div>\n        <div class=\"procurement-item\"><dt>Дата публикации</dt><dd>${formatDate(procurement.publication_at)}</dd></div>\n      </dl>\n    </section>\n    <section id=\"summary\"><h2>Сводка</h2><div class=\"summary\">\n      <div class=\"summary-item\"><span class=\"summary-number\">${escapeHtml(model.statistics.total)}</span><span class=\"summary-label\">Всего полей</span></div>\n      <div class=\"summary-item\"><span class=\"summary-number\">${escapeHtml(model.statistics.resolved)}</span><span class=\"summary-label\">Подтверждено</span></div>\n      <div class=\"summary-item\"><span class=\"summary-number\">${escapeHtml(model.statistics.requires_review)}</span><span class=\"summary-label\">Требует проверки</span></div>\n      <div class=\"summary-item\"><span class=\"summary-number\">${escapeHtml(model.statistics.not_found)}</span><span class=\"summary-label\">Не найдено</span></div>\n    </div></section>\n    <section id=\"fields\"><h2>Результаты анализа</h2><table>\n      <thead><tr><th>Поле</th><th>Значение</th><th>Источник</th></tr></thead>\n      <tbody>${model.fields.map(renderFieldRow).join('')}</tbody>\n    </table></section>\n    <section id=\"attention\"><h2>Требует внимания</h2>${attentionFields.map(renderAttentionItem).join('')}</section>\n    <section id=\"statistics\"><h2>Статистика анализа</h2><p class=\"statistics\">Всего: ${escapeHtml(model.statistics.total)}; подтверждено: ${escapeHtml(model.statistics.resolved)}; требует проверки: ${escapeHtml(model.statistics.requires_review)}; не найдено: ${escapeHtml(model.statistics.not_found)}.</p></section>\n  </main>\n</body>\n</html>`;\n\nreturn [\n  {\n    json: {\n      analysis_run_id: model.internal.analysis_run_id,\n      filename: `Анализ закупки_${safeTenderNumber}.html`,\n      mime_type: 'text/html',\n      template_version: 'tender_report_html_v1',\n      expected_field_count: EXPECTED_FIELD_COUNT,\n      html,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        496
+      ],
+      "id": "e44e4589-aedc-48de-83a0-238e78b1778e",
+      "name": "Сгенерировать HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const report = $json.report_data;\n\n\n// ============================================================\n// Вспомогательные функции\n// ============================================================\n\nfunction escapeMarkdown(value) {\n\n  if (value === null || value === undefined) {\n    return '';\n  }\n\n  return String(value)\n    .replace(/\\|/g, '\\\\|');\n\n}\n\n\nfunction statusLabel(status) {\n\n  switch (status) {\n\n    case 'resolved':\n      return '✅ Подтверждено';\n\n    case 'requires_review':\n      return '⚠️ Требует проверки';\n\n    case 'not_found':\n      return '❌ Не найдено';\n\n    default:\n      return '';\n\n  }\n\n}\n\n\n// Длинные поля лучше выводить отдельными блоками\nfunction isLongValue(value) {\n\n  if (!value) return false;\n\n  return value.length > 180;\n\n}\n\n\n// ============================================================\n// Заголовок\n// ============================================================\n\nlet markdown = '';\n\nmarkdown += `# Анализ закупки №${report.procurement.number}\\n\\n`;\n\nmarkdown += `## Основная информация\\n\\n`;\n\nmarkdown += `**Предмет закупки:** ${escapeMarkdown(report.procurement.title)}\\n\\n`;\n\nmarkdown += `**Заказчик:** ${escapeMarkdown(report.procurement.customer)}\\n\\n`;\n\nmarkdown += `**Электронная площадка:** ${escapeMarkdown(report.procurement.platform)}\\n\\n`;\n\nmarkdown += `**НМЦК по данным площадки:** ${report.procurement.max_price_formatted}\\n\\n`;\n\nmarkdown += `**Дата публикации:** ${report.procurement.publication_at_formatted}\\n\\n`;\n\nmarkdown += `**Срок подачи заявки:** ${report.procurement.deadline_formatted}\\n\\n`;\n\nmarkdown += `---\\n\\n`;\n\n\n// ============================================================\n// Разделы\n// ============================================================\n\n\nfor (const section of report.sections) {\n\n\n  // Общую информацию уже вывели выше\n\n  if (section.name === 'Общая информация') {\n    continue;\n  }\n\n\n  markdown += `## ${section.name}\\n\\n`;\n\n\n  const tableFields = [];\n\n  const longFields = [];\n\n\n  for (const field of section.fields) {\n\n\n    if (\n      isLongValue(field.value)\n      &&\n      field.status === 'resolved'\n    ) {\n\n      longFields.push(field);\n\n    } else {\n\n      tableFields.push(field);\n\n    }\n\n  }\n\n\n  // Таблица коротких значений\n\n  if (tableFields.length > 0) {\n\n    markdown += `| Поле | Значение | Статус |\\n`;\n\n    markdown += `|---|---|---|\\n`;\n\n\n    for (const field of tableFields) {\n\n      markdown +=\n        `| ${escapeMarkdown(field.name)} | ${escapeMarkdown(field.value)} | ${statusLabel(field.status)} |\\n`;\n\n    }\n\n\n    markdown += `\\n`;\n\n  }\n\n\n\n  // Длинные значения отдельными блоками\n\n  for (const field of longFields) {\n\n    markdown += `### ${field.name}\\n\\n`;\n\n    markdown += `${escapeMarkdown(field.value)}\\n\\n`;\n\n    markdown += `Статус: ${statusLabel(field.status)}\\n\\n`;\n\n  }\n\n\n}\n\n\n// ============================================================\n// Требует внимания\n// ============================================================\n\n\nif (\n  report.attention_items &&\n  report.attention_items.length > 0\n) {\n\n  markdown += `## ⚠️ Требует внимания\\n\\n`;\n\n\n  for (const item of report.attention_items) {\n\n    markdown += `### ${item.name}\\n\\n`;\n\n    markdown += `**Значение:** ${escapeMarkdown(item.value)}\\n\\n`;\n\n    markdown += `**Почему требует проверки:** ${escapeMarkdown(item.comment)}\\n\\n`;\n\n  }\n\n}\n\n\n// ============================================================\n// Не найдено\n// ============================================================\n\n\nconst importantMissing = [\n\n  'Дата рассмотрения заявок',\n\n  'Дата подведения итогов',\n\n  'Критерии оценки заявки',\n\n  'Документы для подачи заявки',\n\n  'Опыт аналогичных поставок'\n\n];\n\n\nconst filteredMissing =\n  report.missing_items.filter(item =>\n    importantMissing.includes(item.name)\n  );\n\n\nif (filteredMissing.length > 0) {\n\n  markdown += `## Не найдено в документах\\n\\n`;\n\n\n  for (const item of filteredMissing) {\n\n    markdown += `- ${escapeMarkdown(item.name)}\\n`;\n\n  }\n\n\n  markdown += `\\n`;\n\n}\n\n\n// ============================================================\n// Статистика\n// ============================================================\n\n\nmarkdown += `## Статистика анализа\\n\\n`;\n\nmarkdown += `- Всего проверено полей: ${report.quality.total}\\n`;\n\nmarkdown += `- Подтверждено: ${report.quality.resolved}\\n`;\n\nmarkdown += `- Требуют проверки: ${report.quality.requires_review}\\n`;\n\nmarkdown += `- Не найдено: ${report.quality.not_found}\\n`;\n\n\n// ============================================================\n// Output\n// ============================================================\n\n\nreturn [\n  {\n    json: {\n\n      analysis_run_id:\n        $json.analysis_run_id,\n\n\n      filename:\n        `Анализ закупки_${report.procurement.number}.md`,\n\n\n      markdown\n\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        496
+      ],
+      "id": "5f641eec-6a82-4dd6-82d7-3eb35fdfedf8",
+      "name": "Сформировать Markdown отчёт"
+    },
+    {
+      "parameters": {
+        "jsCode": "const markdown = $json.markdown;\n\nconst filename = $json.filename || 'report.md';\n\nreturn [\n  {\n    json: {\n      filename\n    },\n    binary: {\n      data: {\n        data: Buffer.from(markdown, 'utf8').toString('base64'),\n        mimeType: 'text/markdown',\n        fileName: filename\n      }\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        496
+      ],
+      "id": "b778d4f0-4168-4c2b-8656-e8c46f586c31",
+      "name": "Создать Markdown файл"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// Обогащение evidence данными документов\n// ============================================================\n\n\n// Данные документов из PostgreSQL\nconst documents = $input.all()\n  .map(item => item.json);\n\n\n// Получаем исходные данные из предыдущей ноды\nconst sourceData = $('Собрать итоговые данные')\n  .first()\n  .json;\n\n\n\n// ------------------------------------------------------------\n// Создаем быстрый lookup\n// document_id -> filename\n// ------------------------------------------------------------\n\nconst documentMap = {};\n\nfor (const doc of documents) {\n\n  documentMap[doc.id] = {\n\n    file_name:\n      doc.file_name,\n\n    display_name:\n      doc.display_name,\n\n    document_index:\n      doc.document_index\n\n  };\n\n}\n\n\n\n// ------------------------------------------------------------\n// Обогащение полей\n// ------------------------------------------------------------\n\nconst fields = sourceData.fields.map(field => {\n\n\n  const source = field.source || null;\n\n\n  if (\n    !source\n    ||\n    !source.document_id\n  ) {\n\n    return field;\n\n  }\n\n\n\n  const document =\n    documentMap[source.document_id];\n\n\n\n  if (!document) {\n\n    return field;\n\n  }\n\n\n\n  return {\n\n    ...field,\n\n\n    source: {\n\n      ...source,\n\n\n      document:\n        document.file_name,\n\n\n      display_name:\n        document.display_name,\n\n\n      document_index:\n        document.document_index\n\n    }\n\n  };\n\n\n});\n\n\n\n\n// ------------------------------------------------------------\n// Возвращаем тот же контракт,\n// только с обогащенными source\n// ------------------------------------------------------------\n\nreturn [\n  {\n    json: {\n\n      ...sourceData,\n\n      fields\n\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        496
+      ],
+      "id": "8fa36b8f-715c-4e88-a519-515f7daa3266",
+      "name": "Обогатить источники документов"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    id,\n    file_name,\n    display_name,\n    document_index\nFROM tender_analysis_documents\nWHERE analysis_run_id = $1;",
+        "options": {
+          "queryReplacement": "={{$json.analysis_run_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1328,
+        0
+      ],
+      "id": "5621787e-bbb4-4401-a024-ba825c28fde7",
+      "name": "Получить документы источников",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    id,\n    field_key,\n    document_id,\n    evidence,\n    validator_verdict,\n    validator_confidence\nFROM tender_analysis_facts\nWHERE analysis_run_id = $1;",
+        "options": {
+          "queryReplacement": "={{$json.analysis_run_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1552,
+        0
+      ],
+      "id": "68d6550d-3e10-43a2-84d2-b9b6cd9c5a59",
+      "name": "Получить факты источников",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\nconst html = input.html;\n\nif (typeof html !== 'string' || html.length === 0) {\n  throw new Error('[Создать HTML artifact] REPORT_HTML_INVALID: html is empty');\n}\n\nconst filename = input.filename;\nif (typeof filename !== 'string' || !/\\.html$/i.test(filename)) {\n  throw new Error('[Создать HTML artifact] REPORT_HTML_FILENAME_INVALID');\n}\n\nif (input.mime_type !== 'text/html') {\n  throw new Error('[Создать HTML artifact] REPORT_HTML_INVALID: mime_type');\n}\n\nconst data = Buffer.from(html, 'utf8').toString('base64');\nconst decodedHtml = Buffer.from(data, 'base64').toString('utf8');\nconst sizeBytes = Buffer.byteLength(html, 'utf8');\n\nif (sizeBytes <= 0 || decodedHtml !== html) {\n  throw new Error('[Создать HTML artifact] REPORT_HTML_INVALID: binary round-trip');\n}\n\nreturn [\n  {\n    json: {\n      analysis_run_id: input.analysis_run_id,\n      filename,\n      mime_type: 'text/html',\n      template_version: input.template_version,\n      expected_field_count: input.expected_field_count,\n      artifact_validation: {\n        valid: true,\n        property: 'report_html',\n        size_bytes: sizeBytes,\n        html_matches_renderer: true,\n      },\n    },\n    binary: {\n      report_html: {\n        data,\n        mimeType: 'text/html',\n        fileName: filename,\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        720
+      ],
+      "id": "02be62bc-deac-4b06-bef7-aa666b0bd68d",
+      "name": "Создать HTML artifact"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "analysis_run_id": "f9d8e1d7-f01a-4d91-8eac-89c8376535c2",
+          "run_exists": true,
+          "run_status_before": "aggregating",
+          "final_count": 27,
+          "barrier_ready": true,
+          "completion_claimed": true,
+          "missing_keys": [],
+          "unexpected_keys": [],
+          "invalid_status_keys": [],
+          "invalid_catalog_keys": [],
+          "invalid_contract_keys": [],
+          "finalization_state": "completed_now"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Проверить результат финализации",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить результат финализации": {
+      "main": [
+        [
+          {
+            "node": "Получить Report Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Получить Report Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Проверить Report Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить Report Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Адаптировать поля отчёта",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Адаптировать поля отчёта": {
+      "main": [
+        [
+          {
+            "node": "Собрать Report Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать Report Model": {
+      "main": [
+        [
+          {
+            "node": "Проверить Report Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить Report Model": {
+      "main": [
+        [
+          {
+            "node": "Сгенерировать HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сгенерировать HTML": {
+      "main": [
+        [
+          {
+            "node": "Создать HTML artifact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать HTML artifact": {
+      "main": [
+        []
+      ]
+    },
+    "Сформировать Markdown отчёт": {
+      "main": [
+        [
+          {
+            "node": "Создать Markdown файл",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Получить документы источников": {
+      "main": [
+        [
+          {
+            "node": "Получить факты источников",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Получить факты источников": {
+      "main": [
+        [
+          {
+            "node": "Обогатить источники документов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c3de6189-6e82-49b3-8ce8-d5e9f66727c0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
+  },
+  "nodeGroups": [],
+  "id": "ckPnP3hRhKu4Mf9u",
+  "tags": []
+}
