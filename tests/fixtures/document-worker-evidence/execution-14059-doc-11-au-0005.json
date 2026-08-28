@@ -1,0 +1,1833 @@
+{
+  "fixture_version": "execution_derived_evidence_fixture_v1",
+  "source_execution_id": 14059,
+  "source_workflow_id": "ZjEYvIOA3DSaAQUn",
+  "source_workflow_name": "[2 TEST] TENDER — Обработать документ",
+  "analysis_unit_id": "doc_11_au_0005",
+  "expected": {
+    "fact_count": 8,
+    "evidence_count": 33,
+    "validation_attempt": 1,
+    "validation_passed": true,
+    "repair_calls": 0
+  },
+  "source": {
+    "tender": {
+      "title": null,
+      "source": "manual_test",
+      "currency": null,
+      "platform": {
+        "url": null,
+        "name": null
+      },
+      "max_price": null,
+      "tender_id": "manual-calibration-167-26-ZO",
+      "tender_number": null,
+      "primary_customer": null,
+      "tender_external_id": null,
+      "submission_close_at": null
+    },
+    "document": {
+      "file_name": "Блок_9_Требования.docx",
+      "document_id": "1203efb2-9350-4b7a-a62e-374eaae08ac1",
+      "display_name": "Блок_9_Требования.docx",
+      "parser_schema": "DoclingDocument",
+      "document_index": 11,
+      "file_extension": "docx",
+      "parser_provider": "docling"
+    },
+    "analysis_batch": {
+      "unit_index": 5,
+      "units_total": 16,
+      "source_semantic_blocks_count": 997
+    },
+    "analysis_unit_meta": {
+      "analysis_unit_id": "doc_11_au_0005",
+      "section_id": "sec_001",
+      "section_title": "Преамбула",
+      "section_kind": "preamble",
+      "part_index": 5,
+      "parts_total": 16,
+      "context": {
+        "sheet_name": null,
+        "sheet_title": null,
+        "section_title": "Преамбула",
+        "subsection_titles": [],
+        "end_subsection_title": null,
+        "sheet_title_in_primary": false,
+        "start_subsection_title": null,
+        "sheet_title_source_block_id": null,
+        "sheet_title_semantic_block_id": null
+      },
+      "source_pages": [],
+      "flags": {
+        "contains_table": true,
+        "oversized_atomic_block": false,
+        "table_semantic_block_ids": [
+          "sb_0200",
+          "sb_0206",
+          "sb_0211",
+          "sb_0217",
+          "sb_0223"
+        ],
+        "contains_sheet_title_block": false
+      },
+      "primary_semantic_block_ids": [
+        "sb_0194",
+        "sb_0195",
+        "sb_0196",
+        "sb_0197",
+        "sb_0198",
+        "sb_0199",
+        "sb_0200",
+        "sb_0201",
+        "sb_0202",
+        "sb_0203",
+        "sb_0204",
+        "sb_0205",
+        "sb_0206",
+        "sb_0207",
+        "sb_0208",
+        "sb_0209",
+        "sb_0210",
+        "sb_0211",
+        "sb_0212",
+        "sb_0213",
+        "sb_0214",
+        "sb_0215",
+        "sb_0216",
+        "sb_0217",
+        "sb_0218",
+        "sb_0219",
+        "sb_0220",
+        "sb_0221",
+        "sb_0222",
+        "sb_0223",
+        "sb_0224",
+        "sb_0225",
+        "sb_0226",
+        "sb_0227",
+        "sb_0228",
+        "sb_0229",
+        "sb_0230",
+        "sb_0231",
+        "sb_0232",
+        "sb_0233"
+      ],
+      "overlap_semantic_block_ids": [
+        "sb_0193"
+      ]
+    },
+    "ai_segments": [
+      {
+        "role": "paragraph",
+        "text": "Коэффициенты финансовой устойчивости и финансирования являются ключевыми при принятии решения о финансовом состоянии Участника закупки.",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0194"
+      },
+      {
+        "role": "paragraph",
+        "text": "При этом финансовое состояние Участника закупки принимается по наихудшему расчетному показателю 1 группы.",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0195"
+      },
+      {
+        "role": "paragraph",
+        "text": "Показатели 2 группы имеют второстепенное значение и служат в качестве дополнительной информации при формировании окончательного решения в случае, если один или оба показателя 1 группы принимают «граничные» значения (+/- 0,03 от порогового значения, за исключением случаев, когда один или оба показателя 1 группы <0).",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0196"
+      },
+      {
+        "role": "paragraph",
+        "text": "По результатам оценки показателей уровень финансового состояния Участника закупки определяется в соответствии со следующими правилами:",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0197"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для нефинансовых организаций (публичных и непубличных обществ: акционерных обществ (ПАО, ЗАО, если организации не внесли соответствующие изменения в Устав общества), ООО, а также индивидуальных предпринимателей) и нерезидентов Российской Федерации (кроме подпадающих под подпункты II-V):",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0198"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для негосударственных, некоммерческих организаций (учреждения, фонды, коллегии, партнерства):",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0199"
+      },
+      {
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния негосударственных, некоммерческих организации\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал + Целевое финансирование + долгосрочные обязательства)/Пассивы\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = Капитал + Целевое финансирование)/ Обязательства\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80",
+        "type": "table",
+        "scope": "primary",
+        "semantic_block_id": "sb_0200"
+      },
+      {
+        "role": "paragraph",
+        "text": "Устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0201"
+      },
+      {
+        "role": "paragraph",
+        "text": "Достаточно устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0202"
+      },
+      {
+        "role": "paragraph",
+        "text": "Неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0203"
+      },
+      {
+        "role": "paragraph",
+        "text": "Крайне неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0204"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для страховых компаний:",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0205"
+      },
+      {
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния страховых компаний\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни+Долгосрочные обязательства)/Баланс\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни)/(Итого обязательств-Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни)\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Баланс -Внеоборотные активы-Долгосрочные требования)/(Итого обязательств - Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни -Долгосрочные обязательства)\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80",
+        "type": "table",
+        "scope": "primary",
+        "semantic_block_id": "sb_0206"
+      },
+      {
+        "role": "paragraph",
+        "text": "Устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0207"
+      },
+      {
+        "role": "paragraph",
+        "text": "Достаточно устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0208"
+      },
+      {
+        "role": "paragraph",
+        "text": "Неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0209"
+      },
+      {
+        "role": "paragraph",
+        "text": "Крайне неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0210"
+      },
+      {
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния нефинансовых организаций и нерезидентов Российской Федерации\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал + долгосрочные обязательства)/Пассивы\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = Капитал/Обязательства\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80",
+        "type": "table",
+        "scope": "primary",
+        "semantic_block_id": "sb_0211"
+      },
+      {
+        "role": "paragraph",
+        "text": "Устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0212"
+      },
+      {
+        "role": "paragraph",
+        "text": "Достаточно устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0213"
+      },
+      {
+        "role": "paragraph",
+        "text": "Неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0214"
+      },
+      {
+        "role": "paragraph",
+        "text": "Крайне неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0215"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для государственных (муниципальных) бюджетных и автономных учреждений:",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0216"
+      },
+      {
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния государственных (муниципальных) бюджетных и автономных учреждений\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Расчеты с учредителем +Финансовый результат экономического субъекта +Долгосрочные обязательства и расчеты)/ Баланс\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = (Расчеты с учредителем + Финансовый результат экономического субъекта)/ (Обязательства – Расчеты с учредителем)\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Баланс – Внеоборотные активы)/ (Обязательства – Расчеты с учредителем – Долгосрочные обязательства и расчеты)\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80",
+        "type": "table",
+        "scope": "primary",
+        "semantic_block_id": "sb_0217"
+      },
+      {
+        "role": "paragraph",
+        "text": "Устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0218"
+      },
+      {
+        "role": "paragraph",
+        "text": "Достаточно устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0219"
+      },
+      {
+        "role": "paragraph",
+        "text": "Неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0220"
+      },
+      {
+        "role": "paragraph",
+        "text": "Крайне неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0221"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для кредитных и финансовых институтов:",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0222"
+      },
+      {
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния кредитных и финансовых институтов\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Рейтинг долгосрочной кредитоспособности кредитных организаций, присвоенный рейтинговыми агентствами Standard & Poor's/Fitch Ratings/Moody's\n[C2] ≥ВВВ-/ВВВ-/Ваа3\n[C3] ≥BB-/BB-/Ba3\n[C4] <BB-/BB-/Ba3 но >D, либо рейтинг отсутствует\n[C5] D\n\nСтрока R4:\n[C1] Ограничения на ведение деятельности со стороны соответствующего национального регулирующего органа\n[C2] Нет\n[C3] Нет\n[C4] Нет\n[C5] Да",
+        "type": "table",
+        "scope": "primary",
+        "semantic_block_id": "sb_0223"
+      },
+      {
+        "role": "paragraph",
+        "text": "Устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0224"
+      },
+      {
+        "role": "paragraph",
+        "text": "Достаточно устойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0225"
+      },
+      {
+        "role": "paragraph",
+        "text": "Неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0226"
+      },
+      {
+        "role": "paragraph",
+        "text": "Крайне неустойчивое финансовое состояние",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0227"
+      },
+      {
+        "role": "paragraph",
+        "text": "Участник закупки вправе подать документы в подтверждение соответствия требованию раздела 2 Блока 9 настоящего документа в составе квалификационной части заявки настоящей закупки / в составе квалификационной части заявки ранее проводимой закупки / на электронной торговой площадке, на которой проводится закупка (при наличии на электронной торговой площадке специального функционала для приема указанных документов). В случае предоставления обеспечения для подтверждения соответствии требованиям раздела 2 Блока 9 настоящего документа список дополнительных к обеспечению документов и порядок их предоставления указаны в п. 3.24.3 Блока 3 настоящего документа.",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0228"
+      },
+      {
+        "role": "paragraph",
+        "text": "О подаче документов Участник закупки информирует Организатора в форме 1а/б Блока 4 «Образцы форм документов, включаемых в заявку на участие в закупке» квалификационной части заявки.",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0229"
+      },
+      {
+        "role": "paragraph",
+        "text": "Требования в рамках должной осмотрительности",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0230"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для подтверждения соответствия указанным ниже требованиям Участник должен представить:",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0231"
+      },
+      {
+        "role": "paragraph",
+        "text": "либо сведения об успешном прохождении проверки на соответствие требованиям в рамках должной осмотрительности, указав реквизиты документа, подтверждающего факт прохождения указанной проверки и декларацию об отсутствии изменений в части соответствия данным требованиям по форме 1а/1б;",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0232"
+      },
+      {
+        "role": "paragraph",
+        "text": "либо пакет документов, в состав которого входят документы, указанные для каждого представленного ниже требования.",
+        "type": "text",
+        "scope": "primary",
+        "semantic_block_id": "sb_0233"
+      },
+      {
+        "role": "paragraph",
+        "text": "Для целей проверки соответствия приемлемому уровню финансового состояния Участника закупки (за исключением оценки финансового состояния кредитных и финансовых институтов) используется отчетность актуального отчетного периода, при этом применяются четыре показателя: коэффициент финансовой устойчивости, коэффициент финансирования (показатели 1 группы), коэффициент текущей ликвидности и индекс кредитоспособности Альтмана (показатели 2 группы).",
+        "type": "text",
+        "scope": "overlap",
+        "semantic_block_id": "sb_0193"
+      }
+    ],
+    "provenance": {
+      "index": {
+        "sb_0193": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "overlap",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/205",
+              "analysis_order": 193
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/205"
+          ]
+        },
+        "sb_0194": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/206",
+              "analysis_order": 194
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/206"
+          ]
+        },
+        "sb_0195": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/207",
+              "analysis_order": 195
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/207"
+          ]
+        },
+        "sb_0196": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/208",
+              "analysis_order": 196
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/208"
+          ]
+        },
+        "sb_0197": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/209",
+              "analysis_order": 197
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/209"
+          ]
+        },
+        "sb_0198": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/210",
+              "analysis_order": 198
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/210"
+          ]
+        },
+        "sb_0199": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/216",
+              "analysis_order": 199
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/216"
+          ]
+        },
+        "sb_0200": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/5",
+              "analysis_order": 200
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/5"
+          ]
+        },
+        "sb_0201": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/217",
+              "analysis_order": 201
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/217"
+          ]
+        },
+        "sb_0202": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/218",
+              "analysis_order": 202
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/218"
+          ]
+        },
+        "sb_0203": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/219",
+              "analysis_order": 203
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/219"
+          ]
+        },
+        "sb_0204": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/220",
+              "analysis_order": 204
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/220"
+          ]
+        },
+        "sb_0205": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/221",
+              "analysis_order": 205
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/221"
+          ]
+        },
+        "sb_0206": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/6",
+              "analysis_order": 206
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/6"
+          ]
+        },
+        "sb_0207": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/222",
+              "analysis_order": 207
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/222"
+          ]
+        },
+        "sb_0208": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/223",
+              "analysis_order": 208
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/223"
+          ]
+        },
+        "sb_0209": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/224",
+              "analysis_order": 209
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/224"
+          ]
+        },
+        "sb_0210": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/225",
+              "analysis_order": 210
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/225"
+          ]
+        },
+        "sb_0211": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/4",
+              "analysis_order": 211
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/4"
+          ]
+        },
+        "sb_0212": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/212",
+              "analysis_order": 212
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/212"
+          ]
+        },
+        "sb_0213": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/213",
+              "analysis_order": 213
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/213"
+          ]
+        },
+        "sb_0214": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/214",
+              "analysis_order": 214
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/214"
+          ]
+        },
+        "sb_0215": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/215",
+              "analysis_order": 215
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/215"
+          ]
+        },
+        "sb_0216": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/226",
+              "analysis_order": 216
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/226"
+          ]
+        },
+        "sb_0217": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/7",
+              "analysis_order": 217
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/7"
+          ]
+        },
+        "sb_0218": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/227",
+              "analysis_order": 218
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/227"
+          ]
+        },
+        "sb_0219": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/228",
+              "analysis_order": 219
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/228"
+          ]
+        },
+        "sb_0220": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/229",
+              "analysis_order": 220
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/229"
+          ]
+        },
+        "sb_0221": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/230",
+              "analysis_order": 221
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/230"
+          ]
+        },
+        "sb_0222": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/231",
+              "analysis_order": 222
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/231"
+          ]
+        },
+        "sb_0223": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/8",
+              "analysis_order": 223
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/8"
+          ]
+        },
+        "sb_0224": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/232",
+              "analysis_order": 224
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/232"
+          ]
+        },
+        "sb_0225": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/233",
+              "analysis_order": 225
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/233"
+          ]
+        },
+        "sb_0226": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/234",
+              "analysis_order": 226
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/234"
+          ]
+        },
+        "sb_0227": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/235",
+              "analysis_order": 227
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/235"
+          ]
+        },
+        "sb_0228": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/237",
+              "analysis_order": 228
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/237"
+          ]
+        },
+        "sb_0229": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/238",
+              "analysis_order": 229
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/238"
+          ]
+        },
+        "sb_0230": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/240",
+              "analysis_order": 230
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/240"
+          ]
+        },
+        "sb_0231": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "text",
+              "page_no": null,
+              "block_id": "#/texts/241",
+              "analysis_order": 231
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/241"
+          ]
+        },
+        "sb_0232": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/242",
+              "analysis_order": 232
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/242"
+          ]
+        },
+        "sb_0233": {
+          "role": "paragraph",
+          "type": "text",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "list_item",
+              "page_no": null,
+              "block_id": "#/texts/243",
+              "analysis_order": 233
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/texts/243"
+          ]
+        }
+      },
+      "version": "1.0",
+      "total_semantic_blocks_count": 41,
+      "overlap_semantic_blocks_count": 1,
+      "primary_semantic_blocks_count": 40
+    },
+    "ai_request": {
+      "prompt_version": "tender_extractor_prompt_v2",
+      "schema_version": "ai_extractor_v1",
+      "field_catalog_version": "tender_fields_v1",
+      "system_prompt": "Ты — AI Extractor для анализа тендерной документации.\n\nТвоя задача — извлекать из предоставленной части документа только факты, которые относятся к разрешённому каталогу tender_fields_v1.\n\nТы не формируешь финальный отчёт и не делаешь вывод по закупке в целом.\nТы работаешь только с одной analysis unit за один вызов.\n\n\nОСНОВНЫЕ ПРАВИЛА\n\n1. Используй только содержимое блоков SEMANTIC_BLOCK, переданных пользователем.\n\n2. Не используй внешние знания, предположения, типичные условия закупок или сведения, которых нет в предоставленных блоках.\n\n3. Метаданные документа и раздела используются только как контекст. Они не являются доказательством факта.\n\n4. Не делай вывод об отсутствии требования только потому, что оно не встретилось в этой части документа.\n\n5. Никогда не возвращай not_found.\n\nЕсли в этой части нет целевых фактов, верни:\n\"facts\": []\n\n6. Не вычисляй значения, которых документ явно не сообщает.\n\nНапример:\nесли документ содержит несколько исходных цен, но не содержит итоговой НМЦК, не рассчитывай НМЦК самостоятельно.\n\n7. Не достраивай пропущенный текст и не исправляй сомнительное OCR-содержимое по смыслу.\n\nЕсли текст повреждён настолько, что факт нельзя надёжно интерпретировать, используй:\nstatus = \"requires_review\"\nreview_reason_code = \"source_quality_issue\"\n\n8. Шаблонные переменные, пустые поля, подчёркивания и незаполненные значения не считай установленными фактами.\n\nНапример:\n{Цена_4}\n____________________\nне являются реальными значениями.\n\n9. field_key разрешено выбирать только из каталога tender_fields_v1.\n\nНе создавай собственные field_key.\n\n10. Один и тот же field_key разрешено вернуть несколько раз, если документ содержит несколько самостоятельных требований или значений этого типа.\n\n11. Если один логический факт продолжается в нескольких semantic blocks, верни один fact и укажи несколько элементов evidence.\n\n12. Если это действительно разные самостоятельные требования, возвращай их как разные facts.\n\n13. Каждый fact обязан содержать минимум один evidence и не более 25 evidence.\n\nСуммарная длина всех quote одного fact не должна превышать 5000 символов.\nКаждая отдельная quote не должна превышать 1500 символов.\nНе повторяй одинаковую пару semantic_block_id + quote.\nЭти лимиты являются техническим resource contract. Нельзя обрезать evidence или терять существенные условия ради лимита.\n\nПеред возвратом каждого fact проверь resource contract.\n\nЕсли один composite/list fact требует более 25 evidence или более 5000 символов quote, НЕ обрезай evidence и НЕ объединяй независимые условия. Раздели содержание на несколько самостоятельных facts с тем же field_key.\n\nДля application_documents разделяй как минимум по независимо применимым категориям участников, условиям применимости или самостоятельным группам документов. Условие применимости обязательно сохраняй в value_text того же fact.\n\nКаждый resulting fact должен быть самостоятельно понятен и полностью подтверждён собственным evidence в пределах 25 / 1500 / 5000.\n\n14. semantic_block_id в evidence должен в точности совпадать с ID одного из переданных SEMANTIC_BLOCK.\n\nНе придумывай semantic_block_id.\n\n15. quote должен быть дословным фрагментом соответствующего semantic block.\n\nНе пересказывай текст своими словами внутри quote.\n\nЕсли части одного факта находятся в разных местах одного semantic block\nи между ними присутствует другой текст, подписи, метки, переносы или пояснения,\nНЕ объединяй эти части в одну искусственную quote.\n\nВместо этого верни несколько элементов evidence с тем же semantic_block_id,\nгде каждый quote является отдельной непрерывной дословной подстрокой\nсоответствующего SEMANTIC_BLOCK.\n\nНельзя удалять слова, подписи или промежуточный текст внутри quote.\nНельзя склеивать две непоследовательные части текста в одну quote.\n\nНапример, если блок содержит:\n\nСпециалист по закупкам\n(должность)\n/ Оленева С.А.\n\nНЕПРАВИЛЬНО:\n\"quote\": \"Специалист по закупкам / Оленева С.А.\"\n\nПРАВИЛЬНО:\n\"evidence\": [\n  {\n    \"semantic_block_id\": \"sb_0004\",\n    \"quote\": \"Специалист по закупкам\"\n  },\n  {\n    \"semantic_block_id\": \"sb_0004\",\n    \"quote\": \"/ Оленева С.А.\"\n  }\n]\n\nКРИТИЧЕСКОЕ ПРАВИЛО ДЛЯ QUOTE:\n\nПоле quote должно быть непрерывной подстрокой исходного semantic block.\n\nЗапрещено:\n- сокращать начало или конец предложения;\n- заменять слова близкими по смыслу;\n- удалять вводные части предложения;\n- изменять грамматическую форму.\n\nНапример:\n\nSEMANTIC_BLOCK:\n\"Договор вступает в силу с момента подписания и действует до 31 декабря 2026 года\"\n\nНЕЛЬЗЯ:\n\"Договор действует до 31 декабря 2026 года\"\n\nМОЖНО:\n\"действует до 31 декабря 2026 года\"\n\nили\n\n\"Договор вступает в силу с момента подписания и действует до 31 декабря 2026 года\"\n\n16. Каждый найденный fact должен иметь хотя бы один evidence из блока:\nscope = \"primary\"\n\nБлоки scope = \"overlap\" разрешено использовать только как дополнительный контекст или дополнительное доказательство.\n\nФакт, подтверждённый только overlap-блоками, возвращать нельзя.\n\n17. status = \"found\" используй только если значение прямо и однозначно подтверждается предоставленными блоками.\n\nДля status = \"found\":\nreview_reason_code = null\nreview_note = null\n\nКРИТИЧЕСКОЕ ПРАВИЛО О STATUS\n\nЕсли status = \"found\":\n- review_reason_code ОБЯЗАТЕЛЬНО должен быть null;\n- review_note ОБЯЗАТЕЛЬНО должен быть null;\n- факт должен быть прямо и однозначно подтверждён текстом.\n\nЕсли для факта требуется review_reason_code или review_note,\nstatus ОБЯЗАТЕЛЬНО должен быть \"requires_review\".\n\nНикогда не возвращай сочетание:\nstatus = \"found\"\nи одновременно непустой review_reason_code или review_note.\n\n\nКРИТИЧЕСКОЕ ПРАВИЛО ОБ ОТСУТСТВУЮЩЕМ ЗНАЧЕНИИ\n\nЕсли конкретное значение field_key прямо не указано в текущих SEMANTIC_BLOCK,\nНЕ создавай fact для этого field_key.\n\nНе используй status = \"requires_review\" только для сообщения,\nчто значение отсутствует.\n\nrequires_review используется только тогда, когда в тексте действительно\nесть кандидат на значение, но сам кандидат неоднозначен, конфликтует,\nнеполон или повреждён.\n\nНапример:\n\nПоле customer означает наименование организации-заказчика.\n\nФИО сотрудника, контрактного управляющего, специалиста по закупкам,\nподписанта или контактного лица НЕ является значением customer.\n\nЕсли наименование организации-заказчика отсутствует,\nне возвращай customer вообще.\n\nФИО сотрудника может относиться к customer_contacts только если текст\nдействительно позволяет считать его контактным лицом заказчика.\nНе превращай ФИО сотрудника в наименование customer.\n\n18. status = \"requires_review\" используй, если факт релевантен, но есть существенная неоднозначность, конфликт, неполное значение, неясная ссылка или проблема качества источника.\n\nРазрешённые review_reason_code:\n- ambiguous_wording\n- conflicting_evidence\n- incomplete_value\n- unclear_reference\n- source_quality_issue\n- other\n\n19. confidence — число от 0 до 1, отражающее уверенность в том, что именно заявленный fact корректно подтверждается предоставленным текстом.\n\nВысокий confidence не заменяет evidence.\n\n20. value_text должен передавать содержание факта максимально близко к формулировке документа.\n\nНа этом этапе не выполняй машинную нормализацию значений.\n\nНапример:\n\"не менее 12 месяцев с момента подписания акта\"\nнужно сохранить как текст,\nа не преобразовывать в объект с value=12 и unit=months.\n\n21. Не добавляй page_no, bbox, source_block_id или другие сведения о provenance.\n\nОни будут восстановлены системой автоматически по semantic_block_id.\n\n22. Возвращай только JSON.\nНикакого Markdown, комментариев до JSON или текста после JSON.\n\n\nРАЗРЕШЁННЫЙ КАТАЛОГ ПОЛЕЙ tender_fields_v1\n\n1. procurement_subject — Предмет закупки\n   Что именно закупается, поставляется, выполняется или оказывается. Извлекай предмет закупки в формулировке документа.\n\n2. nm_price_with_vat — НМЦ (с НДС)\n   Начальная максимальная цена / НМЦ / НМЦК и информация об НДС, если она прямо указана. Не предполагай, что НДС включён, если документ этого не говорит.\n\n3. platform — Площадка\n   Электронная торговая площадка, информационная система или иной портал, на котором проводится процедура.\n\n4. procedure_type — Тип процедуры\n   Тип закупочной процедуры: конкурс, аукцион, запрос котировок, запрос предложений, закупка у единственного поставщика и другие прямо указанные варианты.\n\n5. application_deadline — Срок окончания приема заявок\n   Дата и время окончания приема или подачи заявок.\n\n6. application_review_date — Дата рассмотрения заявок\n   Дата и, если указано, время рассмотрения заявок.\n\n7. results_date — Дата подведения итогов\n   Дата подведения итогов, определения победителя или завершения соответствующего этапа процедуры.\n\n8. customer — Заказчик\n   Полное или сокращённое наименование заказчика закупки.\n\n9. customer_contacts — Контактная информация Заказчика\n   ФИО контактных лиц, телефоны, email и иные контактные сведения заказчика, прямо указанные в документе.\n\n10. participation_cost — Стоимость участия\n   Плата, тариф или иные расходы именно за участие в процедуре. Не путай со стоимостью обеспечения заявки.\n\n11. participation_guarantee — БГ на участие\n   Банковская гарантия или иное обеспечение участия / заявки: требуется ли, размер или процент, форма, срок и иные прямо указанные условия. Не путай с обеспечением исполнения договора.\n\n12. evaluation_criteria — Критерии оценки\n   Критерии оценки заявок, показатели, веса, значимость критериев и порядок оценки.\n\n13. delivery_term — Срок поставки (исполнения)\n   Сроки поставки товара, выполнения работ или оказания услуг, включая отдельные этапы, если они указаны.\n\n14. payment_terms — Условия оплаты: аванс и остаток\n   Наличие или отсутствие аванса, его размер или процент, а также сроки и условия оплаты оставшейся части.\n\n15. special_account_or_treasury — Спецсчет/казна\n   Требование специального счёта, казначейского счёта или казначейского сопровождения. Извлекай только явно указанные условия.\n\n16. bank_support — Банковское сопровождение\n   Требуется ли банковское сопровождение договора/контракта и какой банк указан, если он указан.\n\n17. government_contract — Госконтракт\n   Является ли заключаемый договор государственным контрактом согласно документации. Не делай вывод только по типу заказчика.\n\n18. rebidding — Предусмотрена ли переторжка\n   Наличие, отсутствие и условия переторжки или повторного улучшения ценовых предложений.\n\n19. national_regime — Национальный режим\n   Запреты, ограничения, преимущества, преференции и иные требования национального режима, прямо применяемые к закупке.\n\n20. advance_contract_guarantee — БГ аванс (исполнение договора)\n   Банковская гарантия или обеспечение, связанное с авансом и/или исполнением договора. Сохраняй буквальную формулировку документа и не смешивай с БГ на участие или обеспечением гарантийных обязательств.\n\n21. warranty_obligations_guarantee — БГ гарантийные обязательства\n   Обеспечение гарантийных обязательств: требуется ли, размер, форма, срок и другие условия. Не путай с самим гарантийным сроком товара.\n\n22. licenses_certificates — Необходимые лицензии/сертификаты\n   Требуемые лицензии, сертификаты, декларации соответствия, разрешения и иные разрешительные документы.\n\n23. required_official_certificates — Необходимые справки\n   Справки, выписки и подтверждения от налоговой, органов статистики, государственных органов и иных организаций.\n\n24. similar_supply_experience — Требование по опыту аналогичных поставок\n   Требования к опыту аналогичных поставок, работ или услуг: период, количество контрактов, стоимость, предмет опыта и документы, которыми опыт подтверждается.\n\n25. analog_allowed — Допускается ли к поставке аналог\n   Прямое указание, допускаются ли аналоги, эквиваленты или альтернативные товары и при каких условиях.\n\n26. analog_definition — Что считается аналогом\n   Прямо указанные критерии, характеристики или условия, по которым товар признаётся аналогом или эквивалентом.\n\n27. application_documents — Что входит в состав заявки\n   Документы, сведения, формы, декларации и иные материалы, которые участник обязан включить или предоставить в составе заявки.\n\n\nФОРМАТ РЕЗУЛЬТАТА\n\n{\n  \"schema_version\": \"ai_extractor_v1\",\n  \"field_catalog_version\": \"tender_fields_v1\",\n  \"analysis_unit_id\": \"<ID текущей analysis unit>\",\n  \"facts\": [\n    {\n      \"field_key\": \"<один из разрешённых field_key>\",\n      \"value_text\": \"<факт как он сформулирован в документе>\",\n      \"status\": \"found | requires_review\",\n      \"confidence\": 0.0,\n      \"evidence\": [\n        {\n          \"semantic_block_id\": \"sb_XXXX\",\n          \"quote\": \"<дословная цитата>\"\n        }\n      ],\n      \"review_reason_code\": null,\n      \"review_note\": null\n    }\n  ]\n}",
+      "user_prompt": "Проанализируй только приведённую ниже часть тендерного документа.\n\nНайди все факты из каталога tender_fields_v1, которые явно подтверждаются содержимым SEMANTIC_BLOCK.\n\nМетаданные ниже предоставлены только для навигации и понимания контекста.\nНе используй их как evidence.\n\n\nКОНТЕКСТ\n\nanalysis_unit_id: doc_11_au_0005\nФайл документа: Блок_9_Требования.docx\nРаздел: Преамбула\nЧасть раздела: 5 из 16\n\n\nSEMANTIC BLOCKS\n\n[SEMANTIC_BLOCK id=\"sb_0194\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКоэффициенты финансовой устойчивости и финансирования являются ключевыми при принятии решения о финансовом состоянии Участника закупки.\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0195\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nПри этом финансовое состояние Участника закупки принимается по наихудшему расчетному показателю 1 группы.\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0196\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nПоказатели 2 группы имеют второстепенное значение и служат в качестве дополнительной информации при формировании окончательного решения в случае, если один или оба показателя 1 группы принимают «граничные» значения (+/- 0,03 от порогового значения, за исключением случаев, когда один или оба показателя 1 группы <0).\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0197\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nПо результатам оценки показателей уровень финансового состояния Участника закупки определяется в соответствии со следующими правилами:\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0198\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля нефинансовых организаций (публичных и непубличных обществ: акционерных обществ (ПАО, ЗАО, если организации не внесли соответствующие изменения в Устав общества), ООО, а также индивидуальных предпринимателей) и нерезидентов Российской Федерации (кроме подпадающих под подпункты II-V):\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0199\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля негосударственных, некоммерческих организаций (учреждения, фонды, коллегии, партнерства):\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0200\" scope=\"primary\" type=\"table\" role=\"table\"]\nТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния негосударственных, некоммерческих организации\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал + Целевое финансирование + долгосрочные обязательства)/Пассивы\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = Капитал + Целевое финансирование)/ Обязательства\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0201\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУстойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0202\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДостаточно устойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0203\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nНеустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0204\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКрайне неустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0205\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля страховых компаний:\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0206\" scope=\"primary\" type=\"table\" role=\"table\"]\nТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния страховых компаний\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни+Долгосрочные обязательства)/Баланс\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни)/(Итого обязательств-Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни)\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Баланс -Внеоборотные активы-Долгосрочные требования)/(Итого обязательств - Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни -Долгосрочные обязательства)\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0207\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУстойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0208\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДостаточно устойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0209\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nНеустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0210\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКрайне неустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0211\" scope=\"primary\" type=\"table\" role=\"table\"]\nТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния нефинансовых организаций и нерезидентов Российской Федерации\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Капитал + долгосрочные обязательства)/Пассивы\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = Капитал/Обязательства\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0212\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУстойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0213\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДостаточно устойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0214\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nНеустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0215\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКрайне неустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0216\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля государственных (муниципальных) бюджетных и автономных учреждений:\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0217\" scope=\"primary\" type=\"table\" role=\"table\"]\nТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния государственных (муниципальных) бюджетных и автономных учреждений\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Коэффициент финансовой устойчивости = (Расчеты с учредителем +Финансовый результат экономического субъекта +Долгосрочные обязательства и расчеты)/ Баланс\n[C2] ≥ 0,80\n[C3] 0,40 - 0,79\n[C4] 0,01 - 0,39\n[C5] ≤ 0\n\nСтрока R4:\n[C1] Коэффициент финансирования = (Расчеты с учредителем + Финансовый результат экономического субъекта)/ (Обязательства – Расчеты с учредителем)\n[C2] ≥ 2,00\n[C3] 0,60 - 1,99\n[C4] 0,01 - 0,59\n[C5] ≤ 0\n\nСтрока R5:\n[C1] Коэффициент текущей ликвидности = (Баланс – Внеоборотные активы)/ (Обязательства – Расчеты с учредителем – Долгосрочные обязательства и расчеты)\n[C2] ≥ 2,00\n[C3] 1,40 - 1,99\n[C4] 1,00 - 1,39\n[C5] ≤ 0,99\n\nСтрока R6:\n[C1] Индекс кредитоспособности Альтмана\n[C2] ≥ 3,00\n[C3] 2,40 - 2,99\n[C4] 1,81 - 2,39\n[C5] ≤ 1,80\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0218\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУстойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0219\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДостаточно устойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0220\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nНеустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0221\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКрайне неустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0222\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля кредитных и финансовых институтов:\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0223\" scope=\"primary\" type=\"table\" role=\"table\"]\nТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[R1-R2,C1] Показатель\n[C2-C5] Уровень финансового состояния кредитных и финансовых институтов\n\nСтрока R2:\n[C2] Устойчивое финансовое состояние\n[C3] Достаточно устойчивое финансовое состояние\n[C4] Неустойчивое финансовое состояние\n[C5] Крайне неустойчивое финансовое состояние\n\nСтрока R3:\n[C1] Рейтинг долгосрочной кредитоспособности кредитных организаций, присвоенный рейтинговыми агентствами Standard & Poor's/Fitch Ratings/Moody's\n[C2] ≥ВВВ-/ВВВ-/Ваа3\n[C3] ≥BB-/BB-/Ba3\n[C4] <BB-/BB-/Ba3 но >D, либо рейтинг отсутствует\n[C5] D\n\nСтрока R4:\n[C1] Ограничения на ведение деятельности со стороны соответствующего национального регулирующего органа\n[C2] Нет\n[C3] Нет\n[C4] Нет\n[C5] Да\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0224\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУстойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0225\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДостаточно устойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0226\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nНеустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0227\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nКрайне неустойчивое финансовое состояние\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0228\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nУчастник закупки вправе подать документы в подтверждение соответствия требованию раздела 2 Блока 9 настоящего документа в составе квалификационной части заявки настоящей закупки / в составе квалификационной части заявки ранее проводимой закупки / на электронной торговой площадке, на которой проводится закупка (при наличии на электронной торговой площадке специального функционала для приема указанных документов). В случае предоставления обеспечения для подтверждения соответствии требованиям раздела 2 Блока 9 настоящего документа список дополнительных к обеспечению документов и порядок их предоставления указаны в п. 3.24.3 Блока 3 настоящего документа.\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0229\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nО подаче документов Участник закупки информирует Организатора в форме 1а/б Блока 4 «Образцы форм документов, включаемых в заявку на участие в закупке» квалификационной части заявки.\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0230\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nТребования в рамках должной осмотрительности\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0231\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nДля подтверждения соответствия указанным ниже требованиям Участник должен представить:\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0232\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nлибо сведения об успешном прохождении проверки на соответствие требованиям в рамках должной осмотрительности, указав реквизиты документа, подтверждающего факт прохождения указанной проверки и декларацию об отсутствии изменений в части соответствия данным требованиям по форме 1а/1б;\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0233\" scope=\"primary\" type=\"text\" role=\"paragraph\"]\nлибо пакет документов, в состав которого входят документы, указанные для каждого представленного ниже требования.\n[/SEMANTIC_BLOCK]\n\n[SEMANTIC_BLOCK id=\"sb_0193\" scope=\"overlap\" type=\"text\" role=\"paragraph\"]\nДля целей проверки соответствия приемлемому уровню финансового состояния Участника закупки (за исключением оценки финансового состояния кредитных и финансовых институтов) используется отчетность актуального отчетного периода, при этом применяются четыре показателя: коэффициент финансовой устойчивости, коэффициент финансирования (показатели 1 группы), коэффициент текущей ликвидности и индекс кредитоспособности Альтмана (показатели 2 группы).\n[/SEMANTIC_BLOCK]\n\n\nВерни результат строго по схеме ai_extractor_v1.\n\nЕсли в этой analysis unit нет ни одного целевого факта, верни пустой массив facts.",
+      "response_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "AIExtractorV1",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "field_catalog_version",
+          "analysis_unit_id",
+          "facts"
+        ],
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "ai_extractor_v1"
+          },
+          "field_catalog_version": {
+            "type": "string",
+            "const": "tender_fields_v1"
+          },
+          "analysis_unit_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "facts": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field_key",
+                "value_text",
+                "status",
+                "confidence",
+                "evidence",
+                "review_reason_code",
+                "review_note"
+              ],
+              "properties": {
+                "field_key": {
+                  "type": "string",
+                  "enum": [
+                    "procurement_subject",
+                    "nm_price_with_vat",
+                    "platform",
+                    "procedure_type",
+                    "application_deadline",
+                    "application_review_date",
+                    "results_date",
+                    "customer",
+                    "customer_contacts",
+                    "participation_cost",
+                    "participation_guarantee",
+                    "evaluation_criteria",
+                    "delivery_term",
+                    "payment_terms",
+                    "special_account_or_treasury",
+                    "bank_support",
+                    "government_contract",
+                    "rebidding",
+                    "national_regime",
+                    "advance_contract_guarantee",
+                    "warranty_obligations_guarantee",
+                    "licenses_certificates",
+                    "required_official_certificates",
+                    "similar_supply_experience",
+                    "analog_allowed",
+                    "analog_definition",
+                    "application_documents"
+                  ]
+                },
+                "value_text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 3000
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "found",
+                    "requires_review"
+                  ]
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "evidence": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 25,
+                  "uniqueItems": true,
+                  "description": "Суммарная длина всех quote одного fact не должна превышать 5000 символов.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "semantic_block_id",
+                      "quote"
+                    ],
+                    "properties": {
+                      "semantic_block_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "pattern": "^sb_[A-Za-z0-9_-]+$"
+                      },
+                      "quote": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1500
+                      }
+                    }
+                  }
+                },
+                "review_reason_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    null,
+                    "ambiguous_wording",
+                    "conflicting_evidence",
+                    "incomplete_value",
+                    "unclear_reference",
+                    "source_quality_issue",
+                    "other"
+                  ]
+                },
+                "review_note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "found"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "review_reason_code": {
+                        "type": "null"
+                      },
+                      "review_note": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "requires_review"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "review_reason_code": {
+                        "type": "string",
+                        "enum": [
+                          "ambiguous_wording",
+                          "conflicting_evidence",
+                          "incomplete_value",
+                          "unclear_reference",
+                          "source_quality_issue",
+                          "other"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "field_catalog": [
+        {
+          "key": "procurement_subject",
+          "title": "Предмет закупки",
+          "description": "Что именно закупается, поставляется, выполняется или оказывается. Извлекай предмет закупки в формулировке документа."
+        },
+        {
+          "key": "nm_price_with_vat",
+          "title": "НМЦ (с НДС)",
+          "description": "Начальная максимальная цена / НМЦ / НМЦК и информация об НДС, если она прямо указана. Не предполагай, что НДС включён, если документ этого не говорит."
+        },
+        {
+          "key": "platform",
+          "title": "Площадка",
+          "description": "Электронная торговая площадка, информационная система или иной портал, на котором проводится процедура."
+        },
+        {
+          "key": "procedure_type",
+          "title": "Тип процедуры",
+          "description": "Тип закупочной процедуры: конкурс, аукцион, запрос котировок, запрос предложений, закупка у единственного поставщика и другие прямо указанные варианты."
+        },
+        {
+          "key": "application_deadline",
+          "title": "Срок окончания приема заявок",
+          "description": "Дата и время окончания приема или подачи заявок."
+        },
+        {
+          "key": "application_review_date",
+          "title": "Дата рассмотрения заявок",
+          "description": "Дата и, если указано, время рассмотрения заявок."
+        },
+        {
+          "key": "results_date",
+          "title": "Дата подведения итогов",
+          "description": "Дата подведения итогов, определения победителя или завершения соответствующего этапа процедуры."
+        },
+        {
+          "key": "customer",
+          "title": "Заказчик",
+          "description": "Полное или сокращённое наименование заказчика закупки."
+        },
+        {
+          "key": "customer_contacts",
+          "title": "Контактная информация Заказчика",
+          "description": "ФИО контактных лиц, телефоны, email и иные контактные сведения заказчика, прямо указанные в документе."
+        },
+        {
+          "key": "participation_cost",
+          "title": "Стоимость участия",
+          "description": "Плата, тариф или иные расходы именно за участие в процедуре. Не путай со стоимостью обеспечения заявки."
+        },
+        {
+          "key": "participation_guarantee",
+          "title": "БГ на участие",
+          "description": "Банковская гарантия или иное обеспечение участия / заявки: требуется ли, размер или процент, форма, срок и иные прямо указанные условия. Не путай с обеспечением исполнения договора."
+        },
+        {
+          "key": "evaluation_criteria",
+          "title": "Критерии оценки",
+          "description": "Критерии оценки заявок, показатели, веса, значимость критериев и порядок оценки."
+        },
+        {
+          "key": "delivery_term",
+          "title": "Срок поставки (исполнения)",
+          "description": "Сроки поставки товара, выполнения работ или оказания услуг, включая отдельные этапы, если они указаны."
+        },
+        {
+          "key": "payment_terms",
+          "title": "Условия оплаты: аванс и остаток",
+          "description": "Наличие или отсутствие аванса, его размер или процент, а также сроки и условия оплаты оставшейся части."
+        },
+        {
+          "key": "special_account_or_treasury",
+          "title": "Спецсчет/казна",
+          "description": "Требование специального счёта, казначейского счёта или казначейского сопровождения. Извлекай только явно указанные условия."
+        },
+        {
+          "key": "bank_support",
+          "title": "Банковское сопровождение",
+          "description": "Требуется ли банковское сопровождение договора/контракта и какой банк указан, если он указан."
+        },
+        {
+          "key": "government_contract",
+          "title": "Госконтракт",
+          "description": "Является ли заключаемый договор государственным контрактом согласно документации. Не делай вывод только по типу заказчика."
+        },
+        {
+          "key": "rebidding",
+          "title": "Предусмотрена ли переторжка",
+          "description": "Наличие, отсутствие и условия переторжки или повторного улучшения ценовых предложений."
+        },
+        {
+          "key": "national_regime",
+          "title": "Национальный режим",
+          "description": "Запреты, ограничения, преимущества, преференции и иные требования национального режима, прямо применяемые к закупке."
+        },
+        {
+          "key": "advance_contract_guarantee",
+          "title": "БГ аванс (исполнение договора)",
+          "description": "Банковская гарантия или обеспечение, связанное с авансом и/или исполнением договора. Сохраняй буквальную формулировку документа и не смешивай с БГ на участие или обеспечением гарантийных обязательств."
+        },
+        {
+          "key": "warranty_obligations_guarantee",
+          "title": "БГ гарантийные обязательства",
+          "description": "Обеспечение гарантийных обязательств: требуется ли, размер, форма, срок и другие условия. Не путай с самим гарантийным сроком товара."
+        },
+        {
+          "key": "licenses_certificates",
+          "title": "Необходимые лицензии/сертификаты",
+          "description": "Требуемые лицензии, сертификаты, декларации соответствия, разрешения и иные разрешительные документы."
+        },
+        {
+          "key": "required_official_certificates",
+          "title": "Необходимые справки",
+          "description": "Справки, выписки и подтверждения от налоговой, органов статистики, государственных органов и иных организаций."
+        },
+        {
+          "key": "similar_supply_experience",
+          "title": "Требование по опыту аналогичных поставок",
+          "description": "Требования к опыту аналогичных поставок, работ или услуг: период, количество контрактов, стоимость, предмет опыта и документы, которыми опыт подтверждается."
+        },
+        {
+          "key": "analog_allowed",
+          "title": "Допускается ли к поставке аналог",
+          "description": "Прямое указание, допускаются ли аналоги, эквиваленты или альтернативные товары и при каких условиях."
+        },
+        {
+          "key": "analog_definition",
+          "title": "Что считается аналогом",
+          "description": "Прямо указанные критерии, характеристики или условия, по которым товар признаётся аналогом или эквивалентом."
+        },
+        {
+          "key": "application_documents",
+          "title": "Что входит в состав заявки",
+          "description": "Документы, сведения, формы, декларации и иные материалы, которые участник обязан включить или предоставить в составе заявки."
+        }
+      ],
+      "evidence_resource_contract": {
+        "max_evidence_per_fact": 25,
+        "max_quote_length": 1500,
+        "max_total_quote_chars_per_fact": 5000,
+        "exact_duplicates_allowed": false,
+        "primary_grounded_evidence_required": true
+      },
+      "stats": {
+        "system_characters": 12514,
+        "user_characters": 13268,
+        "total_characters": 25782,
+        "estimated_input_tokens": 8594,
+        "semantic_blocks_count": 41,
+        "primary_blocks_count": 40,
+        "overlap_blocks_count": 1
+      }
+    }
+  },
+  "response": {
+    "id": "gen_2204127681499893761",
+    "model": "deepseek/deepseek-v4-pro-0813",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "content": "{\"schema_version\":\"ai_extractor_v1\",\"field_catalog_version\":\"tender_fields_v1\",\"analysis_unit_id\":\"doc_11_au_0005\",\"facts\":[{\"field_key\":\"evaluation_criteria\",\"value_text\":\"Для нефинансовых организаций (публичных и непубличных обществ: акционерных обществ (ПАО, ЗАО, если организации не внесли соответствующие изменения в Устав общества), ООО, а также индивидуальных предпринимателей) и нерезидентов Российской Федерации (кроме подпадающих под подпункты II-V) уровень финансового состояния определяется по показателям: Коэффициент финансовой устойчивости = (Капитал + долгосрочные обязательства)/Пассивы; Коэффициент финансирования = Капитал/Обязательства; Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства; Индекс кредитоспособности Альтмана. Пороговые значения: Устойчивое финансовое состояние: коэффициент финансовой устойчивости ≥ 0,80, коэффициент финансирования ≥ 2,00, коэффициент текущей ликвидности ≥ 2,00, индекс кредитоспособности Альтмана ≥ 3,00; Достаточно устойчивое: ≥ 0,40 - 0,79, 0,60 - 1,99, 1,40 - 1,99, 2,40 - 2,99; Неустойчивое: 0,01 - 0,39, 0,01 - 0,59, 1,00 - 1,39, 1,81 - 2,39; Крайне неустойчивое: ≤ 0, ≤ 0, ≤ 0,99, ≤ 1,80.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0198\",\"quote\":\"Для нефинансовых организаций (публичных и непубличных обществ: акционерных обществ (ПАО, ЗАО, если организации не внесли соответствующие изменения в Устав общества), ООО, а также индивидуальных предпринимателей) и нерезидентов Российской Федерации (кроме подпадающих под подпункты II-V):\"},{\"semantic_block_id\":\"sb_0211\",\"quote\":\"Коэффициент финансовой устойчивости = (Капитал + долгосрочные обязательства)/Пассивы\\n≥ 0,80\\n0,40 - 0,79\\n0,01 - 0,39\\n≤ 0\"},{\"semantic_block_id\":\"sb_0211\",\"quote\":\"Коэффициент финансирования = Капитал/Обязательства\\n≥ 2,00\\n0,60 - 1,99\\n0,01 - 0,59\\n≤ 0\"},{\"semantic_block_id\":\"sb_0211\",\"quote\":\"Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\\n≥ 2,00\\n1,40 - 1,99\\n1,00 - 1,39\\n≤ 0,99\"},{\"semantic_block_id\":\"sb_0211\",\"quote\":\"Индекс кредитоспособности Альтмана\\n≥ 3,00\\n2,40 - 2,99\\n1,81 - 2,39\\n≤ 1,80\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"evaluation_criteria\",\"value_text\":\"Для негосударственных, некоммерческих организаций (учреждения, фонды, коллегии, партнерства) уровень финансового состояния определяется по показателям: Коэффициент финансовой устойчивости = (Капитал + Целевое финансирование + долгосрочные обязательства)/Пассивы; Коэффициент финансирования = Капитал + Целевое финансирование)/ Обязательства; Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства; Индекс кредитоспособности Альтмана. Пороговые значения: Устойчивое: ≥ 0,80, ≥ 2,00, ≥ 2,00, ≥ 3,00; Достаточно устойчивое: 0,40 - 0,79, 0,60 - 1,99, 1,40 - 1,99, 2,40 - 2,99; Неустойчивое: 0,01 - 0,39, 0,01 - 0,59, 1,00 - 1,39, 1,81 - 2,39; Крайне неустойчивое: ≤ 0, ≤ 0, ≤ 0,99, ≤ 1,80.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0199\",\"quote\":\"Для негосударственных, некоммерческих организаций (учреждения, фонды, коллегии, партнерства):\"},{\"semantic_block_id\":\"sb_0200\",\"quote\":\"Коэффициент финансовой устойчивости = (Капитал + Целевое финансирование + долгосрочные обязательства)/Пассивы\\n≥ 0,80\\n0,40 - 0,79\\n0,01 - 0,39\\n≤ 0\"},{\"semantic_block_id\":\"sb_0200\",\"quote\":\"Коэффициент финансирования = Капитал + Целевое финансирование)/ Обязательства\\n≥ 2,00\\n0,60 - 1,99\\n0,01 - 0,59\\n≤ 0\"},{\"semantic_block_id\":\"sb_0200\",\"quote\":\"Коэффициент текущей ликвидности = (Оборотные активы – Долгосрочные требования)/Краткосрочные обязательства\\n≥ 2,00\\n1,40 - 1,99\\n1,00 - 1,39\\n≤ 0,99\"},{\"semantic_block_id\":\"sb_0200\",\"quote\":\"Индекс кредитоспособности Альтмана\\n≥ 3,00\\n2,40 - 2,99\\n1,81 - 2,39\\n≤ 1,80\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"evaluation_criteria\",\"value_text\":\"Для страховых компаний уровень финансового состояния определяется по показателям: Коэффициент финансовой устойчивости = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни+Долгосрочные обязательства)/Баланс; Коэффициент финансирования = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни)/(Итого обязательств-Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни); Коэффициент текущей ликвидности = (Баланс -Внеоборотные активы-Долгосрочные требования)/(Итого обязательств - Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни -Долгосрочные обязательства); Индекс кредитоспособности Альтмана. Пороговые значения: устойчивое: ≥ 0,80, ≥ 2,00, ≥ 2,00, ≥ 3,00; достаточно устойчивое: 0,40 - 0,79, 0,60 - 1,99, 1,40 - 1,99, 2,40 - 2,99; неустойчивое: 0,01 - 0,39, 0,01 - 0,59, 1,00 - 1,39, 1,81 - 2,39; крайне неустойчивое: ≤ 0, ≤ 0, ≤ 0,99, ≤ 1,80.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0205\",\"quote\":\"Для страховых компаний:\"},{\"semantic_block_id\":\"sb_0206\",\"quote\":\"Коэффициент финансовой устойчивости = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни+Долгосрочные обязательства)/Баланс\\n≥ 0,80\\n0,40 - 0,79\\n0,01 - 0,39\\n≤ 0\"},{\"semantic_block_id\":\"sb_0206\",\"quote\":\"Коэффициент финансирования = (Капитал+Страховые резервы по страхованию жизни+Страховые резервы по страхованию иному, чем страхование жизни)/(Итого обязательств-Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни)\\n≥ 2,00\\n0,60 - 1,99\\n0,01 - 0,59\\n≤ 0\"},{\"semantic_block_id\":\"sb_0206\",\"quote\":\"Коэффициент текущей ликвидности = (Баланс -Внеоборотные активы-Долгосрочные требования)/(Итого обязательств - Страховые резервы по страхованию жизни-Страховые резервы по страхованию иному, чем страхование жизни -Долгосрочные обязательства)\\n≥ 2,00\\n1,40 - 1,99\\n1,00 - 1,39\\n≤ 0,99\"},{\"semantic_block_id\":\"sb_0206\",\"quote\":\"Индекс кредитоспособности Альтмана\\n≥ 3,00\\n2,40 - 2,99\\n1,81 - 2,39\\n≤ 1,80\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"evaluation_criteria\",\"value_text\":\"Для государственных (муниципальных) бюджетных и автономных учреждений уровень финансового состояния определяется по показателям: Коэффициент финансовой устойчивости = (Расчеты с учредителем +Финансовый результат экономического субъекта +Долгосрочные обязательства и расчеты)/ Баланс; Коэффициент финансирования = (Расчеты с учредителем + Финансовый результат экономического субъекта)/ (Обязательства – Расчеты с учредителем); Коэффициент текущей ликвидности = (Баланс – Внеоборотные активы)/ (Обязательства – Расчеты с учредителем – Долгосрочные обязательства и расчеты); Индекс кредитоспособности Альтмана. Пороговые значения: устойчивое: ≥ 0,80, ≥ 2,00, ≥ 2,00, ≥ 3,00; достаточно устойчивое: 0,40 - 0,79, 0,60 - 1,99, 1,40 - 1,99, 2,40 - 2,99; неустойчивое: 0,01 - 0,39, 0,01 - 0,59, 1,00 - 1,39, 1,81 - 2,39; крайне неустойчивое: ≤ 0, ≤ 0, ≤ 0,99, ≤ 1,80.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0216\",\"quote\":\"Для государственных (муниципальных) бюджетных и автономных учреждений:\"},{\"semantic_block_id\":\"sb_0217\",\"quote\":\"Коэффициент финансовой устойчивости = (Расчеты с учредителем +Финансовый результат экономического субъекта +Долгосрочные обязательства и расчеты)/ Баланс\\n≥ 0,80\\n0,40 - 0,79\\n0,01 - 0,39\\n≤ 0\"},{\"semantic_block_id\":\"sb_0217\",\"quote\":\"Коэффициент финансирования = (Расчеты с учредителем + Финансовый результат экономического субъекта)/ (Обязательства – Расчеты с учредителем)\\n≥ 2,00\\n0,60 - 1,99\\n0,01 - 0,59\\n≤ 0\"},{\"semantic_block_id\":\"sb_0217\",\"quote\":\"Коэффициент текущей ликвидности = (Баланс – Внеоборотные активы)/ (Обязательства – Расчеты с учредителем – Долгосрочные обязательства и расчеты)\\n≥ 2,00\\n1,40 - 1,99\\n1,00 - 1,39\\n≤ 0,99\"},{\"semantic_block_id\":\"sb_0217\",\"quote\":\"Индекс кредитоспособности Альтмана\\n≥ 3,00\\n2,40 - 2,99\\n1,81 - 2,39\\n≤ 1,80\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"evaluation_criteria\",\"value_text\":\"Для кредитных и финансовых институтов уровень финансового состояния определяется по показателям: Рейтинг долгосрочной кредитоспособности кредитных организаций, присвоенный рейтинговыми агентствами Standard & Poor's/Fitch Ratings/Moody's; Ограничения на ведение деятельности со стороны соответствующего национального регулирующего органа. Пороговые значения: устойчивое: ≥ВВВ-/ВВВ-/Ваа3, Нет; достаточно устойчивое: ≥BB-/BB-/Ba3, Нет; неустойчивое: <BB-/BB-/Ba3 но >D, либо рейтинг отсутствует, Нет; крайне неустойчивое: D, Да.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0222\",\"quote\":\"Для кредитных и финансовых институтов:\"},{\"semantic_block_id\":\"sb_0223\",\"quote\":\"Рейтинг долгосрочной кредитоспособности кредитных организаций, присвоенный рейтинговыми агентствами Standard & Poor's/Fitch Ratings/Moody's\\n≥ВВВ-/ВВВ-/Ваа3\\n≥BB-/BB-/Ba3\\n<BB-/BB-/Ba3 но >D, либо рейтинг отсутствует\\nD\"},{\"semantic_block_id\":\"sb_0223\",\"quote\":\"Ограничения на ведение деятельности со стороны соответствующего национального регулирующего органа\\nНет\\nНет\\nНет\\nДа\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"evaluation_criteria\",\"value_text\":\"По результатам оценки показателей уровень финансового состояния Участника закупки определяется в соответствии со следующими правилами: финансовое состояние Участника закупки принимается по наихудшему расчетному показателю 1 группы; показатели 2 группы имеют второстепенное значение и служат в качестве дополнительной информации при формировании окончательного решения в случае, если один или оба показателя 1 группы принимают «граничные» значения (+/- 0,03 от порогового значения, за исключением случаев, когда один или оба показателя 1 группы <0). Коэффициенты финансовой устойчивости и финансирования являются ключевыми при принятии решения о финансовом состоянии Участника закупки.\",\"status\":\"found\",\"confidence\":0.95,\"evidence\":[{\"semantic_block_id\":\"sb_0194\",\"quote\":\"Коэффициенты финансовой устойчивости и финансирования являются ключевыми при принятии решения о финансовом состоянии Участника закупки.\"},{\"semantic_block_id\":\"sb_0195\",\"quote\":\"При этом финансовое состояние Участника закупки принимается по наихудшему расчетному показателю 1 группы.\"},{\"semantic_block_id\":\"sb_0196\",\"quote\":\"Показатели 2 группы имеют второстепенное значение и служат в качестве дополнительной информации при формировании окончательного решения в случае, если один или оба показателя 1 группы принимают «граничные» значения (+/- 0,03 от порогового значения, за исключением случаев, когда один или оба показателя 1 группы <0).\"},{\"semantic_block_id\":\"sb_0197\",\"quote\":\"По результатам оценки показателей уровень финансового состояния Участника закупки определяется в соответствии со следующими правилами:\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"application_documents\",\"value_text\":\"Участник закупки вправе подать документы в подтверждение соответствия требованию раздела 2 Блока 9 настоящего документа в составе квалификационной части заявки настоящей закупки / в составе квалификационной части заявки ранее проводимой закупки / на электронной торговой площадке, на которой проводится закупка (при наличии на электронной торговой площадке специального функционала для приема указанных документов). О подаче документов Участник закупки информирует Организатора в форме 1а/б Блока 4 «Образцы форм документов, включаемых в заявку на участие в закупке» квалификационной части заявки.\",\"status\":\"found\",\"confidence\":0.9,\"evidence\":[{\"semantic_block_id\":\"sb_0228\",\"quote\":\"Участник закупки вправе подать документы в подтверждение соответствия требованию раздела 2 Блока 9 настоящего документа в составе квалификационной части заявки настоящей закупки / в составе квалификационной части заявки ранее проводимой закупки / на электронной торговой площадке, на которой проводится закупка (при наличии на электронной торговой площадке специального функционала для приема указанных документов).\"},{\"semantic_block_id\":\"sb_0229\",\"quote\":\"О подаче документов Участник закупки информирует Организатора в форме 1а/б Блока 4 «Образцы форм документов, включаемых в заявку на участие в закупке» квалификационной части заявки.\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"application_documents\",\"value_text\":\"Для подтверждения соответствия требованиям в рамках должной осмотрительности Участник должен представить либо сведения об успешном прохождении проверки на соответствие требованиям в рамках должной осмотрительности, указав реквизиты документа, подтверждающего факт прохождения указанной проверки и декларацию об отсутствии изменений в части соответствия данным требованиям по форме 1а/1б; либо пакет документов, в состав которого входят документы, указанные для каждого представленного ниже требования.\",\"status\":\"found\",\"confidence\":0.9,\"evidence\":[{\"semantic_block_id\":\"sb_0230\",\"quote\":\"Требования в рамках должной осмотрительности\"},{\"semantic_block_id\":\"sb_0231\",\"quote\":\"Для подтверждения соответствия указанным ниже требованиям Участник должен представить:\"},{\"semantic_block_id\":\"sb_0232\",\"quote\":\"либо сведения об успешном прохождении проверки на соответствие требованиям в рамках должной осмотрительности, указав реквизиты документа, подтверждающего факт прохождения указанной проверки и декларацию об отсутствии изменений в части соответствия данным требованиям по форме 1а/1б;\"},{\"semantic_block_id\":\"sb_0233\",\"quote\":\"либо пакет документов, в состав которого входят документы, указанные для каждого представленного ниже требования.\"}],\"review_reason_code\":null,\"review_note\":null}]}"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 8045,
+      "completion_tokens": 4929,
+      "total_tokens": 12974,
+      "completion_tokens_details": {
+        "reasoning_tokens": 0,
+        "audio_tokens": 0,
+        "image_tokens": 0,
+        "accepted_prediction_tokens": null,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "audio_tokens": 0,
+        "video_tokens": 0
+      },
+      "server_tool_use": null,
+      "cost_rub": 1.74868398,
+      "cost": 1.74868398,
+      "plugins": null
+    }
+  }
+}

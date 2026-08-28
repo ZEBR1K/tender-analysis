@@ -1,7 +1,7 @@
 # TENDER — Агрегация закупки
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
+**Последнее обновление:** 2026-08-28
 **Тип:** sub-workflow n8n  
 **Вызывается:** другим workflow после готовности всех документов  
 **Вызывает:** `TENDER - Targeted Recheck`  
@@ -10,6 +10,8 @@
 **AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
 **Основная модель Semantic Aggregator:** `deepseek/deepseek-v4-pro-0813`
 **Reasoning:** через alias модели `@reasoning_effort=low`
+
+> Protected production workflow не изменялся в текущем Aggregator hardening cycle. Изолированный workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) предназначен для следующего prompt-only runtime canary. Текущие source-of-truth расхождения перечислены в `PROJECT_STATUS.md`.
 
 \---
 
@@ -123,6 +125,8 @@ TENDER — Агрегация закупки
 \&#x20;       	     v
 
 \&#x09;  	 UPSERT DB
+
+```
 
 \\---
 
@@ -534,6 +538,10 @@ Round 1 `FIELD\\\_RULES` содержит правила для всех 27 по
   "rules": \\\["..."]
 }
 ```
+
+Execution-derived regression `14104` выявил отсутствующую универсальную границу для `procurement_subject`: текущие rules не требуют доказать, что candidate описывает объект именно текущей закупки/договора, а не внутренний процесс, вспомогательное обязательство или отдельное соглашение.
+
+Это не structural checker defect. Checker проверяет schema/cardinality/linking, но не является независимым semantic interpreter. При ambiguous scope безопасный AI result должен быть `requires_recheck`, а не `resolved`.
 
 ### Подготавливает candidates для AI
 
@@ -1253,6 +1261,38 @@ Targeted Recheck Round 2 FIELD\\\_RULES
 Aggregator
 → запускает Targeted Recheck
 → parent execution не ждёт его FINAL
+```
+
+\---
+
+### AG-8 — `procurement_subject` current-scope false-resolved
+
+**Severity:** Critical / P0 before client report
+**Status:** RED regression; implementation not started
+
+Execution `14104` содержит четыре `confirmed` candidates для `procurement_subject`: три относятся к закупаемым стандартным закрытиям палуб, один описывает внутренний процесс поддержания технологического оборудования.
+
+Текущий schema-valid AI response может:
+
+```text
+назначить внутренний процесс primary
+→ пройти deterministic checker
+→ сформировать false-resolved FINAL
+```
+
+Route-aware offline harness и neutral anti-overfit controls подтверждают trust-boundary gap. Один явно установленный предмет закупки остаётся допустимым positive control; blanket recheck не требуется.
+
+Минимальный следующий fix:
+
+```text
+universal procurement_subject prompt boundary
+→ только [TEST CODEX]
+→ offline GREEN
+→ paid runtime canary
+```
+
+Не менять topology, SQL, checker или protected production workflow до результата canary.
+
 \---
 
 ## 28\. Safe Modification Checklist
@@ -1385,11 +1425,30 @@ metadata\\\_resolved=false
 retry только проблемного field item
 ```
 
+### A13 — current procurement scope
+
+```text
+real current-procurement subject
++ concrete internal/auxiliary process
+→ internal/auxiliary candidate = not_applicable
+→ real subject = primary/supporting
+```
+
+При недостаточном evidence для scope:
+
+```text
+requires_recheck
+→ Targeted Recheck
+→ no Round 1 FINAL
+```
+
 \---
 
 ## 30\. Ближайший план работ
 
 ### Следующий MVP milestone
+
+Сначала закрыть `AG-8` только в `[TEST CODEX]` prompt и выполнить runtime canary. Production promotion допускается только после semantic oracle и anti-overfit positive control.
 
 1. Использовать реализованный `AG-0`:
 

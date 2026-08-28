@@ -1,0 +1,452 @@
+{
+  "fixture_version": "aggregator_procurement_subject_execution_14104_v1",
+  "source": {
+    "execution_id": "14104",
+    "workflow_id": "2T7szFpiGcfNpKkB",
+    "workflow_name": "[3 TEST] TENDER — Обработать документ",
+    "analysis_run_id": "399dbdc5-e76f-417c-9f5f-db0294918646",
+    "execution_status": "success",
+    "execution_mode": "manual",
+    "started_at": "2026-08-28T18:19:34.484Z",
+    "stopped_at": "2026-08-28T18:19:55.741Z",
+    "source_node": "Собрать факты документа1",
+    "note": "Execution-derived regression fixture. Execution IDs and analysis-unit IDs are test data only."
+  },
+  "fact_id_policy": {
+    "origin": "stable_fixture_uuid_not_production",
+    "reason": "Production fact_id values were not available through the execution payload and no PostgreSQL query was required for this RED phase.",
+    "must_not_be_reported_as_production_ids": true
+  },
+  "document": {
+    "file_name": "Блок_6_Проект_договора.docx",
+    "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+    "display_name": "Блок_6_Проект_договора.docx",
+    "parser_schema": "DoclingDocument",
+    "document_index": 7,
+    "file_extension": "docx",
+    "parser_provider": "docling"
+  },
+  "fact_ids_by_analysis_unit": {
+    "doc_7_au_0001": "14104000-0001-4000-8000-000000000001",
+    "doc_7_au_0008": "14104000-0008-4000-8000-000000000008",
+    "doc_7_au_0010": "14104000-0010-4000-8000-000000000010",
+    "doc_7_au_0031": "14104000-0031-4000-8000-000000000031"
+  },
+  "execution_validator_meta_by_analysis_unit": {
+    "doc_7_au_0001": {
+      "fact_local_literal_guard": {
+        "version": "fact_local_material_literals_v1",
+        "applied": true,
+        "original_ai_verdict": "confirmed",
+        "downgraded": false,
+        "missing_literals": []
+      }
+    },
+    "doc_7_au_0008": {
+      "fact_local_literal_guard": {
+        "version": "fact_local_material_literals_v1",
+        "applied": true,
+        "original_ai_verdict": "confirmed",
+        "downgraded": false,
+        "missing_literals": []
+      }
+    },
+    "doc_7_au_0010": {
+      "fact_local_literal_guard": {
+        "version": "fact_local_material_literals_v1",
+        "applied": true,
+        "original_ai_verdict": "confirmed",
+        "downgraded": false,
+        "missing_literals": []
+      }
+    },
+    "doc_7_au_0031": {
+      "fact_local_literal_guard": {
+        "version": "fact_local_material_literals_v1",
+        "applied": true,
+        "original_ai_verdict": "confirmed",
+        "downgraded": false,
+        "missing_literals": []
+      }
+    }
+  },
+  "semantic_oracle": {
+    "target_analysis_unit_id": "doc_7_au_0031",
+    "required_target_role": "not_applicable",
+    "forbidden_target_roles": [
+      "primary",
+      "supporting",
+      "duplicate",
+      "complement"
+    ],
+    "allowed_primary_analysis_unit_ids": [
+      "doc_7_au_0001",
+      "doc_7_au_0008",
+      "doc_7_au_0010"
+    ],
+    "final_value_must_describe": "стандартные закрытия палуб",
+    "final_value_must_not_describe": "поддержание технологического оборудования",
+    "candidate_id_cardinality": "all four IDs exactly once",
+    "authoritative_catalog_definition": "Конкретный товар, работа или услуга, которые закупаются.",
+    "regression_oracle_interpretation": "Для execution 14104 внутренний процесс обслуживания оборудования не является предметом данной закупки, когда три других кандидата и контекст договора подтверждают поставку стандартных закрытий палуб.",
+    "interpretation_provenance": "Execution-specific regression inference; not a verbatim FIELD_CATALOG.md rule."
+  },
+  "contract_layers": {
+    "structural_checker_contract": [
+      "schema",
+      "cardinality",
+      "fact_linking",
+      "role_consistency",
+      "resolved_recheck_consistency"
+    ],
+    "ai_semantic_behavior": [
+      "candidate_applicability_to_current_procurement",
+      "correct_primary_selection",
+      "correct_final_value_text"
+    ],
+    "deterministic_post_ai_guards": {
+      "scope": "Formally provable invariants only",
+      "must_not_claim": "Universal semantic understanding of unrestricted candidate text"
+    }
+  },
+  "aggregator_field_item": {
+    "analysis_run_id": "399dbdc5-e76f-417c-9f5f-db0294918646",
+    "field_catalog_version": "tender_fields_v1",
+    "field_index": 1,
+    "field_key": "procurement_subject",
+    "has_candidates": true,
+    "candidates_count": 4,
+    "confirmed_count": 4,
+    "requires_review_count": 0,
+    "source_documents_count": 1,
+    "source_documents": [
+      {
+        "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+        "document_index": 7,
+        "file_name": "Блок_6_Проект_договора.docx",
+        "file_extension": "docx"
+      }
+    ],
+    "candidates": [
+      {
+        "fact_id": "14104000-0001-4000-8000-000000000001",
+        "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+        "document_index": 7,
+        "file_name": "Блок_6_Проект_договора.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_7_au_0001",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "procurement_subject",
+        "value_text": "Поставщик обязуется передать в собственность Покупателя стандартные закрытия палуб для ледокола-лидера пр.10510 зав № 056001 (далее – «Товар») согласно Спецификации (Приложение № 1 к Договору), а Покупатель обязуется принять и оплатить Товар.",
+        "extractor_status": "found",
+        "extractor_confidence": 0.97,
+        "extractor_review_reason_code": null,
+        "extractor_review_note": null,
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.98,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0049",
+            "quote": "Поставщик обязуется передать в собственность Покупателя стандартные закрытия палуб для ледокола-лидера пр.10510 зав № 056001 (далее – «Товар») согласно Спецификации (Приложение № 1 к Договору), которая является неотъемлемой частью Договора (далее – Спецификация), а Покупатель обязуется принять и оплатить Товар.",
+            "scope": "primary",
+            "type": "text",
+            "role": "paragraph",
+            "source_block_ids": [
+              "#/texts/94"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "list_item",
+                "page_no": null,
+                "block_id": "#/texts/94",
+                "analysis_order": 49
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "fact_id": "14104000-0008-4000-8000-000000000008",
+        "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+        "document_index": 7,
+        "file_name": "Блок_6_Проект_договора.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_7_au_0008",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "procurement_subject",
+        "value_text": "Стандартные закрытия палуб для ледокола-лидера пр. 10510 зав. № 056001 в составе: (включая ЗИП к оборудованию) — крышки по ГОСТ 25309-94",
+        "extractor_status": "found",
+        "extractor_confidence": 0.9,
+        "extractor_review_reason_code": null,
+        "extractor_review_note": null,
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0320",
+            "quote": "Стандартные закрытия палуб для ледокола-лидера пр. 10510 зав. № 056001 в составе:",
+            "scope": "primary",
+            "type": "table",
+            "role": "table",
+            "source_block_ids": [
+              "#/tables/2"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "table",
+                "page_no": null,
+                "block_id": "#/tables/2",
+                "analysis_order": 320
+              }
+            ]
+          },
+          {
+            "semantic_block_id": "sb_0320",
+            "quote": "ЗИП к оборудованию",
+            "scope": "primary",
+            "type": "table",
+            "role": "table",
+            "source_block_ids": [
+              "#/tables/2"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "table",
+                "page_no": null,
+                "block_id": "#/tables/2",
+                "analysis_order": 320
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "fact_id": "14104000-0010-4000-8000-000000000010",
+        "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+        "document_index": 7,
+        "file_name": "Блок_6_Проект_договора.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_7_au_0010",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "procurement_subject",
+        "value_text": "поставка стандартных закрытий палуб для ледокола-лидера пр. 10510 по ИТТ №10510/20-068/1ИТТ",
+        "extractor_status": "found",
+        "extractor_confidence": 0.85,
+        "extractor_review_reason_code": null,
+        "extractor_review_note": null,
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0401",
+            "quote": "на поставку стандартных закрытий палуб для ледокола-лидера пр. 10510 по ИТТ №10510/20-068/1ИТТ",
+            "scope": "primary",
+            "type": "text",
+            "role": "paragraph",
+            "source_block_ids": [
+              "#/texts/461"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "text",
+                "page_no": null,
+                "block_id": "#/texts/461",
+                "analysis_order": 401
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "fact_id": "14104000-0031-4000-8000-000000000031",
+        "document_id": "c8797a6c-a624-4b80-a723-b29124392c59",
+        "document_index": 7,
+        "file_name": "Блок_6_Проект_договора.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_7_au_0031",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "procurement_subject",
+        "value_text": "Поддержание технологического оборудования в работоспособном состоянии: планирование технического обслуживания и ремонта оборудования; поддержание основного (технологического) оборудования в работоспособном состоянии; поддержание вспомогательного оборудования в работоспособном состоянии",
+        "extractor_status": "found",
+        "extractor_confidence": 0.9,
+        "extractor_review_reason_code": null,
+        "extractor_review_note": null,
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.92,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0812",
+            "quote": "8. Поддержание технологического оборудования в работоспособном состоянии",
+            "scope": "primary",
+            "type": "text",
+            "role": "section_heading",
+            "source_block_ids": [
+              "#/texts/964"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "text",
+                "page_no": null,
+                "block_id": "#/texts/964",
+                "analysis_order": 812
+              }
+            ]
+          },
+          {
+            "semantic_block_id": "sb_0813",
+            "quote": "Планирование технического обслуживания и ремонта оборудования",
+            "scope": "primary",
+            "type": "text",
+            "role": "paragraph",
+            "source_block_ids": [
+              "#/texts/965"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "text",
+                "page_no": null,
+                "block_id": "#/texts/965",
+                "analysis_order": 813
+              }
+            ]
+          },
+          {
+            "semantic_block_id": "sb_0814",
+            "quote": "Поддержание основного (технологического) оборудования в работоспособном состоянии",
+            "scope": "primary",
+            "type": "text",
+            "role": "paragraph",
+            "source_block_ids": [
+              "#/texts/966"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "text",
+                "page_no": null,
+                "block_id": "#/texts/966",
+                "analysis_order": 814
+              }
+            ]
+          },
+          {
+            "semantic_block_id": "sb_0815",
+            "quote": "Поддержание вспомогательного оборудования в работоспособном состоянии",
+            "scope": "primary",
+            "type": "text",
+            "role": "paragraph",
+            "source_block_ids": [
+              "#/texts/967"
+            ],
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null,
+            "sources": [
+              {
+                "bbox": null,
+                "label": "text",
+                "page_no": null,
+                "block_id": "#/texts/967",
+                "analysis_order": 815
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "recorded_false_resolved_api_response": {
+    "id": "synthetic-execution-14104-false-resolved",
+    "model": "synthetic-schema-valid-no-ai",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"field_key\":\"procurement_subject\",\"status\":\"resolved\",\"final_value_text\":\"Поддержание технологического оборудования в работоспособном состоянии: планирование технического обслуживания и ремонта оборудования; поддержание основного и вспомогательного оборудования в работоспособном состоянии\",\"confidence\":0.93,\"candidate_decisions\":[{\"fact_id\":\"14104000-0001-4000-8000-000000000001\",\"role\":\"supporting\",\"reason\":\"Дополнительный кандидат.\"},{\"fact_id\":\"14104000-0008-4000-8000-000000000008\",\"role\":\"not_applicable\",\"reason\":\"Не выбран для итогового значения.\"},{\"fact_id\":\"14104000-0010-4000-8000-000000000010\",\"role\":\"supporting\",\"reason\":\"Дополнительный кандидат.\"},{\"fact_id\":\"14104000-0031-4000-8000-000000000031\",\"role\":\"primary\",\"reason\":\"Ошибочно выбран как основной предмет.\"}],\"supporting_fact_ids\":[\"14104000-0001-4000-8000-000000000001\",\"14104000-0010-4000-8000-000000000010\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+        }
+      }
+    ],
+    "usage": null
+  },
+  "proposed_semantic_axis_contract": {
+    "scope_values": [
+      "current_procurement_object",
+      "other_or_auxiliary_object",
+      "ambiguous_scope"
+    ],
+    "semantic_object_values": [
+      "procurement_subject",
+      "other_object",
+      "ambiguous_object"
+    ],
+    "applicability_values": [
+      "applicable",
+      "not_applicable",
+      "ambiguous"
+    ],
+    "formal_primary_matrix": {
+      "scope": "current_procurement_object",
+      "semantic_object": "procurement_subject",
+      "applicability": "applicable"
+    },
+    "trust_boundary": "All semantic-axis values are self-declared by the same untrusted model response."
+  },
+  "adversarial_self_declared_axis_api_response": {
+    "id": "synthetic-execution-14104-self-declared-axis",
+    "model": "synthetic-schema-valid-no-ai",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"field_key\":\"procurement_subject\",\"status\":\"resolved\",\"final_value_text\":\"Поддержание технологического оборудования в работоспособном состоянии: планирование технического обслуживания и ремонта оборудования; поддержание основного и вспомогательного оборудования в работоспособном состоянии\",\"confidence\":0.93,\"candidate_decisions\":[{\"fact_id\":\"14104000-0001-4000-8000-000000000001\",\"role\":\"supporting\",\"reason\":\"Кандидат объявлен дополнительным.\",\"semantic_axes\":{\"scope\":\"current_procurement_object\",\"semantic_object\":\"procurement_subject\",\"applicability\":\"applicable\"}},{\"fact_id\":\"14104000-0008-4000-8000-000000000008\",\"role\":\"not_applicable\",\"reason\":\"Кандидат объявлен неприменимым.\",\"semantic_axes\":{\"scope\":\"other_or_auxiliary_object\",\"semantic_object\":\"other_object\",\"applicability\":\"not_applicable\"}},{\"fact_id\":\"14104000-0010-4000-8000-000000000010\",\"role\":\"supporting\",\"reason\":\"Кандидат объявлен дополнительным.\",\"semantic_axes\":{\"scope\":\"current_procurement_object\",\"semantic_object\":\"procurement_subject\",\"applicability\":\"applicable\"}},{\"fact_id\":\"14104000-0031-4000-8000-000000000031\",\"role\":\"primary\",\"reason\":\"Кандидат объявлен основным объектом текущей закупки.\",\"semantic_axes\":{\"scope\":\"current_procurement_object\",\"semantic_object\":\"procurement_subject\",\"applicability\":\"applicable\"}}],\"supporting_fact_ids\":[\"14104000-0001-4000-8000-000000000001\",\"14104000-0010-4000-8000-000000000010\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+        }
+      }
+    ],
+    "usage": null
+  }
+}

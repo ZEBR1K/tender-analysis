@@ -1,0 +1,325 @@
+{
+  "fixture_version": "aggregator_procurement_subject_anti_overfit_controls_v1",
+  "provenance": {
+    "origin": "neutral_synthetic_contract_cases",
+    "execution_derived": false,
+    "purpose": "Prevent execution-specific fixes and blanket requires_recheck behavior."
+  },
+  "authoritative_catalog_definition": "Конкретный товар, работа или услуга, которые закупаются.",
+  "cases": [
+    {
+      "case_id": "legitimate_single_subject",
+      "description": "A single explicit current-procurement subject remains eligible for resolved.",
+      "aggregator_field_item": {
+        "analysis_run_id": "71000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 1,
+        "field_key": "procurement_subject",
+        "has_candidates": true,
+        "candidates_count": 1,
+        "confirmed_count": 1,
+        "requires_review_count": 0,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "71000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-current-subject.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "71000000-0000-4000-8000-000000001001",
+            "document_id": "71000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-current-subject.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "synthetic_single_subject_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "procurement_subject",
+            "value_text": "Поставка комплектов офисной мебели для административных помещений.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.98,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "synthetic_sb_001",
+                "quote": "Предмет закупки: поставка комплектов офисной мебели для административных помещений.",
+                "scope": "primary",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-legitimate-single-subject",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"procurement_subject\",\"status\":\"resolved\",\"final_value_text\":\"Поставка комплектов офисной мебели для административных помещений.\",\"confidence\":0.98,\"candidate_decisions\":[{\"fact_id\":\"71000000-0000-4000-8000-000000001001\",\"role\":\"primary\",\"reason\":\"Кандидат прямо описывает предмет текущей закупки.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "resolved",
+        "required_roles": {
+          "71000000-0000-4000-8000-000000001001": "primary"
+        },
+        "allowed_primary_fact_ids": [
+          "71000000-0000-4000-8000-000000001001"
+        ],
+        "final_value_must_include": [
+          "комплектов офисной мебели"
+        ],
+        "final_value_must_exclude": []
+      }
+    },
+    {
+      "case_id": "auxiliary_or_internal_process",
+      "description": "Concrete-looking internal and auxiliary work must not displace the current procurement subject.",
+      "aggregator_field_item": {
+        "analysis_run_id": "72000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 1,
+        "field_key": "procurement_subject",
+        "has_candidates": true,
+        "candidates_count": 3,
+        "confirmed_count": 3,
+        "requires_review_count": 0,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "72000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-mixed-scope.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "72000000-0000-4000-8000-000000001001",
+            "document_id": "72000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-mixed-scope.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "synthetic_current_object_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "procurement_subject",
+            "value_text": "Поставка промышленных насосов для системы водоснабжения.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.97,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "synthetic_sb_101",
+                "quote": "Предмет договора: поставка промышленных насосов для системы водоснабжения.",
+                "scope": "primary",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          },
+          {
+            "fact_id": "72000000-0000-4000-8000-000000001002",
+            "document_id": "72000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-mixed-scope.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "synthetic_internal_process_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "procurement_subject",
+            "value_text": "Плановое обслуживание станочного парка по внутреннему регламенту организации.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.91,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "synthetic_sb_102",
+                "quote": "Внутренний процесс: плановое обслуживание станочного парка по регламенту организации.",
+                "scope": "primary",
+                "type": "text",
+                "role": "section_heading",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          },
+          {
+            "fact_id": "72000000-0000-4000-8000-000000001003",
+            "document_id": "72000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-mixed-scope.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "synthetic_auxiliary_agreement_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "procurement_subject",
+            "value_text": "Настройка электронного архива в рамках отдельного соглашения о сопровождении.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.9,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "synthetic_sb_103",
+                "quote": "По отдельному соглашению о сопровождении выполняется настройка электронного архива.",
+                "scope": "primary",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-false-internal-primary",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"procurement_subject\",\"status\":\"resolved\",\"final_value_text\":\"Плановое обслуживание станочного парка по внутреннему регламенту организации.\",\"confidence\":0.91,\"candidate_decisions\":[{\"fact_id\":\"72000000-0000-4000-8000-000000001001\",\"role\":\"supporting\",\"reason\":\"Дополнительный конкретный кандидат.\"},{\"fact_id\":\"72000000-0000-4000-8000-000000001002\",\"role\":\"primary\",\"reason\":\"Выбран как наиболее конкретная услуга.\"},{\"fact_id\":\"72000000-0000-4000-8000-000000001003\",\"role\":\"not_applicable\",\"reason\":\"Отнесён к отдельному соглашению.\"}],\"supporting_fact_ids\":[\"72000000-0000-4000-8000-000000001001\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "resolved",
+        "required_roles": {
+          "72000000-0000-4000-8000-000000001001": "primary",
+          "72000000-0000-4000-8000-000000001002": "not_applicable",
+          "72000000-0000-4000-8000-000000001003": "not_applicable"
+        },
+        "allowed_primary_fact_ids": [
+          "72000000-0000-4000-8000-000000001001"
+        ],
+        "final_value_must_include": [
+          "промышленных насосов"
+        ],
+        "final_value_must_exclude": [
+          "обслуживание станочного парка",
+          "электронного архива"
+        ]
+      }
+    },
+    {
+      "case_id": "ambiguous_scope",
+      "description": "A concrete service with no reliable link to the current procurement requires recheck.",
+      "aggregator_field_item": {
+        "analysis_run_id": "73000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 1,
+        "field_key": "procurement_subject",
+        "has_candidates": true,
+        "candidates_count": 1,
+        "confirmed_count": 0,
+        "requires_review_count": 1,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "73000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-ambiguous-scope.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "73000000-0000-4000-8000-000000001001",
+            "document_id": "73000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "synthetic-ambiguous-scope.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "synthetic_ambiguous_scope_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "procurement_subject",
+            "value_text": "Оказание услуг по настройке системы мониторинга согласно упомянутому соглашению.",
+            "validator_verdict": "requires_review",
+            "validator_confidence": 0.62,
+            "validator_reason_code": "ambiguous_scope",
+            "validator_reason_note": "Не установлено, относится ли упомянутое соглашение к текущей закупке.",
+            "processing_status": "requires_review",
+            "evidence": [
+              {
+                "semantic_block_id": "synthetic_sb_201",
+                "quote": "Согласно упомянутому соглашению могут оказываться услуги по настройке системы мониторинга.",
+                "scope": "primary",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-false-ambiguous-resolved",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"procurement_subject\",\"status\":\"resolved\",\"final_value_text\":\"Оказание услуг по настройке системы мониторинга.\",\"confidence\":0.72,\"candidate_decisions\":[{\"fact_id\":\"73000000-0000-4000-8000-000000001001\",\"role\":\"primary\",\"reason\":\"Кандидат содержит конкретную услугу.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "correct_requires_recheck_api_response": {
+        "id": "synthetic-correct-ambiguous-requires-recheck",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"procurement_subject\",\"status\":\"requires_recheck\",\"final_value_text\":null,\"confidence\":0.62,\"candidate_decisions\":[{\"fact_id\":\"73000000-0000-4000-8000-000000001001\",\"role\":\"not_applicable\",\"reason\":\"Связь упомянутого соглашения с текущей закупкой не установлена надёжно.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":true,\"recheck_reason_code\":\"ambiguous_scope\",\"recheck_note\":\"Требуется дополнительный контекст для установления scope.\"}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "requires_recheck",
+        "required_roles": {},
+        "allowed_primary_fact_ids": [],
+        "final_value_must_include": [],
+        "final_value_must_exclude": []
+      }
+    }
+  ]
+}

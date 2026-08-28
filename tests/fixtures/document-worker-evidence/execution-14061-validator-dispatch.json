@@ -1,0 +1,514 @@
+{
+  "fixture_version": "execution_derived_validator_dispatch_summary_v1",
+  "source_execution_id": 14061,
+  "source_workflow_id": "ZjEYvIOA3DSaAQUn",
+  "source_workflow_name": "[2 TEST] TENDER — Обработать документ",
+  "document_file_name": "Блок_6_Проект_договора.docx",
+  "expected": {
+    "units_total": 66,
+    "current_passed_units": 64,
+    "current_invalid_overlap_units": 2,
+    "current_nonempty_passed_units": 14,
+    "current_zero_fact_units": 50,
+    "target_units_for_ai": 16,
+    "target_units_without_ai": 50,
+    "target_http_ai_validator_items": 16,
+    "target_unit_results": 66,
+    "overlap_unit_ids": [
+      "doc_7_au_0002",
+      "doc_7_au_0003"
+    ]
+  },
+  "units": [
+    {
+      "analysis_unit_id": "doc_7_au_0001",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0002",
+      "validation_passed": false,
+      "verified_fact_indexes": [
+        1,
+        2,
+        3
+      ],
+      "violations": [
+        {
+          "code": "overlap_only",
+          "fact_index": 0,
+          "evidence_index": null
+        }
+      ]
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0003",
+      "validation_passed": false,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        18
+      ],
+      "violations": [
+        {
+          "code": "overlap_only",
+          "fact_index": 17,
+          "evidence_index": null
+        }
+      ]
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0004",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0005",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0006",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0007",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0008",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0009",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0010",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0011",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0012",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0013",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0014",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0015",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0016",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0017",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0018",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0019",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0020",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0021",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0022",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0023",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0024",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0025",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0026",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0027",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0028",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0029",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0030",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0031",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0032",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0033",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0034",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0035",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0036",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0037",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0038",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0039",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0040",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0041",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0042",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0043",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0044",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0045",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0046",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0047",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0048",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0049",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0050",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0051",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0052",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0053",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0054",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0055",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0056",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0057",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0058",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0059",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0060",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0061",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0062",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0063",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0064",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0065",
+      "validation_passed": true,
+      "verified_fact_indexes": [
+        0
+      ],
+      "violations": []
+    },
+    {
+      "analysis_unit_id": "doc_7_au_0066",
+      "validation_passed": true,
+      "verified_fact_indexes": [],
+      "violations": []
+    }
+  ]
+}

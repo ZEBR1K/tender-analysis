@@ -1,0 +1,876 @@
+{
+  "schema_version": "document_worker_evidence_regression_v1",
+  "captured_from": "production n8n read-only executions",
+  "captured_at": "2026-08-26T05:57:30.849Z",
+  "fixture_policy": "Only the selected fact and evidence-relevant semantic blocks are retained. Very large blocks use exact execution-derived excerpts and are marked segment_text_is_excerpt.",
+  "cases": [
+    {
+      "execution_id": 14006,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_1_au_0001",
+      "analysis_unit_id": "execution-14006-fixture",
+      "original_unit_count": 1,
+      "facts": [
+        {
+          "field_key": "procurement_subject",
+          "value_text": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.",
+          "status": "found",
+          "confidence": 1,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0008",
+              "quote": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0008",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14007,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_2_au_0001",
+      "analysis_unit_id": "execution-14007-fixture",
+      "original_unit_count": 4,
+      "facts": [
+        {
+          "field_key": "procurement_subject",
+          "value_text": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.",
+          "status": "found",
+          "confidence": 0.99,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0004",
+              "quote": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0004",
+          "scope": "primary",
+          "type": "table",
+          "role": "table",
+          "text": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.",
+          "segment_text_is_excerpt": true
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14008,
+      "production_status": "error",
+      "production_error_type": "wrong_semantic_block_id",
+      "unit_index": 2,
+      "original_analysis_unit_id": "doc_3_au_0003",
+      "analysis_unit_id": "execution-14008-fixture",
+      "original_unit_count": 12,
+      "facts": [
+        {
+          "field_key": "national_regime",
+          "value_text": "В отношении закупаемой продукции установлен: [выбрано] запрет, ограничение, преимущество или Не применимо",
+          "status": "requires_review",
+          "confidence": 0.7,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0019",
+              "quote": "В отношении закупаемой продукции установлен:"
+            },
+            {
+              "semantic_block_id": "sb_0019",
+              "quote": "запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];"
+            },
+            {
+              "semantic_block_id": "sb_0019",
+              "quote": "ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];"
+            },
+            {
+              "semantic_block_id": "sb_0019",
+              "quote": "преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];"
+            },
+            {
+              "semantic_block_id": "sb_0019",
+              "quote": "Не применимо."
+            }
+          ],
+          "review_reason_code": "ambiguous_wording",
+          "review_note": "Таблица содержит несколько взаимоисключающих вариантов (запрет, ограничение, преимущество, Не применимо), но не указано, какой именно выбран. Документ не позволяет однозначно определить применяемый национальный режим."
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0018",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "В отношении закупаемой продукции установлен:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0019",
+          "scope": "primary",
+          "type": "table",
+          "role": "table",
+          "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R1:\n[C2] запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];\n\nСтрока R2:\n[C2] ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];\n\nСтрока R3:\n[C2] преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];\n\nСтрока R4:\n[C2] Не применимо.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": false,
+        "violation_codes": [
+          "wrong_semantic_block_id"
+        ],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14009,
+      "production_status": "error",
+      "production_error_type": "quote_not_found",
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_4_au_0001",
+      "analysis_unit_id": "execution-14009-fixture",
+      "original_unit_count": 10,
+      "facts": [
+        {
+          "field_key": "application_documents",
+          "value_text": "При привлечении субподрядчиков (соисполнителей) необходимо предоставить информацию о принадлежности/отсутствии принадлежности каждого субподрядчика к субъектам МСП в виде одного из документов: выписки из реестра МСП, декларации о соответствии или формы подтверждения отсутствия принадлежности.",
+          "status": "found",
+          "confidence": 0.95,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0030",
+              "quote": "Дополнительно в пакете документов необходимо предоставить информацию о принадлежности / отсутствии принадлежности каждого планируемого к привлечению субподрядчика (соисполнителя) к субъектам малого и среднего предпринимательства... в виде предоставления одного из нижеперечисленных документов:"
+            },
+            {
+              "semantic_block_id": "sb_0031",
+              "quote": "«Сведения из единого реестра субъектов малого и среднего предпринимательства» (информация в виде выписки из единого реестра субъектов малого и среднего предпринимательства, размещенного по адресу: https://rmsp.nalog.ru/)."
+            },
+            {
+              "semantic_block_id": "sb_0033",
+              "quote": "Декларация о соответствии Поставщика /Участника закупки критериям отнесения к субъектам малого и среднего предпринимательства по форме приложения к ПП 1352..."
+            },
+            {
+              "semantic_block_id": "sb_0035",
+              "quote": "Форма подтверждения отсутствия принадлежности Поставщика / Участника закупки к субъектам малого и среднего предпринимательства по форме 16 (Блок 4 «Образцы форм документов, включаемых в заявку на участие в закупке»)."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0030",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Дополнительно в пакете документов необходимо предоставить информацию о принадлежности / отсутствии принадлежности каждого планируемого к привлечению субподрядчика (соисполнителя) к субъектам малого и среднего предпринимательства (только для резидентов РФ) в соответствии с Федеральным законом от 24.07.2007 № 209-ФЗ «О развитии малого и среднего предпринимательства», в виде предоставления одного из нижеперечисленных документов:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0031",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "«Сведения из единого реестра субъектов малого и среднего предпринимательства» (информация в виде выписки из единого реестра субъектов малого и среднего предпринимательства, размещенного по адресу: https://rmsp.nalog.ru/).",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0033",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Декларация о соответствии Поставщика /Участника закупки критериям отнесения к субъектам малого и среднего предпринимательства по форме приложения к ПП 1352 в случае отсутствия сведений о Поставщике, который является вновь зарегистрированным индивидуальным предпринимателем или вновь созданным юридическим лицом в соответствии с частью 3 статьи 4 Федерального закона от 24.07.2007 № 209-ФЗ «О развитии малого и среднего предпринимательства в Российской Федерации», в едином реестре субъектов малого и среднего предпринимательства.",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0035",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Форма подтверждения отсутствия принадлежности Поставщика / Участника закупки к субъектам малого и среднего предпринимательства по форме 16 (Блок 4 «Образцы форм документов, включаемых в заявку на участие в закупке»).",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": false,
+        "violation_codes": [
+          "quote_not_found"
+        ],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14010,
+      "production_status": "error",
+      "production_error_type": "historical_evidence_limit_exceeded",
+      "unit_index": 1,
+      "original_analysis_unit_id": "doc_5_au_0002",
+      "analysis_unit_id": "execution-14010-fixture",
+      "original_unit_count": 17,
+      "facts": [
+        {
+          "field_key": "application_documents",
+          "value_text": "Форма 1а «Сведения об Участнике закупки, не являющимся физическим лицом, в том числе индивидуальным предпринимателем» является обязательной к заполнению и должна быть включена в состав заявки; в ней необходимо указать сведения об участнике закупки: наименование, ИНН, наименование закупки, сведения об организации, банковские реквизиты, годовые обороты, среднесписочную численность персонала, сведения о соответствии требованиям, и т.д.",
+          "status": "found",
+          "confidence": 0.95,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0006",
+              "quote": "Сведения об Участнике закупки, не являющимся физическим лицом, в том числе индивидуальным предпринимателем"
+            },
+            {
+              "semantic_block_id": "sb_0009",
+              "quote": "(ОБЯЗАТЕЛЬНА К ЗАПОЛНЕНИЮ)"
+            },
+            {
+              "semantic_block_id": "sb_0011",
+              "quote": "Наименование Участника закупки:"
+            },
+            {
+              "semantic_block_id": "sb_0013",
+              "quote": "ИНН (или иной идентификационный номер) Участника закупки:"
+            },
+            {
+              "semantic_block_id": "sb_0015",
+              "quote": "Наименование закупки: ["
+            },
+            {
+              "semantic_block_id": "sb_0018",
+              "quote": "Сведения об Участнике закупки"
+            },
+            {
+              "semantic_block_id": "sb_0028",
+              "quote": "Наименование организации:"
+            },
+            {
+              "semantic_block_id": "sb_0069",
+              "quote": "Банковские реквизиты:"
+            },
+            {
+              "semantic_block_id": "sb_0076",
+              "quote": "Годовые обороты организации за последние 3 года с учетом НДС (в тыс. рублей) и без учета НДС (тыс. руб.)"
+            },
+            {
+              "semantic_block_id": "sb_0091",
+              "quote": "Среднесписочная численность персонала"
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0006",
+          "scope": "primary",
+          "type": "text",
+          "role": "subsection_heading",
+          "text": "Сведения об Участнике закупки, не являющимся физическим лицом, в том числе индивидуальным предпринимателем",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0009",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "(ОБЯЗАТЕЛЬНА К ЗАПОЛНЕНИЮ)",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0011",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Наименование Участника закупки:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0013",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "ИНН (или иной идентификационный номер) Участника закупки:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0015",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Наименование закупки: [",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0018",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Сведения об Участнике закупки",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0028",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Наименование организации:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0069",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Банковские реквизиты:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0076",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Годовые обороты организации за последние 3 года с учетом НДС (в тыс. рублей) и без учета НДС (тыс. руб.)",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0091",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Среднесписочная численность персонала",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": "The production failure was caused by the former max=5; 8/10 evidence are within v2 max=25."
+      }
+    },
+    {
+      "execution_id": 14011,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_6_au_0001",
+      "analysis_unit_id": "execution-14011-fixture",
+      "original_unit_count": 2,
+      "facts": [],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0001",
+          "scope": "primary",
+          "type": "text",
+          "role": "subsection_heading",
+          "text": "Блок 5 «Образец оформления конвертов и иных документов, оформляемых в ходе проведения закупки и/или по ее результатам»",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14012,
+      "production_status": "error",
+      "production_error_type": "overlap_only",
+      "unit_index": 1,
+      "original_analysis_unit_id": "doc_7_au_0002",
+      "analysis_unit_id": "execution-14012-fixture",
+      "original_unit_count": 66,
+      "facts": [
+        {
+          "field_key": "payment_terms",
+          "value_text": "Окончательный платеж в размере 70% от Цены Договора, указанной в пункте 2.1 Договора, что составляет ___ руб., в том числе НДС 22 % в размере ___ руб., Покупатель перечисляет Поставщику не ранее чем через 45-ть дней, но не позднее чем через 60-т дней (для субъектов малого и среднего предпринимательства – не позднее 7-ми рабочих дней) после даты подписания Сторонами товарной накладной (форма ТОРГ-12) или УПД на основании выставленного Поставщиком оригинала счета на оплату и после получения Покупателем оригинала счета-фактуры.",
+          "status": "found",
+          "confidence": 0.97,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0079",
+              "quote": "Окончательный платеж в размере 70% от Цены Договора, указанной в пункте 2.1 Договора, что составляет ___ руб., в том числе НДС 22 % в размере ___ руб., Покупатель перечисляет Поставщику не ранее чем через 45-ть дней, но не позднее чем через 60-т дней (для субъектов малого и среднего предпринимательства – не позднее 7-ми рабочих дней) после даты подписания Сторонами товарной накладной (форма ТОРГ-12) или УПД на основании выставленного Поставщиком оригинала счета на оплату и после получения Покупателем оригинала счета-фактуры."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0080",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "При условии невыплаты авансового платежа по причинам, изложенным в п. 3.1 Договора, платеж в размере 100 % от стоимости Товара, указанной в пункте 2.1 Договора, что составляет ___ руб., в том числе НДС 22 % в размере ___ руб., Покупатель перечисляет Поставщику не ранее чем через 45-ть дней, но не позднее чем через 60-т дней (для субъектов малого и среднего предпринимательства – не позднее 7-ми рабочих дней) после даты подписания Сторонами товарной накладной (форма ТОРГ-12) или УПД на основании выставленного Поставщиком оригинала счета на оплату и после получения Покупателем оригинала счета-фактуры. Поставщик обязуется предоставить Покупателю оригинал счета на оплату не позднее, чем за 10-ть дней до наступления срока платежа.",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0079",
+          "scope": "overlap",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Окончательный платеж в размере 70% от Цены Договора, указанной в пункте 2.1 Договора, что составляет ___ руб., в том числе НДС 22 % в размере ___ руб., Покупатель перечисляет Поставщику не ранее чем через 45-ть дней, но не позднее чем через 60-т дней (для субъектов малого и среднего предпринимательства – не позднее 7-ми рабочих дней) после даты подписания Сторонами товарной накладной (форма ТОРГ-12) или УПД на основании выставленного Поставщиком оригинала счета на оплату и после получения Покупателем оригинала счета-фактуры.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": false,
+        "violation_codes": [
+          "overlap_only"
+        ],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14013,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_8_au_0001",
+      "analysis_unit_id": "execution-14013-fixture",
+      "original_unit_count": 3,
+      "facts": [
+        {
+          "field_key": "procurement_subject",
+          "value_text": "поставку стандартных закрытий палуб для ледокола лидера пр. 10510 зав. № 056001",
+          "status": "found",
+          "confidence": 0.99,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0004",
+              "quote": "на поставку стандартных закрытий палуб для ледокола лидера пр. 10510 зав. № 056001"
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0004",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "на поставку стандартных закрытий палуб для ледокола лидера пр. 10510 зав. № 056001",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14014,
+      "production_status": "error",
+      "production_error_type": "quote_not_found",
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_9_au_0001",
+      "analysis_unit_id": "execution-14014-fixture",
+      "original_unit_count": 2,
+      "facts": [
+        {
+          "field_key": "licenses_certificates",
+          "value_text": "Установленныые нa крыдцках 3амковьюе устройства доЛжНь БЫТТь накладного Tиπa, препнятствуюооиие несаниииооиковааннооN проникновениюо. 3аmkоBOe устройство должно компЛеектоаатооя 4 клиочами + 2 клoОча системьй \"MacTep KmHо\"*.",
+          "status": "found",
+          "confidence": 0.8,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0072",
+              "quote": "Установленныые нa крыдцках 3амковьюе устройства доЛжНь БЫТТь накладного Tиπa, препнятствуюооиие несаниииооиковааннооN проникновениюо. 3аmkоBOe устройство должно компЛеектоаатооя 4 клиочами + 2 клoОча системьй \"MacTep KmHо\"*."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0072",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Установленныые нa крыдцках 3амковьюе устройства доЛжНь БЫТТь накладного Tиπa, препнятствуюооиие несаниииооиковааннооN проникновениюо. 3аmkоBое устройство c наружной стороны должно открывваться клHочом (клночевое отверстие должно закрьвваться герметичной заглуикойй) изнутри крылшии 3аMковое устройство должно открыввтться ручкой или аналотичньым ио конструкиии устройством. 3amkоBOe устройство должно компЛеектоаатооя 4 клиочами + 2 клoОча системьй \"MacTep KmHо\"*.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": false,
+        "violation_codes": [
+          "quote_not_found",
+          "missing_primary_evidence"
+        ],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14015,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_10_au_0001",
+      "analysis_unit_id": "execution-14015-fixture",
+      "original_unit_count": 1,
+      "facts": [
+        {
+          "field_key": "evaluation_criteria",
+          "value_text": "Проверка Участников закупки/квалификации может осуществляться в два этапа. Первый этап (обязательный): камеральная проверка, которая проводится в виде рассмотрения предоставленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС. Второй этап (опциональный): выездная проверка (технический аудит) достоверности представленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС.",
+          "status": "found",
+          "confidence": 0.95,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0005",
+              "quote": "1.\tПроверка Участников закупки/квалификации может осуществляться в два этапа."
+            },
+            {
+              "semantic_block_id": "sb_0006",
+              "quote": "Первый этап (обязательный): камеральная проверка, которая проводится в виде рассмотрения предоставленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС."
+            },
+            {
+              "semantic_block_id": "sb_0007",
+              "quote": "Второй этап (опциональный): выездная проверка (технический аудит) достоверности представленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0005",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "1.\tПроверка Участников закупки/квалификации может осуществляться в два этапа.",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0006",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Первый этап (обязательный): камеральная проверка, которая проводится в виде рассмотрения предоставленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС.",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0007",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Второй этап (опциональный): выездная проверка (технический аудит) достоверности представленных Участником закупки/квалификации в составе заявки документов/сведений, подтверждающих его соответствие установленным требованиям к квалификации в области ПБОТОС.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    },
+    {
+      "execution_id": 14016,
+      "production_status": "error",
+      "production_error_type": "historical_evidence_limit_exceeded",
+      "unit_index": 2,
+      "original_analysis_unit_id": "doc_11_au_0003",
+      "analysis_unit_id": "execution-14016-fixture",
+      "original_unit_count": 16,
+      "facts": [
+        {
+          "field_key": "application_documents",
+          "value_text": "Письмо Участника закупки о наличии судебных разбирательств качестве ответчика с [ООО «ССК «Звезда»], исковые требования по которым были удовлетворены за подписью уполномоченного лица Участника закупки (в свободной форме) с приложением Реестра таких судебных разбирательств (в свободной форме), включающего следующую информацию: а) наименование истца [ООО «ССК «Звезда»]; б) предмета спора с пометкой признака наличия/отсутствия существенного нарушения условий договора; в) номера дела и даты вынесения судебного акта.",
+          "status": "found",
+          "confidence": 0.95,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0084",
+              "quote": "Письмо Участника закупки о наличии судебных разбирательств качестве ответчика с"
+            },
+            {
+              "semantic_block_id": "sb_0085",
+              "quote": "[ООО «ССК «Звезда»]"
+            },
+            {
+              "semantic_block_id": "sb_0086",
+              "quote": ", исковые требования по которым были удовлетворены за подписью уполномоченного лица Участника закупки (в свободной форме) с приложением Реестра таких судебных разбирательств (в свободной форме), включающего следующую информацию:"
+            },
+            {
+              "semantic_block_id": "sb_0087",
+              "quote": "а) наименование истца"
+            },
+            {
+              "semantic_block_id": "sb_0088",
+              "quote": "[ООО «ССК «Звезда»]"
+            },
+            {
+              "semantic_block_id": "sb_0089",
+              "quote": ";"
+            },
+            {
+              "semantic_block_id": "sb_0090",
+              "quote": "б) предмета спора с пометкой признака наличия/отсутствия существенного нарушения условий договора;"
+            },
+            {
+              "semantic_block_id": "sb_0091",
+              "quote": "в) номера дела и даты вынесения судебного акта."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0084",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Письмо Участника закупки о наличии судебных разбирательств качестве ответчика с",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0085",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "[ООО «ССК «Звезда»]",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0086",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": ", исковые требования по которым были удовлетворены за подписью уполномоченного лица Участника закупки (в свободной форме) с приложением Реестра таких судебных разбирательств (в свободной форме), включающего следующую информацию:",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0087",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "а) наименование истца",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0088",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "[ООО «ССК «Звезда»]",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0089",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": ";",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0090",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "б) предмета спора с пометкой признака наличия/отсутствия существенного нарушения условий договора;",
+          "segment_text_is_excerpt": false
+        },
+        {
+          "semantic_block_id": "sb_0091",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "в) номера дела и даты вынесения судебного акта.",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": "The production failure was caused by the former max=5; 8/10 evidence are within v2 max=25."
+      }
+    },
+    {
+      "execution_id": 14017,
+      "production_status": "success",
+      "production_error_type": null,
+      "unit_index": 0,
+      "original_analysis_unit_id": "doc_12_au_0001",
+      "analysis_unit_id": "execution-14017-fixture",
+      "original_unit_count": 1,
+      "facts": [
+        {
+          "field_key": "procurement_subject",
+          "value_text": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.",
+          "status": "found",
+          "confidence": 0.99,
+          "evidence": [
+            {
+              "semantic_block_id": "sb_0001",
+              "quote": "Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001."
+            }
+          ],
+          "review_reason_code": null,
+          "review_note": null
+        }
+      ],
+      "ai_segments": [
+        {
+          "semantic_block_id": "sb_0001",
+          "scope": "primary",
+          "type": "text",
+          "role": "paragraph",
+          "text": "Расчет НМЦ  на \"Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.\"",
+          "segment_text_is_excerpt": false
+        }
+      ],
+      "expected_attempt_1": {
+        "validation_passed": true,
+        "violation_codes": [],
+        "note": null
+      }
+    }
+  ],
+  "performance_baseline": [
+    {
+      "execution_id": 14006,
+      "status": "success",
+      "units": 1,
+      "total_execution_ms": 28343,
+      "prepare_request_ms": 174,
+      "extractor_node_ms": 5592,
+      "evidence_validator_ms": 158
+    },
+    {
+      "execution_id": 14007,
+      "status": "success",
+      "units": 4,
+      "total_execution_ms": 65047,
+      "prepare_request_ms": 112,
+      "extractor_node_ms": 13659,
+      "evidence_validator_ms": 809
+    },
+    {
+      "execution_id": 14008,
+      "status": "error",
+      "units": 12,
+      "total_execution_ms": 61093,
+      "prepare_request_ms": 536,
+      "extractor_node_ms": 32132,
+      "evidence_validator_ms": 2447
+    },
+    {
+      "execution_id": 14009,
+      "status": "error",
+      "units": 10,
+      "total_execution_ms": 70872,
+      "prepare_request_ms": 442,
+      "extractor_node_ms": 49589,
+      "evidence_validator_ms": 1514
+    },
+    {
+      "execution_id": 14010,
+      "status": "error",
+      "units": 17,
+      "total_execution_ms": 61637,
+      "prepare_request_ms": 1616,
+      "extractor_node_ms": 21697,
+      "evidence_validator_ms": 3045
+    },
+    {
+      "execution_id": 14011,
+      "status": "success",
+      "units": 2,
+      "total_execution_ms": 31631,
+      "prepare_request_ms": 219,
+      "extractor_node_ms": 4806,
+      "evidence_validator_ms": 834
+    },
+    {
+      "execution_id": 14012,
+      "status": "error",
+      "units": 66,
+      "total_execution_ms": 119717,
+      "prepare_request_ms": 601,
+      "extractor_node_ms": 40573,
+      "evidence_validator_ms": 3843
+    },
+    {
+      "execution_id": 14013,
+      "status": "success",
+      "units": 3,
+      "total_execution_ms": 55996,
+      "prepare_request_ms": 598,
+      "extractor_node_ms": 9021,
+      "evidence_validator_ms": 441
+    },
+    {
+      "execution_id": 14014,
+      "status": "error",
+      "units": 2,
+      "total_execution_ms": 50089,
+      "prepare_request_ms": 297,
+      "extractor_node_ms": 25227,
+      "evidence_validator_ms": 294
+    },
+    {
+      "execution_id": 14015,
+      "status": "success",
+      "units": 1,
+      "total_execution_ms": 73166,
+      "prepare_request_ms": 214,
+      "extractor_node_ms": 25143,
+      "evidence_validator_ms": 89
+    },
+    {
+      "execution_id": 14016,
+      "status": "error",
+      "units": 16,
+      "total_execution_ms": 98640,
+      "prepare_request_ms": 303,
+      "extractor_node_ms": 58389,
+      "evidence_validator_ms": 1711
+    },
+    {
+      "execution_id": 14017,
+      "status": "success",
+      "units": 1,
+      "total_execution_ms": 32850,
+      "prepare_request_ms": 34,
+      "extractor_node_ms": 5840,
+      "evidence_validator_ms": 101
+    }
+  ]
+}

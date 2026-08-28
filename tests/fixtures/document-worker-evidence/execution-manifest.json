@@ -1,0 +1,26 @@
+{
+  "source": "production_n8n_read_only",
+  "workflow_id": "1Pw61ZY3HgBSvcUr",
+  "execution_ids": [
+    14006,
+    14007,
+    14008,
+    14009,
+    14010,
+    14011,
+    14012,
+    14013,
+    14014,
+    14015,
+    14016,
+    14017
+  ],
+  "target_cases": {
+    "14008": "wrong_semantic_block_id",
+    "14009": "quote_not_found",
+    "14010": "evidence_limit_regression",
+    "14012": "overlap_only",
+    "14014": "quote_not_found_ocr",
+    "14016": "evidence_limit_regression"
+  }
+}

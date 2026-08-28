@@ -1,10 +1,16 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
-**Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI (модель DeepSeek)
+**Последнее обновление:** 2026-08-28
+**Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
+
+Короткий актуальный снимок production/test границ, runtime evidence и открытых gates:
+
+```text
+PROJECT_STATUS.md
+```
 
 ---
 
@@ -420,7 +426,7 @@ not_found
 
 # 8. Текущее состояние
 
-## Уже работает
+## Подтверждённый production baseline
 
 ```text
 TenderPlan FullInfo
@@ -508,27 +514,28 @@ Full E2E aggregation run
 → 27/27 FINAL field results
 ```
 
+Это исторически подтверждённый baseline executions `13852–13864`, а не доказательство корректности текущих test-кандидатов.
+
 ---
 
-## Текущий остаток MVP
+## Текущий test-hardening
 
-После закрытия AG-0 текущая последовательность выглядит так:
+В изолированном `[3 TEST]` Document Worker реализованы и покрыты execution-derived tests:
 
 ```text
-run.status = aggregating
-        ↓
-TENDER — Финализация анализа
-        ↓
-27/27 + atomic run completion
-        ↓
-run.status = completed
-        ↓
-Report Generation V2
-        ↓
-HTML artifact (`report_html`)
-        ↓
-future: PDF / DOCX / XLSX / delivery
+bounded evidence repair
+lossless fact partition
+deterministic overlap-only rejection
+document-level Validator dispatch
+27 field-specific Validator profiles
+fact-local material literal guard
 ```
+
+Execution `14104` подтвердил `66/66` units и сохранение `61` facts, но run был уже завершён, поэтому Aggregator для нового snapshot не запускался.
+
+Тестовый Document Worker ещё не является production import candidate: canonical persistence path, calibration nodes, Manual Trigger и `pinData` зафиксированы двумя падающими promotion tests.
+
+Для Aggregator создан execution-derived RED по `procurement_subject`: текущий Round 1 может формально пропустить `false_resolved`, выбрав внутренний процесс вместо объекта текущей закупки.
 
 ---
 
@@ -540,19 +547,18 @@ future: PDF / DOCX / XLSX / delivery
 TECH_DEBT.md
 ```
 
-Критический путь MVP:
+Текущие P0 gates перед клиентским отчётом:
 
 ```text
-TR-0 ✅ Closed
-TR-1 ✅ Closed
-TR-2 ✅ Closed (MVP)
-TR-3 ✅ Closed
+AG-8
+universal current-procurement scope для procurement_subject
 
+Document Worker promotion
+test/calibration export → clean production candidate
 
-Текущий реализованный report path:
-ordered FINAL 1..27
-→ validated Report Model
-→ HTML artifact
+full fresh run
+→ 27/27 semantic review
+→ client report
 ```
 
 ---
@@ -562,18 +568,13 @@ ordered FINAL 1..27
 Текущая точка продолжения:
 
 ```text
-расширить Report Generation только по отдельному согласованию:
-PDF / DOCX / XLSX / delivery
+усилить universal procurement_subject FIELD_RULES
+только в [TEST CODEX] Aggregator
+→ GREEN offline regression
+→ runtime canary
 ```
 
-DB-backed completion уже подтверждён execution `13863`: `27/27`, `completion_claimed=true`, `run.status=completed`.
-
-После этого добавить regression test и обновить:
-
-```text
-TECH_DEBT.md
-DEVELOPMENT_LOG.md
-```
+Не менять production Aggregator, checker, topology, SQL, Targeted Recheck, Finalization или Report Generation без отдельного решения.
 
 ---
 
@@ -582,6 +583,7 @@ DEVELOPMENT_LOG.md
 ## Нужно быстро понять весь проект
 
 ```text
+PROJECT_STATUS.md
 ARCHITECTURE.md
 ```
 
@@ -636,6 +638,7 @@ DEVELOPMENT_LOG.md
 ```text
 .
 ├── README.md
+├── PROJECT_STATUS.md
 ├── ARCHITECTURE.md
 ├── FIELD_CATALOG.md
 ├── DATA_MODEL.md

@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
+**Последнее обновление:** 2026-08-28
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -13,6 +13,10 @@
 **AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
 **AI Extractor:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=none`
 **AI Validator:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low`
+
+> Production metadata выше относится к workflow `1Pw61ZY3HgBSvcUr`. Локальный JSON по canonical path на 28.08.2026 содержит inactive `[3 TEST]` workflow `2T7szFpiGcfNpKkB`, а не production import candidate. Точная граница зафиксирована в `PROJECT_STATUS.md`.
+
+Test candidate использует Gemini 3.7 Flash для Validator и содержит bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. До production promotion должны стать GREEN два packaging/completeness tests.
 
 ---
 
@@ -731,6 +735,20 @@ section
 
 AI не создаёт provenance самостоятельно.
 
+В test candidate validation является двухпопыточной и bounded:
+
+```text
+attempt 1
+→ pure exact-grounded overlap_only: audited deterministic rejected
+→ repairable evidence violation: Evidence Repair
+→ pure resource overflow: Lossless Fact Partition
+→ mixed/non-repairable violation: hard error
+→ attempt 2
+→ explicit pass or explicit Worker failure
+```
+
+Exact grounding не заменяется fuzzy matching. Одинаковая table-coordinate canonicalization используется в attempt 1, attempt 2, classifier и lossless partition checker.
+
 ---
 
 ## 22. `verified_facts` semantics
@@ -761,22 +779,22 @@ verified_facts = evidence-grounded candidates
 
 ## 23. Error behavior evidence validator
 
-В актуальном export у ноды `Проверить и привязать evidence` отсутствуют:
+В production baseline у ноды `Проверить и привязать evidence` отсутствуют:
 
 ```text
 onError
 continueOnFail
 ```
 
-Её regular output подключён к `AI Validator v1`.
+В test candidate regular output сначала проходит через per-unit bounded retry classification. Невалидный attempt 2 приходит в `Завершить unit: evidence validation failed` и завершает Worker явной ошибкой.
 
-Следовательно, configuration-level silent bypass через `continueErrorOutput` текущим export не подтверждается. При этом invalid-response/error behavior требует runtime regression; риск `DW-14` не считается полностью закрытым.
+Configuration-level silent bypass через `continueErrorOutput` не используется. При этом production promotion и workflow-level Error Workflow behavior остаются отдельными runtime gates; риск `DW-14 / EW-3` не считается закрытым автоматически.
 
 ---
 
 ## 24. Independent AI Validator
 
-`AI Validator v1` использует:
+Production baseline `AI Validator v1` использует:
 
 ```text
 deepseek-v4-pro
@@ -784,6 +802,18 @@ thinking = enabled
 reasoning_effort = low
 response_format = json_object
 ```
+
+Test candidate использует:
+
+```text
+google/gemini-3.7-flash
+reasoning_effort = low
+response_format = json_object
+max_tokens = 8192
+timeout = 180000 ms
+```
+
+`VALIDATOR_FIELD_PROFILES` версии `validator_field_profiles_v1` покрывает ровно 27 canonical `field_key`. В prompt каждой unit передаются только реально используемые profiles в стабильном порядке; unit не делится на отдельные facts и остаётся одним HTTP item. Unknown `field_key` или missing profile дают hard error до HTTP.
 
 Validator не ищет новые facts. Он проверяет каждый existing candidate независимо:
 
@@ -827,6 +857,14 @@ reason fields соответствуют verdict
 ```
 
 После этого формируется `validated_facts[]`.
+
+В test candidate checker дополнительно применяет `fact_local_material_literals_v1` только к исходному `AI verdict=confirmed`:
+
+- проценты, даты, суммы, сроки и контекстные идентификаторы проверяются только по `evidence[]` этого fact;
+- соседние facts и общий `evidence_context` не могут закрыть missing literal;
+- отсутствующий material literal понижает verdict только до `requires_review / insufficient_evidence`;
+- guard не создаёт `rejected` и не меняет исходные `requires_review`/`rejected`;
+- audit сохраняет original verdict и список missing literals.
 
 ---
 
@@ -889,7 +927,19 @@ evidence_context
 
 ## 28. Collect document facts
 
-`Собрать факты документа` делает barrier:
+Production baseline `Собрать факты документа` делает barrier. В test candidate перед AI Validator добавлен document-level dispatch:
+
+```text
+all validated units
+→ units_for_ai: verified_facts.length > 0
+→ units_without_ai: verified_facts.length === 0
+→ one batch AI call for units_for_ai
+→ exact unit-set reassembly
+```
+
+Это не per-unit Validator loop и не conditional Merge. Zero-fact units сохраняются для completeness, но не создают synthetic facts и не вызывают AI.
+
+Финальный collector делает barrier:
 
 ```text
 N validated unit items
@@ -1203,6 +1253,12 @@ completed_documents_count = documents_total
 | evidence validator Error branch handling | ❌ |
 | Docling terminal failure handling | ❌ |
 | stale units retry safety | ❌ |
+| execution 14104: evidence convergence | ✅ 66/66 units |
+| execution 14104: Validator dispatch | ✅ 20 AI + 46 without AI |
+| execution 14104: facts persistence output | ✅ 61 facts |
+| fact-local literal downgrade | ✅ exactly one verdict changed |
+| pure overlap-only audit preservation | ✅ rejected, no silent drop |
+| clean production import candidate | ❌ two explicit RED gates |
 
 ---
 

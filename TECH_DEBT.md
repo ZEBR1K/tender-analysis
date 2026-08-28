@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-08-23  
+**Последнее обновление:** 2026-08-28
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -127,6 +127,7 @@ Naming, comments, cleanup, future hardening.
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
+|`AG-8`|`procurement_subject` может стать schema-valid `false_resolved`, если внутренний/вспомогательный процесс выбран primary вместо объекта текущей закупки|Aggregator semantic safety|
 
 \---
 
@@ -679,6 +680,49 @@ adjacent/relevant context
 
 ```text
 P1
+```
+
+\---
+
+## C3 — `AG-8`
+
+### Observed execution-derived risk
+
+Execution `14104` дал четыре `confirmed` candidates для `procurement_subject`:
+
+```text
+3 candidates — объект текущей закупки
+1 candidate — внутренний процесс поддержания оборудования
+```
+
+Текущий Round 1 prompt не содержит полной universal current-scope boundary. Structural checker проверяет IDs, cardinality и role consistency, но schema-valid response может назначить внутренний процесс `primary` и материализовать неправильный FINAL.
+
+### Почему P0
+
+Это прямой путь к:
+
+```text
+false_resolved
+→ неправильное поле в клиентском отчёте
+```
+
+Самодекларируемая AI semantic-axis matrix не является независимым proof: модель может одновременно ошибиться в primary и назвать его `current_procurement_object`.
+
+### Требуемое минимальное решение
+
+```text
+universal field-specific prompt boundary
+→ current procurement / contract scope
+→ internal process / auxiliary obligation / separate agreement = not_applicable
+→ ambiguous scope = requires_recheck
+```
+
+Сначала GREEN offline regression и runtime canary в `[TEST CODEX]`. Production Aggregator, checker, SQL и topology до canary не менять.
+
+### Приоритет
+
+```text
+P0 before client report
 ```
 
 \---
@@ -1665,6 +1709,8 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
+Дополнительный текущий Critical gate: `AG-8 — procurement_subject current-scope false-resolved`.
+
 ## High
 
 ```text
@@ -1727,11 +1773,11 @@ future: PDF / DOCX / XLSX / delivery
 Основной долг находится в:
 
 ```text
-1. корректности Targeted Recheck;
+1. `AG-8` Aggregator semantic scope safety;
 2. отсутствии silent-stuck paths;
-3. deterministic semantic safety;
+3. deterministic semantic safety Document Worker;
 4. retry-safe persistence;
-5. финальной DB synchronization 27/27.
+5. production promotion и новом 27/27 runtime run.
 ```
 
 После закрытия этих пунктов архитектура уже достаточно зрелая, чтобы закончить MVP без большого redesign.

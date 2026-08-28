@@ -1,0 +1,122 @@
+{
+  "fixture_version": "execution_derived_quote_not_found_fixture_v1",
+  "source_execution_id": 14075,
+  "source_workflow_id": "2T7szFpiGcfNpKkB",
+  "source_workflow_name": "[3 TEST] TENDER — Обработать документ",
+  "document_file_name": "Блок_9_Требования.docx",
+  "analysis_unit_id": "doc_11_au_0002",
+  "problem_fact_index": 1,
+  "field_key": "licenses_certificates",
+  "fixture_note": "Execution-derived minimal excerpt. The source uses РАЗРЕЩЕНИЙ (with Щ), while Extractor and Evidence Repair returned РАЗРЕШЕНИЙ (with Ш). The fixture intentionally preserves deterministic quote_not_found semantics.",
+  "source": {
+    "tender": {
+      "source": "manual_test",
+      "tender_id": "manual-calibration-167-26-ZO"
+    },
+    "document": {
+      "file_name": "Блок_9_Требования.docx",
+      "document_index": 11,
+      "file_extension": "docx"
+    },
+    "analysis_batch": {
+      "unit_index": 2,
+      "units_total": 16
+    },
+    "analysis_unit_meta": {
+      "analysis_unit_id": "doc_11_au_0002"
+    },
+    "ai_segments": [
+      {
+        "semantic_block_id": "sb_0006",
+        "scope": "primary",
+        "type": "table",
+        "role": "table",
+        "text": "ТАБЛИЦА\nКоординаты: R = строка, C = колонка.\n\nСтрока R10:\n[C1-C5] ТРЕБОВАНИЯ К НАЛИЧИЮ РАЗРЕЩЕНИЙ (лицензий, свидетельств о допуске на поставку товаров, выполнение работ или оказание услуг в соответствии с действующим законодательством Российской Федерации или применимым правом)\n\nСтрока R11:\n[C1] 1.2.1\n[C2] Не установлено\n[C3] не требуется\n[C4] не требуется\n\nСтрока R12:\n[C1-C5] ТРЕБОВАНИЯ К ОПЫТУ\n\nСтрока R13:\n[C1] 1.3.1\n[C2] Не установлено\n[C3] не требуется\n[C4] не требуется"
+      }
+    ],
+    "provenance": {
+      "index": {
+        "sb_0006": {
+          "role": "table",
+          "type": "table",
+          "scope": "primary",
+          "page_to": null,
+          "sources": [
+            {
+              "bbox": null,
+              "label": "table",
+              "page_no": null,
+              "block_id": "#/tables/0",
+              "analysis_order": 6
+            }
+          ],
+          "page_from": null,
+          "section_id": "sec_001",
+          "sheet_name": null,
+          "section_path": [
+            "Преамбула"
+          ],
+          "section_title": "Преамбула",
+          "source_block_ids": [
+            "#/tables/0"
+          ]
+        }
+      }
+    },
+    "ai_request": {
+      "prompt_version": "tender_extractor_prompt_v2",
+      "schema_version": "ai_extractor_v1",
+      "field_catalog_version": "tender_fields_v1"
+    }
+  },
+  "extractor_response": {
+    "id": "execution-14075-extractor-response",
+    "model": "deepseek/deepseek-v4-pro-0813",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "content": "{\"schema_version\":\"ai_extractor_v1\",\"field_catalog_version\":\"tender_fields_v1\",\"analysis_unit_id\":\"doc_11_au_0002\",\"facts\":[{\"field_key\":\"similar_supply_experience\",\"value_text\":\"Не установлено\",\"status\":\"found\",\"confidence\":0.9,\"evidence\":[{\"semantic_block_id\":\"sb_0006\",\"quote\":\"ТРЕБОВАНИЯ К ОПЫТУ\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"1.3.1\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"Не установлено\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"не требуется\"}],\"review_reason_code\":null,\"review_note\":null},{\"field_key\":\"licenses_certificates\",\"value_text\":\"Не установлено\",\"status\":\"found\",\"confidence\":0.9,\"evidence\":[{\"semantic_block_id\":\"sb_0006\",\"quote\":\"ТРЕБОВАНИЯ К НАЛИЧИЮ РАЗРЕШЕНИЙ (лицензий, свидетельств о допуске на поставку товаров, выполнение работ или оказание услуг в соответствии с действующим законодательством Российской Федерации или применимым правом)\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"1.2.1\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"Не установлено\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"не требуется\"}],\"review_reason_code\":null,\"review_note\":null}]}"
+        }
+      }
+    ],
+    "usage": {}
+  },
+  "repair_response": {
+    "id": "execution-14075-repair-response",
+    "model": "deepseek/deepseek-v4-pro-0813",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "content": "{\"schema_version\":\"ai_evidence_repair_v1\",\"field_catalog_version\":\"tender_fields_v1\",\"analysis_unit_id\":\"doc_11_au_0002\",\"repairs\":[{\"fact_index\":1,\"violation_codes\":[\"quote_not_found\"],\"evidence\":[{\"semantic_block_id\":\"sb_0006\",\"quote\":\"ТРЕБОВАНИЯ К НАЛИЧИЮ РАЗРЕШЕНИЙ (лицензий, свидетельств о допуске на поставку товаров, выполнение работ или оказание услуг в соответствии с действующим законодательством Российской Федерации или применимым правом)\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"1.2.1\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"Не установлено\"},{\"semantic_block_id\":\"sb_0006\",\"quote\":\"не требуется\"}]}]}"
+        }
+      }
+    ],
+    "usage": {}
+  },
+  "expected": {
+    "attempt_1": {
+      "validation_passed": false,
+      "violations": [
+        {
+          "code": "quote_not_found",
+          "fact_index": 1,
+          "evidence_index": 0,
+          "semantic_block_id": "sb_0006"
+        }
+      ]
+    },
+    "attempt_2": {
+      "validation_passed": false,
+      "violations": [
+        {
+          "code": "quote_not_found",
+          "fact_index": 1,
+          "evidence_index": 0,
+          "semantic_block_id": "sb_0006"
+        }
+      ]
+    }
+  }
+}

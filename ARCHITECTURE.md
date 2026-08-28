@@ -1,8 +1,10 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
+**Последнее обновление:** 2026-08-28
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
+
+Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
 
 ---
 
@@ -44,6 +46,8 @@ deepseek/deepseek-v4-pro-0813
 ```
 
 `reasoning_effort` задаётся через alias модели (`none` для Extractor, `low` для Validator/Semantic Aggregator). В audit metadata provider сохраняется как `deepseek`, что относится к модели, а не к transport endpoint.
+
+Это описание production baseline. Изолированный `[3 TEST]` Document Worker использует Gemini 3.7 Flash для AI Validator и содержит ещё не promoted hardening. Локальный файл `workflows/n8n-exports/TENDER — Обработать документ.json` на 28.08.2026 является export этого test workflow, а не production import candidate.
 
 ---
 
@@ -1695,7 +1699,14 @@ invalid/error response behavior requires runtime regression
 DW-15
 observed false confirmed:
 customer = "не указан"
+
+test candidate additionally contains:
+validator_field_profiles_v1
+fact_local_material_literals_v1
+deterministic overlap-only rejection
 ```
+
+Эти test guards подтверждены offline/runtime regressions, но production promotion ещё не выполнен.
 
 ## Worker retry correctness
 
@@ -1738,6 +1749,16 @@ AG-0 ✅ verified 23.08.2026
 atomic completion claim
 Report Generation V2 HTML artifact
 ```
+
+## Aggregator semantic safety
+
+```text
+AG-8
+procurement_subject Round 1 lacks a universal current-procurement scope boundary
+→ schema-valid false_resolved remains possible
+```
+
+Execution-derived regression `14104` и neutral anti-overfit controls воспроизводят vulnerability offline. Protected production Aggregator не менялся; следующий шаг ограничен `[TEST CODEX]` prompt + runtime canary.
 
 ---
 
@@ -2210,6 +2231,8 @@ UPSERT FINAL
 → report
 ```
 
+После test-hardening эта граница должна быть повторно подтверждена новым clean run. Execution `14104` подтвердил Document Worker, но не вызвал Aggregator для нового fact snapshot, потому что соответствующий run уже находился в terminal state.
+
 ---
 
 # 80. Следующий архитектурный milestone
@@ -2225,7 +2248,7 @@ TR-3
 Полный integration run уже дал:
 27 / 27 FINAL field results
 AG-0 / Final Field Completion Barrier закрыт live execution `13863`.
-Текущая системная точка перехода:
+Исторически подтверждённая системная точка перехода:
 fan-out field processing
         ↓
 independent FINAL UPSERTs
@@ -2243,6 +2266,15 @@ tender_id
 → 27 FINAL
 → completed
 → report_html
+
+Перед клиентским отчётом текущий milestone:
+
+```text
+AG-8 GREEN в test Aggregator
+→ clean Document Worker promotion candidate
+→ fresh full run
+→ manual review 27/27
+```
 
 Остаются future work: PDF, DOCX, XLSX, manual upload и automatic delivery.
 ---

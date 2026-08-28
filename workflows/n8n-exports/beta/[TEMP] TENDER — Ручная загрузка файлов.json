@@ -1,0 +1,288 @@
+{
+  "name": "[TEMP] TENDER — Ручная загрузка файлов",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -624,
+        -176
+      ],
+      "id": "b112517e-9c89-419e-8b58-0184e1939f45",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const attachments = Array.from({ length: 12 }, (_, index) => {\n  const documentIndex = index + 1;\n  const sequence = String(documentIndex).padStart(2, '0');\n  const fileName = `document-${sequence}.docx`;\n\n  return {\n    document_index: documentIndex,\n    file_name: fileName,\n    file_extension: 'docx',\n    display_name: fileName,\n    download_url: `https://REPLACE_ME/${fileName}`,\n    publication_at: null,\n    source_size: null,\n  };\n});\n\nconst tenderMeta = {\n  source: 'manual_test',\n  tender_id: 'manual-calibration-167-26-ZO',\n  tender_number: null,\n  tender_external_id: null,\n  eid: null,\n\n  title: null,\n  max_price: null,\n  currency: null,\n\n  region: null,\n  status: null,\n  kind: null,\n  type: null,\n  placing_way: null,\n\n  publication_at: null,\n  receive_at: null,\n  submission_start_at: null,\n  submission_close_at: null,\n  scoring_at: null,\n  summing_up_at: null,\n  updated_at_source: null,\n\n  customers: [],\n  primary_customer: null,\n\n  platform: {\n    name: null,\n    url: null,\n  },\n\n  tender_url: null,\n\n  prepayment: null,\n  guarantee_application: null,\n  guarantee_contract: null,\n  guarantee_provision: null,\n\n  okpd2: [],\n  okpd: [],\n  ktru: [],\n\n  smp: null,\n  multilot: null,\n  is_changed: null,\n  is_deleted: null,\n\n  documents_count: attachments.length,\n};\n\nreturn [\n  {\n    json: {\n      tender_meta: tenderMeta,\n      attachments,\n      raw_source: {\n        source: 'manual_test',\n        ingestion_type: 'manual_https_fixture',\n        fixture_id: tenderMeta.tender_id,\n        tender: {\n          _id: tenderMeta.tender_id,\n          attachments: attachments.map(attachment => ({\n            realName: attachment.file_name,\n            displayName: attachment.display_name,\n            href: attachment.download_url,\n            publicationDateTime: null,\n            size: attachment.source_size,\n          })),\n        },\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        -176
+      ],
+      "id": "cfe22bcb-c774-44ec-8c1a-7195d6aa0d17",
+      "name": "Сформировать calibration fixture"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $json;\nconst tenderMeta = input.tender_meta;\nconst attachments = input.attachments;\n\nif (!tenderMeta || typeof tenderMeta !== 'object' || Array.isArray(tenderMeta)) {\n  throw new Error('[Calibration Fixture] tender_meta должен быть объектом');\n}\n\nif (tenderMeta.source !== 'manual_test') {\n  throw new Error('[Calibration Fixture] tender_meta.source должен быть manual_test');\n}\n\nif (typeof tenderMeta.tender_id !== 'string' || !tenderMeta.tender_id.trim()) {\n  throw new Error('[Calibration Fixture] tender_meta.tender_id отсутствует');\n}\n\nif (!Array.isArray(attachments)) {\n  throw new Error('[Calibration Fixture] attachments должен быть массивом');\n}\n\nif (attachments.length !== 12) {\n  throw new Error(\n    `[Calibration Fixture] ожидалось 12 attachments, получено: ${attachments.length}`\n  );\n}\n\nconst allowedExtensions = new Set(['pdf', 'docx', 'xlsx']);\nconst documentIndexes = new Set();\n\nattachments.forEach((attachment, index) => {\n  const path = `attachments[${index}]`;\n\n  if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) {\n    throw new Error(`[Calibration Fixture] ${path} должен быть объектом`);\n  }\n\n  if (!Number.isInteger(attachment.document_index) || attachment.document_index <= 0) {\n    throw new Error(`[Calibration Fixture] ${path}.document_index должен быть positive integer`);\n  }\n\n  if (documentIndexes.has(attachment.document_index)) {\n    throw new Error(\n      `[Calibration Fixture] duplicate document_index: ${attachment.document_index}`\n    );\n  }\n  documentIndexes.add(attachment.document_index);\n\n  if (typeof attachment.file_name !== 'string' || !attachment.file_name.trim()) {\n    throw new Error(`[Calibration Fixture] ${path}.file_name отсутствует`);\n  }\n\n  if (!allowedExtensions.has(attachment.file_extension)) {\n    throw new Error(\n      `[Calibration Fixture] ${path}.file_extension не поддерживается: ${attachment.file_extension}`\n    );\n  }\n\n  if (typeof attachment.download_url !== 'string' || !attachment.download_url.trim()) {\n    throw new Error(`[Calibration Fixture] ${path}.download_url отсутствует`);\n  }\n});\n\nreturn {\n  json: input,\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        -176
+      ],
+      "id": "6467a82c-b88b-4c4c-839e-3d34d97ccb45",
+      "name": "Проверить calibration fixture"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inserted AS (\n    INSERT INTO tender_analysis_runs (\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta\n    )\n    VALUES (\n        $1,\n        $2,\n        NULLIF($3, ''),\n        NULLIF($4, ''),\n        'created',\n        $5::integer,\n        $6::jsonb\n    )\n    RETURNING\n        id,\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta,\n        created_at,\n        updated_at\n)\n\nSELECT\n    id AS analysis_run_id,\n    source,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    status,\n    documents_total,\n    tender_meta,\n\n    -- Возвращаем attachments дальше в workflow,\n    -- чтобы следующая Split Out нода продолжила работать.\n    $7::jsonb AS attachments,\n\n    created_at,\n    updated_at\nFROM inserted;",
+        "options": {
+          "queryReplacement": "={{[  $json.tender_meta.source ?? 'tenderplan',  $json.tender_meta.tender_id,  $json.tender_meta.tender_number ?? '',  $json.tender_meta.tender_external_id ?? '',  $json.attachments.length,  JSON.stringify($json.tender_meta),  JSON.stringify($json.attachments)]}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        112,
+        -176
+      ],
+      "id": "f38cd478-3abc-4bb7-9fef-a6d5a29db261",
+      "name": "Создать запуск анализа",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_documents AS (\n    SELECT\n        (doc->>'document_index')::integer AS document_index,\n        NULLIF(doc->>'file_name', '') AS file_name,\n        NULLIF(doc->>'file_extension', '') AS file_extension,\n        NULLIF(doc->>'display_name', '') AS display_name,\n        NULLIF(doc->>'download_url', '') AS download_url,\n        NULLIF(doc->>'publication_at', '')::timestamptz AS publication_at,\n        NULLIF(doc->>'source_size', '')::bigint AS source_size\n    FROM jsonb_array_elements($2::jsonb) AS doc\n),\n\nupserted_documents AS (\n    INSERT INTO tender_analysis_documents (\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n    )\n    SELECT\n        $1::uuid,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        'pending'\n    FROM input_documents\n\n    ON CONFLICT (\n        analysis_run_id,\n        document_index\n    )\n    DO UPDATE SET\n        file_name = EXCLUDED.file_name,\n        file_extension = EXCLUDED.file_extension,\n        display_name = EXCLUDED.display_name,\n        download_url = EXCLUDED.download_url,\n        publication_at = EXCLUDED.publication_at,\n        source_size = EXCLUDED.source_size\n\n    RETURNING\n        id,\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n),\n\ndocuments_json AS (\n    SELECT\n        COUNT(*)::integer AS registered_documents_count,\n\n        jsonb_agg(\n            jsonb_build_object(\n                'document_id', id,\n                'document_index', document_index,\n                'file_name', file_name,\n                'file_extension', file_extension,\n                'display_name', display_name,\n                'download_url', download_url,\n                'publication_at', publication_at,\n                'source_size', source_size,\n                'status', status\n            )\n            ORDER BY document_index\n        ) AS attachments\n    FROM upserted_documents\n),\n\nupdated_run AS (\n    UPDATE tender_analysis_runs\n    SET\n        status = 'processing',\n        documents_total = (\n            SELECT registered_documents_count\n            FROM documents_json\n        )\n    WHERE id = $1::uuid\n\n    RETURNING\n        id,\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta,\n        created_at,\n        updated_at\n)\n\nSELECT\n    r.id AS analysis_run_id,\n    r.source,\n    r.tender_id,\n    r.tender_number,\n    r.tender_external_id,\n    r.status,\n    r.documents_total,\n    d.registered_documents_count,\n    r.tender_meta,\n    d.attachments,\n    r.created_at,\n    r.updated_at\nFROM updated_run r\nCROSS JOIN documents_json d;",
+        "options": {
+          "queryReplacement": "={{[  $json.analysis_run_id,  JSON.stringify($json.attachments)]}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        -176
+      ],
+      "id": "5f8c4534-f8f5-4719-b312-810d79ab97b8",
+      "name": "Зарегистрировать документы",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "attachments",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "analysis_run_id,tender_meta",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        624,
+        -176
+      ],
+      "id": "d2f1c4c8-4399-42d3-a13c-42023462cc4c",
+      "name": "разделить документы"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cc09d472-3c3e-4163-b55e-ef7d86979b25",
+              "leftValue": "={{ $json.attachments.file_extension }}",
+              "rightValue": "xlsx",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "310fd73e-6d86-44b2-ae91-5e9913fd4dff",
+              "leftValue": "={{ $json.attachments.file_extension }}",
+              "rightValue": "docx",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "20d1d54e-e2ae-4772-b086-797032af6704",
+              "leftValue": "={{ $json.attachments.file_extension }}",
+              "rightValue": "pdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -176
+      ],
+      "id": "37915976-314d-4519-9412-aa3393351f0e",
+      "name": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1Pw61ZY3HgBSvcUr",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/1Pw61ZY3HgBSvcUr",
+          "cachedResultName": "TENDER — Обработать документ"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1136,
+        -176
+      ],
+      "id": "49f07dfe-2882-4612-9fc7-79a2e3640c52",
+      "name": "Запустить обработку документа"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Сформировать calibration fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать calibration fixture": {
+      "main": [
+        [
+          {
+            "node": "Проверить calibration fixture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить calibration fixture": {
+      "main": [
+        [
+          {
+            "node": "Создать запуск анализа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать запуск анализа": {
+      "main": [
+        [
+          {
+            "node": "Зарегистрировать документы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Зарегистрировать документы": {
+      "main": [
+        [
+          {
+            "node": "разделить документы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "разделить документы": {
+      "main": [
+        [
+          {
+            "node": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ": {
+      "main": [
+        [
+          {
+            "node": "Запустить обработку документа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запустить обработку документа": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c6da839a-21d9-4eaa-b825-a55cf13f81f9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
+  },
+  "nodeGroups": [],
+  "id": "tmpManual16726ZO",
+  "tags": []
+}

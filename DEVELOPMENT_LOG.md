@@ -4281,3 +4281,109 @@ HTML escaping test = passed
 PDF, DOCX и delivery пока не реализованы.
 
 Следующий крупный этап — calibration на новой закупке клиента с большим пакетом документов.
+
+---
+
+## 2026-08-28 — Document Worker hardening и Aggregator RED checkpoint
+
+### Document Worker test candidate
+
+В изолированном workflow `[3 TEST] TENDER — Обработать документ` реализованы:
+
+- bounded Evidence Repair;
+- lossless Fact Partition для pure resource overflow;
+- deterministic audited rejection pure exact-grounded `overlap_only`;
+- document-level Validator dispatch без per-unit loop и без Merge;
+- `units_for_ai` / `units_without_ai` с exact unit-set convergence;
+- `validator_field_profiles_v1` для ровно 27 canonical `field_key`;
+- Gemini 3.7 Flash в тестовом AI Validator;
+- fact-local material literal guard `fact_local_material_literals_v1`.
+
+Exact evidence grounding сохранён. Fuzzy matching, OCR auto-correction и automatic rebind не добавлялись.
+
+### Execution 14104
+
+Runtime canary подтвердил:
+
+```text
+66 units
+65 pass attempt 1
+1 bounded Evidence Repair
+20 units_for_ai + 46 units_without_ai = 66
+61 persisted facts
+41 confirmed / 2 requires_review / 18 rejected
+```
+
+Literal guard понизил ровно один verdict:
+
+```text
+advance_contract_guarantee
+confirmed → requires_review
+missing fact-local literal = 30%
+```
+
+Один pure overlap-only fact сохранён как audited `rejected` без silent drop.
+
+Execution не доказал новый Aggregator result: run уже был terminal, readiness вернул `run_not_claimed`, поэтому новый fact snapshot не агрегировался.
+
+### Document Worker promotion boundary
+
+Локальный export по пути `workflows/n8n-exports/TENDER — Обработать документ.json` сейчас является `[3 TEST]` workflow и не готов для production import:
+
+- canonical persistence path не подключён к completeness barrier;
+- присутствуют calibration persistence nodes;
+- присутствуют Manual Trigger и `pinData`.
+
+Эти два promotion gates оставлены явными падающими tests, а не скрыты.
+
+### Aggregator execution-derived RED
+
+Для execution `14104` создан regression fixture поля `procurement_subject` и neutral anti-overfit controls.
+
+Доказана текущая trust-boundary vulnerability:
+
+```text
+internal/auxiliary process selected as primary
+→ structural checker passes
+→ Round 1 FINAL materializes
+→ schema-valid false_resolved
+```
+
+Runtime harness стал route-aware:
+
+- `round1_final` требует FINAL и запускает semantic oracle;
+- `targeted_recheck` требует `final=null`, не запускает resolved-only oracle и возвращает inconclusive exit `3`;
+- несогласованные route/status combinations дают explicit contract error.
+
+Aggregator workflow не изменялся. Оставлен один actionable RED: отсутствует universal current-procurement scope boundary для `procurement_subject`. Backlog ID: `AG-8`.
+
+### Offline suite
+
+Fresh result:
+
+```text
+127 tests
+124 passed
+3 failed
+```
+
+Открытые RED gates:
+
+1. `AG-8` prompt boundary;
+2. Document Worker canonical persistence connection;
+3. clean production import candidate без test/calibration state.
+
+### Source-of-truth drift
+
+Создан `PROJECT_STATUS.md`.
+
+Read-only n8n API выявил и разрешил расхождение draft/published:
+
+- production Aggregator current draft: 24 nodes/version `89b33d04-…`;
+- published active version: 38 nodes/version `c4bbee79-…`;
+- local Aggregator export содержит те же 38 node names и connections, что active version;
+- известное отличие local/live parameters ограничено model alias ноды `Semantic Aggregator` (`@provider=deepseek` в live).
+
+24-нoded draft не опубликован и не определяет production executions. Published version остаётся authoritative production state.
+
+Production workflows, protected workflows и PostgreSQL в рамках checkpoint не изменялись.
