@@ -4466,3 +4466,65 @@ Fresh offline baseline checkpoint:
 136 passed
 3 intentional gate failures
 ```
+
+---
+
+## 2026-08-29 — Document Worker offline production candidate packaging
+
+Работа выполнена только локально. MCP, live n8n, PostgreSQL и AI не вызывались.
+
+### Immutable beta snapshot
+
+Точный test/calibration workflow сохранён без изменений:
+
+```text
+workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json
+nodes = 60
+SHA-256 = 02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd
+```
+
+### Clean canonical candidate
+
+Canonical JSON упакован как offline production import candidate:
+
+```text
+workflows/n8n-exports/TENDER — Обработать документ.json
+name = TENDER — Обработать документ
+nodes = 51
+active = false
+settings.availableInMCP = false
+pinData = {}
+```
+
+Удалены только top-level `id`, `versionId` и `meta`. Node IDs, Wait `webhookId`, credentials, parameters, positions, connections, settings и `nodeGroups` не изменялись на этом packaging-шаге.
+
+Beta→canonical regression фиксирует:
+
+- удаление ровно девяти test/calibration nodes;
+- идентичность shared node parameters, credentials, types, type versions и runtime settings;
+- удаление Manual Trigger edge;
+- добавление только production trigger edge и canonical persistence edge;
+- отсутствие instance identity и test state в candidate.
+
+### Offline verification
+
+```text
+Document Worker: 78/78 PASS
+Validator: 31/31 PASS
+full suite: 139 total / 138 PASS / 1 intentional AG-8 production-promotion RED
+git diff --check: PASS
+```
+
+### Remaining boundary
+
+Live production Worker `1Pw61ZY3HgBSvcUr` не изменён. Candidate ещё не promoted/wired, runtime canary candidate не выполнялся. `DATA_MODEL.md` и `FIELD_CATALOG.md` не менялись.
+
+Следующий шаг:
+
+```text
+test workflow promotion / wiring clean Document Worker candidate
+→ runtime canary
+→ fresh full run
+→ manual semantic review 27/27
+→ client report
+```

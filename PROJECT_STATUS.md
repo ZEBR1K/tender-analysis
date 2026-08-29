@@ -85,15 +85,30 @@ missing literal: 30%
 
 Pure `overlap_only` fact был сохранён как audited `rejected`, а не потерян и не отправлен в AI Validator.
 
-### Promotion blockers
+### Offline production candidate packaging
 
-Локальный файл `workflows/n8n-exports/TENDER — Обработать документ.json` сейчас является export тестового workflow, а не production import candidate:
+Test/calibration workflow сохранён без изменений как immutable snapshot:
 
-- workflow name содержит `[3 TEST]`;
-- присутствуют Manual Trigger, calibration persistence nodes и `pinData`;
-- canonical production persistence path не подключён к completeness barrier.
+```text
+workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json
+60 nodes
+SHA-256: 02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd
+```
 
-Поэтому он **не должен импортироваться поверх production** до отдельной promotion-задачи и GREEN двух production-packaging tests.
+Canonical path теперь содержит clean offline production candidate:
+
+```text
+workflows/n8n-exports/TENDER — Обработать документ.json
+name = TENDER — Обработать документ
+51 nodes
+active = false
+settings.availableInMCP = false
+pinData = {}
+```
+
+Из beta удалены только девять test/calibration nodes; shared node parameters, credentials, types и runtime settings защищены beta→canonical regression. Canonical persistence path подключён к completeness barrier, Manual Trigger отсутствует, top-level `id`, `versionId` и `meta` удалены.
+
+Это только import packaging: live production Worker `1Pw61ZY3HgBSvcUr` не изменён, candidate ещё не promoted/wired и runtime canary для него не выполнялся.
 
 ## 4. Aggregator AG-8 test mitigation
 
@@ -133,19 +148,15 @@ Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d0
 
 ## 5. Test status
 
-Fresh full offline suite on 2026-08-29:
+Fresh full offline suite after Document Worker packaging on 2026-08-29:
 
 ```text
 139 tests
-136 passed
-3 failed
+138 passed
+1 failed
 ```
 
-Падающие tests являются открытыми gates, а не случайными regression failures:
-
-1. `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary;
-2. Document Worker completeness barrier не подключён к canonical `Сохранить analysis unit`;
-3. Document Worker export пока содержит test/calibration topology и `pinData`.
+Единственный падающий test — намеренный `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary. Document Worker suites теперь GREEN: Worker `78/78`, Validator `31/31`.
 
 Этот checkpoint не является release-ready или production-ready состоянием.
 
@@ -162,10 +173,13 @@ Fresh full offline suite on 2026-08-29:
 - Aggregator route-aware harness не материализует Round 1 FINAL для `requires_recheck`;
 - AG-8 offline beta contract, MCP read-back и один paid runtime canary execution-derived case `14104` прошли GREEN;
 - runtime canary назначил `doc_7_au_0031` роль `not_applicable`, выбрал `doc_7_au_0001` primary и прошёл 6/6 semantic oracle checks.
+- immutable Document Worker beta snapshot сохранён с ожидаемым SHA-256;
+- canonical Document Worker JSON является clean offline production candidate, а beta→canonical packaging contract проходит regression.
 
 ### Not verified
 
-- production promotion Document Worker;
+- promotion/wiring clean Document Worker candidate в test/production contour;
+- runtime canary Document Worker candidate;
 - production promotion Aggregator AG-8 boundary;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
@@ -175,20 +189,20 @@ Fresh full offline suite on 2026-08-29:
 
 На snapshot date exports имеют разные роли:
 
-- Document Worker canonical path содержит `[3 TEST]` export;
+- `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` — неизменяемый 60-node test/calibration snapshot;
+- Document Worker canonical path — clean inactive 51-node offline production candidate без instance identity и test state;
 - Aggregator local export содержит 38 nodes и совпадает с published active node set/connections; известное отличие параметров — provider pin в model alias ноды `Semantic Aggregator`;
 - 24-нoded production Aggregator draft не опубликован и соответствует очищенному core graph без disabled legacy/test nodes;
 - защищённые workflow JSON не изменялись автоматически в рамках этого checkpoint.
 
-Для production поведения authoritative остаётся published active version, а не current draft. Перед любой promotion всё равно нужен повторный live read-back; молчаливо подменять published export draft-версией нельзя.
+Для production поведения authoritative остаются live published workflows: локальный Document Worker candidate ещё не promoted и не прошёл runtime canary. Перед любой promotion нужен повторный live read-back; молчаливо подменять published workflow локальным candidate нельзя.
 
 ## 8. Next checkpoint criterion
 
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-clean Document Worker production import candidate
-→ test workflow promotion / wiring
+test workflow promotion / wiring clean Document Worker candidate
 → fresh full run
 → 27/27 manual semantic review
 → client report

@@ -47,7 +47,7 @@ deepseek/deepseek-v4-pro-0813
 
 `reasoning_effort` задаётся через alias модели (`none` для Extractor, `low` для Validator/Semantic Aggregator). В audit metadata provider сохраняется как `deepseek`, что относится к модели, а не к transport endpoint.
 
-Это описание production baseline. Изолированный `[3 TEST]` Document Worker использует Gemini 3.7 Flash для AI Validator и содержит ещё не promoted hardening. Локальный файл `workflows/n8n-exports/TENDER — Обработать документ.json` на 28.08.2026 является export этого test workflow, а не production import candidate.
+Это описание live production baseline. Изолированный `[3 TEST]` Document Worker использует Gemini 3.7 Flash для AI Validator и сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean inactive offline production candidate: test/calibration nodes и state удалены, production trigger/persistence wiring восстановлен, top-level instance identity удалена. Live production Worker не менялся; promotion/wiring и runtime canary candidate ещё не выполнены.
 
 ---
 
@@ -2269,11 +2269,10 @@ tender_id
 → completed
 → report_html
 
-AG-8 GREEN подтверждён только в test Aggregator. Перед клиентским отчётом текущий milestone:
+AG-8 GREEN подтверждён только в test Aggregator. Document Worker production candidate упакован только локально и ещё не promoted. Перед клиентским отчётом текущий milestone:
 
 ```text
-clean Document Worker production import candidate
-→ test workflow promotion / wiring
+test workflow promotion / wiring clean Document Worker candidate
 → fresh full run
 → manual review 27/27
 → client report

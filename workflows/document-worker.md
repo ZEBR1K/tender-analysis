@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-28
+**Последнее обновление:** 2026-08-29
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -14,9 +14,9 @@
 **AI Extractor:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=none`
 **AI Validator:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low`
 
-> Production metadata выше относится к workflow `1Pw61ZY3HgBSvcUr`. Локальный JSON по canonical path на 28.08.2026 содержит inactive `[3 TEST]` workflow `2T7szFpiGcfNpKkB`, а не production import candidate. Точная граница зафиксирована в `PROJECT_STATUS.md`.
+> Production metadata выше относится к неизменённому live workflow `1Pw61ZY3HgBSvcUr`. Test/calibration workflow `2T7szFpiGcfNpKkB` сохранён локально как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical path содержит clean inactive offline production candidate с именем `TENDER — Обработать документ`, без top-level instance identity и test state. Candidate ещё не promoted/wired и не прошёл runtime canary; точная граница зафиксирована в `PROJECT_STATUS.md`.
 
-Test candidate использует Gemini 3.7 Flash для Validator и содержит bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. До production promotion должны стать GREEN два packaging/completeness tests.
+Beta snapshot и clean candidate используют Gemini 3.7 Flash для Validator и содержат bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Offline packaging/completeness tests GREEN; это не доказывает live runtime behavior.
 
 ---
 
@@ -1258,7 +1258,8 @@ completed_documents_count = documents_total
 | execution 14104: facts persistence output | ✅ 61 facts |
 | fact-local literal downgrade | ✅ exactly one verdict changed |
 | pure overlap-only audit preservation | ✅ rejected, no silent drop |
-| clean production import candidate | ❌ two explicit RED gates |
+| clean offline production import candidate | ✅ Worker 78/78, Validator 31/31 |
+| candidate promotion/wiring and runtime canary | ❌ not executed |
 
 ---
 

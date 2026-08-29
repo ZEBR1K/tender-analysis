@@ -129,6 +129,13 @@ Naming, comments, cleanup, future hardening.
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
 
+Document Worker packaging checkpoint 2026-08-29:
+
+- immutable 60-node beta snapshot сохранён по пути `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`, SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`;
+- canonical JSON является clean 51-node offline production candidate и защищён beta→canonical regression;
+- packaging gate закрыт локально, но live production Worker не изменён;
+- promotion/wiring и runtime canary candidate остаются открытыми verification gates.
+
 \---
 
 ## P1 — High
@@ -1790,8 +1797,8 @@ future: PDF / DOCX / XLSX / delivery
 Основной долг находится в:
 
 ```text
-1. clean Document Worker production import candidate;
-2. test workflow promotion / wiring, включая отдельный AG-8 production gate;
+1. test workflow promotion / wiring clean Document Worker candidate, включая runtime canary;
+2. отдельный AG-8 production promotion gate;
 3. fresh full run;
 4. manual semantic review 27/27;
 5. client report.

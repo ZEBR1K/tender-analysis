@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -12,6 +13,13 @@ const workflowPath = path.join(
   'workflows',
   'n8n-exports',
   'TENDER — Обработать документ.json',
+);
+const betaWorkflowPath = path.join(
+  repositoryRoot,
+  'workflows',
+  'n8n-exports',
+  'beta',
+  '[3 TEST] TENDER — Обработать документ.json',
 );
 const aggregatorWorkflowPath = path.join(
   repositoryRoot,
@@ -58,6 +66,48 @@ const execution14075FixturePath = path.join(
 
 function loadWorkflow() {
   return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+}
+
+function loadBetaWorkflow() {
+  return JSON.parse(fs.readFileSync(betaWorkflowPath, 'utf8'));
+}
+
+function workflowConnectionEdges(workflow) {
+  const edges = [];
+
+  for (const [sourceNode, connectionTypes] of Object.entries(workflow.connections)) {
+    for (const [connectionType, outputs] of Object.entries(connectionTypes)) {
+      outputs.forEach((targets, outputIndex) => {
+        for (const target of targets ?? []) {
+          edges.push([
+            sourceNode,
+            connectionType,
+            outputIndex,
+            target.node,
+            target.type,
+            target.index,
+          ].join('|'));
+        }
+      });
+    }
+  }
+
+  return edges.sort();
+}
+
+function nodeRuntimeSettings(node) {
+  const {
+    id,
+    webhookId,
+    name,
+    position,
+    parameters,
+    credentials,
+    type,
+    typeVersion,
+    ...settings
+  } = node;
+  return settings;
 }
 
 function findNode(workflow, name) {
@@ -3343,11 +3393,84 @@ test('completeness barrier references the canonical upstream persistence node by
   );
 });
 
-test('production import candidate contains no calibration persistence nodes, manual trigger, or pinData', () => {
+test('production import candidate is the exact clean packaging projection of the immutable beta snapshot', () => {
   const workflow = loadWorkflow();
+  const betaWorkflow = loadBetaWorkflow();
+  const expectedRemovedNodes = [
+    'Filter',
+    'When clicking ‘Execute workflow’',
+    'Проверить и привязать evidence ТЕСТОВАЯ',
+    'Проверить ответ AI Validator ТЕСТОВАЯ',
+    'Собрать факты документа ТЕСТОВАЯ',
+    'Сохранить analysis unit 22 item1',
+    'Сохранить analysis unit123',
+    'режем огромную таблицу на части для теста',
+    'статистика аномальных блоков',
+  ].sort();
+  const betaHash = crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(betaWorkflowPath))
+    .digest('hex');
+
+  assert.equal(
+    betaHash,
+    '02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd',
+  );
+
+  const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));
+  const candidateNodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
+  assert.equal(betaNodesByName.size, 60);
+  assert.equal(candidateNodesByName.size, 51);
+  assert.deepEqual(
+    [...betaNodesByName.keys()]
+      .filter((name) => !candidateNodesByName.has(name))
+      .sort(),
+    expectedRemovedNodes,
+  );
+  assert.deepEqual(
+    [...candidateNodesByName.keys()]
+      .filter((name) => !betaNodesByName.has(name))
+      .sort(),
+    [],
+  );
+
+  for (const [name, candidateNode] of candidateNodesByName) {
+    const betaNode = betaNodesByName.get(name);
+    assert.ok(betaNode, `Shared node missing from beta snapshot: ${name}`);
+    assert.deepEqual(candidateNode.parameters, betaNode.parameters, `${name}: parameters drift`);
+    assert.deepEqual(candidateNode.credentials ?? null, betaNode.credentials ?? null, `${name}: credentials drift`);
+    assert.equal(candidateNode.type, betaNode.type, `${name}: type drift`);
+    assert.equal(candidateNode.typeVersion, betaNode.typeVersion, `${name}: typeVersion drift`);
+    assert.deepEqual(
+      nodeRuntimeSettings(candidateNode),
+      nodeRuntimeSettings(betaNode),
+      `${name}: node settings drift`,
+    );
+  }
+
+  const betaEdges = workflowConnectionEdges(betaWorkflow);
+  const candidateEdges = workflowConnectionEdges(workflow);
+  assert.deepEqual(
+    betaEdges.filter((edge) => !candidateEdges.includes(edge)),
+    ['When clicking ‘Execute workflow’|main|0|Сохранить analysis unit|main|0'],
+  );
+  assert.deepEqual(
+    candidateEdges.filter((edge) => !betaEdges.includes(edge)),
+    [
+      'When Executed by Another Workflow|main|0|Проверить вход Worker|main|0',
+      'Развернуть части для AI v1.2|main|0|Сохранить analysis unit|main|0',
+    ].sort(),
+  );
+
+  assert.equal(Object.hasOwn(workflow, 'id'), false);
+  assert.equal(Object.hasOwn(workflow, 'versionId'), false);
+  assert.equal(Object.hasOwn(workflow, 'meta'), false);
 
   assert.equal(workflow.name, 'TENDER — Обработать документ');
+  assert.equal(workflow.active, false);
+  assert.equal(workflow.settings.availableInMCP, false);
   assert.deepEqual(Object.keys(workflow.pinData ?? {}), []);
+  assert.deepEqual(workflow.nodeGroups ?? [], betaWorkflow.nodeGroups ?? []);
   assert.equal(
     workflow.nodes.some((node) => node.type === 'n8n-nodes-base.manualTrigger'),
     false,

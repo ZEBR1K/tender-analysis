@@ -533,7 +533,9 @@ fact-local material literal guard
 
 Execution `14104` подтвердил `66/66` units и сохранение `61` facts, но run был уже завершён, поэтому Aggregator для нового snapshot не запускался.
 
-Тестовый Document Worker ещё не является production import candidate: canonical persistence path, calibration nodes, Manual Trigger и `pinData` зафиксированы двумя падающими promotion tests.
+Test/calibration Worker сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` с SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`.
+
+Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 51 node, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: universal current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary на fixture `14104`. Canary выбрал корректный current-procurement candidate primary, назначил внутреннему процессу `not_applicable` и прошёл 6/6 semantic oracle checks.
 
@@ -556,7 +558,7 @@ AG-8 production promotion
 verified test boundary → canonical production candidate
 
 Document Worker promotion
-test/calibration export → clean production candidate
+clean offline candidate → test workflow promotion / wiring → runtime canary
 
 test workflow promotion / wiring
 → fresh full run
@@ -568,11 +570,10 @@ test workflow promotion / wiring
 
 # 10. Следующая задача
 
-Текущая точка продолжения после AG-8 test GREEN:
+Текущая точка продолжения после AG-8 test GREEN и local Document Worker packaging:
 
 ```text
-clean Document Worker production import candidate
-→ test workflow promotion / wiring
+test workflow promotion / wiring clean Document Worker candidate
 → fresh full run
 → manual semantic review 27/27
 → client report
