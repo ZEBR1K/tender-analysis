@@ -47,7 +47,7 @@ deepseek/deepseek-v4-pro-0813
 
 `reasoning_effort` задаётся через alias модели (`none` для Extractor, `low` для Validator/Semantic Aggregator). В audit metadata provider сохраняется как `deepseek`, что относится к модели, а не к transport endpoint.
 
-Это описание live production baseline. Изолированный `[3 TEST]` Document Worker использует Gemini 3.7 Flash для AI Validator и сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean inactive offline production candidate: test/calibration nodes и state удалены, production trigger/persistence wiring восстановлен, top-level instance identity удалена. Live production Worker не менялся; promotion/wiring и runtime canary candidate ещё не выполнены.
+Это описание live production baseline. Изолированный `[3 TEST]` Document Worker и clean canonical candidate используют GLM 5.3 Flash с `reasoning_effort=low` для Extractor и Gemini 3.7 Flash с `reasoning_effort=low` для AI Validator. Выбор Extractor сделан по A/B на одинаковых 16 pinned units и зафиксирован в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`; поиск моделей на этом fixture остановлен. Beta snapshot сохранён в `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` является clean inactive offline production candidate: test/calibration nodes и state удалены, production trigger/persistence wiring восстановлен, top-level instance identity удалена. Live production Worker не менялся; promotion/wiring и полный runtime canary candidate ещё не выполнены.
 
 ---
 

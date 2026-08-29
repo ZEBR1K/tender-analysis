@@ -533,6 +533,15 @@ fact-local material literal guard
 
 Execution `14104` подтвердил `66/66` units и сохранение `61` facts, но run был уже завершён, поэтому Aggregator для нового snapshot не запускался.
 
+Extractor model benchmark на одинаковых 16 pinned units завершён. Текущий test/canonical baseline зафиксирован как:
+
+```text
+z-ai/glm-5.3-flash
+reasoning_effort = low
+```
+
+Gemini 3.7 Flash low оставлен резервным Extractor candidate. GLM 5.2, GLM 5.3 high, GPT-5.6 Luna Pro, GPT-5.4 Nano, GPT-5 Mini и DeepSeek V4 Flash 0731 отклонены для текущего Extractor contract. Сводный отчёт: `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`. Это model-selection checkpoint, а не подтверждение полного Worker runtime.
+
 Test/calibration Worker сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` с SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`.
 
 Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 51 node, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
@@ -570,10 +579,12 @@ test workflow promotion / wiring
 
 # 10. Следующая задача
 
-Текущая точка продолжения после AG-8 test GREEN и local Document Worker packaging:
+Текущая точка продолжения после AG-8 test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
 
 ```text
-test workflow promotion / wiring clean Document Worker candidate
+Aggregator AG-8 production-candidate audit / promotion plan
+→ без изменения protected production workflow до отдельного согласования
+→ затем full Document Worker runtime canary
 → fresh full run
 → manual semantic review 27/27
 → client report

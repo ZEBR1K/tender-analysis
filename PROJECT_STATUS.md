@@ -39,7 +39,7 @@ Production PostgreSQL и published production workflows в текущем цик
 
 | Workflow | ID | Active | Current purpose |
 |---|---|---:|---|
-| `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | runtime canary Document Worker, 60 nodes, version `71d69ab3-…` |
+| `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | runtime canary Document Worker, 60 nodes, version `2f3e1ea6-…`; Extractor alias синхронизирован с tested beta baseline |
 | `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | no | AG-8 verified test candidate, 24 nodes, version `0147805e-…` |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
@@ -60,7 +60,34 @@ Repository также содержит inactive local-only export `[TEMP] TENDER
 5. `VALIDATOR_FIELD_PROFILES` версии `validator_field_profiles_v1` для ровно 27 canonical `field_key`;
 6. hard error для unknown/missing Validator profile до HTTP;
 7. fact-local material literal guard `fact_local_material_literals_v1`;
-8. Gemini 3.7 Flash в тестовом AI Validator.
+8. GLM 5.3 Flash low в тестовом Extractor;
+9. Gemini 3.7 Flash low в тестовом AI Validator.
+
+### Extractor model-selection checkpoint
+
+На одинаковых 16 pinned units проверены:
+
+```text
+GLM 5.3 Flash low/high
+GLM 5.2 low/without reasoning
+Gemini 3.7 Flash low
+GPT-5.6 Luna Pro low
+GPT-5.4 Nano low
+GPT-5 Mini low
+DeepSeek V4 Flash 0731
+```
+
+По reliability-first приоритету текущим provisional baseline выбран:
+
+```text
+z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low
+```
+
+Gemini 3.7 Flash low оставлен fallback-кандидатом. Поиск новых моделей на этом fixture остановлен; сводный evidence-backed отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`.
+
+MCP read-back тестового Worker подтвердил атомарное изменение только `AI Extractor v1.0`: alias приведён с временного `@provider=deepinfra/fp8` к протестированному `@provider=cloudflare`; workflow остался inactive/unpublished, node count `60`, connections, settings, pin data и credentials не изменились.
+
+Этот выбор подтверждает только сравнительный Extractor result. Full path Evidence Repair → AI Validator → persistence с выбранной связкой ещё требует отдельного runtime canary.
 
 ### Runtime evidence
 
@@ -179,7 +206,7 @@ Fresh full offline suite after Document Worker packaging on 2026-08-29:
 ### Not verified
 
 - promotion/wiring clean Document Worker candidate в test/production contour;
-- runtime canary Document Worker candidate;
+- full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
@@ -202,8 +229,9 @@ Fresh full offline suite after Document Worker packaging on 2026-08-29:
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-test workflow promotion / wiring clean Document Worker candidate
-→ fresh full run
+Aggregator AG-8 production-candidate audit / promotion decision
+→ full Document Worker runtime canary
+→ fresh full 27/27 run
 → 27/27 manual semantic review
 → client report
 ```

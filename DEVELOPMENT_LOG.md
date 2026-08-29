@@ -4528,3 +4528,61 @@ test workflow promotion / wiring clean Document Worker candidate
 → manual semantic review 27/27
 → client report
 ```
+
+---
+
+## 2026-08-29 — Extractor model benchmark checkpoint
+
+На одинаковых 16 pinned analysis units документа `Блок_9_Требования.docx` завершён сравнительный Extractor A/B.
+
+Проверены:
+
+```text
+GLM 5.3 Flash low/high
+GLM 5.2 low/without reasoning
+Gemini 3.7 Flash low
+GPT-5.6 Luna Pro low
+GPT-5.4 Nano low
+GPT-5 Mini low
+DeepSeek V4 Flash 0731
+```
+
+Итог:
+
+```text
+current provisional Extractor baseline:
+z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low
+
+fallback:
+google/gemini-3.7-flash low
+
+model search on current fixture:
+stopped
+```
+
+GLM 5.3 Flash low выбран по совокупности schema reliability, semantic precision и observed cost. Он не объявлен окончательно production-verified: full Evidence Repair → Validator → persistence canary ещё не выполнен.
+
+Созданы evidence-backed evaluation artifacts в `evaluations/`, включая сводный `EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`.
+
+Test workflow `2T7szFpiGcfNpKkB` синхронизирован через MCP с выбранным A/B baseline:
+
+```text
+node: AI Extractor v1.0
+model alias: z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low
+version: 2f3e1ea6-2fda-4c0f-81ec-7ff514efdafc
+active: false
+published: false
+```
+
+Read-back подтвердил, что изменена только Extractor-нода. Node count `60`, connections, settings, pin data и credentials остались без изменений. Все возвращённые `DISCONNECTED_NODE` warnings были pre-existing test/calibration warnings.
+
+Production Worker, Aggregator, Targeted Recheck, Finalization, Report Generation и PostgreSQL этим checkpoint не изменялись.
+
+Следующий фокус:
+
+```text
+Aggregator AG-8 production-candidate audit / promotion decision
+→ отдельное согласование protected workflow change
+→ full Document Worker runtime canary
+→ fresh 27/27 run
+```

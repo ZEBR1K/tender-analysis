@@ -16,7 +16,7 @@
 
 > Production metadata выше относится к неизменённому live workflow `1Pw61ZY3HgBSvcUr`. Test/calibration workflow `2T7szFpiGcfNpKkB` сохранён локально как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical path содержит clean inactive offline production candidate с именем `TENDER — Обработать документ`, без top-level instance identity и test state. Candidate ещё не promoted/wired и не прошёл runtime canary; точная граница зафиксирована в `PROJECT_STATUS.md`.
 
-Beta snapshot и clean candidate используют Gemini 3.7 Flash для Validator и содержат bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Offline packaging/completeness tests GREEN; это не доказывает live runtime behavior.
+Beta snapshot и clean candidate используют GLM 5.3 Flash с `reasoning_effort=low` для Extractor и Gemini 3.7 Flash с `reasoning_effort=low` для Validator. Они содержат bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Extractor выбран как provisional baseline после model benchmark на одинаковых 16 pinned units; сводный отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`. Offline packaging/completeness tests GREEN; выбор модели и offline tests не доказывают full runtime behavior.
 
 ---
 
