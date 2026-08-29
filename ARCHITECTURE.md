@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-28
+**Последнее обновление:** 2026-08-29
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -1753,12 +1753,14 @@ Report Generation V2 HTML artifact
 ## Aggregator semantic safety
 
 ```text
-AG-8
-procurement_subject Round 1 lacks a universal current-procurement scope boundary
-→ schema-valid false_resolved remains possible
+AG-8 production gate
+procurement_subject Round 1 in production lacks the verified test current-scope boundary
+→ schema-valid false_resolved remains possible until promotion
 ```
 
-Execution-derived regression `14104` и neutral anti-overfit controls воспроизводят vulnerability offline. Protected production Aggregator не менялся; следующий шаг ограничен `[TEST CODEX]` prompt + runtime canary.
+В `[TEST CODEX]` AG-8 mitigated и verified: execution-derived regression `14104` и neutral anti-overfit controls прошли offline beta contract, MCP read-back и один paid runtime canary. Canary вернул `round1_final/resolved`, назначил внутренний process candidate `not_applicable`, выбрал корректный current-procurement primary и прошёл 6/6 oracle checks.
+
+Protected production Aggregator не менялся. Production promotion и fresh full 27/27 run остаются отдельными архитектурными gates.
 
 ---
 
@@ -2267,13 +2269,14 @@ tender_id
 → completed
 → report_html
 
-Перед клиентским отчётом текущий milestone:
+AG-8 GREEN подтверждён только в test Aggregator. Перед клиентским отчётом текущий milestone:
 
 ```text
-AG-8 GREEN в test Aggregator
-→ clean Document Worker promotion candidate
+clean Document Worker production import candidate
+→ test workflow promotion / wiring
 → fresh full run
 → manual review 27/27
+→ client report
 ```
 
 Остаются future work: PDF, DOCX, XLSX, manual upload и automatic delivery.

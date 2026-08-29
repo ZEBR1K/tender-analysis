@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-28
+**Последнее обновление:** 2026-08-29
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -535,7 +535,9 @@ Execution `14104` подтвердил `66/66` units и сохранение `61
 
 Тестовый Document Worker ещё не является production import candidate: canonical persistence path, calibration nodes, Manual Trigger и `pinData` зафиксированы двумя падающими promotion tests.
 
-Для Aggregator создан execution-derived RED по `procurement_subject`: текущий Round 1 может формально пропустить `false_resolved`, выбрав внутренний процесс вместо объекта текущей закупки.
+Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: universal current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary на fixture `14104`. Canary выбрал корректный current-procurement candidate primary, назначил внутреннему процессу `not_applicable` и прошёл 6/6 semantic oracle checks.
+
+Production Aggregator не менялся. Production promotion остаётся отдельным RED gate, а fresh full 27/27 run после hardening ещё не выполнен.
 
 ---
 
@@ -550,13 +552,14 @@ TECH_DEBT.md
 Текущие P0 gates перед клиентским отчётом:
 
 ```text
-AG-8
-universal current-procurement scope для procurement_subject
+AG-8 production promotion
+verified test boundary → canonical production candidate
 
 Document Worker promotion
 test/calibration export → clean production candidate
 
-full fresh run
+test workflow promotion / wiring
+→ fresh full run
 → 27/27 semantic review
 → client report
 ```
@@ -565,16 +568,17 @@ full fresh run
 
 # 10. Следующая задача
 
-Текущая точка продолжения:
+Текущая точка продолжения после AG-8 test GREEN:
 
 ```text
-усилить universal procurement_subject FIELD_RULES
-только в [TEST CODEX] Aggregator
-→ GREEN offline regression
-→ runtime canary
+clean Document Worker production import candidate
+→ test workflow promotion / wiring
+→ fresh full run
+→ manual semantic review 27/27
+→ client report
 ```
 
-Не менять production Aggregator, checker, topology, SQL, Targeted Recheck, Finalization или Report Generation без отдельного решения.
+Не считать test GREEN автоматическим production promotion. Production Aggregator, checker, topology, SQL, Targeted Recheck, Finalization и Report Generation не менялись в рамках AG-8 test verification.
 
 ---
 

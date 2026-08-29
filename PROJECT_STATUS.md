@@ -1,6 +1,6 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-08-28
+**Snapshot date:** 2026-08-29
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `main`
 
@@ -40,7 +40,7 @@ Production PostgreSQL и published production workflows в текущем цик
 | Workflow | ID | Active | Current purpose |
 |---|---|---:|---|
 | `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | runtime canary Document Worker, 60 nodes, version `71d69ab3-…` |
-| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | no | isolated Aggregator prompt work, 24 nodes, version `98d8c2ed-…` |
+| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | no | AG-8 verified test candidate, 24 nodes, version `0147805e-…` |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
 
@@ -95,7 +95,7 @@ Pure `overlap_only` fact был сохранён как audited `rejected`, а �
 
 Поэтому он **не должен импортироваться поверх production** до отдельной promotion-задачи и GREEN двух production-packaging tests.
 
-## 4. Aggregator current blocker
+## 4. Aggregator AG-8 test mitigation
 
 Execution-derived regression для `procurement_subject` показывает возможность schema-valid `false_resolved`:
 
@@ -104,33 +104,46 @@ Execution-derived regression для `procurement_subject` показывает �
 - текущий Round 1 checker проверяет IDs/cardinality/roles, но не может доказать semantic applicability;
 - ложный AI response может выбрать внутренний процесс `primary` и сформировать FINAL.
 
-Создан route-aware offline harness с execution `14104` и neutral anti-overfit controls. Реализация Aggregator ещё не менялась.
-
-Следующий согласованный минимальный шаг:
+Vulnerability остаётся production gate, но AG-8 теперь mitigated и verified в изолированном `[TEST CODEX]` workflow:
 
 ```text
-усилить только universal procurement_subject FIELD_RULES
-в [TEST CODEX] Aggregator
-→ runtime eval
-→ проверить, что ambiguous scope уходит в Targeted Recheck
-→ не менять checker/topology/SQL/protected production workflow
+universal procurement_subject FIELD_RULES
+→ offline beta contract GREEN
+→ MCP read-back workflow ftvmrEHoMbPOAqZG
+→ один paid runtime canary на execution-derived fixture 14104
+→ semantic oracle GREEN (6/6)
 ```
 
-Backlog ID: `AG-8`.
+Runtime canary подтвердил:
+
+```text
+ai_called = true
+checker_accepted = true
+route = round1_final
+final_status = resolved
+doc_7_au_0031 = not_applicable
+primary = doc_7_au_0001
+semantic_oracle_passed = true
+exit code = 0
+```
+
+Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d05bdb0c`.
+
+Это **не** означает, что production исправлен: production Aggregator и canonical production export не менялись, production promotion test остаётся отдельным RED gate, а fresh 27/27 run ещё не выполнен. Backlog ID `AG-8` остаётся открытым до promotion и fresh full-run verification.
 
 ## 5. Test status
 
-Fresh full offline suite on 2026-08-28:
+Fresh full offline suite on 2026-08-29:
 
 ```text
-127 tests
-124 passed
+139 tests
+136 passed
 3 failed
 ```
 
 Падающие tests являются открытыми gates, а не случайными regression failures:
 
-1. `AG-8`: отсутствует universal current-scope boundary в `procurement_subject FIELD_RULES`;
+1. `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary;
 2. Document Worker completeness barrier не подключён к canonical `Сохранить analysis unit`;
 3. Document Worker export пока содержит test/calibration topology и `pinData`.
 
@@ -146,13 +159,15 @@ Fresh full offline suite on 2026-08-28:
 - Validator field profiles покрывают ровно 27 canonical keys;
 - fact-local material literal guard не использует соседние facts или общий context как evidence;
 - Aggregator candidate SQL по-прежнему исключает `rejected` и включает `confirmed`/`requires_review`;
-- Aggregator route-aware harness не материализует Round 1 FINAL для `requires_recheck`.
+- Aggregator route-aware harness не материализует Round 1 FINAL для `requires_recheck`;
+- AG-8 offline beta contract, MCP read-back и один paid runtime canary execution-derived case `14104` прошли GREEN;
+- runtime canary назначил `doc_7_au_0031` роль `not_applicable`, выбрал `doc_7_au_0001` primary и прошёл 6/6 semantic oracle checks.
 
 ### Not verified
 
 - production promotion Document Worker;
+- production promotion Aggregator AG-8 boundary;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
-- runtime semantic GREEN Aggregator для execution `14104` candidate set;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
 
@@ -172,10 +187,9 @@ Fresh full offline suite on 2026-08-28:
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-AG-8 prompt GREEN offline
-→ Aggregator runtime canary в [TEST CODEX]
-→ clean Document Worker promotion candidate
-→ полный новый test run
+clean Document Worker production import candidate
+→ test workflow promotion / wiring
+→ fresh full run
 → 27/27 manual semantic review
 → client report
 ```

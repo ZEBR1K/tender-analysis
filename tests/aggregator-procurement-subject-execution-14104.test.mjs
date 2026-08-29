@@ -12,13 +12,16 @@ import {
   evaluateProcurementSubjectOracle,
   evaluateRecordedFixture,
   evaluateSelfDeclaredSemanticAxisMatrix,
+  executeWorkflowCodeNode,
   loadAggregatorAntiOverfitFixture,
   loadAggregatorFixture,
   loadAggregatorWorkflow,
   routeCheckedAggregation,
   runAggregatorRound1,
 } from './helpers/aggregator-runtime-eval.mjs';
-import { reportRuntimePipeline } from './runtime/aggregator-procurement-subject-runtime-eval.mjs';
+import * as runtimeEvaluator from './runtime/aggregator-procurement-subject-runtime-eval.mjs';
+
+const { reportRuntimePipeline } = runtimeEvaluator;
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
@@ -28,6 +31,113 @@ const runtimeEvalPath = path.join(
   'aggregator-procurement-subject-runtime-eval.mjs',
 );
 const fieldCatalogPath = path.join(repositoryRoot, 'FIELD_CATALOG.md');
+const betaAggregatorWorkflowPath = path.join(
+  repositoryRoot,
+  'workflows',
+  'n8n-exports',
+  'beta',
+  '[TEST CODEX] TENDER — Агрегация закупки.json',
+);
+
+const universalProcurementSubjectSignals = [
+  {
+    label: 'current procurement or contract scope',
+    patterns: [
+      /текущ[а-яё]*\s+закупк/iu,
+      /договор[а-яё]*,?\s+заключаем[а-яё]*\s+по\s+текущ[а-яё]*\s+закупк/iu,
+    ],
+  },
+  {
+    label: 'specific wording alone does not prove applicability',
+    patterns: [
+      /конкретност[а-яё\s]*сама\s+по\s+себе[^.]{0,160}не\s+(?:доказыва|подтвержда)[а-яё]*[^.]{0,100}(?:применимост|относимост)/iu,
+    ],
+  },
+  {
+    label: 'internal processes exclusion',
+    patterns: [/внутренн[а-яё]*\s+процесс/iu],
+  },
+  {
+    label: 'auxiliary obligations exclusion',
+    patterns: [/вспомогательн[а-яё]*\s+обязательств/iu],
+  },
+  {
+    label: 'other or separate agreements exclusion',
+    patterns: [/(?:друг|отдельн)[а-яё]*\s+(?:договор|соглашен)/iu],
+  },
+  {
+    label: 'ambiguous scope routes to recheck',
+    patterns: [/(?:ambiguous_scope|неоднозначн[а-яё]*\s+scope)[^\n]{0,180}(?:requires_recheck|recheck)/iu],
+  },
+  {
+    label: 'requires_review ambiguous_scope cannot be promoted without confirmation',
+    patterns: [
+      /validator_verdict[^\n]{0,80}requires_review[^\n]{0,220}ambiguous_scope[^\n]{0,220}resolved[^\n]{0,220}дополнительн[а-яё]*\s+подтвержден/iu,
+    ],
+  },
+];
+
+function getProcurementSubjectRules(workflow) {
+  const prepareCode = workflow.nodes.find(
+    ({ name }) => name === 'Подготовить запрос Semantic Aggregator',
+  ).parameters.jsCode;
+  const start = prepareCode.indexOf('procurement_subject: {');
+  const end = prepareCode.indexOf('nm_price_with_vat:', start);
+  assert.ok(start >= 0 && end > start, 'procurement_subject FIELD_RULES not found');
+  return prepareCode.slice(start, end).toLocaleLowerCase('ru-RU');
+}
+
+function assertUniversalProcurementSubjectBoundary(workflow) {
+  const rules = getProcurementSubjectRules(workflow);
+  for (const { label, patterns } of universalProcurementSubjectSignals) {
+    assert.equal(
+      patterns.some((pattern) => pattern.test(rules)),
+      true,
+      `Missing universal procurement_subject rule: ${label}`,
+    );
+  }
+}
+
+function syntheticApiResponse(id, payload) {
+  return {
+    id,
+    model: 'synthetic-schema-valid-no-ai',
+    choices: [
+      {
+        finish_reason: 'stop',
+        message: {
+          role: 'assistant',
+          content: JSON.stringify(payload),
+        },
+      },
+    ],
+    usage: null,
+  };
+}
+
+test('Aggregator harness keeps production default and accepts an explicit beta workflow path', async () => {
+  const productionWorkflow = loadAggregatorWorkflow();
+  const betaWorkflow = loadAggregatorWorkflow(betaAggregatorWorkflowPath);
+  const missingWorkflowPath = path.join(testDirectory, 'missing-aggregator.json');
+  const fixture = loadAggregatorFixture();
+
+  assert.equal(productionWorkflow.name, 'TENDER — Агрегация закупки');
+  assert.equal(betaWorkflow.id, 'ftvmrEHoMbPOAqZG');
+  assert.equal(betaWorkflow.name, '[TEST CODEX] TENDER — Агрегация закупки');
+  assert.equal(betaWorkflow.nodeCount, 24);
+  assert.throws(
+    () => loadAggregatorWorkflow(missingWorkflowPath),
+    /ENOENT/u,
+  );
+  await assert.rejects(
+    runAggregatorRound1({
+      fixture,
+      modelResponse: fixture.recorded_false_resolved_api_response,
+      workflowPath: missingWorkflowPath,
+    }),
+    /ENOENT/u,
+  );
+});
 
 test('execution 14104 fixture preserves the four exact procurement_subject candidates', () => {
   const fixture = loadAggregatorFixture();
@@ -332,71 +442,210 @@ test('production Aggregator prompt and code contain no execution-derived or fixt
 
 test('RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary', () => {
   const workflow = loadAggregatorWorkflow();
+  assertUniversalProcurementSubjectBoundary(workflow);
+});
+
+test('RED candidate contract: beta procurement_subject prompt contains the universal current-scope boundary', async () => {
+  const workflow = loadAggregatorWorkflow(betaAggregatorWorkflowPath);
+  const fixture = loadAggregatorFixture();
+  const controls = loadAggregatorAntiOverfitFixture();
+  const prepared = await executeWorkflowCodeNode({
+    workflow,
+    nodeName: 'Подготовить запрос Semantic Aggregator',
+    inputJson: fixture.aggregator_field_item,
+  });
+
+  assertUniversalProcurementSubjectBoundary(workflow);
+  assert.equal(prepared.field_key, 'procurement_subject');
+  assert.equal(prepared.aggregation_input.candidates.length, 4);
+  assert.deepEqual(
+    prepared.allowed_fact_ids,
+    fixture.aggregator_field_item.candidates.map(({ fact_id: factId }) => factId),
+  );
   const prepareCode = workflow.nodes.find(
     ({ name }) => name === 'Подготовить запрос Semantic Aggregator',
-  ).parameters.jsCode;
-  const start = prepareCode.indexOf('procurement_subject: {');
-  const end = prepareCode.indexOf('nm_price_with_vat:', start);
-  assert.ok(start >= 0 && end > start, 'procurement_subject FIELD_RULES not found');
-  const rules = prepareCode.slice(start, end).toLocaleLowerCase('ru-RU');
-  const requiredSignals = [
-    {
-      label: 'current procurement or contract scope',
-      patterns: [
-        /текущ[а-яё]*\s+закупк/iu,
-        /договор[а-яё]*,?\s+заключаем[а-яё]*\s+по\s+текущ[а-яё]*\s+закупк/iu,
-      ],
-    },
-    {
-      label: 'specific wording alone does not prove applicability',
-      patterns: [
-        /конкретност[а-яё\s]*сама\s+по\s+себе[^.]{0,160}не\s+(?:доказыва|подтвержда)[а-яё]*[^.]{0,100}(?:применимост|относимост)/iu,
-      ],
-    },
-    {
-      label: 'internal processes exclusion',
-      patterns: [/внутренн[а-яё]*\s+процесс/iu],
-    },
-    {
-      label: 'auxiliary obligations exclusion',
-      patterns: [/вспомогательн[а-яё]*\s+обязательств/iu],
-    },
-    {
-      label: 'other or separate agreements exclusion',
-      patterns: [/(?:друг|отдельн)[а-яё]*\s+(?:договор|соглашен)/iu],
-    },
-    {
-      label: 'ambiguous scope routes to recheck',
-      patterns: [/(?:ambiguous_scope|неоднозначн[а-яё]*\s+scope)[^\n]{0,180}(?:requires_recheck|recheck)/iu],
-    },
-    {
-      label: 'requires_review ambiguous_scope cannot be promoted without confirmation',
-      patterns: [
-        /validator_verdict[^\n]{0,80}requires_review[^\n]{0,220}ambiguous_scope[^\n]{0,220}resolved[^\n]{0,220}дополнительн[а-яё]*\s+подтвержден/iu,
-      ],
-    },
+  ).parameters.jsCode.toLocaleLowerCase('ru-RU');
+  const forbidden = [
+    '14104',
+    'doc_7_au_0031',
+    'стандартные закрытия палуб',
+    'поддержание технологического оборудования',
+    ...Object.values(fixture.fact_ids_by_analysis_unit),
+    ...controls.cases.flatMap(({ aggregator_field_item: fieldItem }) =>
+      fieldItem.candidates.map(({ fact_id: factId }) => factId)),
   ];
-
-  for (const { label, patterns } of requiredSignals) {
+  for (const literal of forbidden) {
     assert.equal(
-      patterns.some((pattern) => pattern.test(rules)),
-      true,
-      `Missing universal procurement_subject rule: ${label}`,
+      prepareCode.includes(literal.toLocaleLowerCase('ru-RU')),
+      false,
+      `Beta Aggregator contains fixture-specific literal: ${literal}`,
     );
   }
+});
+
+test('RED pre-canary: beta FIELD_RULES use the AI response status field, not downstream aggregation_status', async () => {
+  const workflow = loadAggregatorWorkflow(betaAggregatorWorkflowPath);
+  const fixture = loadAggregatorFixture();
+  const rules = getProcurementSubjectRules(workflow);
+  const prepared = await executeWorkflowCodeNode({
+    workflow,
+    nodeName: 'Подготовить запрос Semantic Aggregator',
+    inputJson: fixture.aggregator_field_item,
+  });
+  const checkerCode = workflow.nodes.find(
+    ({ name }) => name === 'Проверить ответ Semantic Aggregator',
+  ).parameters.jsCode;
+
+  assert.match(rules, /\bstatus\s*=\s*requires_recheck\b/iu);
+  assert.doesNotMatch(rules, /\baggregation_status\s*=/iu);
+  assert.match(
+    prepared.system_prompt,
+    /"status"\s*:\s*"resolved\s*\|\s*requires_recheck"/u,
+  );
+  assert.match(checkerCode, /result\.status/u);
+  assert.doesNotMatch(checkerCode, /result\.aggregation_status/u);
+});
+
+test('beta offline contract can materialize the execution-14104 expected selection', async () => {
+  const fixture = loadAggregatorFixture();
+  const ids = fixture.fact_ids_by_analysis_unit;
+  const modelResponse = syntheticApiResponse(
+    'synthetic-execution-14104-expected-selection',
+    {
+      field_key: 'procurement_subject',
+      status: 'resolved',
+      final_value_text: fixture.aggregator_field_item.candidates[0].value_text,
+      confidence: 0.98,
+      candidate_decisions: [
+        { fact_id: ids.doc_7_au_0001, role: 'primary', reason: 'Прямо установлен предмет текущей закупки.' },
+        { fact_id: ids.doc_7_au_0008, role: 'duplicate', reason: 'То же закупаемое изделие в спецификации.' },
+        { fact_id: ids.doc_7_au_0010, role: 'supporting', reason: 'Подтверждает поставку того же предмета.' },
+        { fact_id: ids.doc_7_au_0031, role: 'not_applicable', reason: 'Описывает внутренний процесс, а не объект текущей закупки.' },
+      ],
+      supporting_fact_ids: [ids.doc_7_au_0010],
+      conflict_fact_ids: [],
+      needs_recheck: false,
+      recheck_reason_code: null,
+      recheck_note: null,
+    },
+  );
+  const pipeline = await runAggregatorRound1({
+    fixture,
+    modelResponse,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const oracle = evaluateProcurementSubjectOracle({
+    fixture,
+    checked: pipeline.checked,
+    final: pipeline.final,
+  });
+
+  assert.equal(pipeline.route, 'round1_final');
+  assert.equal(pipeline.final.aggregation_status, 'resolved');
+  assert.equal(oracle.passed, true);
+});
+
+test('beta offline contract prevents a neutral internal or auxiliary process from displacing the subject', async () => {
+  const controls = loadAggregatorAntiOverfitFixture();
+  const caseFixture = controls.cases.find(
+    ({ case_id: caseId }) => caseId === 'auxiliary_or_internal_process',
+  );
+  const [current, internal, auxiliary] = caseFixture.aggregator_field_item.candidates;
+  const modelResponse = syntheticApiResponse(
+    'synthetic-neutral-internal-expected-selection',
+    {
+      field_key: 'procurement_subject',
+      status: 'resolved',
+      final_value_text: current.value_text,
+      confidence: 0.97,
+      candidate_decisions: [
+        { fact_id: current.fact_id, role: 'primary', reason: 'Прямо установлен предмет текущей закупки.' },
+        { fact_id: internal.fact_id, role: 'not_applicable', reason: 'Внутренний процесс организации.' },
+        { fact_id: auxiliary.fact_id, role: 'not_applicable', reason: 'Предмет отдельного вспомогательного соглашения.' },
+      ],
+      supporting_fact_ids: [],
+      conflict_fact_ids: [],
+      needs_recheck: false,
+      recheck_reason_code: null,
+      recheck_note: null,
+    },
+  );
+  const pipeline = await runAggregatorRound1({
+    fixture: caseFixture,
+    modelResponse,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const oracle = evaluateExplicitSemanticExpectation({
+    caseFixture,
+    checked: pipeline.checked,
+    final: pipeline.final,
+  });
+
+  assert.equal(pipeline.route, 'round1_final');
+  assert.equal(oracle.passed, true);
+});
+
+test('beta offline contract routes neutral ambiguous scope to Targeted Recheck', async () => {
+  const controls = loadAggregatorAntiOverfitFixture();
+  const caseFixture = controls.cases.find(
+    ({ case_id: caseId }) => caseId === 'ambiguous_scope',
+  );
+  const pipeline = await runAggregatorRound1({
+    fixture: caseFixture,
+    modelResponse: caseFixture.correct_requires_recheck_api_response,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const oracle = evaluateExplicitSemanticExpectation({
+    caseFixture,
+    checked: pipeline.checked,
+    final: pipeline.final,
+  });
+
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.final, null);
+  assert.equal(
+    pipeline.executed_nodes.includes('Сформировать FINAL после Round 1'),
+    false,
+  );
+  assert.equal(oracle.passed, true);
+});
+
+test('beta offline positive control keeps one explicit current subject resolved', async () => {
+  const controls = loadAggregatorAntiOverfitFixture();
+  const caseFixture = controls.cases.find(
+    ({ case_id: caseId }) => caseId === 'legitimate_single_subject',
+  );
+  const pipeline = await runAggregatorRound1({
+    fixture: caseFixture,
+    modelResponse: caseFixture.recorded_api_response,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const oracle = evaluateExplicitSemanticExpectation({
+    caseFixture,
+    checked: pipeline.checked,
+    final: pipeline.final,
+  });
+
+  assert.equal(pipeline.route, 'round1_final');
+  assert.equal(pipeline.final.aggregation_status, 'resolved');
+  assert.equal(oracle.passed, true);
 });
 
 test('runtime eval remains explicit and its live path uses the route-aware helper', () => {
   const source = fs.readFileSync(runtimeEvalPath, 'utf8');
   assert.match(source, /--recorded/u);
   assert.match(source, /--live/u);
+  assert.match(source, /--beta/u);
   assert.match(source, /--allow-paid-ai/u);
   assert.equal(
     LIVE_MODEL_ALIAS,
     'deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low',
   );
-  assert.match(source, /model:\s*LIVE_MODEL_ALIAS/u);
-  assert.match(source, /runAggregatorRound1\(\{\s*fixture,\s*modelResponse\s*\}\)/u);
+  assert.match(source, /request\.model\s*!==\s*LIVE_MODEL_ALIAS/u);
+  assert.match(
+    source,
+    /runAggregatorRound1\(\{[\s\S]*?fixture,[\s\S]*?modelResponse,[\s\S]*?workflowPath[\s\S]*?\}\)/u,
+  );
   assert.doesNotMatch(source, /Сформировать FINAL после Round 1/u);
 
   assert.equal(
@@ -404,6 +653,172 @@ test('runtime eval remains explicit and its live path uses the route-aware helpe
     true,
     'Runtime evaluation must reference the real Aggregator workflow export.',
   );
+});
+
+test('RED pre-canary: live beta preparation and model contract come only from the explicit beta export', async () => {
+  assert.equal(
+    typeof runtimeEvaluator.prepareLiveBetaRuntimeRequest,
+    'function',
+    'Runtime evaluator must expose explicit beta preparation.',
+  );
+  const fixture = loadAggregatorFixture();
+  const preparedRuntime = await runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+    fixture,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+
+  assert.equal(preparedRuntime.workflow.workflow_id, 'ftvmrEHoMbPOAqZG');
+  assert.equal(
+    preparedRuntime.workflow.workflow_name,
+    '[TEST CODEX] TENDER — Агрегация закупки',
+  );
+  assert.equal(
+    preparedRuntime.workflow.workflow_path,
+    'workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.json',
+  );
+  assert.match(preparedRuntime.workflow.workflow_sha256, /^[a-f0-9]{64}$/u);
+  assert.match(
+    preparedRuntime.prepared.user_prompt,
+    /объектом именно текущей закупки/iu,
+  );
+  assert.equal(
+    preparedRuntime.request.messages[0].content,
+    preparedRuntime.prepared.system_prompt,
+  );
+  assert.equal(
+    preparedRuntime.request.messages[1].content,
+    preparedRuntime.prepared.user_prompt,
+  );
+  assert.equal(preparedRuntime.request.model, LIVE_MODEL_ALIAS);
+  assert.equal(preparedRuntime.workflow.model_alias, LIVE_MODEL_ALIAS);
+});
+
+test('RED pre-canary: live beta response uses checker and routing from the same explicit beta workflow', async () => {
+  assert.equal(
+    typeof runtimeEvaluator.evaluateLiveBetaModelResponse,
+    'function',
+    'Runtime evaluator must expose explicit beta response evaluation.',
+  );
+  const controls = loadAggregatorAntiOverfitFixture();
+  const fixture = controls.cases.find(
+    ({ case_id: caseId }) => caseId === 'ambiguous_scope',
+  );
+  const pipeline = await runtimeEvaluator.evaluateLiveBetaModelResponse({
+    fixture,
+    modelResponse: fixture.correct_requires_recheck_api_response,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.final, null);
+  assert.deepEqual(pipeline.workflow, {
+    workflow_id: 'ftvmrEHoMbPOAqZG',
+    workflow_name: '[TEST CODEX] TENDER — Агрегация закупки',
+    workflow_path:
+      'workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.json',
+  });
+});
+
+test('RED pre-canary: beta runtime path errors before HTTP and never falls back to production', async () => {
+  assert.equal(
+    typeof runtimeEvaluator.prepareLiveBetaRuntimeRequest,
+    'function',
+    'Runtime evaluator must expose explicit beta preparation.',
+  );
+  const fixture = loadAggregatorFixture();
+  const missingPath = path.join(testDirectory, 'missing-beta-aggregator.json');
+
+  await assert.rejects(
+    runtimeEvaluator.prepareLiveBetaRuntimeRequest({ fixture }),
+    /explicit beta workflowPath/iu,
+  );
+  await assert.rejects(
+    runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+      fixture,
+      workflowPath: missingPath,
+    }),
+    /missing-beta-aggregator\.json|ENOENT/iu,
+  );
+});
+
+test('RED pre-canary: live CLI requires --beta before credentials or HTTP', () => {
+  const baseEnv = {
+    ...process.env,
+    AGGREGATOR_RUNTIME_URL: 'http://127.0.0.1:1/must-not-be-called',
+    AGGREGATOR_RUNTIME_API_KEY: 'offline-placeholder',
+  };
+  const withoutBeta = spawnSync(
+    process.execPath,
+    [runtimeEvalPath, '--live', '--allow-paid-ai'],
+    { cwd: repositoryRoot, encoding: 'utf8', env: baseEnv },
+  );
+
+  assert.equal(withoutBeta.status, 2, withoutBeta.stderr || withoutBeta.stdout);
+  assert.match(withoutBeta.stderr, /--live requires[^\n]*--beta/iu);
+  assert.doesNotMatch(withoutBeta.stderr, /fetch failed|ECONNREFUSED/iu);
+
+  const missingBeta = spawnSync(
+    process.execPath,
+    [runtimeEvalPath, '--live', '--beta', '--allow-paid-ai'],
+    {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env: {
+        ...baseEnv,
+        AGGREGATOR_BETA_WORKFLOW_PATH: path.join(
+          testDirectory,
+          'missing-beta-aggregator.json',
+        ),
+      },
+    },
+  );
+
+  assert.equal(missingBeta.status, 2, missingBeta.stderr || missingBeta.stdout);
+  assert.match(missingBeta.stderr, /beta workflow preparation failed/iu);
+  assert.doesNotMatch(missingBeta.stderr, /fetch failed|ECONNREFUSED/iu);
+});
+
+test('RED pre-canary: live report records the exact beta workflow artifact and model alias', async () => {
+  assert.equal(
+    typeof runtimeEvaluator.prepareLiveBetaRuntimeRequest,
+    'function',
+    'Runtime evaluator must expose explicit beta preparation.',
+  );
+  const fixture = loadAggregatorFixture();
+  const controls = loadAggregatorAntiOverfitFixture();
+  const ambiguousFixture = controls.cases.find(
+    ({ case_id: caseId }) => caseId === 'ambiguous_scope',
+  );
+  const preparedRuntime = await runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+    fixture,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const pipeline = await runtimeEvaluator.evaluateLiveBetaModelResponse({
+    fixture: ambiguousFixture,
+    modelResponse: ambiguousFixture.correct_requires_recheck_api_response,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const report = reportRuntimePipeline({
+    mode: 'live',
+    aiCalled: true,
+    requestModel: preparedRuntime.request.model,
+    responseModel: ambiguousFixture.correct_requires_recheck_api_response.model,
+    workflow: preparedRuntime.workflow,
+    fixture: ambiguousFixture,
+    pipeline,
+  });
+
+  assert.equal(report.payload.workflow_id, 'ftvmrEHoMbPOAqZG');
+  assert.equal(
+    report.payload.workflow_name,
+    '[TEST CODEX] TENDER — Агрегация закупки',
+  );
+  assert.equal(report.payload.workflow_path, preparedRuntime.workflow.workflow_path);
+  assert.equal(
+    report.payload.workflow_sha256,
+    preparedRuntime.workflow.workflow_sha256,
+  );
+  assert.equal(report.payload.model_alias, LIVE_MODEL_ALIAS);
 });
 
 test('runtime reporting defers targeted_recheck without running the resolved-only oracle', () => {

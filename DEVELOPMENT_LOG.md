@@ -4387,3 +4387,82 @@ Read-only n8n API выявил и разрешил расхождение draft/
 24-нoded draft не опубликован и не определяет production executions. Published version остаётся authoritative production state.
 
 Production workflows, protected workflows и PostgreSQL в рамках checkpoint не изменялись.
+
+---
+
+## 2026-08-29 — AG-8 test GREEN и runtime canary checkpoint
+
+### Test-only implementation
+
+В изолированном workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) усилены только universal `procurement_subject FIELD_RULES`:
+
+```text
+current procurement / contract scope required
+specific wording alone does not prove applicability
+internal / auxiliary / separate-agreement objects are not_applicable
+ambiguous scope → requires_recheck
+```
+
+Topology, SQL, response checker, FINAL builder, Targeted Recheck и production Aggregator не менялись.
+
+Beta export:
+
+```text
+workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.json
+SHA-256 = 95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d05bdb0c
+```
+
+Offline beta contract и MCP read-back прошли GREEN. MCP version comparison подтвердил изменение только ноды `Подготовить запрос Semantic Aggregator`; workflow остался inactive/unpublished.
+
+### Paid runtime canary — execution-derived fixture 14104
+
+Выполнен один ограниченный AI-вызов через beta runtime harness:
+
+```text
+request model = deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low
+response model = deepseek/deepseek-v4-pro-0813
+ai_called = true
+checker_accepted = true
+route = round1_final
+final_status = resolved
+semantic_oracle_passed = true
+exit code = 0
+```
+
+Semantic result:
+
+```text
+doc_7_au_0031 role = not_applicable
+primary = 14104000-0001-4000-8000-000000000001
+fixture mapping = doc_7_au_0001
+final_value_text = Стандартные закрытия палуб для ледокола-лидера пр.10510 зав № 056001
+oracle checks = 6/6 passed
+```
+
+Первый transient TLS `ECONNRESET` классифицирован как transport incident, не semantic failure. Неблокирующий follow-up: необработанный network exception runtime harness возвращает exit `1`, который может быть ошибочно воспринят как semantic oracle failure; позже нужно развести transport и semantic exit semantics без redesign Aggregator.
+
+### Production boundary и следующий milestone
+
+AG-8 имеет статус **mitigated / verified in test**, но остаётся открытым:
+
+- production Aggregator и canonical production export не изменялись;
+- production promotion остаётся отдельным gate;
+- fresh full 27/27 run после hardening ещё не выполнен.
+
+Следующий milestone:
+
+```text
+clean Document Worker production import candidate
+→ test workflow promotion / wiring
+→ fresh full run
+→ manual semantic review 27/27
+→ client report
+```
+
+Fresh offline baseline checkpoint:
+
+```text
+139 total
+136 passed
+3 intentional gate failures
+```

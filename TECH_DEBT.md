@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-08-28
+**Последнее обновление:** 2026-08-29
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -127,7 +127,7 @@ Naming, comments, cleanup, future hardening.
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
-|`AG-8`|`procurement_subject` может стать schema-valid `false_resolved`, если внутренний/вспомогательный процесс выбран primary вместо объекта текущей закупки|Aggregator semantic safety|
+|`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
 
 \---
 
@@ -695,7 +695,7 @@ Execution `14104` дал четыре `confirmed` candidates для `procurement
 1 candidate — внутренний процесс поддержания оборудования
 ```
 
-Текущий Round 1 prompt не содержит полной universal current-scope boundary. Structural checker проверяет IDs, cardinality и role consistency, но schema-valid response может назначить внутренний процесс `primary` и материализовать неправильный FINAL.
+Production Round 1 prompt не содержит полной universal current-scope boundary. Structural checker проверяет IDs, cardinality и role consistency, но schema-valid response может назначить внутренний процесс `primary` и материализовать неправильный FINAL.
 
 ### Почему P0
 
@@ -717,7 +717,24 @@ universal field-specific prompt boundary
 → ambiguous scope = requires_recheck
 ```
 
-Сначала GREEN offline regression и runtime canary в `[TEST CODEX]`. Production Aggregator, checker, SQL и topology до canary не менять.
+В `[TEST CODEX]` минимальная prompt boundary реализована и проверена:
+
+```text
+offline beta contract = GREEN
+MCP read-back = exact test artifact
+paid runtime canary fixture 14104 = exit 0
+checker_accepted = true
+route = round1_final
+semantic oracle = 6/6 GREEN
+doc_7_au_0031 = not_applicable
+primary = doc_7_au_0001
+```
+
+Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d05bdb0c`.
+
+Статус остаётся **open**: production Aggregator, checker, SQL и topology не менялись; нужны отдельный production promotion gate и fresh full 27/27 run с manual semantic review.
+
+Первый transient TLS `ECONNRESET` зафиксирован как transport incident, а не semantic failure. Неблокирующий follow-up test harness: необработанный network exception сейчас возвращает exit `1`, который может выглядеть как semantic failure; нужно позже развести transport и semantic exit semantics без redesign Aggregator.
 
 ### Приоритет
 
@@ -1709,7 +1726,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
-Дополнительный текущий Critical gate: `AG-8 — procurement_subject current-scope false-resolved`.
+Дополнительный Critical gate: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run.
 
 ## High
 
@@ -1773,11 +1790,11 @@ future: PDF / DOCX / XLSX / delivery
 Основной долг находится в:
 
 ```text
-1. `AG-8` Aggregator semantic scope safety;
-2. отсутствии silent-stuck paths;
-3. deterministic semantic safety Document Worker;
-4. retry-safe persistence;
-5. production promotion и новом 27/27 runtime run.
+1. clean Document Worker production import candidate;
+2. test workflow promotion / wiring, включая отдельный AG-8 production gate;
+3. fresh full run;
+4. manual semantic review 27/27;
+5. client report.
 ```
 
 После закрытия этих пунктов архитектура уже достаточно зрелая, чтобы закончить MVP без большого redesign.

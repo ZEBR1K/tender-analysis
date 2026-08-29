@@ -1,7 +1,7 @@
 # TENDER — Агрегация закупки
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-28
+**Последнее обновление:** 2026-08-29
 **Тип:** sub-workflow n8n  
 **Вызывается:** другим workflow после готовности всех документов  
 **Вызывает:** `TENDER - Targeted Recheck`  
@@ -11,7 +11,7 @@
 **Основная модель Semantic Aggregator:** `deepseek/deepseek-v4-pro-0813`
 **Reasoning:** через alias модели `@reasoning_effort=low`
 
-> Protected production workflow не изменялся в текущем Aggregator hardening cycle. Изолированный workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) предназначен для следующего prompt-only runtime canary. Текущие source-of-truth расхождения перечислены в `PROJECT_STATUS.md`.
+> Protected production workflow не изменялся в текущем Aggregator hardening cycle. В изолированном workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) AG-8 прошёл offline beta contract, MCP read-back и один paid runtime canary. Production promotion и fresh 27/27 run остаются отдельными gates; подробности перечислены в `PROJECT_STATUS.md`.
 
 \---
 
@@ -539,7 +539,9 @@ Round 1 `FIELD\\\_RULES` содержит правила для всех 27 по
 }
 ```
 
-Execution-derived regression `14104` выявил отсутствующую универсальную границу для `procurement_subject`: текущие rules не требуют доказать, что candidate описывает объект именно текущей закупки/договора, а не внутренний процесс, вспомогательное обязательство или отдельное соглашение.
+Execution-derived regression `14104` выявил отсутствующую в production универсальную границу для `procurement_subject`: production rules не требуют доказать, что candidate описывает объект именно текущей закупки/договора, а не внутренний процесс, вспомогательное обязательство или отдельное соглашение.
+
+В `[TEST CODEX]` эта граница добавлена универсально и подтверждена offline и одним runtime canary. Это test mitigation, а не доказательство production promotion.
 
 Это не structural checker defect. Checker проверяет schema/cardinality/linking, но не является независимым semantic interpreter. При ambiguous scope безопасный AI result должен быть `requires_recheck`, а не `resolved`.
 
@@ -1268,11 +1270,11 @@ Aggregator
 ### AG-8 — `procurement_subject` current-scope false-resolved
 
 **Severity:** Critical / P0 before client report
-**Status:** RED regression; implementation not started
+**Status:** Mitigated / verified in test; open until production promotion and fresh full run
 
 Execution `14104` содержит четыре `confirmed` candidates для `procurement_subject`: три относятся к закупаемым стандартным закрытиям палуб, один описывает внутренний процесс поддержания технологического оборудования.
 
-Текущий schema-valid AI response может:
+Production schema-valid AI response может:
 
 ```text
 назначить внутренний процесс primary
@@ -1282,16 +1284,20 @@ Execution `14104` содержит четыре `confirmed` candidates для `p
 
 Route-aware offline harness и neutral anti-overfit controls подтверждают trust-boundary gap. Один явно установленный предмет закупки остаётся допустимым positive control; blanket recheck не требуется.
 
-Минимальный следующий fix:
+Test verification:
 
 ```text
 universal procurement_subject prompt boundary
 → только [TEST CODEX]
 → offline GREEN
-→ paid runtime canary
+→ MCP read-back
+→ paid runtime canary execution-derived case 14104
+→ semantic oracle GREEN 6/6
 ```
 
-Не менять topology, SQL, checker или protected production workflow до результата canary.
+Canary вернул `round1_final/resolved`, назначил `doc_7_au_0031` роль `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и сформировал корректный `final_value_text`. Request model: `deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low`; response model: `deepseek/deepseek-v4-pro-0813`.
+
+Production Aggregator, topology, SQL и checker не менялись. Production promotion gate и fresh full 27/27 run обязательны до закрытия AG-8.
 
 \---
 
@@ -1448,7 +1454,17 @@ requires_recheck
 
 ### Следующий MVP milestone
 
-Сначала закрыть `AG-8` только в `[TEST CODEX]` prompt и выполнить runtime canary. Production promotion допускается только после semantic oracle и anti-overfit positive control.
+AG-8 GREEN подтверждён в `[TEST CODEX]` offline, MCP read-back и одним paid runtime canary. Следующий milestone не меняет semantic design:
+
+```text
+clean Document Worker production import candidate
+→ test workflow promotion / wiring
+→ fresh full run
+→ manual semantic review 27/27
+→ client report
+```
+
+Production Aggregator promotion остаётся отдельным gate и не считается выполненным этим test canary.
 
 1. Использовать реализованный `AG-0`:
 

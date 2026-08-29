@@ -11,6 +11,13 @@ export const aggregatorWorkflowPath = path.join(
   'n8n-exports',
   'TENDER — Агрегация закупки.json',
 );
+export const betaAggregatorWorkflowPath = path.join(
+  repositoryRoot,
+  'workflows',
+  'n8n-exports',
+  'beta',
+  '[TEST CODEX] TENDER — Агрегация закупки.json',
+);
 export const aggregatorFixturePath = path.join(
   repositoryRoot,
   'tests',
@@ -29,8 +36,8 @@ export const aggregatorAntiOverfitFixturePath = path.join(
 export const LIVE_MODEL_ALIAS =
   'deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low';
 
-export function loadAggregatorWorkflow() {
-  return JSON.parse(fs.readFileSync(aggregatorWorkflowPath, 'utf8'));
+export function loadAggregatorWorkflow(workflowPath = aggregatorWorkflowPath) {
+  return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 }
 
 export function loadAggregatorFixture() {
@@ -130,8 +137,12 @@ export async function routeCheckedAggregation({ workflow, checked }) {
   );
 }
 
-export async function runAggregatorRound1({ fixture, modelResponse }) {
-  const workflow = loadAggregatorWorkflow();
+export async function runAggregatorRound1({
+  fixture,
+  modelResponse,
+  workflowPath = aggregatorWorkflowPath,
+}) {
+  const workflow = loadAggregatorWorkflow(workflowPath);
   const prepared = await executeWorkflowCodeNode({
     workflow,
     nodeName: 'Подготовить запрос Semantic Aggregator',
@@ -150,6 +161,14 @@ export async function runAggregatorRound1({ fixture, modelResponse }) {
     checked,
   });
   return {
+    workflow: {
+      workflow_id: workflow.id,
+      workflow_name: workflow.name,
+      workflow_path: path
+        .relative(repositoryRoot, workflowPath)
+        .split(path.sep)
+        .join('/'),
+    },
     prepared,
     checked,
     route: routed.route,
