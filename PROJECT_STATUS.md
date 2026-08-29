@@ -137,7 +137,7 @@ pinData = {}
 
 Это только import packaging: live production Worker `1Pw61ZY3HgBSvcUr` не изменён, candidate ещё не promoted/wired и runtime canary для него не выполнялся.
 
-## 4. Aggregator AG-8 test mitigation
+## 4. Aggregator semantic test mitigation
 
 Execution-derived regression для `procurement_subject` показывает возможность schema-valid `false_resolved`:
 
@@ -173,17 +173,39 @@ Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d0
 
 Это **не** означает, что production исправлен: production Aggregator и canonical production export не менялись, production promotion test остаётся отдельным RED gate, а fresh 27/27 run ещё не выполнен. Backlog ID `AG-8` остаётся открытым до promotion и fresh full-run verification.
 
-## 5. Test status
+### `application_documents` execution 14173
 
-Fresh full offline suite after Document Worker packaging on 2026-08-29:
+Execution `14173` выявил отдельный schema-valid `false_resolved`: Round 1 включил в FINAL неоднозначные и не полностью подтверждённые требования, потерял существенные условия и расширил scope за пределы документов, подаваемых именно в составе заявки.
+
+В `[TEST CODEX]` усилен только field-specific профиль `application_documents`. Execution-derived regression, neutral anti-overfit controls и route-aware oracle проходят offline. Paid runtime canary на точном beta artifact подтвердил безопасный результат:
 
 ```text
-139 tests
-138 passed
+ai_called = true
+checker_accepted = true
+route = targeted_recheck
+status = requires_recheck
+recheck_reason_code = ambiguous_scope
+final_status = null
+false_resolved_prevented = true
+semantic_oracle_passed = true
+expected exit code = 3
+```
+
+Canary artifact SHA-256: `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`. HTTP `max_tokens` для beta runtime поднят `8192 → 16384` после подтверждённого `finish_reason=length`; model alias и timeout не менялись.
+
+Это подтверждает только безопасную границу Round 1: ложный FINAL не создан. Полнота и окончательная семантика `application_documents` остаются не подтверждены до проверки Targeted Recheck. Production Aggregator и Targeted Recheck не изменялись.
+
+## 5. Test status
+
+Fresh full offline suite after `application_documents` test hardening on 2026-08-29:
+
+```text
+163 tests
+162 passed
 1 failed
 ```
 
-Единственный падающий test — намеренный `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary. Document Worker suites теперь GREEN: Worker `78/78`, Validator `31/31`.
+Единственный падающий test — намеренный `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary. Targeted `application_documents` suite проходит `24/24`.
 
 Этот checkpoint не является release-ready или production-ready состоянием.
 
@@ -200,6 +222,9 @@ Fresh full offline suite after Document Worker packaging on 2026-08-29:
 - Aggregator route-aware harness не материализует Round 1 FINAL для `requires_recheck`;
 - AG-8 offline beta contract, MCP read-back и один paid runtime canary execution-derived case `14104` прошли GREEN;
 - runtime canary назначил `doc_7_au_0031` роль `not_applicable`, выбрал `doc_7_au_0001` primary и прошёл 6/6 semantic oracle checks.
+- `application_documents` execution `14173` воспроизводит production false-resolved как diagnostic control;
+- beta field-specific boundary и neutral controls для `application_documents` проходят offline;
+- paid runtime canary точного beta artifact безопасно выбрал `targeted_recheck/ambiguous_scope`, не создал Round 1 FINAL и прошёл route-aware oracle;
 - immutable Document Worker beta snapshot сохранён с ожидаемым SHA-256;
 - canonical Document Worker JSON является clean offline production candidate, а beta→canonical packaging contract проходит regression.
 
@@ -208,6 +233,8 @@ Fresh full offline suite after Document Worker packaging on 2026-08-29:
 - promotion/wiring clean Document Worker candidate в test/production contour;
 - full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
+- production promotion `application_documents` boundary;
+- фактический Targeted Recheck и окончательный FINAL для `application_documents` после safe deferred route;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
@@ -230,6 +257,7 @@ Fresh full offline suite after Document Worker packaging on 2026-08-29:
 
 ```text
 Aggregator AG-8 production-candidate audit / promotion decision
+→ application_documents Targeted Recheck audit
 → full Document Worker runtime canary
 → fresh full 27/27 run
 → 27/27 manual semantic review

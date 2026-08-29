@@ -548,6 +548,8 @@ Canonical `workflows/n8n-exports/TENDER — Обработать докумен�
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: universal current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary на fixture `14104`. Canary выбрал корректный current-procurement candidate primary, назначил внутреннему процессу `not_applicable` и прошёл 6/6 semantic oracle checks.
 
+Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Это безопасный deferred результат, а не доказательство окончательной полноты поля; Targeted Recheck ещё не проверен.
+
 Production Aggregator не менялся. Production promotion остаётся отдельным RED gate, а fresh full 27/27 run после hardening ещё не выполнен.
 
 ---
@@ -566,6 +568,12 @@ TECH_DEBT.md
 AG-8 production promotion
 verified test boundary → canonical production candidate
 
+application_documents production promotion
+verified beta boundary → canonical production candidate
+
+application_documents Targeted Recheck
+safe deferred Round 1 → проверенный terminal result
+
 Document Worker promotion
 clean offline candidate → test workflow promotion / wiring → runtime canary
 
@@ -579,10 +587,11 @@ test workflow promotion / wiring
 
 # 10. Следующая задача
 
-Текущая точка продолжения после AG-8 test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
+Текущая точка продолжения после AG-8 и `application_documents` test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
 
 ```text
-Aggregator AG-8 production-candidate audit / promotion plan
+application_documents Targeted Recheck audit
+→ Aggregator AG-8 / application_documents production-candidate audit
 → без изменения protected production workflow до отдельного согласования
 → затем full Document Worker runtime canary
 → fresh full run

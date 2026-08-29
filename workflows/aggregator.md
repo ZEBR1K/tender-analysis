@@ -11,7 +11,7 @@
 **Основная модель Semantic Aggregator:** `deepseek/deepseek-v4-pro-0813`
 **Reasoning:** через alias модели `@reasoning_effort=low`
 
-> Protected production workflow не изменялся в текущем Aggregator hardening cycle. В изолированном workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) AG-8 прошёл offline beta contract, MCP read-back и один paid runtime canary. Production promotion и fresh 27/27 run остаются отдельными gates; подробности перечислены в `PROJECT_STATUS.md`.
+> Protected production workflow не изменялся в текущем Aggregator hardening cycle. В изолированном workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) AG-8 прошёл offline beta contract, MCP read-back и paid runtime canary; `application_documents` boundary также прошла offline regressions и safe-deferred runtime canary. Production promotion, Targeted Recheck verification и fresh 27/27 run остаются отдельными gates; подробности перечислены в `PROJECT_STATUS.md`.
 
 \---
 
@@ -1298,6 +1298,40 @@ universal procurement_subject prompt boundary
 Canary вернул `round1_final/resolved`, назначил `doc_7_au_0031` роль `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и сформировал корректный `final_value_text`. Request model: `deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low`; response model: `deepseek/deepseek-v4-pro-0813`.
 
 Production Aggregator, topology, SQL и checker не менялись. Production promotion gate и fresh full 27/27 run обязательны до закрытия AG-8.
+
+\---
+
+### AG-9 — `application_documents` scope/completeness false-resolved
+
+**Severity:** Critical / P0 before client report
+**Status:** Mitigated / verified safe deferral in test; open until Targeted Recheck verification, production promotion and fresh full run
+
+Execution `14173` показал, что schema-valid Round 1 response может:
+
+```text
+расширить scope за пределы документов в составе заявки
++ включить неподтверждённые material clauses
++ потерять точные participant-type, period, deadline и format requirements
+→ пройти structural checker
+→ материализовать false-resolved FINAL
+```
+
+В `[TEST CODEX]` изменён только field-specific профиль `application_documents`. Execution-derived regression сохраняет recorded false-resolved как diagnostic PASS; neutral controls проверяют explicit current-application scope, separate post-contract scope, ambiguous scope и независимое corroboration для `requires_review` clauses.
+
+Runtime verification точного beta artifact:
+
+```text
+SHA-256 = dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484
+checker_accepted = true
+route = targeted_recheck
+status = requires_recheck
+recheck_reason_code = ambiguous_scope
+Round 1 FINAL = not executed
+semantic_oracle = GREEN
+expected exit code = 3
+```
+
+Это подтверждает предотвращение false-resolved, но не полноту terminal result. Targeted Recheck фактически не запускался. Production Aggregator, Targeted Recheck, SQL, checker и topology не менялись.
 
 \---
 

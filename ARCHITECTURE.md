@@ -1760,6 +1760,8 @@ procurement_subject Round 1 in production lacks the verified test current-scope 
 
 В `[TEST CODEX]` AG-8 mitigated и verified: execution-derived regression `14104` и neutral anti-overfit controls прошли offline beta contract, MCP read-back и один paid runtime canary. Canary вернул `round1_final/resolved`, назначил внутренний process candidate `not_applicable`, выбрал корректный current-procurement primary и прошёл 6/6 oracle checks.
 
+Отдельный execution-derived regression `14173` зафиксировал `application_documents` false-resolved: schema-valid Round 1 ответ расширял scope, включал неподтверждённые существенные clauses и создавал неполный FINAL. В test Aggregator усилен только профиль этого поля. Paid runtime canary точного beta artifact вернул `requires_recheck/ambiguous_scope`, не исполнил Round 1 FINAL и прошёл route-aware oracle. Архитектурная гарантия на этом этапе ограничена safe deferral: terminal semantic result зависит от ещё не проверенного Targeted Recheck.
+
 Protected production Aggregator не менялся. Production promotion и fresh full 27/27 run остаются отдельными архитектурными gates.
 
 ---

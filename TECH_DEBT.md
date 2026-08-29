@@ -128,6 +128,7 @@ Naming, comments, cleanup, future hardening.
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
+|`AG-9`|⚠ Mitigated / safe-deferred in test: `application_documents` execution `14173` покрыт offline oracle и paid runtime canary, который вернул `requires_recheck/ambiguous_scope` без Round 1 FINAL. Остаётся открытой до Targeted Recheck verification, production promotion и fresh full run.|Aggregator / Targeted Recheck semantic safety|
 
 Document Worker packaging checkpoint 2026-08-29:
 
@@ -750,6 +751,48 @@ Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d0
 Статус остаётся **open**: production Aggregator, checker, SQL и topology не менялись; нужны отдельный production promotion gate и fresh full 27/27 run с manual semantic review.
 
 Первый transient TLS `ECONNRESET` зафиксирован как transport incident, а не semantic failure. Неблокирующий follow-up test harness: необработанный network exception сейчас возвращает exit `1`, который может выглядеть как semantic failure; нужно позже развести transport и semantic exit semantics без redesign Aggregator.
+
+### Приоритет
+
+```text
+P0 before client report
+```
+
+\---
+
+## C4 — `AG-9`
+
+### Observed execution-derived risk
+
+Execution `14173` для `application_documents` дал schema-valid `resolved`, который прошёл production checker и материализовал FINAL, но semantic oracle выявил неверный scope, потерю существенных participant-type/period/deadline/format clauses, расплывчатые обобщения и использование неподтверждённых material requirements.
+
+### Test mitigation
+
+В beta Aggregator усилен только field-specific профиль. Recorded response сохранён как diagnostic false-resolved control; neutral controls не вводят blanket recheck и допускают `resolved` при прямом current-application evidence или независимом confirmed corroboration.
+
+Paid runtime canary exact artifact:
+
+```text
+SHA-256 = dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484
+checker_accepted = true
+route = targeted_recheck
+status = requires_recheck
+recheck_reason_code = ambiguous_scope
+final = null
+false_resolved_prevented = true
+semantic_oracle = GREEN
+```
+
+После первого `finish_reason=length` beta `max_tokens` увеличен `8192 → 16384`; повторный canary завершился структурно корректным ответом. Это не доказательство terminal correctness: Targeted Recheck не запускался, production workflow не менялся.
+
+### Remaining gate
+
+```text
+Targeted Recheck audit/runtime verification
+→ production promotion decision
+→ fresh full 27/27 run
+→ manual semantic review
+```
 
 ### Приоритет
 

@@ -1,0 +1,499 @@
+{
+  "fixture_version": "aggregator_application_documents_anti_overfit_controls_v3",
+  "provenance": {
+    "origin": "neutral_synthetic_contract_cases",
+    "execution_derived": false,
+    "control_kind": "synthetic_recorded_structural_controls",
+    "purpose": "Exercise deterministic checker, routing, and FINAL materialization contracts without tender-specific literals.",
+    "limitations": [
+      "Prewritten responses do not test AI model behavior.",
+      "Prewritten responses do not prove prompt compliance.",
+      "These controls are structural anti-overfit guards only."
+    ]
+  },
+  "authoritative_catalog_definition": "Документы, сведения, формы, декларации и подтверждения, которые участник должен предоставить именно в составе заявки.",
+  "cases": [
+    {
+      "case_id": "explicit_current_application_document",
+      "description": "A document directly required in the current procurement application remains resolved.",
+      "aggregator_field_item": {
+        "analysis_run_id": "75000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 27,
+        "field_key": "application_documents",
+        "has_candidates": true,
+        "candidates_count": 1,
+        "confirmed_count": 1,
+        "requires_review_count": 0,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "75000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-current-application.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "75000000-0000-4000-8000-000000001001",
+            "document_id": "75000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-current-application.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_current_application_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки на участие в текущей закупке предоставляется подписанная форма технического предложения.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.98,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_001",
+                "quote": "В составе заявки на участие в текущей закупке участник предоставляет подписанную форму технического предложения.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-explicit-current-application",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"application_documents\",\"status\":\"resolved\",\"final_value_text\":\"Подписанная форма технического предложения.\",\"confidence\":0.98,\"candidate_decisions\":[{\"fact_id\":\"75000000-0000-4000-8000-000000001001\",\"role\":\"primary\",\"reason\":\"Evidence directly links the document to the current procurement application.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "resolved",
+        "route": "round1_final",
+        "required_roles": {
+          "75000000-0000-4000-8000-000000001001": "primary"
+        },
+        "final_value_must_include": [
+          "технического предложения"
+        ]
+      }
+    },
+    {
+      "case_id": "post_contract_document",
+      "description": "A separate post-contract document is not applicable while an explicit application document remains resolved.",
+      "aggregator_field_item": {
+        "analysis_run_id": "76000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 27,
+        "field_key": "application_documents",
+        "has_candidates": true,
+        "candidates_count": 2,
+        "confirmed_count": 2,
+        "requires_review_count": 0,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "76000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-stage-boundary.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "76000000-0000-4000-8000-000000001001",
+            "document_id": "76000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-stage-boundary.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_application_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки текущей закупки предоставляется декларация соответствия.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.97,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_101",
+                "quote": "В составе заявки текущей закупки предоставляется декларация соответствия.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          },
+          {
+            "fact_id": "76000000-0000-4000-8000-000000001002",
+            "document_id": "76000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-stage-boundary.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_post_contract_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "После заключения договора поставщик передает акт приемки вместе с товаром.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.96,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_102",
+                "quote": "Акт приемки передается поставщиком после заключения договора вместе с товаром.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-post-contract-not-applicable",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"application_documents\",\"status\":\"resolved\",\"final_value_text\":\"Декларация соответствия.\",\"confidence\":0.97,\"candidate_decisions\":[{\"fact_id\":\"76000000-0000-4000-8000-000000001001\",\"role\":\"primary\",\"reason\":\"Direct current-application requirement.\"},{\"fact_id\":\"76000000-0000-4000-8000-000000001002\",\"role\":\"not_applicable\",\"reason\":\"The document is provided only after contract conclusion.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "resolved",
+        "route": "round1_final",
+        "required_roles": {
+          "76000000-0000-4000-8000-000000001001": "primary",
+          "76000000-0000-4000-8000-000000001002": "not_applicable"
+        },
+        "final_value_must_include": [
+          "декларация соответствия"
+        ]
+      }
+    },
+    {
+      "case_id": "ambiguous_participation_stage",
+      "description": "A document required at an unspecified participation or qualification stage requires recheck.",
+      "aggregator_field_item": {
+        "analysis_run_id": "77000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 27,
+        "field_key": "application_documents",
+        "has_candidates": true,
+        "candidates_count": 1,
+        "confirmed_count": 0,
+        "requires_review_count": 1,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "77000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-ambiguous-participation-stage.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "77000000-0000-4000-8000-000000001001",
+            "document_id": "77000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-ambiguous-participation-stage.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_ambiguous_participation_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "На соответствующем этапе участия предоставляется анкета для квалификационной проверки.",
+            "validator_verdict": "requires_review",
+            "validator_confidence": 0.62,
+            "validator_reason_code": "ambiguous_scope",
+            "validator_reason_note": "Evidence does not link the qualification stage to the current procurement application.",
+            "processing_status": "requires_review",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_201",
+                "quote": "На соответствующем этапе участия может быть запрошена анкета для квалификационной проверки.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-ambiguous-participation-recheck",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"application_documents\",\"status\":\"requires_recheck\",\"final_value_text\":null,\"confidence\":0.62,\"candidate_decisions\":[{\"fact_id\":\"77000000-0000-4000-8000-000000001001\",\"role\":\"not_applicable\",\"reason\":\"No direct evidence links the qualification-stage document to the current procurement application.\"}],\"supporting_fact_ids\":[],\"conflict_fact_ids\":[],\"needs_recheck\":true,\"recheck_reason_code\":\"ambiguous_scope\",\"recheck_note\":\"Additional context is required to determine whether this document belongs to the current application.\"}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "semantic_expectation": {
+        "status": "requires_recheck",
+        "route": "targeted_recheck",
+        "required_roles": {
+          "77000000-0000-4000-8000-000000001001": "not_applicable"
+        },
+        "final_value_must_include": []
+      }
+    },
+    {
+      "case_id": "directly_corroborated_requires_review_clause",
+      "description": "A concrete requires_review clause is independently and fully corroborated by a separate confirmed fact.",
+      "control_kind": "synthetic_recorded_structural_oracle_control",
+      "does_not_prove": [
+        "AI model behavior",
+        "prompt compliance"
+      ],
+      "aggregator_field_item": {
+        "analysis_run_id": "78000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 27,
+        "field_key": "application_documents",
+        "has_candidates": true,
+        "candidates_count": 2,
+        "confirmed_count": 1,
+        "requires_review_count": 1,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "78000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-corroborated-requirement.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "78000000-0000-4000-8000-000000001001",
+            "document_id": "78000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-corroborated-requirement.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_reviewed_requirement_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки текущей закупки участник предоставляет подписанную декларацию об отсутствии просроченной задолженности.",
+            "validator_verdict": "requires_review",
+            "validator_confidence": 0.68,
+            "validator_reason_code": "insufficient_evidence",
+            "validator_reason_note": "The local quote omits material qualifiers from the candidate value.",
+            "processing_status": "requires_review",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_301",
+                "quote": "В составе заявки текущей закупки предоставляется декларация об отсутствии задолженности.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          },
+          {
+            "fact_id": "78000000-0000-4000-8000-000000001002",
+            "document_id": "78000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-corroborated-requirement.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_confirmed_requirement_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки текущей закупки участник предоставляет подписанную декларацию об отсутствии просроченной задолженности.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.99,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_302",
+                "quote": "В составе заявки текущей закупки участник предоставляет подписанную декларацию об отсутствии просроченной задолженности.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-direct-corroboration-resolved",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"application_documents\",\"status\":\"resolved\",\"final_value_text\":\"Участник предоставляет подписанную декларацию об отсутствии просроченной задолженности.\",\"confidence\":0.95,\"candidate_decisions\":[{\"fact_id\":\"78000000-0000-4000-8000-000000001001\",\"role\":\"duplicate\",\"reason\":\"The reviewed statement is fully corroborated by a separate confirmed fact.\"},{\"fact_id\":\"78000000-0000-4000-8000-000000001002\",\"role\":\"primary\",\"reason\":\"Independent direct evidence fully states the application requirement.\"}],\"supporting_fact_ids\":[\"78000000-0000-4000-8000-000000001001\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "corroboration_oracle": {
+        "material_clause_text": "подписанную декларацию об отсутствии просроченной задолженности",
+        "requires_review_fact_id": "78000000-0000-4000-8000-000000001001",
+        "link": {
+          "from_requires_review_fact_id": "78000000-0000-4000-8000-000000001001",
+          "to_confirmed_fact_id": "78000000-0000-4000-8000-000000001002",
+          "relation": "direct_full_semantic_corroboration",
+          "direct": true,
+          "complete": true,
+          "classification_basis": "The confirmed candidate and its own evidence state the same complete material clause verbatim."
+        }
+      }
+    },
+    {
+      "case_id": "unrelated_confirmed_fact_does_not_corroborate_clause",
+      "description": "An explicit ID link to an unrelated confirmed fact cannot resolve a material requires_review clause.",
+      "control_kind": "synthetic_recorded_structural_oracle_control",
+      "does_not_prove": [
+        "AI model behavior",
+        "prompt compliance"
+      ],
+      "aggregator_field_item": {
+        "analysis_run_id": "79000000-0000-4000-8000-000000000001",
+        "field_catalog_version": "tender_fields_v1",
+        "field_index": 27,
+        "field_key": "application_documents",
+        "has_candidates": true,
+        "candidates_count": 2,
+        "confirmed_count": 1,
+        "requires_review_count": 1,
+        "source_documents_count": 1,
+        "source_documents": [
+          {
+            "document_id": "79000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-unrelated-confirmation.txt",
+            "file_extension": "txt"
+          }
+        ],
+        "candidates": [
+          {
+            "fact_id": "79000000-0000-4000-8000-000000001001",
+            "document_id": "79000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-unrelated-confirmation.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_unresolved_authority_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки текущей закупки участник предоставляет нотариальную доверенность подписанта.",
+            "validator_verdict": "requires_review",
+            "validator_confidence": 0.61,
+            "validator_reason_code": "insufficient_evidence",
+            "validator_reason_note": "The local quote does not fully establish the authority-document qualifier.",
+            "processing_status": "requires_review",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_401",
+                "quote": "В составе заявки предоставляется документ о полномочиях подписанта.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          },
+          {
+            "fact_id": "79000000-0000-4000-8000-000000001002",
+            "document_id": "79000000-0000-4000-8000-000000000101",
+            "document_index": 1,
+            "file_name": "neutral-unrelated-confirmation.txt",
+            "file_extension": "txt",
+            "analysis_unit_id": "neutral_confirmed_schedule_unit",
+            "fact_index": 0,
+            "field_catalog_version": "tender_fields_v1",
+            "field_key": "application_documents",
+            "value_text": "В составе заявки текущей закупки участник предоставляет график поставки.",
+            "validator_verdict": "confirmed",
+            "validator_confidence": 0.99,
+            "validator_reason_code": null,
+            "validator_reason_note": null,
+            "processing_status": "confirmed",
+            "evidence": [
+              {
+                "semantic_block_id": "neutral_sb_402",
+                "quote": "В составе заявки текущей закупки участник предоставляет график поставки.",
+                "type": "text",
+                "role": "paragraph",
+                "page_from": null,
+                "page_to": null,
+                "sheet_name": null
+              }
+            ]
+          }
+        ]
+      },
+      "recorded_api_response": {
+        "id": "synthetic-unrelated-confirmation-resolved",
+        "model": "synthetic-schema-valid-no-ai",
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "{\"field_key\":\"application_documents\",\"status\":\"resolved\",\"final_value_text\":\"Нотариальная доверенность подписанта.\",\"confidence\":0.9,\"candidate_decisions\":[{\"fact_id\":\"79000000-0000-4000-8000-000000001001\",\"role\":\"complement\",\"reason\":\"Material reviewed requirement included in the proposed final.\"},{\"fact_id\":\"79000000-0000-4000-8000-000000001002\",\"role\":\"primary\",\"reason\":\"Separate confirmed application document.\"}],\"supporting_fact_ids\":[\"79000000-0000-4000-8000-000000001001\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+            }
+          }
+        ],
+        "usage": null
+      },
+      "corroboration_oracle": {
+        "material_clause_text": "нотариальную доверенность подписанта",
+        "requires_review_fact_id": "79000000-0000-4000-8000-000000001001",
+        "link": {
+          "from_requires_review_fact_id": "79000000-0000-4000-8000-000000001001",
+          "to_confirmed_fact_id": "79000000-0000-4000-8000-000000001002",
+          "relation": "direct_full_semantic_corroboration",
+          "direct": true,
+          "complete": true,
+          "classification_basis": "This deliberately incorrect claimed link tests that IDs and labels cannot substitute for matching direct evidence."
+        }
+      }
+    }
+  ]
+}

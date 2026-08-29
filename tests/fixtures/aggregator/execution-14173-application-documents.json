@@ -1,0 +1,1041 @@
+{
+  "fixture_version": "aggregator_application_documents_execution_14173_v2",
+  "provenance": {
+    "origin": "read_only_mcp_execution_data",
+    "source_execution_id": "14173",
+    "source_workflow_id": "ftvmrEHoMbPOAqZG",
+    "source_workflow_name": "[TEST CODEX] TENDER — Агрегация закупки",
+    "source_analysis_run_id_persisted": false,
+    "extraction": "sanitized_minimal_candidate_contract",
+    "evidence_policy": "first execution evidence item per candidate; complete value_text and validator state retained",
+    "excluded": [
+      "credentials",
+      "headers",
+      "full_execution_dump",
+      "production UUIDs"
+    ]
+  },
+  "fact_id_policy": {
+    "origin": "stable_fixture_uuid_not_production",
+    "must_not_be_reported_as_production_ids": true
+  },
+  "execution_observation": {
+    "candidates_count": 28,
+    "confirmed_count": 21,
+    "requires_review_count": 7,
+    "response_status": "resolved",
+    "response_confidence": 0.9,
+    "response_role_counts": {
+      "primary": 1,
+      "complement": 22,
+      "duplicate": 3,
+      "supporting": 0,
+      "conflict": 0,
+      "not_applicable": 2
+    },
+    "checker_accepted": true,
+    "route": "round1_final",
+    "final_status": "resolved",
+    "final_resolution_method": "semantic_aggregator_round_1"
+  },
+  "aggregator_field_item": {
+    "analysis_run_id": "74000000-0000-4000-8000-000000000001",
+    "field_catalog_version": "tender_fields_v1",
+    "field_index": 27,
+    "field_key": "application_documents",
+    "has_candidates": true,
+    "candidates_count": 28,
+    "confirmed_count": 21,
+    "requires_review_count": 7,
+    "source_documents_count": 1,
+    "source_documents": [
+      {
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx"
+      }
+    ],
+    "candidates": [
+      {
+        "fact_id": "74000000-0001-4000-8000-000000000001",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0002",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "По общим требованиям (пп. 1.1.1–1.1.6) участник обязан представить Декларацию участника закупки о соответствии данному требованию за подписью руководителя участника закупки по форме 1а/1б; по требованию 1.1.1 дополнительно — копию Бухгалтерского баланса за последний отчетный период (п.3.1.3.2 Блока 9), а также вправе представить Справку об исполнении налогоплательщиком обязанности по уплате налогов, сборов, пеней, штрафов или Справку о состоянии расчетов по налогам, сборам, пеням, штрафам (оригинал или заверенная копия, дата выдачи не более 1 месяца от даты подачи документов); по требованию 1.1.7 — письмо/письмо-декларацию в свободной форме об отсутствии (или наличии, с приложением реестра) судебных разбирательств с ООО «ССК «Звезда» за подписью уполномоченного лица.",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.95,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Deterministic fact-local literal coverage guard found material value_text literals absent from this fact evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0006",
+            "quote": "Декларация Участника закупки о соответствии данному требованию за подписью руководителя Участника закупки по форме 1а/1б.",
+            "type": "table",
+            "role": "table",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0002-4000-8000-000000000002",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки о соответствии данному требованию за подписью руководителя Участника закупки по форме 1а/1б.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0012",
+            "quote": "Декларация Участника закупки о соответствии данному требованию за подписью руководителя Участника закупки по форме 1а/1б.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0003-4000-8000-000000000003",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 1,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Копия Бухгалтерского баланса за последний отчетный период, предоставленная в соответствии с требованиями п.3.1.3.2 Блока 9 настоящего документа.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0013",
+            "quote": "Копия Бухгалтерского баланса за последний отчетный период, предоставленная в соответствии с требованиями п.3.1.3.2 Блока 9 настоящего документа.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0004-4000-8000-000000000004",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 2,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "По желанию участника: Справка об исполнении налогоплательщиком обязанности по уплате налогов, сборов, пеней, штрафов или Справка о состоянии расчетов по налогам, сборам, пеням, штрафам по формам, установленным законодательством РФ (оригинал или заверенная копия; дата выдачи справки не более 1 месяца от даты подачи документов).",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.95,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Deterministic fact-local literal coverage guard found material value_text literals absent from this fact evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0014",
+            "quote": "Участник закупки вправе в дополнение к вышеуказанным документам представить Справку об исполнении налогоплательщиком обязанности по уплате налогов, сборов, пеней, штрафов или Справку о состоянии расчетов по налогам, сборам, пеням, штрафам по формам, установленным законодательством РФ (Оригинал или заверенная печатью организации (при наличии) и подписью руководителя Участника закупки копия. Дата выдачи справки не более 1 (одного) месяца от даты подачи документов.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0005-4000-8000-000000000005",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 3,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки о соответствии требованиям об отсутствии задолженности по уплате налогов (задолженность из информационной базы ФНС не должна превышать 25% балансовой стоимости активов) — за подписью руководителя Участника закупки по форме 1а/1б.",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.95,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Deterministic fact-local literal coverage guard found material value_text literals absent from this fact evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0017",
+            "quote": "Задолженность Участника закупки, содержащаяся в информационной базе «Сведения о юридических лицах, имеющих задолженность по уплате налогов (более 1000 рублей) и/или не представляющих налоговую отчетность более года» (https://service.nalog.ru/zd.do), не должна превышать двадцать пять процентов балансовой стоимости его активов.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0006-4000-8000-000000000006",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 4,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки об отсутствии фактов неправомерного уклонения от заключения договора по результатам процедур закупок для Обществ, относящихся к Заказчикам второго типа, в течение последних 24 месяцев до окончания срока подачи заявок и в течение срока проведения процедуры закупки до подведения ее итогов — за подписью руководителя по форме 1а/1б.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0023",
+            "quote": "Отсутствие фактов неправомерного уклонения Участника закупки от заключения договора по результатам процедур закупок для Обществ, относящихся к Заказчикам второго типа в течение последних 24 месяцев до момента окончания срока подачи заявок на участие в закупке и в течение срока проведения процедуры закупки до подведения ее итогов.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0007-4000-8000-000000000007",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 5,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки об отсутствии в течение 12 месяцев до окончания срока подачи заявок и в течение срока проведения процедуры закупки до подведения ее итогов фактов отклонения участника от участия в закупочных процедурах по причинам: обнаружение недостоверных сведений в заявке и/или уточнениях заявок, существенных для допуска и/или установления места в итогах ранжирования; наличие документально подтвержденного факта оказания давления на представителей Заказчика/Организатора закупки — за подписью руководителя по форме 1а/1б.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0035",
+            "quote": "Отсутствие в течение 12 месяцев до момента окончания срока подачи заявок на участие в закупке и в течение срока проведения процедуры закупки до подведения ее итогов фактов отклонения Участника закупки от участия в закупочных процедурах",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0008-4000-8000-000000000008",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 6,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки об отсутствии в течение 24 месяцев до окончания срока подачи заявок и в течение срока проведения процедуры закупки до подведения ее итогов фактов расторжения Обществом, относящимся к Заказчикам второго типа, договора с Участником закупки по решению суда, вступившему в законную силу, либо случаев одностороннего отказа от исполнения договора в связи с существенным нарушением договора Участником — за подписью руководителя по форме 1а/1б.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0048",
+            "quote": "Отсутствие в течение 24 месяцев до момента окончания срока подачи заявок на участие в закупке и в течение срока проведения процедуры закупки до подведения ее итогов фактов расторжения Обществом, относящимся к Заказчикам второго типа договора с Участником закупки по решению суда, вступившему в законную силу, либо случаев одностороннего отказа",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0009-4000-8000-000000000009",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 7,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Декларация Участника закупки об отсутствии конфликта интересов с работниками Заказчика/Организатора закупки, членами коллегиальных органов управления, закупочных органов, уполномоченными лицами Заказчика/Организатора закупки — за подписью руководителя по форме 1а/1б.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0060",
+            "quote": "Отсутствие у Участника закупки конфликта интересов с работниками\nЗаказчика/Организатора закупки, членами коллегиальных органов управления, закупочных органов, уполномоченными лицами Заказчика/Организатора закупки",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0010-4000-8000-000000000010",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0003",
+        "fact_index": 8,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Письмо-декларация Участника закупки об отсутствии судебных разбирательств в качестве ответчика с ООО «ССК «Звезда» в течение 24 месяцев до окончания срока подачи заявок и в течение срока проведения процедуры закупки до подведения ее итогов, исковые требования по которым были удовлетворены (решение суда вступило в законную силу), за подписью уполномоченного лица Участника закупки (в свободной форме).",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.8,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Фрагмент цитаты sb_0075 оборван, а часть утверждения о форме («за подписью уполномоченного лица Участника закупки (в свободной форме)») не полностью подтверждена представленным evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0068",
+            "quote": "Отсутствие в течение 24 месяцев до момента окончания срока подачи заявок на участие в процедуре закупки и в течение срока проведения процедуры закупки до подведения ее итогов случаев судебных разбирательств в качестве ответчика с",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0011-4000-8000-000000000011",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0004",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для подтверждения финансового состояния ЮЛ (резиденты РФ): копия бухгалтерской отчетности за последний отчетный год с отметкой налоговых органов о принятии, заверенная печатью и подписью руководителя (Форма 0710001 — Бухгалтерский баланс, Форма 0710002 — Отчет о финансовых результатах), а также сведения о финансовом состоянии на последнюю отчетную дату (квартал) по тем же формам (без отметки налоговых органов).",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0118",
+            "quote": "Копия Бухгалтерской отчетности за последний отчетный год (с отметкой налоговых органов о принятии), заверенная печатью Участника закупки и подписью руководителя Участника закупки:",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0012-4000-8000-000000000012",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0007",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Поставщик/Участник закупки должен быть зарегистрирован в качестве юридического лица или индивидуального предпринимателя в установленном в Российской Федерации порядке (для резидентов РФ), либо зарегистрирован в качестве субъекта гражданского права и иметь все необходимые разрешения для ведения деятельности по месту нахождения, месту выполнения работ (оказания услуг) в соответствии с законодательством государства и законодательством РФ (для нерезидентов). Должны быть представлены документы в соответствии с требованиями, установленными законодательством соответствующей юрисдикции (страны); перечень документов указан в п. 3.1 Блока 9.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0244",
+            "quote": "должен быть зарегистрирован в качестве юридического лица или индивидуального предпринимателя в установленном в Российской Федерации порядке (для резидентов Российской Федерации)",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0013-4000-8000-000000000013",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0007",
+        "fact_index": 1,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Требуется представление (раскрытие) полной цепочки собственников, включая конечных бенефициаров, в соответствии с установленной формой Блока 10. В состав предоставляемых сведений необходимо включать сведения о полной цепочке собственников, включая конечных бенефициаров организации, которой переданы полномочия единоличного исполнительного органа Поставщика/Участника закупки (управляющей компании) или индивидуального предпринимателя, которому переданы полномочия единоличного исполнительного органа (управляющему), при их наличии.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0259",
+            "quote": "Представление (раскрытие) полной цепочки собственников, включая конечных бенефициаров.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0014-4000-8000-000000000014",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0011",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Требуется анкета-заявка установленной формы (документы, которые участник обязан предоставить в составе заявки)",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.98,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0537",
+            "quote": "АНКЕТА-ЗАЯВКА И ИНЫЕ ПРИЛОЖЕНИЯ ПО УСТАНОВЛЕННЫМ ФОРМАМ",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0015-4000-8000-000000000015",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0012",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для резидентов РФ (юр. лиц) в составе заявки (Анкета-заявка): письмо о наличии непогашенной задолженности, сумма взыскания по которой превышает 50% выручки (по установленной форме); регистрационные и иные документы: копия Устава; копия свидетельства о государственной регистрации или копия листа записи ЕГРЮЛ; копия свидетельства о постановке на учет в налоговом органе; копия документа, подтверждающего полномочия руководителя (приказ/решение/протокол); копия документа, подтверждающего полномочия лица, подписавшего Анкету-заявку (приказ/доверенность); копия решения о назначении главного бухгалтера (при наличии); копия бухгалтерской отчетности за 2 последних отчетных года (баланс, отчет о прибылях и убытках) с отметкой налогового органа либо с сопроводительным письмом о подаче в налоговый орган; копия справки из ФНС об отсутствии задолженности по уплате налогов и сборов либо копия деклараций с отметкой о принятии налоговым органом; копии документов, подтверждающих фактическое местонахождение (договор аренды/свидетельство о праве собственности); справка об отсутствии процедуры банкротства.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0557",
+            "quote": "3.1.2.5. Форма письма о наличии/отсутствии у Поставщика/Участника закупки (только для резидентов РФ) непогашенной задолженности, совокупная сумма взыскания по которой превышает 50% выручки Поставщика/Участника закупки за последний отчетный период (календарный год), предшествующий году подачи документов на проверку соответствия требованиям в рамках должной осмотрительности, в том числе, по следующим обязательствам (при наличии вступившего в законную силу судебного решения) по установленной форме:",
+            "type": "text",
+            "role": "subsection_heading",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0016-4000-8000-000000000016",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0012",
+        "fact_index": 1,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для резидентов РФ (ИП) в составе заявки (Анкета-заявка): письмо о наличии непогашенной задолженности, сумма взыскания по которой превышает 50% выручки (по установленной форме); регистрационные и иные документы: копия паспорта; копия листа записи ЕГРИП; копия свидетельства о постановке на учет в налоговом органе; копия выписки из ЕГРИП (не позднее 6 месяцев); копия документа, подтверждающего полномочия лица, подписавшего Анкету-заявку (доверенность); копия карточки с образцами подписей и оттиска печати (при наличии); копия справки из ФНС об отсутствии задолженности по уплате налогов и сборов либо копия деклараций с отметкой о принятии налоговым органом; копия бухгалтерской отчетности за 2 последних отчетных года (баланс, отчет о прибылях и убытках) с отметкой налогового органа либо с сопроводительным письмом о подаче в налоговый орган.",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.95,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Deterministic fact-local literal coverage guard found material value_text literals absent from this fact evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0579",
+            "quote": "Копия документа о государственной регистрации физического лица в качестве индивидуального предпринимателя в соответствии с законодательством Российской Федерации;",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0017-4000-8000-000000000017",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0012",
+        "fact_index": 2,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для нерезидентов РФ в составе заявки (Анкета-заявка): письмо о наличии непогашенной задолженности, сумма взыскания по которой превышает 50% выручки (по установленной форме); регистрационные и иные документы: копия учредительных документов; копия документа о государственной регистрации; копия документа о постановке на налоговый учет (при наличии); копия выписки из торгового реестра/реестра юридических лиц (не позднее 6 месяцев); копия доверенности/документа о полномочиях подписанта Анкеты-заявки; копия бухгалтерской/финансовой отчетности за 2 последних отчетных года; справка из налогового органа об отсутствии задолженности (при наличии); справка об отсутствии процедуры банкротства; документы, подтверждающие фактическое местонахождение.",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.95,
+        "validator_reason_code": "insufficient_evidence",
+        "validator_reason_note": "Deterministic fact-local literal coverage guard found material value_text literals absent from this fact evidence.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0588",
+            "quote": "ДЛЯ НЕРЕЗИДЕНТОВ РОССИЙСКОЙ ФЕДЕРАЦИИ:",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0018-4000-8000-000000000018",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для нерезидентов Российской Федерации (иная форма отчетности): копии финансовой отчетности за последние отчетные 2 (два) года по разделам (Бухгалтерский баланс и Отчет о финансовых результатах), приведенным в соответствие к стандартам, применимым к бухгалтерской отчетности на территории Российской Федерации, заверенные печатью Поставщика/Участника закупки и подписью руководителя Поставщика/Участника закупки. Язык представления отчетности: на любом языке Поставщика/Участника закупки с переводом на русский, либо английский язык.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0620",
+            "quote": "ДЛЯ НЕРЕЗИДЕНТОВ РОССИЙСКОЙ ФЕДЕРАЦИИ (ИНАЯ ФОРМА ОТЧЕТНОСТИ):",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0019-4000-8000-000000000019",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 1,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для кредитных организаций - резидентов РФ: копии финансовой отчетности за последние отчетные 2 (два) года, заверенные печатью Поставщика/Участника закупки и подписью руководителя Поставщика/Участника закупки: Форма 0409806 по ОКУД – Бухгалтерский баланс (публикуемая форма); Форма 0409807 по ОКУД – Отчет о финансовых результатах (публикуемая форма).",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0624",
+            "quote": "ДЛЯ КРЕДИТНЫХ ОРГАНИЗАЦИЙ - РЕЗИДЕНТОВ РФ",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0020-4000-8000-000000000020",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 2,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для кредитных организаций - нерезидентов РФ (отчетность по стандартам IAS): копии финансовой отчетности за последние 2 (два) отчетных года (допускаются не аудированные), заверенные печатью Поставщика/Участника закупки и подписью руководителя Поставщика/Участника закупки: Consolidated Balance Sheet (Бухгалтерский баланс); Income Statement (Отчет о прибылях и убытках); Cash Flow Statement (Отчет о движении денежных средств). Язык представления отчетности: на любом языке Поставщика/Участника закупки с переводом на русский, либо английский язык.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0628",
+            "quote": "ДЛЯ КРЕДИТНЫХ ОРГАНИЗАЦИЙ - НЕРЕЗИДЕНТОВ РФ (ОТЧЕТНОСТЬ ПО СТАНДАРТАМ IAS",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0021-4000-8000-000000000021",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 3,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Для кредитных организаций - нерезидентов Российской Федерации (иная форма отчетности): копия финансовой отчетности за последние 2 (два) отчетных года по разделам, приведенным в соответствие к стандартам, применимым к бухгалтерской отчетности на территории Российской Федерации, заверенные печатью Поставщика/Участника закупки и подписью руководителя: Форма 0409806 по ОКУД - Бухгалтерский баланс (публикуемая форма); Форма 0409807 по ОКУД - Отчет о прибылях и убытках (публикуемая форма); Форма 0409814 по ОКУД - Отчет о движении денежных средств (публикуемая форма). Язык представления отчетности: на любом языке Поставщика/Участника закупки с переводом на русский, либо английский язык.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0637",
+            "quote": "ДЛЯ КРЕДИТНЫХ ОРГАНИЗАЦИЙ - НЕРЕЗИДЕНТОВ РОССИЙСКОЙ ФЕДЕРАЦИИ (ИНАЯ ФОРМА ОТЧЕТНОСТИ):",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0022-4000-8000-000000000022",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 4,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Требования к оформлению комплекта документов на бумажном носителе: документы представляются в 1 экземпляре; пакет включает все документы, указанные в Требованиях, заверенные печатью и подписью руководителя Поставщика/Участника закупки; дополнительно вкладывается Flash-накопитель с полной электронной версией (сканированной копией) всех представленных документов; документы направляются в запечатанном конверте с сопроводительным письмом с исходящим номером и датой регистрации.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0644",
+            "quote": "В случае подачи документов для проверки соответствия требованиям в рамках должной осмотрительности в конверте (в бумажном виде), документы представляются в 1 экземпляре. Пакет документов включает в себя все документы, указанные в настоящих Требованиях заверенные печатью и подписью руководителя Поставщика / Участника закупки.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0023-4000-8000-000000000023",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 5,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Требования к оформлению документов в электронном виде: пакет в электронном виде должен содержать электронные копии всех документов, указанных в разделах 3.1.2.-3.1.3. Требований; каждый документ — отдельным многостраничным файлом в формате *.pdf (кроме формуляра — *.xls); суммарный размер электронной версии всех документов не должен превышать 40 Мбайт.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0648",
+            "quote": "пакет документов в электронном виде должен содержать электронные копии всех документов, указанных в разделах 3.1.2.-3.1.3. настоящих Требований.",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0024-4000-8000-000000000024",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0013",
+        "fact_index": 6,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "В состав заявки на проверку соответствия требованиям в рамках должной осмотрительности входит заполненная анкета-заявка Поставщика/Участника закупки (полное и краткое наименование, прежние названия, ИНН/TIN, КПП, ОГРН, ОКПО, код ОКВЭД2, сведения о руководителе и главном бухгалтере, дата/место/орган регистрации, юридический и фактический адреса, страна регистрации, телефон, электронная почта, веб-сайт, адрес филиала/представительства в РФ), информация о дочерних обществах, филиалах и представительствах, информация о собственниках компании (акционерах), конечные бенефициары с указанием страны регистрации, информация о руководителях/собственниках/членах коллегиального исполнительного органа или главном бухгалтере, являющихся (бывшими) работниками заказчика, и наименование видов товаров, работ и услуг, на поставку (выполнение, оказание) которых претендует Поставщик/Участник закупки (с кодом ОКПД2 и категорией Поставщика).",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.9,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0654",
+            "quote": "АНКЕТА-ЗАЯВКА на проверку соответствия требованиям в рамках должной осмотрительности",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0025-4000-8000-000000000025",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0014",
+        "fact_index": 1,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Требуется письмо о принадлежности участника закупки к категории производителя МТР / сбытовой организации, предоставляемое от имени участника закупки",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.9,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0736",
+            "quote": "(приложить отдельное письмо за подписью руководителя, раскрывающее специализацию Поставщика/Участника закупки).",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0026-4000-8000-000000000026",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0014",
+        "fact_index": 5,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "В составе сведений о принадлежности к субъектам естественных монополий и/или естественных монополий в сфере оказания услуг требуется указать долю участия субъекта естественной монополии и/или естественной монополии в сфере оказания услуг в уставном капитале участника закупки",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.95,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0738",
+            "quote": "(В случае вхождения Поставщика /Участника закупки в структуры естественных монополий и/или государственных корпораций указать наименование данной структуры и долю ее участия (прямую или косвенную) в уставном капитале Поставщика/Участника закупки)",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0027-4000-8000-000000000027",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0016",
+        "fact_index": 0,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "Свидетельство о государственной регистрации (форма с незаполненным полем в составе документации)",
+        "validator_verdict": "requires_review",
+        "validator_confidence": 0.85,
+        "validator_reason_code": "template_or_placeholder",
+        "validator_reason_note": "Фрагмент представляет собой незаполненную строку/шаблон реквизита свидетельства без явного требования о предоставлении документа в составе заявки.",
+        "processing_status": "requires_review",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0928",
+            "quote": "Свидетельство о государственной регистрации: ______________________________________________________________________________",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      },
+      {
+        "fact_id": "74000000-0028-4000-8000-000000000028",
+        "document_id": "74000000-0000-4000-8000-000000000011",
+        "document_index": 1,
+        "file_name": "execution-derived-application-documents.docx",
+        "file_extension": "docx",
+        "analysis_unit_id": "doc_11_au_0016",
+        "fact_index": 5,
+        "field_catalog_version": "tender_fields_v1",
+        "field_key": "application_documents",
+        "value_text": "В состав заявки входит форма согласия на обработку персональных данных в связи с участием в закупочном процессе.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.92,
+        "validator_reason_code": null,
+        "validator_reason_note": null,
+        "processing_status": "confirmed",
+        "evidence": [
+          {
+            "semantic_block_id": "sb_0934",
+            "quote": "в соответствии с Федеральным законом от 27.07.2006 №152-ФЗ «О персональных данных» (далее – Закон 152-ФЗ), подтверждает получение им в целях участия в проверке при мелкой закупке/квалификации/процедурах закупок, включения в отчет о проведении процедур закупок в соответствии с Положением Компании «О закупке товаров, работ, услуг» всех требуемых в соответствии с действующим законодательством Российской Федерации (в том числе о персональных данных) согласий на передачу и обработку персональных данных субъектов персональных данных, упомянутых в предоставленных материалах (в том числе материалах для участия в проверке при мелкой закупке/квалификации/в любой из частей заявки при участии в процедурах закупок), а также направление в адрес таких субъектов персональных данных уведомлений об осуществлении обработки их персональных данных в [ПОЛНОЕ НАИМЕНОВАНИЕ ОГК], зарегистрированному по адресу: [",
+            "type": "text",
+            "role": "paragraph",
+            "page_from": null,
+            "page_to": null,
+            "sheet_name": null
+          }
+        ]
+      }
+    ]
+  },
+  "safe_requires_recheck_structural_control": {
+    "control_kind": "synthetic_recorded_structural_control",
+    "response_id": "synthetic-safe-application-documents-recheck",
+    "model": "synthetic-schema-valid-no-ai",
+    "confidence": 0.62,
+    "recheck_reason_code": "ambiguous_scope",
+    "recheck_note": "Direct evidence does not establish that every material requirement belongs to the current procurement application.",
+    "proves": [
+      "structural checker acceptance",
+      "targeted_recheck routing",
+      "route-aware semantic deferral"
+    ],
+    "does_not_prove": [
+      "AI model behavior",
+      "prompt compliance",
+      "Targeted Recheck outcome"
+    ]
+  },
+  "recorded_schema_valid_api_response": {
+    "id": "synthetic-execution-derived-application-documents-response",
+    "model": "recorded-schema-valid-no-ai",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "message": {
+          "role": "assistant",
+          "content": "{\"field_key\":\"application_documents\",\"status\":\"resolved\",\"final_value_text\":\"Документы в составе заявки: Анкета-заявка по установленной форме (включая сведения о компании, собственниках, бенефициарах, коды и др.); для резидентов РФ (юридические лица и ИП) и нерезидентов — соответствующие регистрационные, учредительные, налоговые и финансовые документы (копии уставов, свидетельств, выписок, бухгалтерской/финансовой отчетности за последние 2 года или иной срок, справки налоговых органов); для кредитных организаций — специфические формы отчетности; декларации о соответствии требованиям по форме 1а/1б по каждому установленному критерию (отсутствие задолженности, фактов уклонения, отклонения, расторжения договоров, конфликта интересов и т.п.); письмо-декларация об отсутствии/наличии судебных разбирательств с ООО «ССК «Звезда»; справка об исполнении налоговых обязанностей (опционально); письмо о категории производителя/сбытовой организации; сведения о цепочке собственников и бенефициарах; согласие на обработку персональных данных; также соблюдение требований к оформлению (бумажный или электронный формат).\",\"confidence\":0.9,\"candidate_decisions\":[{\"fact_id\":\"74000000-0001-4000-8000-000000000001\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0002-4000-8000-000000000002\",\"role\":\"duplicate\",\"reason\":\"Execution-derived duplicate classification.\"},{\"fact_id\":\"74000000-0003-4000-8000-000000000003\",\"role\":\"duplicate\",\"reason\":\"Execution-derived duplicate classification.\"},{\"fact_id\":\"74000000-0004-4000-8000-000000000004\",\"role\":\"duplicate\",\"reason\":\"Execution-derived duplicate classification.\"},{\"fact_id\":\"74000000-0005-4000-8000-000000000005\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0006-4000-8000-000000000006\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0007-4000-8000-000000000007\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0008-4000-8000-000000000008\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0009-4000-8000-000000000009\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0010-4000-8000-000000000010\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0011-4000-8000-000000000011\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0012-4000-8000-000000000012\",\"role\":\"not_applicable\",\"reason\":\"Execution-derived not_applicable classification.\"},{\"fact_id\":\"74000000-0013-4000-8000-000000000013\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0014-4000-8000-000000000014\",\"role\":\"primary\",\"reason\":\"Execution-derived primary classification.\"},{\"fact_id\":\"74000000-0015-4000-8000-000000000015\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0016-4000-8000-000000000016\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0017-4000-8000-000000000017\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0018-4000-8000-000000000018\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0019-4000-8000-000000000019\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0020-4000-8000-000000000020\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0021-4000-8000-000000000021\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0022-4000-8000-000000000022\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0023-4000-8000-000000000023\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0024-4000-8000-000000000024\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0025-4000-8000-000000000025\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0026-4000-8000-000000000026\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"},{\"fact_id\":\"74000000-0027-4000-8000-000000000027\",\"role\":\"not_applicable\",\"reason\":\"Execution-derived not_applicable classification.\"},{\"fact_id\":\"74000000-0028-4000-8000-000000000028\",\"role\":\"complement\",\"reason\":\"Execution-derived complement classification.\"}],\"supporting_fact_ids\":[\"74000000-0001-4000-8000-000000000001\",\"74000000-0005-4000-8000-000000000005\",\"74000000-0006-4000-8000-000000000006\",\"74000000-0007-4000-8000-000000000007\",\"74000000-0008-4000-8000-000000000008\",\"74000000-0009-4000-8000-000000000009\",\"74000000-0010-4000-8000-000000000010\",\"74000000-0011-4000-8000-000000000011\",\"74000000-0013-4000-8000-000000000013\",\"74000000-0015-4000-8000-000000000015\",\"74000000-0016-4000-8000-000000000016\",\"74000000-0017-4000-8000-000000000017\",\"74000000-0018-4000-8000-000000000018\",\"74000000-0019-4000-8000-000000000019\",\"74000000-0020-4000-8000-000000000020\",\"74000000-0021-4000-8000-000000000021\",\"74000000-0022-4000-8000-000000000022\",\"74000000-0023-4000-8000-000000000023\",\"74000000-0024-4000-8000-000000000024\",\"74000000-0025-4000-8000-000000000025\",\"74000000-0026-4000-8000-000000000026\",\"74000000-0028-4000-8000-000000000028\"],\"conflict_fact_ids\":[],\"needs_recheck\":false,\"recheck_reason_code\":null,\"recheck_note\":null}"
+        }
+      }
+    ],
+    "usage": null
+  },
+  "semantic_oracle": {
+    "authoritative_catalog_definition": "Документы, сведения, формы, декларации и подтверждения, которые участник должен предоставить именно в составе заявки.",
+    "broadened_prompt_rule": "Включай только документы, которые должны быть представлены в составе заявки или на соответствующем этапе участия.",
+    "direct_scope_rule": "A document is in scope only when evidence directly links it to the current procurement application.",
+    "ambiguous_due_diligence_fact_ids": [
+      "74000000-0024-4000-8000-000000000024",
+      "74000000-0028-4000-8000-000000000028"
+    ],
+    "requires_review_clause_classification": [
+      {
+        "fact_id": "74000000-0001-4000-8000-000000000001",
+        "classification_basis": "The compound candidate mixes clauses corroborated by confirmed facts with material clauses that have no independent confirmed direct evidence in this fixture.",
+        "independently_confirmed_clauses": [
+          {
+            "clause_summary": "Signed declaration in form 1a/1b.",
+            "independent_direct_evidence_fact_ids": [
+              "74000000-0002-4000-8000-000000000002"
+            ],
+            "classification_basis": "Confirmed fact 0002 directly states the declaration and signature/form requirement."
+          },
+          {
+            "clause_summary": "Balance sheet for the last reporting period.",
+            "independent_direct_evidence_fact_ids": [
+              "74000000-0003-4000-8000-000000000003"
+            ],
+            "classification_basis": "Confirmed fact 0003 directly states this reporting-period document."
+          }
+        ],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Optional tax certificate with the exact one-month issue deadline.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "No confirmed fact independently preserves both the optionality and exact deadline; the related detailed fact is also requires_review."
+          },
+          {
+            "clause_summary": "Litigation declaration, its scope, and authorized-signatory condition.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The only detailed related candidate is requires_review and its retained evidence is truncated."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0004-4000-8000-000000000004",
+        "classification_basis": "The candidate carries an exact optional-document deadline that is material if the document is included in FINAL, but no separate confirmed fact establishes it.",
+        "independently_confirmed_clauses": [],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Tax certificate optionality, copy/original condition, and issue date no more than one month before submission.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The compound fact that mentions this requirement is also requires_review; there is no independent confirmed direct-evidence fact for the exact condition."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0005-4000-8000-000000000005",
+        "classification_basis": "A confirmed fact corroborates the generic declaration form, but not the material tax-debt threshold and its linkage to that declaration.",
+        "independently_confirmed_clauses": [
+          {
+            "clause_summary": "Generic declaration signed by the participant head in form 1a/1b.",
+            "independent_direct_evidence_fact_ids": [
+              "74000000-0002-4000-8000-000000000002"
+            ],
+            "classification_basis": "Confirmed fact 0002 directly establishes the generic form and signature requirement."
+          }
+        ],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Tax-debt declaration condition with the 25 percent of assets threshold.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The retained evidence establishes the threshold but no independent confirmed fact directly establishes the complete document requirement."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0010-4000-8000-000000000010",
+        "classification_basis": "The candidate's retained quote is truncated and no confirmed fact independently establishes the full litigation declaration requirement.",
+        "independently_confirmed_clauses": [],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Litigation declaration covering 24 months, the procedure period, satisfied claims, and authorized signature.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The only overlapping compound candidate is also requires_review and does not independently resolve the missing tail of the quote."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0016-4000-8000-000000000016",
+        "classification_basis": "No confirmed fact independently establishes the complete participant-type-specific package for individual entrepreneurs.",
+        "independently_confirmed_clauses": [],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Complete application-document set for Russian individual entrepreneurs, including the six-month EGRIP deadline and authority documents.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The retained evidence names only one registration document and no independent confirmed fact covers the full package or exact deadline."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0017-4000-8000-000000000017",
+        "classification_basis": "One confirmed fact corroborates the two-year nonresident financial-reporting clause, while the remaining participant-type-specific package lacks independent confirmed direct evidence.",
+        "independently_confirmed_clauses": [
+          {
+            "clause_summary": "Two latest reporting years of nonresident financial statements.",
+            "independent_direct_evidence_fact_ids": [
+              "74000000-0018-4000-8000-000000000018"
+            ],
+            "classification_basis": "Confirmed fact 0018 directly states the two-year nonresident financial-reporting requirement."
+          }
+        ],
+        "unresolved_material_clauses": [
+          {
+            "clause_summary": "Remaining nonresident application package, including the six-month registry deadline, authority, bankruptcy, and location documents.",
+            "independent_direct_evidence_fact_ids": [],
+            "classification_basis": "The retained evidence is only the nonresident heading and no separate confirmed fact covers these material clauses."
+          }
+        ],
+        "excluded_non_material_clauses": []
+      },
+      {
+        "fact_id": "74000000-0027-4000-8000-000000000027",
+        "classification_basis": "This is an unfilled template label without a direct requirement to submit the document, so it is unresolved but not material to a safe FINAL.",
+        "independently_confirmed_clauses": [],
+        "unresolved_material_clauses": [],
+        "excluded_non_material_clauses": [
+          {
+            "clause_summary": "Blank registration-certificate template field.",
+            "classification_basis": "The candidate is a placeholder and the recorded decision is not_applicable; omission does not remove a confirmed application requirement."
+          }
+        ]
+      }
+    ],
+    "required_exact_final_fragments": [
+      "Для резидентов РФ (юр. лиц)",
+      "копия Устава",
+      "документа, подтверждающего полномочия руководителя",
+      "2 последних отчетных года",
+      "фактическое местонахождение",
+      "отсутствии процедуры банкротства",
+      "Для резидентов РФ (ИП)",
+      "ЕГРИП (не позднее 6 месяцев)",
+      "Для нерезидентов РФ",
+      "торгового реестра/реестра юридических лиц (не позднее 6 месяцев)",
+      "последний отчетный год",
+      "последнюю отчетную дату (квартал)",
+      "не более 1 месяца",
+      "Форма 0409806",
+      "Форма 0409814",
+      "*.pdf",
+      "*.xls",
+      "40 Мбайт",
+      "Flash-накопитель"
+    ],
+    "forbidden_vague_final_fragments": [
+      "или иной срок"
+    ],
+    "expected_safe_status": "requires_recheck",
+    "expected_recheck_reason_code": "ambiguous_scope"
+  }
+}

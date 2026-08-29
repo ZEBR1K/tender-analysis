@@ -4586,3 +4586,37 @@ Aggregator AG-8 production-candidate audit / promotion decision
 → full Document Worker runtime canary
 → fresh 27/27 run
 ```
+
+---
+
+## 2026-08-29 — Aggregator `application_documents` safe-deferral checkpoint
+
+Execution `14173` использован как execution-derived regression для поля `application_documents`. Recorded schema-valid Round 1 response проходит production checker и материализует `resolved`, но отдельный semantic oracle фиксирует false-resolved: неоднозначный scope, потерянные существенные условия, расплывчатые сроки и неподтверждённые clauses.
+
+В beta `[TEST CODEX] TENDER — Агрегация закупки` изменён только field-specific профиль `application_documents`. Добавлены neutral anti-overfit controls, общий route-aware oracle и beta-only runtime evaluator. Production Aggregator, checker, topology, SQL, Targeted Recheck и PostgreSQL не менялись.
+
+Первый paid canary с `max_tokens=8192` завершился `finish_reason=length`; false-resolved не был создан. После локальной синхронизации beta limit с test draft (`16384`) повторный paid canary exact artifact вернул:
+
+```text
+workflow_id = ftvmrEHoMbPOAqZG
+workflow_sha256 = dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484
+ai_called = true
+checker_accepted = true
+route = targeted_recheck
+status = requires_recheck
+recheck_reason_code = ambiguous_scope
+final_status = null
+false_resolved_prevented = true
+semantic_oracle_passed = true
+expected exit code = 3
+```
+
+Observed candidate roles: fixture `0024 → not_applicable`, `0028 → complement`. Round 1 FINAL не исполнялся. Это safe deferral, а не terminal semantic proof; следующий semantic gate — фактический Targeted Recheck для `application_documents`.
+
+Fresh verification перед checkpoint:
+
+```text
+application_documents targeted = 24/24 PASS
+full offline suite = 163 total / 162 PASS / 1 intentional AG-8 production-promotion RED
+git diff --check = PASS
+```
