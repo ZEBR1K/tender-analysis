@@ -169,7 +169,9 @@ semantic_oracle_passed = true
 exit code = 0
 ```
 
-Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d05bdb0c`.
+The current beta artifact SHA-256 is `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`. On the exact `14104` fixture (SHA-256 `6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75`), a request-model-only A/B accepted both GLM 5.3 Flash low and Gemini 3.7 Flash low with `round1_final` and a 6/6 oracle. Both assigned `doc_7_au_0031` `not_applicable`; GLM selected `doc_7_au_0001`, Gemini selected `doc_7_au_0008`.
+
+GLM is the recommended Aggregator beta baseline for observed reliability/correctness/cost (0.08151487 RUB, 12911 ms, 3290 tokens); Gemini is the latency/provider fallback (0.25840089 RUB, 3711 ms, 3732 tokens). The detailed bounded comparison is `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
 Это **не** означает, что production исправлен: production Aggregator и canonical production export не менялись, production promotion test остаётся отдельным RED gate, а fresh 27/27 run ещё не выполнен. Backlog ID `AG-8` остаётся открытым до promotion и fresh full-run verification.
 
@@ -197,11 +199,11 @@ Canary artifact SHA-256: `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52e
 
 ## 5. Test status
 
-Fresh full offline suite after `application_documents` test hardening on 2026-08-29:
+Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 
 ```text
-163 tests
-162 passed
+170 tests
+169 passed
 1 failed
 ```
 
@@ -222,6 +224,7 @@ Fresh full offline suite after `application_documents` test hardening on 2026-08
 - Aggregator route-aware harness не материализует Round 1 FINAL для `requires_recheck`;
 - AG-8 offline beta contract, MCP read-back и один paid runtime canary execution-derived case `14104` прошли GREEN;
 - runtime canary назначил `doc_7_au_0031` роль `not_applicable`, выбрал `doc_7_au_0001` primary и прошёл 6/6 semantic oracle checks.
+- exact beta `14104` A/B accepted GLM and Gemini with the same safe scope decision; GLM is the beta baseline and Gemini is fallback only.
 - `application_documents` execution `14173` воспроизводит production false-resolved как diagnostic control;
 - beta field-specific boundary и neutral controls для `application_documents` проходят offline;
 - paid runtime canary точного beta artifact безопасно выбрал `targeted_recheck/ambiguous_scope`, не создал Round 1 FINAL и прошёл route-aware oracle;

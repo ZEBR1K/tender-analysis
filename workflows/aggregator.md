@@ -1295,9 +1295,11 @@ universal procurement_subject prompt boundary
 → semantic oracle GREEN 6/6
 ```
 
-Canary вернул `round1_final/resolved`, назначил `doc_7_au_0031` роль `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и сформировал корректный `final_value_text`. Request model: `deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low`; response model: `deepseek/deepseek-v4-pro-0813`.
+Previous DeepSeek canary on fixture `14104` returned `round1_final/resolved`, assigned `doc_7_au_0031` `not_applicable`, chose fixture fact `14104000-0001-4000-8000-000000000001` primary, and passed the semantic oracle 6/6. Request model: `deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low`; response model: `deepseek/deepseek-v4-pro-0813`.
 
-Production Aggregator, topology, SQL и checker не менялись. Production promotion gate и fresh full 27/27 run обязательны до закрытия AG-8.
+Subsequent request-model-only A/B used exact beta artifact SHA-256 `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484` and fixture SHA-256 `6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75`. It returned checker-accepted `round1_final` and semantic oracle 6/6 for both candidates. GLM (`z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`) chose `doc_7_au_0001` primary at 0.08151487 RUB / 12911 ms / 3290 tokens; Gemini (`google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low`) chose `doc_7_au_0008` at 0.25840089 RUB / 3711 ms / 3732 tokens. Both assigned `doc_7_au_0031` `not_applicable`. GLM is the recommended beta baseline on reliability/correctness/cost; Gemini is the latency/provider fallback. Full evidence: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
+
+The harness did not access DB/n8n and changed only `request.model`; the beta workflow and fixture were not modified. Production Aggregator, topology, SQL и checker не менялись. Production promotion gate и fresh full 27/27 run обязательны до закрытия AG-8.
 
 \---
 

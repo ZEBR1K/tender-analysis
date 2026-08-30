@@ -4620,3 +4620,33 @@ application_documents targeted = 24/24 PASS
 full offline suite = 163 total / 162 PASS / 1 intentional AG-8 production-promotion RED
 git diff --check = PASS
 ```
+
+---
+
+## 2026-08-29 — Aggregator `procurement_subject` model A/B checkpoint
+
+На exact beta artifact `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) выполнен bounded A/B на fixture execution `14104`.
+
+```text
+fixture SHA-256 = 6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75
+beta SHA-256 = dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484
+```
+
+Harness не обращался к БД/n8n и менял только `request.model`; workflow и fixture не менялись.
+
+| Model | Result | Primary | `doc_7_au_0031` | Cost / latency / tokens |
+|---|---|---|---|---|
+| Gemini 3.7 Flash low | exit 0, `stop`, checker accepted, `round1_final`, oracle 6/6 | `doc_7_au_0008` | `not_applicable` | 0.25840089 RUB / 3711 ms / 3732 |
+| GLM 5.3 Flash low | exit 0, `stop`, checker accepted, `round1_final`, oracle 6/6 | `doc_7_au_0001` | `not_applicable` | 0.08151487 RUB / 12911 ms / 3290 |
+
+GLM оказался на 68.5% дешевле; Gemini — на 71.3% быстрее. GLM выбран recommended Aggregator beta baseline по observed reliability/correctness/cost; Gemini остаётся fallback при latency/provider issues. Полный evidence: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
+
+Предыдущее `application_documents` evidence остаётся только safe Round 1 deferral: обе модели дали `requires_recheck/ambiguous_scope`; GLM был дешевле и более scope-sensitive, Gemini быстрее. Фактический Targeted Recheck для terminal correctness остаётся P0 gate до полного клиентского прогона.
+
+Production promotion не выполнялась. Production Aggregator остаётся с intentional promotion RED; ни полная корректность 27 полей, ни fresh 27/27 run этим checkpoint не подтверждаются.
+
+Fresh offline suite после harness:
+
+```text
+170 total / 169 pass / 1 intentional production-promotion RED
+```

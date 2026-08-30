@@ -746,9 +746,9 @@ doc_7_au_0031 = not_applicable
 primary = doc_7_au_0001
 ```
 
-Beta export SHA-256: `95a04f8f7c054fda00b55abed0338cc66ba6c3c90d52e10698265b03d05bdb0c`.
+Current beta artifact SHA-256: `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`. A request-model-only A/B on fixture `14104` (fixture SHA-256 `6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75) returned exit `0`, `finish_reason=stop`, checker acceptance, `round1_final`, and oracle 6/6 for both GLM and Gemini. Both assigned `doc_7_au_0031` `not_applicable`; GLM chose `doc_7_au_0001`, Gemini `doc_7_au_0008`. GLM is the recommended Aggregator beta baseline (0.08151487 RUB; 12911 ms; 3290 tokens); Gemini is fallback for latency/provider issues (0.25840089 RUB; 3711 ms; 3732 tokens). Evidence: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
-Статус остаётся **open**: production Aggregator, checker, SQL и topology не менялись; нужны отдельный production promotion gate и fresh full 27/27 run с manual semantic review.
+Статус остаётся **open**: A/B harness не обращался к БД/n8n и менял только `request.model`; workflow/fixture не менялись. Production Aggregator, checker, SQL и topology не менялись; нужны отдельный production promotion gate и fresh full 27/27 run с manual semantic review.
 
 Первый transient TLS `ECONNRESET` зафиксирован как transport incident, а не semantic failure. Неблокирующий follow-up test harness: необработанный network exception сейчас возвращает exit `1`, который может выглядеть как semantic failure; нужно позже развести transport и semantic exit semantics без redesign Aggregator.
 
@@ -1784,7 +1784,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
-Дополнительный Critical gate: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run.
+Дополнительные Critical gates: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` остаётся P0 до Targeted Recheck terminal verification, production promotion и full run.
 
 ## High
 

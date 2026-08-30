@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -38,6 +39,57 @@ const betaAggregatorWorkflowPath = path.join(
   'beta',
   '[TEST CODEX] TENDER — Агрегация закупки.json',
 );
+const fixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'aggregator',
+  'execution-14104-procurement-subject.json',
+);
+const GLM_53_FLASH_ALIAS =
+  'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low';
+const GEMINI_37_FLASH_ALIAS =
+  'google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low';
+const FIXTURE_SHA256 =
+  '6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75';
+const BETA_WORKFLOW_SHA256 =
+  'dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484';
+
+function sha256File(filePath) {
+  return crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(filePath))
+    .digest('hex');
+}
+
+function liveOverrideArgs() {
+  return [
+    '--live',
+    '--beta',
+    '--allow-paid-ai',
+    '--allow-model-override',
+  ];
+}
+
+function expectedExecution14104Response(fixture) {
+  const ids = fixture.fact_ids_by_analysis_unit;
+  return syntheticApiResponse('synthetic-ab-expected-selection', {
+    field_key: 'procurement_subject',
+    status: 'resolved',
+    final_value_text: fixture.aggregator_field_item.candidates[0].value_text,
+    confidence: 0.98,
+    candidate_decisions: [
+      { fact_id: ids.doc_7_au_0001, role: 'primary', reason: 'Предмет текущей закупки.' },
+      { fact_id: ids.doc_7_au_0008, role: 'duplicate', reason: 'Дублирует предмет.' },
+      { fact_id: ids.doc_7_au_0010, role: 'supporting', reason: 'Подтверждает предмет.' },
+      { fact_id: ids.doc_7_au_0031, role: 'not_applicable', reason: 'Внутренний процесс.' },
+    ],
+    supporting_fact_ids: [ids.doc_7_au_0010],
+    conflict_fact_ids: [],
+    needs_recheck: false,
+    recheck_reason_code: null,
+    recheck_note: null,
+  });
+}
 
 const universalProcurementSubjectSignals = [
   {
@@ -641,12 +693,15 @@ test('runtime eval remains explicit and its live path uses the route-aware helpe
     LIVE_MODEL_ALIAS,
     'deepseek/deepseek-v4-pro-0813@provider=deepseek&reasoning_effort=low',
   );
-  assert.match(source, /request\.model\s*!==\s*LIVE_MODEL_ALIAS/u);
+  assert.match(source, /artifactRequest\.model\s*!==\s*LIVE_MODEL_ALIAS/u);
   assert.match(
     source,
     /runAggregatorRound1\(\{[\s\S]*?fixture,[\s\S]*?modelResponse,[\s\S]*?workflowPath[\s\S]*?\}\)/u,
   );
-  assert.doesNotMatch(source, /Сформировать FINAL после Round 1/u);
+  assert.doesNotMatch(
+    source,
+    /executeWorkflowCodeNode\(\{[\s\S]*?nodeName:\s*'Сформировать FINAL после Round 1'/u,
+  );
 
   assert.equal(
     fs.existsSync(aggregatorWorkflowPath),
@@ -737,7 +792,7 @@ test('RED pre-canary: beta runtime path errors before HTTP and never falls back 
       fixture,
       workflowPath: missingPath,
     }),
-    /missing-beta-aggregator\.json|ENOENT/iu,
+    /exact beta workflow artifact|anything except/iu,
   );
 });
 
@@ -774,7 +829,7 @@ test('RED pre-canary: live CLI requires --beta before credentials or HTTP', () =
   );
 
   assert.equal(missingBeta.status, 2, missingBeta.stderr || missingBeta.stdout);
-  assert.match(missingBeta.stderr, /beta workflow preparation failed/iu);
+  assert.match(missingBeta.stderr, /exact beta workflow artifact|anything except/iu);
   assert.doesNotMatch(missingBeta.stderr, /fetch failed|ECONNREFUSED/iu);
 });
 
@@ -819,6 +874,223 @@ test('RED pre-canary: live report records the exact beta workflow artifact and m
     preparedRuntime.workflow.workflow_sha256,
   );
   assert.equal(report.payload.model_alias, LIVE_MODEL_ALIAS);
+});
+
+test('RED A/B contract exposes only the exact execution-snapshot model aliases', () => {
+  assert.deepEqual(runtimeEvaluator.ALLOWED_RUNTIME_MODEL_ALIASES, [
+    GLM_53_FLASH_ALIAS,
+    GEMINI_37_FLASH_ALIAS,
+  ]);
+});
+
+test('RED A/B contract clones the beta-derived request and changes only request.model', async () => {
+  const fixture = loadAggregatorFixture();
+  const beforeWorkflow = loadAggregatorWorkflow(betaAggregatorWorkflowPath);
+  const baseline = await runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+    fixture,
+    workflowPath: betaAggregatorWorkflowPath,
+  });
+  const overridden = await runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+    fixture,
+    workflowPath: betaAggregatorWorkflowPath,
+    args: liveOverrideArgs(),
+    env: { AGGREGATOR_RUNTIME_MODEL_ALIAS: GLM_53_FLASH_ALIAS },
+  });
+  const afterWorkflow = loadAggregatorWorkflow(betaAggregatorWorkflowPath);
+  const baselineWithoutModel = structuredClone(baseline.request);
+  const overriddenWithoutModel = structuredClone(overridden.request);
+  delete baselineWithoutModel.model;
+  delete overriddenWithoutModel.model;
+
+  assert.equal(baseline.request.model, LIVE_MODEL_ALIAS);
+  assert.equal(overridden.request.model, GLM_53_FLASH_ALIAS);
+  assert.deepEqual(overriddenWithoutModel, baselineWithoutModel);
+  assert.deepEqual(overridden.prepared, baseline.prepared);
+  assert.deepEqual(afterWorkflow, beforeWorkflow);
+  assert.equal(overridden.workflow.artifact_model_alias, LIVE_MODEL_ALIAS);
+  assert.equal(overridden.workflow.effective_request_model_alias, GLM_53_FLASH_ALIAS);
+  assert.equal(overridden.workflow.model_override_applied, true);
+});
+
+test('RED A/B contract rejects missing override permission, empty alias, and unknown alias before HTTP', async () => {
+  assert.equal(typeof runtimeEvaluator.runLiveCanary, 'function');
+  const cases = [
+    {
+      label: 'missing explicit override flag',
+      args: ['--live', '--beta', '--allow-paid-ai'],
+      alias: GLM_53_FLASH_ALIAS,
+      expected: /--allow-model-override/iu,
+    },
+    {
+      label: 'empty alias',
+      args: liveOverrideArgs(),
+      alias: '   ',
+      expected: /model alias.*empty|AGGREGATOR_RUNTIME_MODEL_ALIAS/iu,
+    },
+    {
+      label: 'unknown alias',
+      args: liveOverrideArgs(),
+      alias: 'unknown/model@provider=unknown&reasoning_effort=low',
+      expected: /not allowed|unknown model|allow-list/iu,
+    },
+  ];
+
+  for (const control of cases) {
+    let fetchCalls = 0;
+    await assert.rejects(
+      runtimeEvaluator.runLiveCanary({
+        args: control.args,
+        env: {
+          AGGREGATOR_RUNTIME_API_KEY: 'offline-placeholder',
+          AGGREGATOR_RUNTIME_MODEL_ALIAS: control.alias,
+        },
+        fetchImpl: async () => {
+          fetchCalls += 1;
+          throw new Error('fetch must not run');
+        },
+      }),
+      (error) =>
+        error?.exitCode === 2 &&
+        control.expected.test(error.message),
+      control.label,
+    );
+    assert.equal(fetchCalls, 0, control.label);
+  }
+});
+
+test('RED A/B contract requires an alias when --allow-model-override is present', async () => {
+  let fetchCalls = 0;
+  await assert.rejects(
+    runtimeEvaluator.runLiveCanary({
+      args: liveOverrideArgs(),
+      env: { AGGREGATOR_RUNTIME_API_KEY: 'offline-placeholder' },
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        throw new Error('fetch must not run');
+      },
+    }),
+    (error) =>
+      error?.exitCode === 2 &&
+      /AGGREGATOR_RUNTIME_MODEL_ALIAS/iu.test(error.message),
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test('RED A/B contract accepts each allowed alias and performs exactly one beta-derived HTTP call', async () => {
+  const fixture = loadAggregatorFixture();
+  const response = expectedExecution14104Response(fixture);
+  response.provider = 'synthetic-offline-provider';
+  response.usage = {
+    prompt_tokens: 100,
+    completion_tokens: 50,
+    total_tokens: 150,
+    cost: 0.123,
+  };
+
+  for (const alias of [GLM_53_FLASH_ALIAS, GEMINI_37_FLASH_ALIAS]) {
+    const calls = [];
+    const result = await runtimeEvaluator.runLiveCanary({
+      args: liveOverrideArgs(),
+      env: {
+        AGGREGATOR_RUNTIME_API_KEY: 'offline-placeholder',
+        AGGREGATOR_RUNTIME_MODEL_ALIAS: alias,
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return {
+          ok: true,
+          status: 200,
+          json: async () => response,
+        };
+      },
+    });
+    const requestBody = JSON.parse(calls[0].options.body);
+
+    assert.equal(calls.length, 1);
+    assert.equal(requestBody.model, alias);
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.payload.artifact_model_alias, LIVE_MODEL_ALIAS);
+    assert.equal(result.payload.effective_request_model_alias, alias);
+    assert.equal(result.payload.model_override_applied, true);
+  }
+});
+
+test('RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit', async () => {
+  const fixture = loadAggregatorFixture();
+  const response = expectedExecution14104Response(fixture);
+  response.model = 'synthetic-response-model';
+  response.provider = 'synthetic-response-provider';
+  response.usage = {
+    prompt_tokens: 321,
+    completion_tokens: 123,
+    total_tokens: 444,
+    cost_details: { currency: 'raw-provider-value' },
+  };
+  const result = await runtimeEvaluator.runLiveCanary({
+    args: liveOverrideArgs(),
+    env: {
+      AGGREGATOR_RUNTIME_API_KEY: 'offline-placeholder',
+      AGGREGATOR_RUNTIME_MODEL_ALIAS: GEMINI_37_FLASH_ALIAS,
+    },
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => response,
+    }),
+  });
+  const payload = result.payload;
+
+  assert.equal(payload.source_execution_id, '14104');
+  assert.equal(payload.fixture_sha256, FIXTURE_SHA256);
+  assert.equal(payload.workflow_id, 'ftvmrEHoMbPOAqZG');
+  assert.equal(payload.workflow_name, '[TEST CODEX] TENDER — Агрегация закупки');
+  assert.equal(
+    payload.workflow_path,
+    'workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.json',
+  );
+  assert.equal(payload.workflow_sha256, BETA_WORKFLOW_SHA256);
+  assert.equal(payload.artifact_model_alias, LIVE_MODEL_ALIAS);
+  assert.equal(payload.effective_request_model_alias, GEMINI_37_FLASH_ALIAS);
+  assert.equal(payload.model_override_applied, true);
+  assert.equal(payload.response_model, response.model);
+  assert.equal(payload.response_provider, response.provider);
+  assert.equal(payload.finish_reason, 'stop');
+  assert.deepEqual(payload.response_usage, response.usage);
+  assert.equal(Number.isFinite(payload.latency_ms), true);
+  assert.equal(payload.latency_ms >= 0, true);
+  assert.equal(payload.checker_accepted, true);
+  assert.equal(payload.route, 'round1_final');
+  assert.equal(payload.final_status, 'resolved');
+  assert.equal(payload.semantic_oracle_passed, true);
+  assert.deepEqual(payload.oracle_checks, payload.oracle.checks);
+  assert.deepEqual(payload.primary_fact_ids, [fixture.fact_ids_by_analysis_unit.doc_7_au_0001]);
+  assert.equal(payload.target_analysis_unit_id, 'doc_7_au_0031');
+  assert.equal(payload.target_role, 'not_applicable');
+  assert.match(payload.final_value_text, /стандартн[а-яё]*\s+закрыт[а-яё]*\s+палуб/iu);
+  assert.equal(payload.exit_code, 0);
+  assert.deepEqual(payload.exit_code_semantics, {
+    0: 'semantic_green_resolved',
+    1: 'checker_rejection_or_oracle_failure',
+    2: 'configuration_or_preflight_failure',
+    3: 'safe_targeted_recheck_inconclusive',
+  });
+  assert.equal(JSON.stringify(payload).includes('offline-placeholder'), false);
+});
+
+test('RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256', async () => {
+  const fixture = loadAggregatorFixture();
+
+  await assert.rejects(
+    runtimeEvaluator.prepareLiveBetaRuntimeRequest({
+      fixture,
+      workflowPath: aggregatorWorkflowPath,
+      args: liveOverrideArgs(),
+      env: { AGGREGATOR_RUNTIME_MODEL_ALIAS: GLM_53_FLASH_ALIAS },
+    }),
+    /exact beta workflow artifact|anything except|refusing non-beta/iu,
+  );
+  assert.equal(sha256File(fixturePath), FIXTURE_SHA256);
+  assert.equal(sha256File(betaAggregatorWorkflowPath), BETA_WORKFLOW_SHA256);
 });
 
 test('runtime reporting defers targeted_recheck without running the resolved-only oracle', () => {
@@ -866,7 +1138,14 @@ test('runtime reporting defers targeted_recheck without running the resolved-onl
   assert.equal(output.final_status, null);
   assert.equal(output.false_resolved_prevented, true);
   assert.equal(output.semantic_outcome, 'deferred_to_targeted_recheck');
-  assert.equal(Object.hasOwn(output, 'semantic_oracle_passed'), false);
+  assert.equal(output.semantic_oracle_passed, true);
+  assert.deepEqual(output.oracle_checks, {
+    checker_accepted: true,
+    targeted_recheck_route: true,
+    final_is_null: true,
+    round1_final_not_executed: true,
+  });
+  assert.equal(output.exit_code, 3);
 });
 
 test('recorded runtime mode still reports the schema-valid false_resolved vulnerability', () => {

@@ -546,11 +546,11 @@ Test/calibration Worker сохранён как immutable beta snapshot `workflo
 
 Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 51 node, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
 
-Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: universal current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary на fixture `14104`. Canary выбрал корректный current-procurement candidate primary, назначил внутреннему процессу `not_applicable` и прошёл 6/6 semantic oracle checks.
+Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
 Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Это безопасный deferred результат, а не доказательство окончательной полноты поля; Targeted Recheck ещё не проверен.
 
-Production Aggregator не менялся. Production promotion остаётся отдельным RED gate, а fresh full 27/27 run после hardening ещё не выполнен.
+Production Aggregator не менялся. Production promotion остаётся отдельным intentional RED gate, а fresh full 27/27 run после hardening ещё не выполнен. A/B harness не обращался к БД/n8n, менял только `request.model` и не изменял workflow/fixture.
 
 ---
 
