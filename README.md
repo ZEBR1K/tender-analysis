@@ -548,7 +548,7 @@ Canonical `workflows/n8n-exports/TENDER — Обработать докумен�
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
-Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Это безопасный deferred результат, а не доказательство окончательной полноты поля; Targeted Recheck ещё не проверен.
+Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Последующий read-only аудит live Targeted Recheck выявил P0 `TR-10`: Round 2 structural checker не доказывает completeness composite result и потенциально допускает частичный `resolved`. До RED-regression и минимального fix terminal correctness не подтверждена.
 
 Production Aggregator не менялся. Production promotion остаётся отдельным intentional RED gate, а fresh full 27/27 run после hardening ещё не выполнен. A/B harness не обращался к БД/n8n, менял только `request.model` и не изменял workflow/fixture.
 
@@ -590,7 +590,8 @@ test workflow promotion / wiring
 Текущая точка продолжения после AG-8 и `application_documents` test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
 
 ```text
-application_documents Targeted Recheck audit
+application_documents Targeted Recheck terminal RED-regression
+→ минимальный fix после подтверждённого RED
 → Aggregator AG-8 / application_documents production-candidate audit
 → без изменения protected production workflow до отдельного согласования
 → затем full Document Worker runtime canary

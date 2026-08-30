@@ -129,6 +129,7 @@ Naming, comments, cleanup, future hardening.
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
 |`AG-9`|⚠ Mitigated / safe-deferred in test: `application_documents` execution `14173` покрыт offline oracle и paid runtime canary, который вернул `requires_recheck/ambiguous_scope` без Round 1 FINAL. Остаётся открытой до Targeted Recheck verification, production promotion и fresh full run.|Aggregator / Targeted Recheck semantic safety|
+|`TR-10`|Round 2 не доказывает полноту составного поля: schema-valid частичный `application_documents` может стать `resolved` и материализовать неполный FINAL. Read-only audit 2026-08-30; RED terminal regression ещё не создан.|Targeted Recheck semantic safety|
 
 Document Worker packaging checkpoint 2026-08-29:
 
@@ -158,6 +159,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |`EW-2`|ошибка до claim не может быть привязана к document через execution id|Error Workflow|
 |`AG-1`|нет selective retry для Round 1 AI|Aggregator|
 |`TR-6`|нет selective retry для Recheck AI anomaly|Targeted Recheck|
+|`TR-11`|provider/checker failure fail-closed, но terminal field result и гарантированный alert не доказаны; run может остаться незавершённым|Targeted Recheck / Error handling|
 
 \---
 
@@ -799,6 +801,95 @@ Targeted Recheck audit/runtime verification
 ```text
 P0 before client report
 ```
+
+\---
+
+## C5 — `TR-10`
+
+### Проблема
+
+Read-only аудит active Targeted Recheck `9uDOU31DGo30fGXX` показал, что Round 2 checker обеспечивает structural correctness, но не completeness составного business result.
+
+Для `application_documents` возможен сценарий:
+
+```text
+28 existing candidates из execution-derived 14173
++
+один новый grounded/confirmed recheck candidate
+→ schema-valid Round 2 status=resolved
+→ часть unresolved material clauses отсутствует
+→ checker принимает response
+→ FINAL материализуется неполным
+```
+
+Это потенциальный `false_resolved`, а не обычный prompt-quality debt. Один подтверждённый candidate не доказывает, что закрыт весь список документов, условий, сроков и форматов.
+
+### Source boundary
+
+```text
+live Targeted Recheck:
+64 nodes, active version 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
+
+local canonical export:
+63 nodes, version 7f82ae43-2ddc-4568-8d76-a6d460c13924
+```
+
+Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` не подключена к production path. Параметры core Round 2 nodes совпадают live/local, поэтому regression можно строить по их фактическому контракту, но exact live snapshot должен быть сохранён как отдельный test/beta artifact, а не молча подменять canonical export.
+
+Отдельное противоречие:
+
+```text
+FIELD_CATALOG.md: application_documents Round 2 = ❌
+workflow implementation: общий Round 2 profile существует
+```
+
+Каталог authoritative для канонического смысла поля; live workflow authoritative для текущего поведения. Противоречие нельзя закрывать молчаливым изменением каталога.
+
+### Следующий gate
+
+Сначала RED-only regression без MCP write, БД и paid AI:
+
+```text
+fixture 14173
+→ synthetic grounded recheck candidate
+→ synthetic Validator confirmation
+→ partial schema-valid Round 2 resolved
+→ exact Code nodes:
+   Собрать candidates для Round 2
+   Подготовить запрос #2 Semantic Aggregator
+   Проверить ответ #2 Semantic Aggregator
+   Сформировать FINAL после Round 2
+→ structural acceptance + materialized FINAL
+→ application_documents oracle FAIL
+```
+
+GREEN implementation требует отдельного согласования protected workflow.
+
+### Приоритет
+
+```text
+P0 before client report
+```
+
+\---
+
+## C6 — `TR-11`
+
+### Проблема
+
+Текущие provider/checker failures fail closed: malformed JSON, empty content, неправильный `finish_reason`, cardinality или linking не создают FINAL. Но audit не подтвердил гарантированный terminal результат поля или alert/error workflow для этих веток.
+
+Риск:
+
+```text
+no false_resolved
+но
+no FINAL / no guaranteed alert
+→ 27/27 barrier не достигается
+→ run может остаться unfinished
+```
+
+Это P1 operational reliability gap. Его нужно исправлять отдельно от `TR-10`, чтобы не смешивать semantic completeness и error lifecycle.
 
 \---
 
@@ -1504,7 +1595,7 @@ tender_analysis_field_results
 
 # 16\. Что исправлять до первого стабильного end-to-end MVP
 
-TR-0…TR-3 уже закрыты и не являются текущими открытыми пунктами. Полный per-field Round 2 regression остаётся отдельной quality-задачей.
+TR-0…TR-3 закрыты как исторические edge-case fixes, но свежий `TR-10` снова делает Targeted Recheck P0 gate: terminal completeness составного `application_documents` не доказана.
 
 Минимальный текущий обязательный пакет:
 
@@ -1517,6 +1608,7 @@ DW-3
 OR-0
 
 AG-0
+TR-10
 ```
 
 После этого система уже должна значительно надёжнее проходить:
@@ -1531,16 +1623,17 @@ tender\\\\\\\\\\\\\\\_id
 
 # 17\. Рекомендуемый порядок реализации
 
-## Этап 1 — Targeted Recheck correctness (completed)
+## Этап 1 — Targeted Recheck correctness
 
 ```text
 1. TR-0 ✅
 2. TR-1 ✅
 3. TR-2 ✅ (MVP)
 4. TR-3 ✅
+5. TR-10 — RED terminal regression → отдельно согласованный minimal fix
 ```
 
-TR-0…TR-3 закрыты. Aggregator уже зависит от этого стабильного Targeted Recheck для значительной части 27 полей; полный per-field Round 2 regression остаётся quality work.
+TR-0…TR-3 закрыты. Это не доказывает общую terminal correctness: `TR-10` показывает отдельный риск partial `false_resolved` для composite fields. До закрытия `TR-10` Targeted Recheck нельзя считать готовым к автоматическому клиентскому отчёту.
 
 \---
 
@@ -1784,7 +1877,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
-Дополнительные Critical gates: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` остаётся P0 до Targeted Recheck terminal verification, production promotion и full run.
+Дополнительные Critical gates: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` остаётся P0 до `TR-10`, production promotion и full run. `TR-11` — отдельный High operational gate для terminal failure/alert semantics.
 
 ## High
 

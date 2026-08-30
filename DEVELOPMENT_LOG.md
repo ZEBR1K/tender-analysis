@@ -4650,3 +4650,45 @@ Fresh offline suite после harness:
 ```text
 170 total / 169 pass / 1 intentional production-promotion RED
 ```
+
+---
+
+## 2026-08-30 — Targeted Recheck read-only audit checkpoint
+
+Выполнен повторный read-only refresh live `TENDER - Targeted Recheck`:
+
+```text
+workflow id = 9uDOU31DGo30fGXX
+active = true
+live version = 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
+live nodes = 64
+
+local export version = 7f82ae43-2ddc-4568-8d76-a6d460c13924
+local nodes = 63
+```
+
+Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` не подключена к production path. Параметры core Round 2 nodes совпадают между live и local export:
+
+```text
+Собрать candidates для Round 2
+Подготовить запрос #2 Semantic Aggregator
+Проверить ответ #2 Semantic Aggregator
+Сформировать FINAL после Round 2
+```
+
+Audit verdict для автоматического клиентского отчёта: `REJECT`.
+
+Новый P0 `TR-10`: structural checker Round 2 не доказывает полноту composite result. Для `application_documents` возможен schema-valid частичный `resolved`, который закрывает один grounded candidate, но теряет другие unresolved material clauses и материализует неполный FINAL.
+
+Новый P1 `TR-11`: provider/checker failures fail closed и не создают ложный FINAL, но terminal field result и гарантированный alert не подтверждены; 27/27 barrier может остаться недостигнутым.
+
+Зафиксирован source conflict:
+
+```text
+FIELD_CATALOG.md: application_documents Round 2 = ❌
+live workflow: общий Round 2 profile реализован
+```
+
+Каталог не изменялся. Следующий единственный implementation gate — RED-only regression на exact current Round 2 Code nodes с fixture `14173`, без MCP write, PostgreSQL и paid AI. GREEN fix требует отдельного согласования protected workflow.
+
+В этом checkpoint изменяется только документация. Live n8n читался через read-only API; workflow JSON, tests, PostgreSQL и AI не изменялись и не запускались.

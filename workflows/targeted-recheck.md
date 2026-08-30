@@ -1,7 +1,7 @@
 # TENDER - Targeted Recheck
 
-**Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
+**Статус:** Active development / P0 terminal completeness audit
+**Последнее обновление:** 2026-08-30
 **Тип:** sub-workflow n8n  
 **Родительский workflow:** `TENDER — Агрегация закупки`  
 **Финальный контракт поля:** `tender_field_final_v1`  
@@ -40,6 +40,42 @@ Workflow не анализирует тендер целиком. Он обра�
 
 Round 2 является последним semantic этапом.
 После Round 2 повторный Targeted Recheck не запускается.
+
+### Current verification boundary — 2026-08-30
+
+Read-only refresh authoritative live workflow:
+
+```text
+workflow id = 9uDOU31DGo30fGXX
+active = true
+live version = 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
+live nodes = 64
+
+local export version = 7f82ae43-2ddc-4568-8d76-a6d460c13924
+local nodes = 63
+```
+
+Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. Core Round 2 parameters совпадают live/local для:
+
+```text
+Собрать candidates для Round 2
+Подготовить запрос #2 Semantic Aggregator
+Проверить ответ #2 Semantic Aggregator
+Сформировать FINAL после Round 2
+```
+
+Structural guarantees этих нод сильные: schema, candidate allow-list, cardinality, linking и evidence validation fail closed. Но они не доказывают semantic completeness составного поля. Для `application_documents` один новый confirmed candidate может позволить Round 2 вернуть частичный `resolved`, не закрыв остальные material clauses. Это P0 `TR-10`; Targeted Recheck нельзя считать готовым к автоматическому клиентскому отчёту до terminal RED-regression и отдельно согласованного fix.
+
+Provider/checker failures не создают ложный FINAL, но terminal field result и гарантированный alert для них не подтверждены (`TR-11`). Это отдельный operational gap.
+
+Source conflict зафиксирован явно:
+
+```text
+FIELD_CATALOG.md: application_documents Round 2 = ❌
+live workflow: общий Round 2 profile реализован
+```
+
+`FIELD_CATALOG.md` authoritative для смысла поля; live workflow authoritative для текущего runtime поведения. Документация каталога не изменяется молча: regression должен применить канонический смысл поля к фактическому live contract.
 
 ---
 
@@ -1451,6 +1487,56 @@ TENDER - Targeted Recheck
 
 ---
 
+### TR-10 — partial `false_resolved` для composite Round 2
+
+**Severity:** Critical / semantic safety
+**Status:** Open / RED regression required
+
+Round 2 checker проверяет структуру ответа, IDs, cardinality и linking, но не доказывает, что `resolved` покрывает все существенные clauses составного поля.
+
+Execution-derived terminal regression должен использовать `application_documents` fixture `14173`:
+
+```text
+28 existing candidates
++
+synthetic grounded recheck candidate
++
+synthetic Validator confirmation
++
+schema-valid partial Round 2 resolved
+```
+
+Требуемое доказательство RED:
+
+```text
+current checker accepts
+→ current FINAL materializes
+→ application_documents semantic oracle fails
+```
+
+До этого нельзя считать безопасным автоматическое `resolved` после Round 2 для composite fields. GREEN implementation не начинать без отдельного согласования protected workflow.
+
+---
+
+### TR-11 — failure не гарантирует terminal field result
+
+**Severity:** High / operational reliability
+**Status:** Open
+
+Malformed/empty AI response, неправильный `finish_reason`, provider failure и checker rejection fail closed и не создают ложный FINAL. Но текущий contract не подтверждает обязательный terminal field result или гарантированный alert/error workflow.
+
+Возможный результат:
+
+```text
+no FINAL
+→ 27/27 barrier не достигнут
+→ run остаётся unfinished
+```
+
+Этот lifecycle gap исправляется отдельно от `TR-10`.
+
+---
+
 ### TR-5 — дублирование Normalize + Save
 
 **Severity:** Medium  
@@ -1776,11 +1862,23 @@ needs_recheck = false
 selective retry только данного item
 ```
 
+### R13 — composite field completeness after Round 2
+
+Ожидание после исправления `TR-10`:
+
+```text
+частичный grounded candidate
+не может единолично закрыть unresolved material clauses
+
+resolved допустим только при доказанной полноте
+иначе requires_review
+```
+
 ---
 
 ## 20. Ближайший план работ по этому workflow
 
-MVP-critical архитектурные проблемы Targeted Recheck:
+Исторические edge-case fixes:
 
 ```text
 TR-0
@@ -1788,14 +1886,19 @@ TR-1
 TR-2
 TR-3
 закрыты.
-На текущем этапе Targeted Recheck не требует новых архитектурных изменений перед следующим системным milestone.
-AG-0 и DB-backed 27/27 completion barrier подтверждены live execution `13863`.
-Следующий общий шаг проекта находится уже вне этого workflow:
-report implementation
-→ Markdown
-→ XLSX
-→ Telegram
-После первого законченного MVP вернуться к hardening Targeted Recheck:
+```
+
+Новый P0 gate:
+
+```text
+TR-10 terminal RED regression
+→ отдельно согласованный minimal fix
+→ runtime verification application_documents
+→ только затем full client run
+```
+
+После `TR-10` отдельно проверить `TR-11` terminal failure/alert semantics. Остальные hardening items не должны расширять текущий P0 scope:
+
 1. TR-6 — selective AI retry.
 2. TR-7 — убрать недетерминированный fallback existingCandidates[0].
 3. расширить regression coverage Round 2 для всех 27 полей.
@@ -1833,7 +1936,7 @@ field-aware retrieval
 
 > ни одно AI-утверждение не считается надёжным только потому, что его сформировала модель; evidence и структура ответа проверяются отдельными детерминированными слоями.
 
-MVP-critical проблемы:
+Исторически закрытые проблемы:
 
 ```text
 TR-0
@@ -1841,13 +1944,23 @@ TR-1
 TR-2
 TR-3
 закрыты.
-Targeted Recheck можно считать архитектурно завершённым для текущего MVP.
-Оставшийся долг относится в основном к reliability и maintainability:
+```
+
+Но Targeted Recheck нельзя считать готовым для автоматического клиентского отчёта до закрытия:
+
+```text
+TR-10 — composite Round 2 completeness false_resolved
+TR-11 — terminal failure / alert semantics
+```
+
+Остальной долг относится к reliability и maintainability:
+
+```text
 TR-5
 TR-6
 TR-7
 TR-8
 TR-9
-и не должен блокировать следующий системный milestone:
-report implementation
-→ Markdown / XLSX / Telegram
+```
+
+и не должен смешиваться с минимальным `TR-10` fix.

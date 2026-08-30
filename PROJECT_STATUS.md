@@ -1,6 +1,6 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-08-29
+**Snapshot date:** 2026-08-30
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `main`
 
@@ -30,6 +30,7 @@
 |---|---|---:|---|
 | `TENDER — Обработать документ` | `1Pw61ZY3HgBSvcUr` | yes | API вернул 37 nodes, version `f3d9fdb3-…`; test hardening ниже не promoted |
 | `TENDER — Агрегация закупки` | `iLt7wLLfueg8qffZ` | yes | published active: 38 nodes/version `c4bbee79-…`; current unpublished draft: 24 nodes/version `89b33d04-…` |
+| `TENDER - Targeted Recheck` | `9uDOU31DGo30fGXX` | yes | read-only refresh 2026-08-30: 64 nodes, version `4e0858c9-…`; local export отстаёт на одну disconnected test-ноду |
 | `TENDER — Финализация анализа` | `cSsh9yjpS7t5p0OO` | yes | 5 nodes; protected workflow, не менялся в текущем цикле |
 | `TENDER — Генерация отчета` | `ckPnP3hRhKu4Mf9u` | yes | 9 nodes; protected workflow, не менялся в текущем цикле |
 
@@ -197,6 +198,32 @@ Canary artifact SHA-256: `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52e
 
 Это подтверждает только безопасную границу Round 1: ложный FINAL не создан. Полнота и окончательная семантика `application_documents` остаются не подтверждены до проверки Targeted Recheck. Production Aggregator и Targeted Recheck не изменялись.
 
+### Targeted Recheck read-only audit 2026-08-30
+
+Live workflow `9uDOU31DGo30fGXX` является authoritative implementation: active, 64 nodes, version `4e0858c9-6ca2-42c7-969b-e74a2f91b8c6`. Canonical local export содержит 63 nodes/version `7f82ae43-2ddc-4568-8d76-a6d460c13924`; live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. Параметры четырёх критических Round 2 нод совпадают между live и local:
+
+```text
+Собрать candidates для Round 2
+Подготовить запрос #2 Semantic Aggregator
+Проверить ответ #2 Semantic Aggregator
+Сформировать FINAL после Round 2
+```
+
+Audit подтвердил сильные structural guards: evidence grounding, allow-list candidate linking, cardinality и hard error для malformed/empty AI response. Но для составного `application_documents` отсутствует terminal completeness barrier: Round 2 может структурно принять частичный `resolved`, если один новый candidate подтверждён, хотя другие существенные clauses исходного набора не закрыты. Такой результат способен материализовать неполный FINAL и является P0 `false_resolved` risk (`TR-10`) до клиентского отчёта.
+
+Отдельный operational gap (`TR-11`): provider/checker failure fail-closed и не создаёт ложный FINAL, но текущая ветка не доказывает обязательный terminal field result или гарантированный alert. Это может оставить run незавершённым; исправление не смешивается с semantic regression.
+
+Есть явное source conflict:
+
+```text
+FIELD_CATALOG.md: application_documents Round 2 = ❌
+live/local Targeted Recheck: общий Round 2 profile реализован
+```
+
+`FIELD_CATALOG.md` остаётся authoritative для смысла поля, live workflow — для фактического runtime поведения. До отдельного решения каталог не изменяется; regression должен проверять канонический смысл поля на фактическом live Round 2 contract.
+
+Runtime terminal result `application_documents` после safe Round 1 deferral не подтверждён. Verdict готовности Targeted Recheck к автоматическому клиентскому отчёту: `REJECT` до RED-regression и последующего минимального fix.
+
 ## 5. Test status
 
 Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
@@ -228,6 +255,8 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 - `application_documents` execution `14173` воспроизводит production false-resolved как diagnostic control;
 - beta field-specific boundary и neutral controls для `application_documents` проходят offline;
 - paid runtime canary точного beta artifact безопасно выбрал `targeted_recheck/ambiguous_scope`, не создал Round 1 FINAL и прошёл route-aware oracle;
+- read-only refresh live Targeted Recheck подтвердил active version `4e0858c9-…`, 64 nodes и точное совпадение параметров четырёх core Round 2 нод с local export;
+- deterministic Targeted Recheck guards fail closed по schema/cardinality/linking/evidence; это не доказывает semantic completeness составного FINAL;
 - immutable Document Worker beta snapshot сохранён с ожидаемым SHA-256;
 - canonical Document Worker JSON является clean offline production candidate, а beta→canonical packaging contract проходит regression.
 
@@ -237,7 +266,9 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 - full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
 - production promotion `application_documents` boundary;
-- фактический Targeted Recheck и окончательный FINAL для `application_documents` после safe deferred route;
+- terminal Targeted Recheck и окончательный полный FINAL для `application_documents` после safe deferred route;
+- RED-regression, воспроизводящий partial `false_resolved` через exact current Round 2 Code nodes;
+- terminal error/alert semantics для provider/checker failure в Targeted Recheck;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
@@ -249,6 +280,7 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 - `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` — неизменяемый 60-node test/calibration snapshot;
 - Document Worker canonical path — clean inactive 51-node offline production candidate без instance identity и test state;
 - Aggregator local export содержит 38 nodes и совпадает с published active node set/connections; известное отличие параметров — provider pin в model alias ноды `Semantic Aggregator`;
+- Targeted Recheck live содержит 64 nodes/version `4e0858c9-…`, local canonical export — 63 nodes/version `7f82ae43-…`; live-only disconnected test evidence node не меняет core path, а четыре проверяемые Round 2 ноды совпадают параметрами;
 - 24-нoded production Aggregator draft не опубликован и соответствует очищенному core graph без disabled legacy/test nodes;
 - защищённые workflow JSON не изменялись автоматически в рамках этого checkpoint.
 
@@ -259,8 +291,9 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-Aggregator AG-8 production-candidate audit / promotion decision
-→ application_documents Targeted Recheck audit
+Targeted Recheck application_documents terminal RED-regression
+→ минимальный fix только после подтверждённого RED
+→ Aggregator AG-8 / application_documents production-candidate audit
 → full Document Worker runtime canary
 → fresh full 27/27 run
 → 27/27 manual semantic review
