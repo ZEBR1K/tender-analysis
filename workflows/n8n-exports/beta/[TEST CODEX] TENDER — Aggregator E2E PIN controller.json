@@ -1,0 +1,486 @@
+{
+  "name": "[TEST CODEX] TENDER — Aggregator E2E PIN controller",
+  "description": "TEST-ONLY E2E controller for run 3caa7a89-b137-4cf6-b23d-941fb465c8f9; source ftvmrEHoMbPOAqZG@91c17313-a593-4fb9-9072-79320a958dd7. Exact PIN contract; DB 27/27 gate; exactly one report per accepted execution.",
+  "active": false,
+  "nodes": [
+    {
+      "id": "e2e-pin-controller-webhook",
+      "name": "Run exact Aggregator E2E PIN fixture",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        -128
+      ],
+      "webhookId": "e2e-pin-3caa7a89-b137-4cf6-b23d-941fb465c8f9",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-codex-tender-aggregator-e2e-3caa7a89",
+        "authentication": "none",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "notes": "TEST-ONLY MCP entry point. The next node rejects every body except the exact audited fixture contract."
+    },
+    {
+      "id": "e2e-pin-controller-validate-request",
+      "name": "Validate exact E2E request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -496,
+        -128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nif (items.length !== 1) {\n  throw new Error('[E2E PIN runner] RUNNER_CONTRACT_MISMATCH: expected exactly one item');\n}\nconst received = items[0]?.json?.body;\nconst EXPECTED = {\n  \"runner_contract_version\": \"tender_aggregator_e2e_pin_runner_v1\",\n  \"report_policy_version\": \"one_report_per_runner_execution_v1\",\n  \"analysis_run_id\": \"3caa7a89-b137-4cf6-b23d-941fb465c8f9\",\n  \"source_workflow_id\": \"ftvmrEHoMbPOAqZG\",\n  \"source_workflow_version_id\": \"91c17313-a593-4fb9-9072-79320a958dd7\",\n  \"trigger_pin_node\": \"When Executed by Another Workflow\",\n  \"claim_pin_node\": \"Захватить run для агрегации\",\n  \"trigger_pin_payload\": {\n    \"json\": {\n      \"analysis_run_id\": \"3caa7a89-b137-4cf6-b23d-941fb465c8f9\",\n      \"previous_run_status\": \"processing\",\n      \"run_status\": \"processing\",\n      \"documents_total\": 12,\n      \"registered_documents_count\": 12,\n      \"completed_documents_count\": 1,\n      \"pending_documents_count\": 0,\n      \"processing_documents_count\": 11,\n      \"failed_documents_count\": 0,\n      \"skipped_documents_count\": 0,\n      \"ready_at\": null,\n      \"should_start_aggregation\": false,\n      \"readiness_reason\": \"documents_still_processing\"\n    },\n    \"pairedItem\": {\n      \"item\": 0\n    }\n  },\n  \"claim_pin_payload\": {\n    \"json\": {\n      \"analysis_run_id\": \"3caa7a89-b137-4cf6-b23d-941fb465c8f9\",\n      \"run_status\": \"aggregating\",\n      \"documents_total\": 12,\n      \"ready_at\": \"2026-08-30T12:27:12.040Z\",\n      \"aggregation_started_at\": \"2026-08-30T12:34:26.499Z\",\n      \"aggregation_claimed\": true\n    },\n    \"pairedItem\": {\n      \"item\": 0\n    }\n  }\n};\nconst CLAIM_PIN = {\n  \"json\": {\n    \"analysis_run_id\": \"3caa7a89-b137-4cf6-b23d-941fb465c8f9\",\n    \"run_status\": \"aggregating\",\n    \"documents_total\": 12,\n    \"ready_at\": \"2026-08-30T12:27:12.040Z\",\n    \"aggregation_started_at\": \"2026-08-30T12:34:26.499Z\",\n    \"aggregation_claimed\": true\n  },\n  \"pairedItem\": {\n    \"item\": 0\n  }\n};\n\nfunction stable(value) {\n  if (Array.isArray(value)) return value.map(stable);\n  if (value && typeof value === 'object') {\n    return Object.fromEntries(\n      Object.keys(value).sort().map((key) => [key, stable(value[key])]),\n    );\n  }\n  return value;\n}\n\nif (JSON.stringify(stable(received)) !== JSON.stringify(stable(EXPECTED))) {\n  throw new Error(\n    '[E2E PIN runner] RUNNER_CONTRACT_MISMATCH: request must equal the audited exact PIN contract',\n  );\n}\n\nreturn [{\n  json: {\n    ...EXPECTED,\n    controller_execution_id: $execution.id,\n    contract_validated: true,\n  },\n}];"
+      },
+      "notes": "Fail-closed contract tender_aggregator_e2e_pin_runner_v1; exact run/source/PIN payload only."
+    },
+    {
+      "id": "e2e-pin-controller-pre-run-state",
+      "name": "Load pre-run lifecycle and barrier",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -272,
+        -128
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH expected_fields(field_index, field_key) AS (\n    VALUES\n        (1, 'procurement_subject'),\n        (2, 'nm_price_with_vat'),\n        (3, 'platform'),\n        (4, 'procedure_type'),\n        (5, 'application_deadline'),\n        (6, 'application_review_date'),\n        (7, 'results_date'),\n        (8, 'customer'),\n        (9, 'customer_contacts'),\n        (10, 'participation_cost'),\n        (11, 'participation_guarantee'),\n        (12, 'evaluation_criteria'),\n        (13, 'delivery_term'),\n        (14, 'payment_terms'),\n        (15, 'special_account_or_treasury'),\n        (16, 'bank_support'),\n        (17, 'government_contract'),\n        (18, 'rebidding'),\n        (19, 'national_regime'),\n        (20, 'advance_contract_guarantee'),\n        (21, 'warranty_obligations_guarantee'),\n        (22, 'licenses_certificates'),\n        (23, 'required_official_certificates'),\n        (24, 'similar_supply_experience'),\n        (25, 'analog_allowed'),\n        (26, 'analog_definition'),\n        (27, 'application_documents')\n),\nrun_state AS (\n    SELECT id, status\n    FROM tender_analysis_runs\n    WHERE id = $1::uuid\n),\nactual_fields AS (\n    SELECT field_index, field_key, field_catalog_version,\n           result_contract_version, status\n    FROM tender_analysis_field_results\n    WHERE analysis_run_id = $1::uuid\n),\nstats AS (\n    SELECT\n        COUNT(*)::int AS final_count,\n        COUNT(*) FILTER (WHERE status IN ('resolved','requires_review','not_found'))::int AS valid_status_count,\n        COUNT(*) FILTER (WHERE field_catalog_version = 'tender_fields_v1')::int AS valid_catalog_count,\n        COUNT(*) FILTER (WHERE result_contract_version = 'tender_field_final_v1')::int AS valid_contract_count\n    FROM actual_fields\n),\nmissing_fields AS (\n    SELECT ARRAY_AGG(e.field_key ORDER BY e.field_index) AS keys\n    FROM expected_fields e\n    LEFT JOIN actual_fields a\n      ON a.field_index = e.field_index AND a.field_key = e.field_key\n    WHERE a.field_key IS NULL\n),\nunexpected_fields AS (\n    SELECT ARRAY_AGG(a.field_key ORDER BY a.field_index) AS keys\n    FROM actual_fields a\n    LEFT JOIN expected_fields e\n      ON e.field_index = a.field_index AND e.field_key = a.field_key\n    WHERE e.field_key IS NULL\n)\nSELECT\n    $1::uuid AS analysis_run_id,\n    EXISTS (SELECT 1 FROM run_state) AS run_exists,\n    (SELECT status FROM run_state LIMIT 1) AS run_status,\n    s.final_count,\n    s.valid_status_count,\n    s.valid_catalog_count,\n    s.valid_contract_count,\n    COALESCE(m.keys, ARRAY[]::text[]) AS missing_keys,\n    COALESCE(u.keys, ARRAY[]::text[]) AS unexpected_keys,\n    (\n      s.final_count = 27\n      AND s.valid_status_count = 27\n      AND s.valid_catalog_count = 27\n      AND s.valid_contract_count = 27\n      AND COALESCE(cardinality(m.keys), 0) = 0\n      AND COALESCE(cardinality(u.keys), 0) = 0\n    ) AS pre_run_barrier_ready\nFROM stats s\nCROSS JOIN missing_fields m\nCROSS JOIN unexpected_fields u;",
+        "options": {
+          "queryReplacement": "={{ [ $('Validate exact E2E request').item.json.analysis_run_id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "id": "e2e-pin-controller-validate-pre-run",
+      "name": "Validate pre-run lifecycle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nif (items.length !== 1) {\n  throw new Error('[E2E PIN controller] RUNNER_LIFECYCLE_MISMATCH: pre-run query must return one row');\n}\nconst state = items[0].json;\nconst request = $('Validate exact E2E request').first().json;\nif (state.analysis_run_id !== request.analysis_run_id || state.run_exists !== true) {\n  throw new Error('[E2E PIN controller] RUNNER_LIFECYCLE_MISMATCH: run missing or ID drift');\n}\nif (!['aggregating', 'completed'].includes(state.run_status)) {\n  throw new Error(\n    '[E2E PIN controller] RUNNER_LIFECYCLE_MISMATCH: expected aggregating or completed, got ' + state.run_status,\n  );\n}\nif (state.run_status === 'completed' && state.pre_run_barrier_ready !== true) {\n  throw new Error('[E2E PIN controller] RUNNER_LIFECYCLE_MISMATCH: completed replay requires exact 27/27 before start');\n}\nreturn [{\n  json: request,\n}];"
+      }
+    },
+    {
+      "id": "e2e-pin-controller-run-body",
+      "name": "Run pinned Aggregator body",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        -128
+      ],
+      "alwaysOutputData": true,
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "gsoPfP4PSjcJjPfa",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/gsoPfP4PSjcJjPfa",
+          "cachedResultName": "[TEST CODEX] TENDER — Aggregator E2E PIN body"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "runner_contract_version": "={{ $json.runner_contract_version }}",
+            "report_policy_version": "={{ $json.report_policy_version }}",
+            "analysis_run_id": "={{ $json.analysis_run_id }}",
+            "source_workflow_id": "={{ $json.source_workflow_id }}",
+            "source_workflow_version_id": "={{ $json.source_workflow_version_id }}",
+            "trigger_pin_node": "={{ $json.trigger_pin_node }}",
+            "claim_pin_node": "={{ $json.claim_pin_node }}",
+            "trigger_pin_payload": "={{ $json.trigger_pin_payload }}",
+            "claim_pin_payload": "={{ $json.claim_pin_payload }}",
+            "controller_execution_id": "={{ $json.controller_execution_id }}",
+            "contract_validated": "={{ $json.contract_validated }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "runner_contract_version",
+              "displayName": "runner_contract_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "report_policy_version",
+              "displayName": "report_policy_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "analysis_run_id",
+              "displayName": "analysis_run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "source_workflow_id",
+              "displayName": "source_workflow_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "source_workflow_version_id",
+              "displayName": "source_workflow_version_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "trigger_pin_node",
+              "displayName": "trigger_pin_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "claim_pin_node",
+              "displayName": "claim_pin_node",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "trigger_pin_payload",
+              "displayName": "trigger_pin_payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "claim_pin_payload",
+              "displayName": "claim_pin_payload",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "object"
+            },
+            {
+              "id": "controller_execution_id",
+              "displayName": "controller_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "contract_validated",
+              "displayName": "contract_validated",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "boolean"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        }
+      },
+      "notes": "Waits for every unchanged Aggregator branch, including test Targeted Recheck and production Finalization calls."
+    },
+    {
+      "id": "e2e-pin-controller-collapse",
+      "name": "Collapse body completion to one item",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const bodyItems = $input.all();\nconst request = $('Validate exact E2E request').first().json;\nconst preRunState = $('Load pre-run lifecycle and barrier').first().json;\nreturn [{ json: {\n    ...request,\n    pre_run_status: preRunState.run_status,\n    pre_run_barrier_ready: preRunState.pre_run_barrier_ready,\n    body_completed: true,\n    body_output_items: bodyItems.length,\n  } }];"
+      },
+      "notes": "Critical one-report guard: fan-out output is collapsed before the single post-run barrier query."
+    },
+    {
+      "id": "e2e-pin-controller-post-run-barrier",
+      "name": "Verify post-run 27/27 barrier",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        624,
+        -128
+      ],
+      "executeOnce": true,
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH expected_fields(field_index, field_key) AS (\n    VALUES\n        (1, 'procurement_subject'),\n        (2, 'nm_price_with_vat'),\n        (3, 'platform'),\n        (4, 'procedure_type'),\n        (5, 'application_deadline'),\n        (6, 'application_review_date'),\n        (7, 'results_date'),\n        (8, 'customer'),\n        (9, 'customer_contacts'),\n        (10, 'participation_cost'),\n        (11, 'participation_guarantee'),\n        (12, 'evaluation_criteria'),\n        (13, 'delivery_term'),\n        (14, 'payment_terms'),\n        (15, 'special_account_or_treasury'),\n        (16, 'bank_support'),\n        (17, 'government_contract'),\n        (18, 'rebidding'),\n        (19, 'national_regime'),\n        (20, 'advance_contract_guarantee'),\n        (21, 'warranty_obligations_guarantee'),\n        (22, 'licenses_certificates'),\n        (23, 'required_official_certificates'),\n        (24, 'similar_supply_experience'),\n        (25, 'analog_allowed'),\n        (26, 'analog_definition'),\n        (27, 'application_documents')\n),\nrun_state AS (\n    SELECT id, status\n    FROM tender_analysis_runs\n    WHERE id = $1::uuid\n),\nactual_fields AS (\n    SELECT field_index, field_key, field_catalog_version,\n           result_contract_version, status\n    FROM tender_analysis_field_results\n    WHERE analysis_run_id = $1::uuid\n),\nstats AS (\n    SELECT\n        COUNT(*)::int AS final_count,\n        COUNT(*) FILTER (WHERE status IN ('resolved','requires_review','not_found'))::int AS valid_status_count,\n        COUNT(*) FILTER (WHERE field_catalog_version = 'tender_fields_v1')::int AS valid_catalog_count,\n        COUNT(*) FILTER (WHERE result_contract_version = 'tender_field_final_v1')::int AS valid_contract_count\n    FROM actual_fields\n),\nmissing_fields AS (\n    SELECT ARRAY_AGG(e.field_key ORDER BY e.field_index) AS keys\n    FROM expected_fields e\n    LEFT JOIN actual_fields a\n      ON a.field_index = e.field_index AND a.field_key = e.field_key\n    WHERE a.field_key IS NULL\n),\nunexpected_fields AS (\n    SELECT ARRAY_AGG(a.field_key ORDER BY a.field_index) AS keys\n    FROM actual_fields a\n    LEFT JOIN expected_fields e\n      ON e.field_index = a.field_index AND e.field_key = a.field_key\n    WHERE e.field_key IS NULL\n)\nSELECT\n    $1::uuid AS analysis_run_id,\n    EXISTS (SELECT 1 FROM run_state) AS run_exists,\n    (SELECT status FROM run_state LIMIT 1) AS run_status,\n    s.final_count,\n    s.valid_status_count,\n    s.valid_catalog_count,\n    s.valid_contract_count,\n    COALESCE(m.keys, ARRAY[]::text[]) AS missing_keys,\n    COALESCE(u.keys, ARRAY[]::text[]) AS unexpected_keys,\n    (\n      s.final_count = 27\n      AND s.valid_status_count = 27\n      AND s.valid_catalog_count = 27\n      AND s.valid_contract_count = 27\n      AND COALESCE(cardinality(m.keys), 0) = 0\n      AND COALESCE(cardinality(u.keys), 0) = 0\n    ) AS post_run_barrier_ready\nFROM stats s\nCROSS JOIN missing_fields m\nCROSS JOIN unexpected_fields u;",
+        "options": {
+          "queryReplacement": "={{ [ $('Collapse body completion to one item').item.json.analysis_run_id ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "id": "e2e-pin-controller-validate-post-run",
+      "name": "Validate post-run lifecycle and select report owner",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -128
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nif (items.length !== 1) {\n  throw new Error('[E2E PIN controller] RUNNER_POST_BARRIER_MISMATCH: expected one barrier row');\n}\nconst state = items[0].json;\nconst request = $('Validate exact E2E request').first().json;\nconst preRunState = $('Load pre-run lifecycle and barrier').first().json;\nif (\n  state.analysis_run_id !== request.analysis_run_id ||\n  state.run_exists !== true ||\n  state.run_status !== 'completed' ||\n  state.post_run_barrier_ready !== true ||\n  state.final_count !== 27\n) {\n  throw new Error(\n    '[E2E PIN controller] RUNNER_POST_BARRIER_MISMATCH: ' + JSON.stringify(state),\n  );\n}\nconst controllerReportRequired = preRunState.run_status === 'completed';\nconst common = {\n  analysis_run_id: state.analysis_run_id,\n  run_status_before: preRunState.run_status,\n  run_status: state.run_status,\n  final_count: state.final_count,\n  valid_status_count: state.valid_status_count,\n  valid_catalog_count: state.valid_catalog_count,\n  valid_contract_count: state.valid_contract_count,\n  missing_keys: state.missing_keys,\n  unexpected_keys: state.unexpected_keys,\n  barrier_ready: true,\n  controller_report_required: controllerReportRequired,\n  runner_contract_version: 'tender_aggregator_e2e_pin_runner_v1',\n  report_policy_version: 'one_report_per_runner_execution_v1',\n  source_workflow_id: 'ftvmrEHoMbPOAqZG',\n  source_workflow_version_id: '91c17313-a593-4fb9-9072-79320a958dd7',\n};\nreturn [{\n  json: controllerReportRequired ? {\n    ...common,\n    completion_claimed: false,\n    finalization_state: 'already_completed',\n    report_replay_authorized: true,\n    report_dispatch_owner: 'test_controller_replay',\n    production_report_workflow_id: 'ckPnP3hRhKu4Mf9u',\n    production_report_version_id: '9d095af6-b60d-4ad9-8061-432201ec0e8e',\n    runner_audit: {\n      controller_execution_id: request.controller_execution_id,\n      finalization_workflow_id: 'cSsh9yjpS7t5p0OO',\n      finalization_version_id: '742051fe-a58a-4e03-afa6-6233c0177247',\n    },\n  } : {\n    ...common,\n    report_dispatch_owner: 'production_finalization',\n    expected_report_count: 1,\n  },\n}];"
+      }
+    },
+    {
+      "id": "e2e-pin-controller-report-gate",
+      "name": "Replay report for already completed run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1072,
+        -128
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e2e-pin-report-required",
+              "leftValue": "={{ $json.controller_report_required === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e2e-pin-controller-call-report",
+      "name": "Call test-only replay report once",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1296,
+        -240
+      ],
+      "executeOnce": true,
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "b4Ga1PoFmlS5ep6Y",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/b4Ga1PoFmlS5ep6Y",
+          "cachedResultName": "[TEST CODEX] TENDER — Report replay after exact 27-of-27 barrier"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "notes": "TEST-ONLY already_completed replay. Calls the isolated truthful replay contract, never production Report directly."
+    },
+    {
+      "id": "e2e-pin-controller-return-audit",
+      "name": "Return production-finalization report audit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{ json: { ...$input.first().json, report_dispatch_owner: 'production_finalization', expected_report_count: 1 } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Run exact Aggregator E2E PIN fixture": {
+      "main": [
+        [
+          {
+            "node": "Validate exact E2E request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate exact E2E request": {
+      "main": [
+        [
+          {
+            "node": "Load pre-run lifecycle and barrier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load pre-run lifecycle and barrier": {
+      "main": [
+        [
+          {
+            "node": "Validate pre-run lifecycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate pre-run lifecycle": {
+      "main": [
+        [
+          {
+            "node": "Run pinned Aggregator body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run pinned Aggregator body": {
+      "main": [
+        [
+          {
+            "node": "Collapse body completion to one item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collapse body completion to one item": {
+      "main": [
+        [
+          {
+            "node": "Verify post-run 27/27 barrier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify post-run 27/27 barrier": {
+      "main": [
+        [
+          {
+            "node": "Validate post-run lifecycle and select report owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate post-run lifecycle and select report owner": {
+      "main": [
+        [
+          {
+            "node": "Replay report for already completed run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replay report for already completed run?": {
+      "main": [
+        [
+          {
+            "node": "Call test-only replay report once",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return production-finalization report audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "meta": {
+    "testOnly": true,
+    "audit": {
+      "analysis_run_id": "3caa7a89-b137-4cf6-b23d-941fb465c8f9",
+      "source_workflow_id": "ftvmrEHoMbPOAqZG",
+      "source_version_id": "91c17313-a593-4fb9-9072-79320a958dd7",
+      "targeted_recheck_workflow_id": "nI47FcgzYwGzwGqy",
+      "targeted_recheck_version_id": "13b3c124-4fef-4a6f-9d5f-8befa3725bc1",
+      "finalization_workflow_id": "cSsh9yjpS7t5p0OO",
+      "finalization_version_id": "742051fe-a58a-4e03-afa6-6233c0177247",
+      "report_workflow_id": "ckPnP3hRhKu4Mf9u",
+      "report_version_id": "9d095af6-b60d-4ad9-8061-432201ec0e8e",
+      "runner_contract_version": "tender_aggregator_e2e_pin_runner_v1",
+      "report_policy_version": "one_report_per_runner_execution_v1"
+    }
+  }
+}

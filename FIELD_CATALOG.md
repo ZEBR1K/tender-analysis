@@ -126,7 +126,7 @@ Report generation
 | 8 | `customer` | Заказчик | CURRENTLY_DEFINED | text | `primary_customer.name` | ✅ | ✅ | ❌ |
 | 9 | `customer_contacts` | Контактная информация Заказчика | CURRENTLY_DEFINED | composite text | — | ✅ | ✅ | ❌ |
 | 10 | `participation_cost` | Стоимость участия | CURRENTLY_DEFINED | amount/terms text | — | ✅ | ✅ | ❌ |
-| 11 | `participation_guarantee` | БГ на участие | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | guarantee/security text | — | ✅ | ✅ | ❌ |
+| 11 | `participation_guarantee` | БГ на участие | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | guarantee/security text | — | ✅ | ✅ | ⚠️ containment-only |
 | 12 | `evaluation_criteria` | Критерии оценки | CURRENTLY_DEFINED | composite text | — | ✅ | ✅ | ❌ |
 | 13 | `delivery_term` | Срок поставки (исполнения) | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | date/period text | — | ✅ | ✅ | ✅ |
 | 14 | `payment_terms` | Условия оплаты: аванс и остаток | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | composite text | — | ✅ | ✅ | ❌ |
@@ -138,7 +138,7 @@ Report generation
 | 20 | `advance_contract_guarantee` | БГ аванс (исполнение договора) | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | guarantee/security text | — | ✅ | ✅ | ❌ |
 | 21 | `warranty_obligations_guarantee` | БГ гарантийные обязательства | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | guarantee/security text | — | ✅ | ✅ | ✅ |
 | 22 | `licenses_certificates` | Необходимые лицензии/сертификаты | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | list/composite text | — | ✅ | ✅ | ❌ |
-| 23 | `required_official_certificates` | Необходимые справки | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | list/composite text | — | ✅ | ✅ | ❌ |
+| 23 | `required_official_certificates` | Необходимые справки | ⚠️ REQUIRES_BUSINESS_CONFIRMATION | list/composite text | — | ✅ | ✅ | ⚠️ containment-only |
 | 24 | `similar_supply_experience` | Требование по опыту аналогичных поставок | CURRENTLY_DEFINED | composite text | — | ✅ | ✅ | ❌ |
 | 25 | `analog_allowed` | Допускается ли к поставке аналог | CURRENTLY_DEFINED | boolean-like + conditions | — | ✅ | ✅ | ❌ |
 | 26 | `analog_definition` | Что считается аналогом | CURRENTLY_DEFINED | composite text | — | ✅ | ✅ | ❌ |
@@ -545,6 +545,24 @@ Round 2: ❌
 ### До уточнения
 
 Сохранять текущую более широкую трактовку.
+
+### Safety contract до точного доказательства
+
+Общие правила, банковские требования, сроки возврата и формулировки вида
+«если предусмотрено» или «размер устанавливается в пункте …» сами по себе не
+доказывают, что обеспечение заявки применимо именно к этой закупке и каков его
+размер. Такой material нельзя завершать как `resolved` только по формальной
+полноте candidate list.
+
+```text
+Round 1 reported resolved без proof применимости/размера
+→ requires_recheck
+
+terminal Round 2 без такого proof
+→ requires_review с provisional value/evidence
+```
+
+Отсутствие proof не означает `не требуется`, `нет` или `not_found`.
 
 ### Не путать
 
@@ -1075,13 +1093,32 @@ licenses_certificates
 
 Использовать эту границу.
 
+### Safety contract полноты
+
+`resolved` должен покрывать material обязательные официальные документы о
+participant/status, а не только один их подтип. Налоговые справки не закрывают
+автоматически выписки ЕГРЮЛ/ЕГРИП, реестр МСП, документы о регистрации/постановке
+на учёт и иные обязательные официальные подтверждения, даже если часть материала
+была извлечена в соседнее `application_documents`.
+
+```text
+Round 1 reported resolved без proof material completeness
+→ requires_recheck
+
+terminal Round 2 без такого proof
+→ requires_review с provisional value/evidence
+```
+
+Это containment-only покрытие: оно сохраняет audit и не создаёт отрицательный
+факт из отсутствия информации.
+
 ### Реализация
 
 ```text
 Extractor: ✅
 Round 1: ✅
 Targeted Recheck: ✅
-Round 2: ❌
+Round 2: ⚠️ containment-only; semantic resolver не доказан
 ```
 
 ---

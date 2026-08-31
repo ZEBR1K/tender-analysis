@@ -12,8 +12,20 @@ export function evaluateApplicationDocumentsOracle({
     'no_reliable_candidate',
     'other',
   ]);
+  const decisionFactId = (decision) => {
+    if (typeof decision.fact_id === 'string') return decision.fact_id;
+    if (
+      typeof decision.candidate_ref === 'string' &&
+      decision.candidate_ref.startsWith('fact:')
+    ) {
+      return decision.candidate_ref.slice('fact:'.length);
+    }
+    return null;
+  };
   const decisionsById = new Map(
-    checked.candidate_decisions.map((decision) => [decision.fact_id, decision]),
+    checked.candidate_decisions
+      .map((decision) => [decisionFactId(decision), decision])
+      .filter(([factId]) => factId !== null),
   );
   const acceptedRoles = new Set([
     'primary',
@@ -56,7 +68,134 @@ export function evaluateApplicationDocumentsOracle({
     };
   }
 
-  if (route !== 'round1_final') {
+  if (route === 'round2_requires_review') {
+    const aggregationCandidates = Array.isArray(
+      checked.aggregation_input?.candidates,
+    )
+      ? checked.aggregation_input.candidates
+      : [];
+    const checkedDecisions = Array.isArray(checked.candidate_decisions)
+      ? checked.candidate_decisions
+      : [];
+    const finalDecisions = Array.isArray(final?.candidate_decisions)
+      ? final.candidate_decisions
+      : [];
+    const candidateRefs = aggregationCandidates.map(
+      ({ candidate_ref: candidateRef }) => candidateRef,
+    );
+    const checkedDecisionRefs = checkedDecisions.map(
+      ({ candidate_ref: candidateRef }) => candidateRef,
+    );
+    const finalDecisionRefs = finalDecisions.map(
+      ({ candidate_ref: candidateRef }) => candidateRef,
+    );
+    const refsAreExact = (actualRefs) =>
+      actualRefs.length === candidateRefs.length &&
+      new Set(actualRefs).size === actualRefs.length &&
+      candidateRefs.every((candidateRef) => actualRefs.includes(candidateRef));
+    const checkedDecisionsByRef = new Map(
+      checkedDecisions.map((decision) => [decision.candidate_ref, decision]),
+    );
+    const expectedAcceptedEvidence = aggregationCandidates.flatMap(
+      (candidate) => {
+        if (!acceptedRoles.has(checkedDecisionsByRef.get(candidate.candidate_ref)?.role)) {
+          return [];
+        }
+        return (Array.isArray(candidate.evidence) ? candidate.evidence : []).map(
+          (evidence) => ({ candidate_ref: candidate.candidate_ref, evidence }),
+        );
+      },
+    );
+    const finalEvidence = Array.isArray(final?.evidence) ? final.evidence : [];
+    const evidenceItemIsPreserved = ({ candidate_ref: candidateRef, evidence }) =>
+      finalEvidence.some(
+        (finalItem) =>
+          finalItem.candidate_ref === candidateRef &&
+          finalItem.analysis_unit_id === evidence.analysis_unit_id &&
+          finalItem.semantic_block_id === evidence.semantic_block_id &&
+          finalItem.quote === evidence.quote,
+      );
+    const unresolvedEgripFactId =
+      '74000000-0016-4000-8000-000000000016';
+    const unresolvedEgripCandidate = aggregationCandidates.find(
+      ({ candidate_ref: candidateRef }) =>
+        candidateRef === `fact:${unresolvedEgripFactId}`,
+    );
+    const unresolvedEgripDecision = checkedDecisionsByRef.get(
+      `fact:${unresolvedEgripFactId}`,
+    );
+
+    const checks = {
+      round2_checked_status_requires_review:
+        checked.aggregation_status === 'requires_review',
+      round2_checked_needs_recheck_is_false: checked.needs_recheck === false,
+      round2_final_exists: final !== null && final !== undefined,
+      round2_final_status_requires_review:
+        final?.aggregation_status === 'requires_review',
+      round2_final_needs_recheck_is_false: final?.needs_recheck === false,
+      round2_final_requires_human_review:
+        final?.requires_human_review === true,
+      round2_review_reason_is_allowed:
+        allowedRecheckReasonCodes.has(checked.review_reason_code) &&
+        final?.review_reason_code === checked.review_reason_code,
+      round2_review_note_is_nonempty:
+        typeof checked.review_note === 'string' &&
+        checked.review_note.trim().length > 0 &&
+        final?.review_note === checked.review_note,
+      automatic_partial_resolved_absent:
+        checked.aggregation_status !== 'resolved' &&
+        final?.aggregation_status !== 'resolved',
+      checked_candidate_decisions_preserved: refsAreExact(checkedDecisionRefs),
+      final_candidate_decisions_preserved:
+        refsAreExact(finalDecisionRefs) &&
+        JSON.stringify(finalDecisions) === JSON.stringify(checkedDecisions),
+      accepted_candidate_evidence_preserved:
+        expectedAcceptedEvidence.length > 0 &&
+        expectedAcceptedEvidence.every(evidenceItemIsPreserved),
+      round2_audit_provenance_preserved:
+        final?.aggregation_round === 2 &&
+        final?.recheck_attempt === checked.recheck_attempt &&
+        JSON.stringify(final?.original_aggregation) ===
+          JSON.stringify(checked.original_aggregation) &&
+        JSON.stringify(final?.recheck_profile) ===
+          JSON.stringify(checked.recheck_profile) &&
+        final?.targeted_recheck_result?.post_validator_route ===
+          checked.post_validator_route,
+      unresolved_egrip_requirement_not_reliably_resolved:
+        unresolvedEgripCandidate?.validator_verdict === 'requires_review' &&
+        /ЕГРИП.*не позднее 6 месяцев/iu.test(
+          unresolvedEgripCandidate?.value_text ?? '',
+        ) &&
+        unresolvedEgripDecision !== undefined &&
+        !acceptedRoles.has(unresolvedEgripDecision.role) &&
+        final?.aggregation_status === 'requires_review',
+    };
+
+    return {
+      passed: Object.values(checks).every(Boolean),
+      semantic_outcome: 'round2_requires_review_evaluated',
+      checks,
+      failed_checks: Object.entries(checks)
+        .filter(([, passed]) => !passed)
+        .map(([name]) => name),
+      observed: {
+        route,
+        checked_status: checked.aggregation_status,
+        final_status: final?.aggregation_status ?? null,
+        needs_recheck: checked.needs_recheck,
+        review_reason_code: checked.review_reason_code ?? null,
+        review_note: checked.review_note ?? null,
+        candidate_count: candidateRefs.length,
+        checked_decision_count: checkedDecisionRefs.length,
+        final_decision_count: finalDecisionRefs.length,
+        expected_accepted_evidence_count: expectedAcceptedEvidence.length,
+        final_evidence_count: finalEvidence.length,
+        unresolved_egrip_role: unresolvedEgripDecision?.role ?? null,
+      },
+    };
+  }
+
+  if (route !== 'round1_final' && route !== 'round2_final') {
     return {
       passed: false,
       semantic_outcome: 'invalid_route_contract',
@@ -146,7 +285,10 @@ export function evaluateApplicationDocumentsOracle({
 
   return {
     passed: Object.values(checks).every(Boolean),
-    semantic_outcome: 'round1_final_evaluated',
+    semantic_outcome:
+      route === 'round2_final'
+        ? 'round2_final_evaluated'
+        : 'round1_final_evaluated',
     checks,
     failed_checks: Object.entries(checks)
       .filter(([, passed]) => !passed)

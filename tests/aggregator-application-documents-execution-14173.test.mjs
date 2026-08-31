@@ -173,14 +173,27 @@ function evaluateRequiresReviewCorroborationControl({
 
 function assertControlExpectation(caseFixture, pipeline) {
   const expectation = caseFixture.semantic_expectation;
+  const reportedResult =
+    pipeline.checked.semantic_aggregator_meta?.reported_result ??
+    pipeline.checked;
+  const containmentApplied =
+    pipeline.checked.semantic_aggregator_meta?.containment_applied === true;
   const decisionById = new Map(
-    pipeline.checked.candidate_decisions.map((decision) => [
+    reportedResult.candidate_decisions.map((decision) => [
       decision.fact_id,
       decision,
     ]),
   );
-  assert.equal(pipeline.checked.aggregation_status, expectation.status);
-  assert.equal(pipeline.route, expectation.route);
+  assert.equal(reportedResult.status ?? pipeline.checked.aggregation_status, expectation.status);
+  if (containmentApplied) {
+    assert.equal(expectation.route, 'round1_final');
+    assert.equal(pipeline.checked.aggregation_status, 'requires_recheck');
+    assert.equal(pipeline.route, 'targeted_recheck');
+    assert.equal(pipeline.final, null);
+  } else {
+    assert.equal(pipeline.checked.aggregation_status, expectation.status);
+    assert.equal(pipeline.route, expectation.route);
+  }
   for (const [factId, expectedRole] of Object.entries(expectation.required_roles)) {
     assert.equal(
       decisionById.get(factId)?.role,
@@ -188,7 +201,11 @@ function assertControlExpectation(caseFixture, pipeline) {
       `Unexpected role for control fact_id=${factId}`,
     );
   }
-  const finalText = String(pipeline.final?.final_value_text ?? '').toLocaleLowerCase('ru-RU');
+  const finalText = String(
+    containmentApplied
+      ? reportedResult.final_value_text
+      : pipeline.final?.final_value_text ?? '',
+  ).toLocaleLowerCase('ru-RU');
   for (const fragment of expectation.final_value_must_include) {
     assert.equal(
       finalText.includes(fragment.toLocaleLowerCase('ru-RU')),
@@ -398,7 +415,7 @@ test('safe synthetic execution-derived requires_recheck response passes the rout
   );
 });
 
-test('synthetic oracle control: a directly corroborated requires_review clause may resolve', async () => {
+test('synthetic oracle control: a directly corroborated raw result is still contained in Round 1', async () => {
   const caseFixture = loadControlsFixture().cases.find(
     ({ case_id: caseId }) =>
       caseId === 'directly_corroborated_requires_review_clause',
@@ -412,19 +429,28 @@ test('synthetic oracle control: a directly corroborated requires_review clause m
   });
   const oracle = evaluateRequiresReviewCorroborationControl({
     caseFixture,
-    checked: pipeline.checked,
-    final: pipeline.final,
-    route: pipeline.route,
+    checked: {
+      ...pipeline.checked.semantic_aggregator_meta.reported_result,
+      aggregation_status:
+        pipeline.checked.semantic_aggregator_meta.reported_status,
+    },
+    final: {
+      final_value_text:
+        pipeline.checked.semantic_aggregator_meta.reported_result.final_value_text,
+    },
+    route: 'round1_final',
   });
 
-  assert.equal(pipeline.route, 'round1_final');
-  assert.equal(pipeline.checked.aggregation_status, 'resolved');
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.checked.aggregation_status, 'requires_recheck');
+  assert.equal(pipeline.final, null);
+  assert.equal(pipeline.checked.semantic_aggregator_meta.reported_status, 'resolved');
   assert.equal(oracle.checks.explicit_link_is_direct_and_complete, true);
   assert.equal(oracle.checks.linked_confirmed_fact_matches_clause, true);
   assert.equal(oracle.passed, true);
 });
 
-test('synthetic oracle control: an unrelated confirmed fact cannot close an unresolved clause', async () => {
+test('synthetic oracle control: an unrelated raw fact remains invalid while Round 1 is contained', async () => {
   const caseFixture = loadControlsFixture().cases.find(
     ({ case_id: caseId }) =>
       caseId === 'unrelated_confirmed_fact_does_not_corroborate_clause',
@@ -438,13 +464,22 @@ test('synthetic oracle control: an unrelated confirmed fact cannot close an unre
   });
   const oracle = evaluateRequiresReviewCorroborationControl({
     caseFixture,
-    checked: pipeline.checked,
-    final: pipeline.final,
-    route: pipeline.route,
+    checked: {
+      ...pipeline.checked.semantic_aggregator_meta.reported_result,
+      aggregation_status:
+        pipeline.checked.semantic_aggregator_meta.reported_status,
+    },
+    final: {
+      final_value_text:
+        pipeline.checked.semantic_aggregator_meta.reported_result.final_value_text,
+    },
+    route: 'round1_final',
   });
 
-  assert.equal(pipeline.route, 'round1_final');
-  assert.equal(pipeline.checked.aggregation_status, 'resolved');
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.checked.aggregation_status, 'requires_recheck');
+  assert.equal(pipeline.final, null);
+  assert.equal(pipeline.checked.semantic_aggregator_meta.reported_status, 'resolved');
   assert.equal(oracle.checks.explicit_link_is_direct_and_complete, true);
   assert.equal(oracle.checks.linked_confirmed_fact_matches_clause, false);
   assert.equal(oracle.passed, false);

@@ -1,8 +1,8 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-08-30
+**Snapshot date:** 2026-08-31
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `main`
+**Branch at snapshot:** `codex/fix-aggregator-execution-14254`
 
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
@@ -40,8 +40,10 @@ Production PostgreSQL и published production workflows в текущем цик
 
 | Workflow | ID | Active | Current purpose |
 |---|---|---:|---|
-| `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | runtime canary Document Worker, 60 nodes, version `2f3e1ea6-…`; Extractor alias синхронизирован с tested beta baseline |
-| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | no | AG-8 verified test candidate, 24 nodes, version `0147805e-…` |
+| `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | legacy calibration/runtime workflow, 60 nodes, current unpublished version `55664cef-…`; последние executions `14147–14158`, в клиентском 12-document run не участвовал |
+| `[PROD CANDIDATE] TENDER — Обработать документ` | `csnDg78NzN1nIjUT` | yes | фактический Worker клиентского 12-document run; published active version `c5977af5-…` с 51-node execution graph, current unpublished draft `778dfb50-…` содержит 52 nodes; executions `14234/14238` воспроизводят `DW-17` |
+| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published containment candidate `91c17313-…`; fresh canary и consecutive series `3/3` GREEN |
+| `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | technical fallback candidate `13b3c124-…`; fresh canary и consecutive series `3/3` GREEN |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
 
@@ -89,6 +91,8 @@ Gemini 3.7 Flash low оставлен fallback-кандидатом. Поиск 
 MCP read-back тестового Worker подтвердил атомарное изменение только `AI Extractor v1.0`: alias приведён с временного `@provider=deepinfra/fp8` к протестированному `@provider=cloudflare`; workflow остался inactive/unpublished, node count `60`, connections, settings, pin data и credentials не изменились.
 
 Этот выбор подтверждает только сравнительный Extractor result. Full path Evidence Repair → AI Validator → persistence с выбранной связкой ещё требует отдельного runtime canary.
+
+Текущий `[PROD CANDIDATE]` Worker является отдельным live test contour и не равен ни `[3 TEST]`, ни canonical repository export. Перед исправлением `DW-17` или `DW-18` нужно сначала получить exact active/draft diff `c5977af5-… → 778dfb50-…` и определить назначение draft-only 52-й ноды; молчаливо редактировать draft как эквивалент execution `14234` нельзя.
 
 ### Runtime evidence
 
@@ -198,9 +202,9 @@ Canary artifact SHA-256: `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52e
 
 Это подтверждает только безопасную границу Round 1: ложный FINAL не создан. Полнота и окончательная семантика `application_documents` остаются не подтверждены до проверки Targeted Recheck. Production Aggregator и Targeted Recheck не изменялись.
 
-### Targeted Recheck read-only audit 2026-08-30
+### Targeted Recheck read-only audit and local TR-10 containment — 2026-08-30
 
-Live workflow `9uDOU31DGo30fGXX` является authoritative implementation: active, 64 nodes, version `4e0858c9-6ca2-42c7-969b-e74a2f91b8c6`. Canonical local export содержит 63 nodes/version `7f82ae43-2ddc-4568-8d76-a6d460c13924`; live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. Параметры четырёх критических Round 2 нод совпадают между live и local:
+Live workflow `9uDOU31DGo30fGXX` является authoritative production implementation: active, 64 nodes, version `4e0858c9-6ca2-42c7-969b-e74a2f91b8c6`. Canonical local export содержит 63 nodes/version `7f82ae43-2ddc-4568-8d76-a6d460c13924`; live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. До local containment параметры четырёх критических Round 2 нод совпадали между live и local:
 
 ```text
 Собрать candidates для Round 2
@@ -209,7 +213,9 @@ Live workflow `9uDOU31DGo30fGXX` является authoritative implementation: 
 Сформировать FINAL после Round 2
 ```
 
-Audit подтвердил сильные structural guards: evidence grounding, allow-list candidate linking, cardinality и hard error для malformed/empty AI response. Но для составного `application_documents` отсутствует terminal completeness barrier: Round 2 может структурно принять частичный `resolved`, если один новый candidate подтверждён, хотя другие существенные clauses исходного набора не закрыты. Такой результат способен материализовать неполный FINAL и является P0 `false_resolved` risk (`TR-10`) до клиентского отчёта.
+Audit подтвердил сильные structural guards: evidence grounding, allow-list candidate linking, cardinality и hard error для malformed/empty AI response. Но LIVE для составного `application_documents` не имеет terminal completeness barrier: Round 2 может структурно принять частичный `resolved`, если один новый candidate подтверждён, хотя другие существенные clauses исходного набора не закрыты.
+
+В local canonical candidate изменена только Code-нода `Проверить ответ #2 Semantic Aggregator`. После всех raw validations комбинация `tender_fields_v1 + Round 2 + application_documents + reported resolved` получает effective terminal `requires_review`, `review_reason_code=insufficient_evidence`, непустой universal note и audit policy `application_documents_round2_requires_review_v1`. `needs_recheck=false`; decisions, lists, provisional text, evidence и upstream audit сохраняются. Другие поля не затронуты, raw `application_documents/requires_review` сохраняет исходные reason/note.
 
 Отдельный operational gap (`TR-11`): provider/checker failure fail-closed и не создаёт ложный FINAL, но текущая ветка не доказывает обязательный terminal field result или гарантированный alert. Это может оставить run незавершённым; исправление не смешивается с semantic regression.
 
@@ -220,23 +226,216 @@ FIELD_CATALOG.md: application_documents Round 2 = ❌
 live/local Targeted Recheck: общий Round 2 profile реализован
 ```
 
-`FIELD_CATALOG.md` остаётся authoritative для смысла поля, live workflow — для фактического runtime поведения. До отдельного решения каталог не изменяется; regression должен проверять канонический смысл поля на фактическом live Round 2 contract.
+`FIELD_CATALOG.md` остаётся authoritative для смысла поля, live workflow — для фактического production поведения, local canonical export — mutable promotion candidate. Каталог не изменялся.
 
-Runtime terminal result `application_documents` после safe Round 1 deferral не подтверждён. Verdict готовности Targeted Recheck к автоматическому клиентскому отчёту: `REJECT` до RED-regression и последующего минимального fix.
+`TR-10` mitigated/GREEN только в local canonical candidate. Immutable LIVE diagnostic продолжает воспроизводить partial `false_resolved`; production promotion/runtime result не подтверждены. Verdict готовности LIVE Targeted Recheck к автоматическому клиентскому отчёту остаётся `REJECT`.
+
+### Targeted Recheck execution 14256 / TR-12 draft checkpoint — 2026-08-31
+
+Execution `14256` подтвердил fail-closed prompt/checker mismatch: prompt разрешал exact evidence из `EXISTING CANDIDATES`, а evidence checker доверял только `allowed_semantic_blocks`. В local canonical export checker теперь строит exact trusted union и допускает только однозначное исправление `analysis_unit_id` при неизменных `semantic_block_id` и normalized exact quote; prompt явно запрещает изобретать или перепечатывать coordinates. Полная итоговая prompt-версия сохранена в `prompts/targeted-recheck-extractor-system-prompt-v1.1-2026-08-31.txt`.
+
+Offline exact-execution harness сохранил 43/43 evidence для `application_documents`, принял 25 exact existing-only references и записал один audit repair `doc_3_au_0007 → doc_3_au_0006` для `sb_0227`. Все пять child items прошли реальный checker; текущая Validator preparation сохранила 43 evidence и repair audit. Related suite: `62/62`; полный offline suite: `208 total / 207 pass / 1 intentional AG-8 RED`.
+
+После local GREEN обновлён только unpublished draft тестового workflow `nI47FcgzYwGzwGqy`:
+
+```text
+draft versionId = bca1746c-abcb-4490-a455-1daa6ac22092
+activeVersionId = d74f1f17-c80f-4499-bf56-b0f7daab594b (unchanged)
+prepare local/live SHA-256 = acb91d5136a0e063359bc36493dca6bcf60c04e490022a7728324cf5c8190ab3
+checker local/live SHA-256 = 74c32f4d85b91e17665846346e02df492d827f7c86ddf70313627b4d8f064138
+nodes = 63; graph/connections/credentials/settings/pinData unchanged
+```
+
+После независимого review версия `bca1746c-abcb-4490-a455-1daa6ac22092` опубликована только в тестовом workflow; `draft=active`. Это всё ещё **не runtime GREEN** до PIN-data canary. Production Targeted Recheck, PostgreSQL и credentials не изменялись; paid AI на этом checkpoint ещё не запускался.
+
+### Test-only Aggregator E2E PIN runner — published, not executed — 2026-08-31
+
+Для прямого запуска test Aggregator с Execute Workflow Trigger опубликован изолированный test harness:
+
+```text
+body: gsoPfP4PSjcJjPfa@18c770bb-70b5-4448-b3a5-d251057ea343
+truthful replay Report: b4Ga1PoFmlS5ep6Y@8570c7ac-b01a-4421-a2e1-454e85cc7173
+Webhook controller: U0S3Oyq5pYfiWVDE@90a69f3b-9c26-46a5-9fba-cb96eee23105
+POST /webhook/test-codex-tender-aggregator-e2e-3caa7a89
+```
+
+Body fail closed принимает только exact audited contract для run `3caa7a89-b137-4cf6-b23d-941fb465c8f9` и двух сохранённых PIN payload. Он не повторяет atomic claim SQL, а inject-ит сохранённый claim output; все 22 business nodes и connections после claim совпадают с test Aggregator. Test Targeted Recheck, реальные LLM, FINAL persistence и production Finalization остаются в downstream graph.
+
+Controller проверяет lifecycle и exact 27/27 DB barrier до/после body. Первый run со статусом `aggregating` оставляет единственный report production Finalization. Повторы уже `completed` используют отдельный test-only Report replay с truthful `completion_claimed=false`, `finalization_state=already_completed` и explicit authorization; восемь последующих Report nodes и connections совпадают с production Report.
+
+Offline runner regression `8/8 PASS`; published structural parity: body `22/22`, Report downstream `8/8`, controller не вызывает production Report напрямую. Prompts не менялись. Paid E2E ещё не выполнялся; controller является временным публичным test endpoint и должен быть снят с публикации после серии испытаний.
+
+#### Execution 14257 launch regression checkpoint
+
+Первый canary controller `14257` / child body `14258` завершился fail-closed до LLM и downstream DB writes: body guard вернул `RUNNER_CONTRACT_MISMATCH`. Child trigger получил ровно 11 declared fields, но guard ошибочно сравнивал их с 9-полевым external request и не учитывал обязательные `controller_execution_id/contract_validated`.
+
+Минимальный TDD fix опубликован только в test body/controller:
+
+```text
+body gsoPfP4PSjcJjPfa@18c770bb-70b5-4448-b3a5-d251057ea343
+controller U0S3Oyq5pYfiWVDE@90a69f3b-9c26-46a5-9fba-cb96eee23105
+```
+
+Body guard теперь проверяет exact 11, numeric controller execution ID, `contract_validated=true` и hard-fail для missing/unknown keys. Lifecycle для post-run ownership читается отдельно из pre-run DB node. Изменены параметры одной body Code node и трёх controller Code nodes; topology, SQL, Aggregator/Targeted Recheck/Finalization/Report и prompts неизменны. Runner regression `10/10 PASS`; полный основной suite `218 total / 217 pass / 1 intentional AG-8 RED`. Повторный canary ещё не выполнялся.
 
 ## 5. Test status
 
-Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
+### E2E PIN canary 14259 — technical success, semantic REJECT
+
+Полная test chain завершилась:
 
 ```text
-170 tests
-169 passed
+controller 14259 = success
+Aggregator body 14260 = success
+Targeted Recheck 14261 = success
+completion-owning Finalization 14267 = success
+Report 14268 = success; HTML artifact created
+DB run = completed; exact 27/27
+```
+
+Semantic audit: `25/27 acceptable (92.6%)`, но найдены два critical `false_resolved`: `participation_guarantee` не устанавливает фактическую применимость/размер обеспечения заявки, а `required_official_certificates` неполно ограничен налоговой справкой при наличии обязательных ЕГРЮЛ/ЕГРИП и иных official documents в grounded facts. Critical `false_not_found` не обнаружены.
+
+Verdict остаётся `REJECT` до минимального containment этих двух полей. Три confirmation runs не начаты. Подробный runtime audit: `evaluations/TENDER_E2E_PIN_CANARY_14259_2026-08-31.md`.
+
+### AG-10 / TR-13 execution-derived containment — historical offline checkpoint
+
+На fixture из body execution `14260` подтверждено, что оба critical поля проходили structural checks, но не имели независимого доказательства применимости/полноты. Минимальный field-specific containment добавлен без изменения prompts и без ослабления schema/linking/cardinality guards:
+
+```text
+Aggregator Round 1 reported resolved
+→ effective requires_recheck / insufficient_evidence
+
+Targeted Recheck terminal Round 2 reported resolved
+→ effective requires_review / insufficient_evidence
+→ needs_recheck=false / requires_human_review=true
+```
+
+Provisional value, candidates, evidence и reported/effective audit сохраняются. Изменены только unpublished test drafts:
+
+```text
+Aggregator ftvmrEHoMbPOAqZG
+draft 91c17313-a593-4fb9-9072-79320a958dd7
+active 01ff5e9d-30d2-4530-b2ff-4513224e9056
+
+Targeted Recheck nI47FcgzYwGzwGqy
+draft c43b4ed3-c384-41e9-b1d9-3636cff42ac5
+active bca1746c-abcb-4490-a455-1daa6ac22092
+
+E2E body gsoPfP4PSjcJjPfa
+draft 7566262e-4c7a-4483-a5cd-9bdfd81a95aa
+active 18c770bb-70b5-4448-b3a5-d251057ea343
+
+E2E controller U0S3Oyq5pYfiWVDE
+draft 03ac36e0-c4f8-44ea-bd52-bf41d5425012
+active 90a69f3b-9c26-46a5-9fba-cb96eee23105
+```
+
+На этом историческом checkpoint live read-back подтвердил parameter-only diff четырёх Code nodes, неизменную topology и exact body downstream parity `22/22`. Позже drafts были опубликованы и проверены canary `14279`, описанным ниже.
+
+### E2E PIN canary 14279 — technical and semantic GREEN
+
+Test drafts опубликованы и новый canary завершился до HTML report:
+
+```text
+controller 14279 = success
+Aggregator body 14280 = success
+Targeted Recheck 14281 / 14285 = success
+Report replay 14289 = success
+DB = exact 27/27
+16 resolved / 7 requires_review / 4 not_found
+semantic audit = 27/27 acceptable
+critical false_resolved = 0 observed
+critical false_not_found = 0 observed
+```
+
+`participation_guarantee` и `required_official_certificates` теперь безопасно `requires_review`. HTML artifact валиден (`484540` bytes). Предыдущий attempt `14269` не засчитывается: replay `14278` fail-closed обнаружил stale source version UUID; TDD fix опубликован как `b4Ga1PoFmlS5ep6Y@80ad3549-998f-41a0-a973-f02ef5eae46a`, downstream parity `8/8`. Prompts не менялись. Audit: `evaluations/TENDER_E2E_PIN_CANARY_14279_2026-08-31.md`.
+
+Canary gate пройден; три consecutive confirmation runs ещё pending.
+
+### Confirmation attempt 14290 — fail-closed, серия 3/3 не начата
+
+Первый post-canary confirmation attempt не засчитывается:
+
+```text
+controller 14290 = error
+Aggregator body 14291 = error
+Targeted Recheck 14292 = error
+Report = не создан
+```
+
+Первый некорректный terminal state возник в `Проверить #2 evidence Targeted Recheck`: для `results_date` модель привязала точную цитату к неверной паре `doc_2_au_0002/sb_0048`, хотя цитата находится в trusted block `doc_2_au_0001/sb_0004`. В том же execution три других ответа нарушили extractor envelope/schema contract (`participation_guarantee`, `required_official_certificates`, `application_documents`). Checker корректно остановил workflow; provider/balance error не обнаружен.
+
+Повторные paid runs приостановлены до TDD-fix: deterministic model-contract/evidence failure должен сохраняться в audit и завершать поле как technical `requires_review`, не принимая unvalidated candidate и не допуская `not_found`. Текущая последовательная серия остаётся `0/3`; canary `14279` сохраняется как отдельное успешное доказательство.
+
+### Execution 14292 technical fallback — offline GREEN, test publish complete
+
+Execution-derived TDD охватывает все семь AI envelopes `14292`. Четыре model contract/evidence violations теперь дают `technical_fallback_required=true`, `evidence_validated=false`, пустой validated candidate set и отдельный terminal `requires_review`; валидные ответы и валидный `insufficient_evidence → not_found` сохраняют прежнюю семантику. Неизвестные programming errors и отсутствующие upstream invariants продолжают hard-fail.
+
+Root verification в authoritative main checkout: focused/related `60/60`, full suite `246 total / 245 pass / 1 intentional AG-8 RED`, graph `64/64` unique nodes, secret scan clean. Test Targeted Recheck `nI47FcgzYwGqy@13b3c124-4fef-4a6f-9d5f-8befa3725bc1` опубликован; production workflows/DB и prompts не изменялись. Следующий gate — fresh E2E canary; confirmation series остаётся `0/3` до его успешного semantic audit.
+
+### Fresh post-fix canary 14294 — technical and semantic GREEN
+
+```text
+controller 14294 success
+Aggregator body 14295 success
+Targeted Recheck 14296 / 14300 success
+Report replay 14303 success
+HTML valid: 482829 bytes
+DB exact 27/27: 16 resolved / 6 requires_review / 5 not_found
+semantic audit: 27/27 acceptable
+critical false_resolved / false_not_found: 0 observed
+```
+
+Новый technical fallback в этом canary не потребовался: все Extractor envelopes/evidence были валидны. Единственное отличие статусов от `14279` — `government_contract` стал безопасным `not_found`: audit прямо фиксирует упоминание только upstream State Contract, отсутствие доказательства статуса текущего договора и запрет отрицательного вывода. Preflight `14293` исключён как root invocation-shape error, остановленный controller до body/LLM. Audit: `evaluations/TENDER_E2E_PIN_CANARY_14294_2026-08-31.md`. Confirmation series готова к старту с `0/3`.
+
+### Consecutive confirmations — 1/3 GREEN
+
+Confirmation 1 завершён цепочкой `14304 → 14305 → 14306/14310 → 14313`: все executions success, exact DB `27/27`, HTML valid `476893` bytes, semantic audit `27/27 acceptable`, zero observed critical false statuses. Распределение `16 resolved / 6 requires_review / 5 not_found`; strict checker принял все model responses, technical fallback не потребовался. Audit: `evaluations/TENDER_E2E_PIN_CONFIRMATIONS_2026-08-31.md`.
+
+Confirmation 2 завершён цепочкой `14314 → 14315 → 14316/14320 → 14324`: все executions success, exact DB `27/27`, HTML valid `477940` bytes, semantic audit `27/27 acceptable`, zero observed critical false statuses. Распределение `16 resolved / 7 requires_review / 4 not_found`; `government_contract` безопасно вернулся в `requires_review/ambiguous_scope`. Consecutive count: `2/3`.
+
+Confirmation 3 завершён цепочкой `14325 → 14326 → 14327/14331 → 14335`: все executions success, exact DB `27/27`, HTML valid `481901` bytes, semantic audit `27/27 acceptable`, zero observed critical false statuses. Распределение `16 resolved / 7 requires_review / 4 not_found`; `application_review_date` консервативно понижен в `requires_review`, а неполный `required_official_certificates` не был материализован как resolved.
+
+Итоговая consecutive series: `3/3 GREEN`. Критерий текущей test PIN-data задачи выполнен. Это не означает автоматическую production promotion всех test candidates.
+
+Temporary public controller `U0S3Oyq5pYfiWVDE` успешно unpublished после серии. Его draft/version `03ac36e0-…` сохранён для audit, но `activeVersionId=null`; внешний webhook больше не должен принимать production-вызовы.
+
+Final verification после unpublish временного controller:
+
+```text
+246 tests
+245 passed
 1 failed
 ```
 
-Единственный падающий test — намеренный `AG-8` production promotion gate: canonical production Aggregator ещё не содержит verified test boundary. Targeted `application_documents` suite проходит `24/24`.
+Единственный падающий test — намеренный `AG-8` production promotion gate. Focused E2E runner suite проходит `11/11`; live verifier подтверждает exact active versions/parity body, replay Report, source Aggregator и Targeted Recheck, а controller имеет `active=false`, `activeVersionId=null`. `git diff --check` не обнаружил whitespace errors (только ожидаемые предупреждения Git о будущей нормализации LF/CRLF).
 
 Этот checkpoint не является release-ready или production-ready состоянием.
+
+### Preliminary client report checkpoint 14336 / 14345 — partial and not client-final
+
+После test PIN confirmation series пользователь вручную запустил текущий test Aggregator на том же сохранённом run:
+
+```text
+analysis_run_id = 3caa7a89-b137-4cf6-b23d-941fb465c8f9
+Aggregator 14336 = success
+Targeted Recheck 14337 / 14341 = success
+Finalization calls 14338–14343 = success
+test Report replay 14345 = success
+```
+
+Получен HTML по 27 полям и локально создан предварительный A4 PDF. Это не clean 12/12 run: документ `Приложение_к_Блоку_7._ИТТ.pdf` ранее был вручную переведён в `failed`, run агрегирован как `11 completed / 1 failed`, а report replay использовал уже существующий 27/27 DB snapshot.
+
+Сравнение с исходными документами и краткой справкой сотрудника подтвердило:
+
+1. площадка определена корректно: ЭТП ГПБ — основная площадка, «Стратег» — отдельная закрытая секция;
+2. `national_regime` в отчёте является P0 `false_resolved`: оригинальный DOCX явно выбирает `Не применимо`, но pipeline потерял selected state и принял общие положения ПП 1875 как доказательство применимости;
+3. `participation_guarantee` безопасно остался `requires_review`, но оригинальный DOCX явно выбирает `Не предусмотрены`; selected negative также потерян;
+4. сумма `24 900` для `participation_cost` отсутствует в предоставленных DOCX, text-readable PDF, OCR execution `14234` и пустом TenderMeta. Найденное `Плата не предусмотрена` относится к плате за предоставление документации, а не к тарифу ЭТП.
+
+Root cause для пунктов 2–3 подтверждён в source OOXML: отметки реализованы ActiveX controls (`w:control` и связанные `word/activeX/*`), тогда как semantic blocks содержат option labels без selected/unselected state. Это отдельный P0 `DW-18 / AG-11`; он не закрыт containment-серией `3/3`, потому что та воспроизводила уже сохранённые Aggregator PIN data после parsing.
+
+Предварительный PDF допустим только с явным сопроводительным предупреждением об `11/12`, OCR gap и известных корректировках. Автоматически клиентским финальным отчётом его считать нельзя.
 
 ## 6. Verified / not verified
 
@@ -257,8 +456,16 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 - paid runtime canary точного beta artifact безопасно выбрал `targeted_recheck/ambiguous_scope`, не создал Round 1 FINAL и прошёл route-aware oracle;
 - read-only refresh live Targeted Recheck подтвердил active version `4e0858c9-…`, 64 nodes и точное совпадение параметров четырёх core Round 2 нод с local export;
 - deterministic Targeted Recheck guards fail closed по schema/cardinality/linking/evidence; это не доказывает semantic completeness составного FINAL;
+- mutable canonical Targeted Recheck gate детерминированно понижает `application_documents` Round 2 reported `resolved` до effective terminal `requires_review/insufficient_evidence`, сохраняя audit/evidence;
+- neutral `procurement_subject/resolved` и raw `application_documents/requires_review` controls проходят без containment;
+- execution-derived `AG-10/TR-13` containment для `participation_guarantee` и `required_official_certificates` проходит offline tests и не ослабляет universal structural guards;
+- E2E runner drafts сохраняют exact post-claim Aggregator parity `22/22` после переноса containment;
 - immutable Document Worker beta snapshot сохранён с ожидаемым SHA-256;
 - canonical Document Worker JSON является clean offline production candidate, а beta→canonical packaging contract проходит regression.
+- executions `14336`, `14337`, `14341` и report replay `14345` успешно завершили сохранённый partial `11/12` contour до HTML;
+- визуальный и OOXML audit исходного `Блок_2_Информационная_карта.docx` подтвердил explicit selections `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`;
+- Aggregator execution `14336` подтвердил первый incorrect terminal state для `national_regime`: Round 1 accepted `resolved` по generic/conditional PP 1875 candidates;
+- Targeted Recheck `14337` корректно зафиксировал `insufficient_evidence` для `participation_guarantee`, потому что его context уже не содержал option-state.
 
 ### Not verified
 
@@ -266,12 +473,16 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 - full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
 - production promotion `application_documents` boundary;
-- terminal Targeted Recheck и окончательный полный FINAL для `application_documents` после safe deferred route;
-- RED-regression, воспроизводящий partial `false_resolved` через exact current Round 2 Code nodes;
+- promotion и runtime canary local Targeted Recheck candidate в LIVE contour;
+- terminal production Targeted Recheck и окончательный полный FINAL для `application_documents` после safe deferred route;
 - terminal error/alert semantics для provider/checker failure в Targeted Recheck;
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
+- deterministic extraction/preservation DOCX ActiveX radio/checkbox state (`DW-18`);
+- Aggregator fail-closed applicability boundary для ambiguous option tables и generic national-regime clauses (`AG-11`);
+- grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
+- финальный клиентский отчёт без известных `national_regime`/option-state расхождений.
 
 ## 7. Canonical export drift
 
@@ -279,8 +490,8 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 
 - `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` — неизменяемый 60-node test/calibration snapshot;
 - Document Worker canonical path — clean inactive 51-node offline production candidate без instance identity и test state;
-- Aggregator local export содержит 38 nodes и совпадает с published active node set/connections; известное отличие параметров — provider pin в model alias ноды `Semantic Aggregator`;
-- Targeted Recheck live содержит 64 nodes/version `4e0858c9-…`, local canonical export — 63 nodes/version `7f82ae43-…`; live-only disconnected test evidence node не меняет core path, а четыре проверяемые Round 2 ноды совпадают параметрами;
+- test Aggregator published active `91c17313-…` содержит execution-derived `AG-10` containment;
+- test Targeted Recheck published active `13b3c124-…` содержит `TR-10/TR-13` containment и audited technical `requires_review` fallback для execution `14292`;
 - 24-нoded production Aggregator draft не опубликован и соответствует очищенному core graph без disabled legacy/test nodes;
 - защищённые workflow JSON не изменялись автоматически в рамках этого checkpoint.
 
@@ -291,11 +502,15 @@ Fresh full offline suite after the Aggregator A/B harness on 2026-08-29:
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-Targeted Recheck application_documents terminal RED-regression
-→ минимальный fix только после подтверждённого RED
-→ Aggregator AG-8 / application_documents production-candidate audit
-→ full Document Worker runtime canary
-→ fresh full 27/27 run
-→ 27/27 manual semantic review
-→ client report
+DW-18 / AG-11 execution-derived RED на исходном DOCX
+→ deterministic selected/unselected option-state contract
+→ Worker/Aggregator runtime canary на national_regime и participation_guarantee
+→ DW-17 reference-only evidence repair для failed OCR document
+→ clean 12/12 document run from Orchestrator
+→ exact 27/27 FINAL
+→ ручная клиентская проверка и отправка отчёта Дмитрию
 ```
+
+Текущий test PIN-data contour готов по согласованному gate: fresh canary и три последовательных подтверждения дошли до отчёта, каждый semantic audit дал `27/27 acceptable` и zero observed critical false statuses. Ограничение: это replay сохранённых Aggregator PIN data, сформированных после ранее согласованного обхода одного failed документа; это не новый clean full run всех `12/12` документов.
+
+Immediate business state: предварительный отчёт можно отправить Дмитрию только как partial `11/12` с перечислением известных ограничений. Технический следующий шаг для Hermes — не новый model benchmark, а минимальный TDD fix `DW-18 / AG-11` на exact source document.

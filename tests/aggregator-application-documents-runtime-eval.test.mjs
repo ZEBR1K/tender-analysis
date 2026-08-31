@@ -166,7 +166,7 @@ test('runtime evaluator rejects production workflow and has no production fallba
   );
 });
 
-test('recorded schema-valid false-resolved response returns exit 1 with actionable oracle failures', async () => {
+test('recorded schema-valid false-resolved response is contained and returns safe exit 3', async () => {
   const fixture = loadFixture();
   const result = await runtimeEvaluator.evaluateOfflineModelResponse({
     mode: 'recorded',
@@ -175,17 +175,27 @@ test('recorded schema-valid false-resolved response returns exit 1 with actionab
     workflowPath: betaAggregatorWorkflowPath,
   });
 
-  assert.equal(result.exitCode, 1);
+  assert.equal(result.exitCode, 3);
   assert.equal(result.payload.ai_called, false);
   assert.equal(result.payload.checker_accepted, true);
-  assert.equal(result.payload.route, 'round1_final');
-  assert.equal(result.payload.final_status, 'resolved');
-  assert.equal(result.payload.semantic_oracle_passed, false);
-  assert.ok(result.payload.failed_checks.length > 0);
-  assert.equal(result.payload.false_resolved_prevented, false);
+  assert.equal(result.payload.route, 'targeted_recheck');
+  assert.equal(result.payload.final_status, null);
+  assert.equal(result.payload.semantic_oracle_passed, true);
+  assert.deepEqual(result.payload.failed_checks, []);
+  assert.equal(result.payload.false_resolved_prevented, true);
   assert.equal(typeof result.payload.ambiguous_candidate_roles['0024'], 'string');
   assert.equal(typeof result.payload.ambiguous_candidate_roles['0028'], 'string');
-  assert.equal(typeof result.payload.final_value_text, 'string');
+  assert.equal(result.payload.final_value_text, null);
+  assert.equal(result.pipeline.final, null);
+  assert.equal(
+    result.pipeline.checked.semantic_aggregator_meta.reported_status,
+    'resolved',
+  );
+  assert.equal(
+    typeof result.pipeline.checked.semantic_aggregator_meta.reported_result
+      .final_value_text,
+    'string',
+  );
 });
 
 test('synthetic requires_recheck response returns exit 3, skips FINAL, and passes route-aware oracle', async () => {

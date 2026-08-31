@@ -548,7 +548,11 @@ Canonical `workflows/n8n-exports/TENDER — Обработать докумен�
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
-Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Последующий read-only аудит live Targeted Recheck выявил P0 `TR-10`: Round 2 structural checker не доказывает completeness composite result и потенциально допускает частичный `resolved`. До RED-regression и минимального fix terminal correctness не подтверждена.
+Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Последующий read-only аудит live Targeted Recheck выявил P0 `TR-10`: Round 2 structural checker не доказывает completeness composite result и допускает частичный `resolved`. Local canonical Targeted Recheck candidate теперь содержит field-specific containment: `tender_fields_v1/application_documents/Round 2/reported resolved` становится effective terminal `requires_review/insufficient_evidence` с audit и сохранением decisions/evidence. LIVE workflow не изменён и остаётся vulnerable до promotion/runtime canary.
+
+Первый полный test E2E для run `3caa7a89-b137-4cf6-b23d-941fb465c8f9` технически завершился: controller `14259`, body Aggregator `14260`, Targeted Recheck `14261`, completion owner `14267` и Report `14268` успешны; DB содержит ровно 27 FINAL (`19 resolved / 3 requires_review / 5 not_found`) и HTML artifact. Semantic audit принял 25/27, но отклонил canary из-за двух critical `false_resolved`: `participation_guarantee` не доказал применимость/размер обеспечения, а `required_official_certificates` не доказал полноту обязательных документов о статусе участника. Для обоих полей test drafts теперь применяют один audited safety contract: Round 1 reported `resolved` → effective `requires_recheck`; terminal Round 2 reported `resolved` → effective `requires_review`, сохраняя provisional text, candidates/evidence и reported/effective audit.
+
+Baseline canary `14279/14280/14281/14285/14289` затем дал exact 27/27 и semantic audit 27/27. Первая confirmation attempt `14290/14291/14292` не засчитана: четыре из семи Targeted Recheck AI payload нарушили contract/evidence validation, первым был точный mismatch `results_date candidate[0].evidence[4]`. Unpublished draft `nI47FcgzYwGzwGqy@13b3c124-4fef-4a6f-9d5f-8befa3725bc1` содержит typed technical fallback: только локальные model-validation errors становятся terminal `requires_review` через отдельный route; `evidence_validated=false`, AI candidates не принимаются, raw response/error/source/original candidates сохраняются. Валидный `insufficient_evidence` по-прежнему может завершиться безопасным `not_found`. Новая confirmation series ещё не начата.
 
 Production Aggregator не менялся. Production promotion остаётся отдельным intentional RED gate, а fresh full 27/27 run после hardening ещё не выполнен. A/B harness не обращался к БД/n8n, менял только `request.model` и не изменял workflow/fixture.
 
@@ -574,6 +578,9 @@ verified beta boundary → canonical production candidate
 application_documents Targeted Recheck
 safe deferred Round 1 → проверенный terminal result
 
+participation_guarantee / required_official_certificates containment
+baseline canary GREEN → technical fallback review → fresh confirmation
+
 Document Worker promotion
 clean offline candidate → test workflow promotion / wiring → runtime canary
 
@@ -590,17 +597,17 @@ test workflow promotion / wiring
 Текущая точка продолжения после AG-8 и `application_documents` test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
 
 ```text
-application_documents Targeted Recheck terminal RED-regression
-→ минимальный fix после подтверждённого RED
+application_documents Targeted Recheck local TR-10 candidate review
+→ отдельное решение о production promotion
+→ runtime canary application_documents
 → Aggregator AG-8 / application_documents production-candidate audit
-→ без изменения protected production workflow до отдельного согласования
 → затем full Document Worker runtime canary
 → fresh full run
 → manual semantic review 27/27
 → client report
 ```
 
-Не считать test GREEN автоматическим production promotion. Production Aggregator, checker, topology, SQL, Targeted Recheck, Finalization и Report Generation не менялись в рамках AG-8 test verification.
+Не считать local GREEN автоматическим production promotion. Production Aggregator, LIVE Targeted Recheck, PostgreSQL, Finalization и Report Generation этим containment checkpoint не менялись.
 
 ---
 

@@ -4692,3 +4692,381 @@ live workflow: общий Round 2 profile реализован
 Каталог не изменялся. Следующий единственный implementation gate — RED-only regression на exact current Round 2 Code nodes с fixture `14173`, без MCP write, PostgreSQL и paid AI. GREEN fix требует отдельного согласования protected workflow.
 
 В этом checkpoint изменяется только документация. Live n8n читался через read-only API; workflow JSON, tests, PostgreSQL и AI не изменялись и не запускались.
+
+---
+
+## 2026-08-30 — Targeted Recheck TR-10 local GREEN containment
+
+После принятого execution-derived RED добавлен минимальный field-specific containment в local canonical export `TENDER - Targeted Recheck`, нода `Проверить ответ #2 Semantic Aggregator`.
+
+Контракт:
+
+```text
+field_catalog_version=tender_fields_v1
+aggregation_round=2
+field_key=application_documents
+reported_status=resolved
+→ effective_status=requires_review
+→ review_reason_code=insufficient_evidence
+→ needs_recheck=false
+→ requires_human_review=true в FINAL
+```
+
+Containment вычисляется после всех существующих raw schema/cardinality/linking/status guards. Parsed AI result не мутируется. Output сохраняет provisional `final_value_text`, candidate decisions, supporting/conflict lists, evidence и upstream audit. `semantic_aggregator_meta` добавляет reported/effective statuses, applied flag, policy и universal containment reason.
+
+Anti-overfit boundaries:
+
+```text
+procurement_subject Round 2 resolved → остаётся resolved
+application_documents raw requires_review → reason/note сохраняются, containment_applied=false
+malformed/finish_reason guards → без изменений
+not_found / TR-11 → вне scope
+```
+
+Fresh offline verification:
+
+```text
+candidate gate = 3/3 PASS
+immutable LIVE diagnostic = 2/2 PASS
+targeted application_documents suite = 29/29 PASS
+full offline suite = 175 total / 174 PASS / 1 intentional AG-8 RED
+topology = 63 unique nodes / 63 unique IDs / all connections resolve
+```
+
+Read-only LIVE read-back после local edit:
+
+```text
+workflow id = 9uDOU31DGo30fGXX
+active = true
+versionId = 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
+activeVersionId = 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
+nodes = 64
+```
+
+LIVE production workflow не изменён и остаётся vulnerable согласно immutable diagnostic. Promotion, runtime canary и fresh 27/27 run — отдельные gates. PostgreSQL, credentials и paid AI не использовались; commit не создавался.
+
+---
+
+## 2026-08-31 — Targeted Recheck execution 14256 trusted evidence union
+
+Execution `14256` выявил контрактное противоречие в `[TEST CODEX] TENDER - Targeted Recheck`: Extractor prompt разрешал evidence из targeted context и existing candidates, но `Проверить #2 evidence Targeted Recheck` строил trusted map только из `allowed_semantic_blocks`. Первый exact existing-only reference падал fail-closed на `candidate[0].evidence[7]`; Validator, Round 2, FINAL и DB save не выполнялись.
+
+TDD regression запускает реальные Code nodes из canonical export и сохраняет material shape: пять linked items, 124 existing candidates для `application_documents`, 43 model evidence, 25 existing-only exact references и одна неверная coordinate `doc_3_au_0007 / sb_0227`, однозначно исправимая на trusted `doc_3_au_0006 / sb_0227` по тому же block ID и exact normalized quote.
+
+Минимальный implementation diff ограничен двумя Code-node bodies:
+
+```text
+Подготовить запрос #2 AI Targeted Recheck
+→ prompt явно разрешает TARGETED CONTEXT или EXISTING CANDIDATES
+→ existing evidence требует exact copy candidate.analysis_unit_id + semantic_block_id + quote
+→ coordinates нельзя изобретать/перепечатывать; existing evidence само по себе не доказывает completeness
+
+Проверить #2 evidence Targeted Recheck
+→ trusted union = allowed_semantic_blocks + well-formed stored existing-candidate quotes
+→ known pair требует exact normalized containment
+→ unknown pair можно исправить только по тому же semantic_block_id + exact quote и ровно одной trusted pair
+→ меняется только analysis_unit_id; zero/ambiguous/mismatch остаются hard failure
+→ audit: targeted_recheck_meta.evidence_coordinate_repairs[]
+```
+
+Полная итоговая prompt-версия сохранена как `prompts/targeted-recheck-extractor-system-prompt-v1.1-2026-08-31.txt`.
+
+Fresh offline verification:
+
+```text
+execution-14256 focused regression = 10/10 PASS
+related Targeted Recheck/application_documents suite = 62/62 PASS
+full offline suite = 208 total / 207 PASS / 1 intentional AG-8 RED
+git diff --check = PASS
+high-confidence secret scan = no matches
+```
+
+Exact execution offline harness сохранил 43/43 evidence, принял 25 existing-only references, записал один repair `doc_3_au_0007 → doc_3_au_0006` для `sb_0227`; остальные четыре child items прошли checker независимо. Validator preparation сохранила 43 evidence и один repair audit.
+
+После local GREEN атомарно обновлён только unpublished draft тестового workflow `nI47FcgzYwGzwGqy`:
+
+```text
+versionId before = d74f1f17-c80f-4499-bf56-b0f7daab594b
+versionId after = bca1746c-abcb-4490-a455-1daa6ac22092
+activeVersionId = d74f1f17-c80f-4499-bf56-b0f7daab594b (unchanged)
+prepare local/live SHA-256 = acb91d5136a0e063359bc36493dca6bcf60c04e490022a7728324cf5c8190ab3
+checker local/live SHA-256 = 74c32f4d85b91e17665846346e02df492d827f7c86ddf70313627b4d8f064138
+node count = 63
+graph, connections, credentials, settings, pinData and published active graph = unchanged
+```
+
+Этот checkpoint — offline/draft GREEN, но **не runtime GREEN**. PIN-data canary, publish и activation оставлены оркестратору после review. Workflow execution, paid AI, PostgreSQL, production workflows и credentials не изменялись; commit не создавался.
+
+### 2026-08-31 — TR-12 test publish checkpoint
+
+После независимого review опубликована только тестовая версия `[TEST CODEX] TENDER - Targeted Recheck`:
+
+```text
+workflow id = nI47FcgzYwGzwGqy
+versionId = bca1746c-abcb-4490-a455-1daa6ac22092
+activeVersionId = bca1746c-abcb-4490-a455-1daa6ac22092
+draft = active
+nodes = 63
+```
+
+Перед publish подтверждены `17/17` focused evidence tests, полный offline suite `208 total / 207 pass / 1 intentional AG-8 RED`, valid configuration обеих изменённых Code nodes и exact live diff только их `parameters`. Graph, connections, credentials, settings и node count не изменялись. Это test publish, а не runtime verdict; PIN-data canary с реальными LLM и downstream FINAL/report ещё не выполнялся.
+
+---
+
+## 2026-08-31 — Test-only Aggregator E2E PIN launch harness
+
+Прямой MCP-запуск test Aggregator `ftvmrEHoMbPOAqZG@01ff5e9d-30d2-4530-b2ff-4513224e9056` невозможен из-за Execute Workflow Trigger. После TDD и отдельного review опубликован изолированный test-only contour:
+
+```text
+Aggregator PIN body = gsoPfP4PSjcJjPfa@e489fc85-b49b-46b4-b8a2-88ebdbb08be2
+truthful Report replay = b4Ga1PoFmlS5ep6Y@8570c7ac-b01a-4421-a2e1-454e85cc7173
+Webhook controller = U0S3Oyq5pYfiWVDE@9fec6c5a-4d08-49c3-81a2-2087aabbad4c
+POST /webhook/test-codex-tender-aggregator-e2e-3caa7a89
+```
+
+Body требует exact audited request и сохранённые trigger/claim PIN items; повторный DB claim отсутствует. После claim сохранены 22/22 source business nodes и connections, включая test Targeted Recheck и production Finalization. Controller использует только read-only pre/post DB checks и exact 27/27 barrier.
+
+Первый draft был остановлен review из-за fabricated `completion_claimed=true` на replay. Исправленный contract не подменяет Finalization: для completed run передаются truthful `completion_claimed=false/finalization_state=already_completed` и explicit `report_replay_authorized=true` в отдельный test Report clone. В clone изменён только initial guard; восемь downstream Report nodes и graph совпадают с production source. Controller не вызывает production Report напрямую.
+
+```text
+runner tests = 8/8 PASS
+live body downstream parity = 22/22
+live Report downstream parity = 8/8
+published readback = draft=active для всех трёх workflow
+prompts changed = no
+```
+
+Первый E2E controller `14257` был запущен после review и безопасно остановился до LLM/downstream DB writes. Paid Aggregator chain фактически не началась; FINAL остался `0/27`.
+
+### Execution 14257 — exact child input contract fix
+
+Controller `14257` / child `14258` подтвердил fail-closed `RUNNER_CONTRACT_MISMATCH`. Execute Workflow predecessor содержал lifecycle metadata, child trigger отфильтровал их и получил declared 11 keys, но body guard ожидал только девять external request keys.
+
+TDD regression исполняет реальные Code-node bodies и доказывает: predecessor перед body формирует ровно 11 declared fields; exact body принимается; missing/unknown keys отвергаются; post-run ownership отдельно корректен для `aggregating` и `completed`.
+
+```text
+body: e489fc85-b49b-46b4-b8a2-88ebdbb08be2
+   → 18c770bb-70b5-4448-b3a5-d251057ea343
+controller: 9fec6c5a-4d08-49c3-81a2-2087aabbad4c
+         → 90a69f3b-9c26-46a5-9fba-cb96eee23105
+```
+
+Изменены параметры одной body Code node и трёх controller Code nodes. Connections/node counts, SQL, Aggregator business nodes, Targeted Recheck, Finalization, Report/replay и prompts не менялись. Live body downstream parity остаётся `22/22`, Report `8/8`; runner `10/10 PASS`; основной full suite `218 total / 217 pass / 1 intentional AG-8 RED`. Повторный paid canary оставлен root после независимого review.
+
+---
+
+## 2026-08-31 — E2E PIN canary 14259: technical GREEN, semantic REJECT
+
+После runner execution-14257 fix выполнен один реальный canary на exact Aggregator PIN data:
+
+```text
+controller 14259 success
+Aggregator body 14260 success
+Targeted Recheck 14261 success
+Finalization owner 14267 success
+Report 14268 success → Создать HTML artifact
+run completed; FINAL 27/27
+19 resolved / 3 requires_review / 5 not_found
+```
+
+One-report ownership подтверждён: Finalization `14262/14263/14264/14266` report не вызывали, только completion owner `14267` вызвал единственный Report `14268`.
+
+Ручной semantic audit дал `25/27 acceptable = 92.6%`, zero observed critical `false_not_found`, но два critical `false_resolved`:
+
+1. `participation_guarantee` — общий conditional contract без фактической применимости/размера текущей закупки;
+2. `required_official_certificates` — только налоговая справка при material ЕГРЮЛ/ЕГРИП/registry evidence, сохранённом под `application_documents`.
+
+Три confirmation runs намеренно не запускались. Создан отдельный implementation task на execution-derived RED и минимальный test-only containment. Production workflows/credentials не изменялись; prompts не менялись. Audit: `evaluations/TENDER_E2E_PIN_CANARY_14259_2026-08-31.md`.
+
+---
+
+## 2026-08-31 — executions 14260/14261 semantic containment offline GREEN
+
+Первый полный E2E run технически завершился успешно, но semantic audit отверг два critical false-resolved:
+
+```text
+participation_guarantee/resolved/0.92
+→ generic conditional/template rules; applicability/size не доказаны
+
+required_official_certificates/resolved/0.95
+→ только tax-certificate alternatives при material ЕГРЮЛ/ЕГРИП/registry facts
+```
+
+TDD fixture `execution-14260-semantic-containment.json` сначала дал четыре RED: Round 1 и Round 2 принимали reported `resolved` для обоих полей. Minimal field-specific containment добавлен только в:
+
+```text
+Aggregator / Проверить ответ Semantic Aggregator
+Round 1 resolved → requires_recheck / insufficient_evidence
+
+Targeted Recheck / Проверить ответ #2 Semantic Aggregator
+Round 2 resolved → requires_review / insufficient_evidence
+```
+
+Containment выполняется после raw schema/linking/cardinality guards, сохраняет provisional value, candidates/evidence и reported/effective policy/reason audit. Raw `requires_recheck`/`requires_review`, unrelated fields и malformed/linking/cardinality controls не изменены. Prompt changes: **no**.
+
+```text
+focused semantic containment + runner = 22/22 PASS
+full main suite = 230 total / 229 PASS / 1 intentional AG-8 RED
+git diff --check = PASS
+```
+
+Unpublished test drafts после parameter-only updates:
+
+```text
+ftvmrEHoMbPOAqZG draft 91c17313-a593-4fb9-9072-79320a958dd7
+nI47FcgzYwGzwGqy draft c43b4ed3-c384-41e9-b1d9-3636cff42ac5
+gsoPfP4PSjcJjPfa draft 7566262e-4c7a-4483-a5cd-9bdfd81a95aa
+U0S3Oyq5pYfiWVDE draft 03ac36e0-c4f8-44ea-bd52-bf41d5425012
+```
+
+Live verifier подтвердил body `22/22` post-claim executable parity, controller parity, unchanged topology и parameter-only scope. Publish и paid E2E после fix оставлены отдельным runtime gate.
+
+---
+
+## 2026-08-31 — E2E canary 14279 GREEN; replay regression 14278 closed
+
+После публикации `AG-10/TR-13` первый attempt `14269` дошёл через Aggregator `14270` и Targeted Recheck `14271/14275`, но test Report replay `14278` fail-closed остановился на stale exact `source_workflow_version_id`. В том же runner task выполнен TDD fix одной Code node; published replay version `80ad3549-998f-41a0-a973-f02ef5eae46a`, downstream Report parity `8/8`, prompts не менялись.
+
+Повторный canary:
+
+```text
+controller 14279 success
+Aggregator body 14280 success
+Targeted Recheck 14281 / 14285 success
+Report replay 14289 success
+HTML artifact valid, 484540 bytes
+DB exact 27 rows / 27 keys
+16 resolved / 7 requires_review / 4 not_found
+semantic audit 27/27 acceptable
+zero observed critical false_resolved / false_not_found
+```
+
+Canary принят. Следующий gate — три consecutive confirmation runs на том же exact PIN contract; временный public controller остаётся опубликован только до завершения серии.
+
+---
+
+## 2026-08-31 — confirmation attempt 14290/14291/14292 fail-closed
+
+Первый confirmation attempt после GREEN canary не засчитан:
+
+```text
+controller 14290 error
+Aggregator body 14291 error
+Targeted Recheck 14292 error
+Report отсутствует
+consecutive confirmations = 0/3
+```
+
+Сбой не связан с balance/provider availability. В `Проверить #2 evidence Targeted Recheck` строгий checker остановил `results_date`: evidence[4] содержал точную цитату, но неверную пару координат `doc_2_au_0002/sb_0048`; trusted source для цитаты — `doc_2_au_0001/sb_0004`. Дополнительно execution содержит три model-response schema variants, не соответствующие `targeted_recheck_extractor_v1`: `participation_guarantee`, `required_official_certificates`, `application_documents`.
+
+Повторные paid runs остановлены. В тот же существующий semantic-containment task отправлен TDD follow-up: сохранить строгие guards, но детерминированные model-contract/evidence failures преобразовывать в явно аудируемый terminal `requires_review` с `evidence_validated=false`, без принятия unvalidated candidates и без возможности получить `not_found`. Production workflows/DB и prompts не изменялись на этом checkpoint.
+
+### Offline fix и test publish
+
+TDD fixture охватывает все семь AI envelopes `14292`. Typed checker перехватывает только собственные model contract/evidence violations; unknown programming errors/upstream invariant failures остаются hard-fail. Invalid AI candidates удаляются, raw response/error/stage сохраняются в audit, а отдельный IF направляет item в terminal `requires_review` как для `requires_recheck`, так и для `no_initial_candidates`. Валидный `insufficient_evidence` не изменён и по-прежнему может завершиться `not_found`.
+
+```text
+focused/related = 60/60 PASS
+full main suite = 246 total / 245 PASS / 1 intentional AG-8 RED
+test Targeted Recheck = nI47FcgzYwGzwGqy@13b3c124-4fef-4a6f-9d5f-8befa3725bc1
+published active = yes
+prompts changed = no
+production workflows / DB changed = no
+```
+
+Fresh E2E canary и confirmation series ещё не выполнялись после этого publish.
+
+### Fresh canary 14294 GREEN
+
+Preflight `14293` fail-closed до body/LLM из-за неверной root-формы PIN payload и не учитывается. Исправленный exact request завершил цепочку `14294 → 14295 → 14296/14300 → 14303` со статусом success, exact DB `27/27` и валидным HTML `482829` bytes.
+
+Semantic audit: `27/27 acceptable`, `16 resolved / 6 requires_review / 5 not_found`, zero observed critical false statuses. `government_contract` безопасно изменился на `not_found`: note различает upstream State Contract и статус заключаемого договора и не создаёт отрицательного факта. Technical fallback в runtime не понадобился; все envelopes/evidence были валидны. Confirmation series остаётся `0/3` и начинается только со следующего запуска.
+
+### Confirmation 1/3 GREEN
+
+`14304 → 14305 → 14306/14310 → 14313`: controller, body, оба Targeted Recheck и один Report replay завершились success. DB exact `27/27`; HTML `476893` bytes и renderer round-trip valid; semantic audit `27/27 acceptable`; `16 resolved / 6 requires_review / 5 not_found`; critical false statuses не обнаружены. Technical fallback не использовался. Consecutive count: `1/3`.
+
+### Confirmation 2/3 GREEN
+
+`14314 → 14315 → 14316/14320 → 14324`: все stages success, DB exact `27/27`, HTML `477940` bytes valid, semantic audit `27/27 acceptable`, `16 resolved / 7 requires_review / 4 not_found`, zero observed critical false statuses. `government_contract` безопасно завершён `requires_review/ambiguous_scope`. Technical fallback не использовался. Consecutive count: `2/3`.
+
+### Confirmation 3/3 GREEN
+
+`14325 → 14326 → 14327/14331 → 14335`: все stages success, DB exact `27/27`, HTML `481901` bytes valid, semantic audit `27/27 acceptable`, `16 resolved / 7 requires_review / 4 not_found`, zero observed critical false statuses. `application_review_date` безопасно понижен в `requires_review/ambiguous_scope`; incomplete `required_official_certificates` остался `requires_review`, а не resolved. Technical fallback не использовался.
+
+Consecutive gate завершён: `3/3 GREEN`. Prompts в серии не менялись.
+
+После завершения серии test controller `U0S3Oyq5pYfiWVDE` unpublished. Draft/version сохранён, public webhook деактивирован; test Targeted Recheck и source Aggregator остаются published для подтверждённого test contour.
+
+### Final verification after controller unpublish
+
+Live verifier повторно подтвердил exact workflow identity/parity: Aggregator body `gsoPfP4PSjcJjPfa@7566262e-…`, replay Report `b4Ga1PoFmlS5ep6Y@80ad3549-…`, source Aggregator `ftvmrEHoMbPOAqZG@91c17313-…` и Targeted Recheck `nI47FcgzYwGzwGqy@13b3c124-…` активны в проверенных версиях; controller `U0S3Oyq5pYfiWVDE` имеет `active=false`, `activeVersionId=null`.
+
+Focused E2E runner suite = `11/11 PASS`. Полный offline suite = `246 total / 245 PASS / 1 intentional AG-8 production-promotion RED`. `git diff --check` не обнаружил whitespace errors; выданы только предупреждения Git о будущей нормализации LF/CRLF. Полные prompt versions не архивировались, потому что в исправлении и runtime-серии prompts не менялись.
+
+Итог текущей задачи: tested Aggregator PIN-data contour готов по gate `fresh canary + 3/3 consecutive GREEN`, каждый запуск создал exact `27/27` FINAL и валидный HTML-отчёт, semantic audit `27/27 acceptable`, zero observed critical `false_resolved/false_not_found`. Это не production promotion и не clean новый прогон всех `12/12` документов: replay основан на ранее сохранённых PIN data после согласованного обхода одного failed документа.
+
+---
+
+## 2026-08-31 — КТ172 preliminary report audit: DOCX ActiveX option-state loss
+
+После завершения PIN-data серии пользователь вручную выполнил сохранённый client-run contour:
+
+```text
+analysis_run_id 3caa7a89-b137-4cf6-b23d-941fb465c8f9
+Aggregator 14336 success
+Targeted Recheck 14337 / 14341 success
+Finalization calls 14338–14343 success
+Report replay 14345 success
+```
+
+Сформированный HTML содержит 27 полей. Локально создан предварительный A4 PDF с именем `ПРЕДВАРИТЕЛЬНЫЙ — Анализ закупки КТ172 — 11 из 12 документов.pdf`; PDF прошёл render QA, 140 страниц, полный evidence appendix сохранён. Artifact не считается production feature и не добавляет PDF-generation в n8n: конвертация выполнена локально из HTML.
+
+Client/source audit выявил три расхождения:
+
+```text
+national_regime
+report: resolved, ПП 1875 / преимущество 15%
+source: selected "Не применимо"
+verdict: P0 false_resolved
+
+participation_guarantee
+report: requires_review
+source: selected "Не предусмотрены"
+verdict: safe containment, но explicit negative потерян
+
+participation_cost
+employee brief: 24 900
+source bundle / OCR execution 14234 / TenderMeta: значение отсутствует
+report candidate: плата за предоставление документации, не тариф участия
+verdict: external-source/subtype gap, 24 900 нельзя materialize без grounded source
+```
+
+Визуальный render `Блок_2_Информационная_карта.docx` подтвердил выбранные `Не применимо` и `Не предусмотрены`. Direct OOXML inspection установил root cause: Word хранит отметки как ActiveX controls (`w:control`, relationships `word/activeX/*`), а parser/normalizer переносит только option labels. Targeted Recheck `14337` поэтому честно увидел оба альтернативных текста без отметки и вернул `insufficient_evidence`; для `national_regime` Round 1 execution `14336` принял шесть generic/conditional PP 1875 candidates и materialized false `resolved`.
+
+Новый P0 записан как `DW-18 / AG-11`. Required fix boundary:
+
+```text
+deterministic selected/unselected extraction
+→ semantic option-state contract
+→ unselected options excluded from applicability candidates
+→ missing/ambiguous state cannot produce positive resolved
+→ exact source regression
+→ Worker/Aggregator runtime canary
+```
+
+Existing `DW-17` OCR/reference-only repair остаётся отдельным blocker clean 12/12 run. Текущий предварительный отчёт допустим только с явным клиентским disclaimer; final/client-ready verdict остаётся `REJECT` до `DW-18 / AG-11`, `DW-17`, fresh 12/12 и ручной проверки 27/27.
+
+Live read-only refresh уточнил фактический Worker contour:
+
+```text
+[PROD CANDIDATE] TENDER — Обработать документ
+workflow id = csnDg78NzN1nIjUT
+published active version = c5977af5-c263-4846-8af2-762b85edcc87
+execution 14234 / 14238 snapshot = 51 nodes
+current unpublished draft = 778dfb50-72be-434d-ba82-2f8fcf90daec / 52 nodes
+```
+
+Старый `[3 TEST]` Worker `2T7szFpiGcfNpKkB@55664cef-…` inactive и в текущем клиентском run не участвовал. Следующий исполнитель обязан сначала сравнить active/draft `[PROD CANDIDATE]`; нельзя применять execution-derived fix к неподтверждённой 52-node draft topology как к source of truth.
+
+Workflow, production n8n, PostgreSQL, credentials и prompts на этом audit checkpoint не изменялись.

@@ -1762,6 +1762,10 @@ procurement_subject Round 1 in production lacks the verified test current-scope 
 
 Отдельный execution-derived regression `14173` зафиксировал `application_documents` false-resolved: schema-valid Round 1 ответ расширял scope, включал неподтверждённые существенные clauses и создавал неполный FINAL. В test Aggregator усилен только профиль этого поля. Paid runtime canary точного beta artifact вернул `requires_recheck/ambiguous_scope`, не исполнил Round 1 FINAL и прошёл route-aware oracle. Архитектурная гарантия на этом этапе ограничена safe deferral: terminal semantic result зависит от ещё не проверенного Targeted Recheck.
 
+Полный test E2E `14259 → 14260 → 14261 → 14267 → 14268` показал ещё два класса schema-valid semantic failure. Для `participation_guarantee` структурно корректный ответ не доказывает фактическую применимость и размер обеспечения; для `required_official_certificates` candidates одного подтипа не доказывают полноту material official documents. Для них действует field-specific containment: Round 1 reported `resolved` переводится в effective `requires_recheck`, а terminal Round 2 reported `resolved` без deterministic proof — в effective `requires_review` с сохранением provisional value, candidates/evidence и audit.
+
+Execution `14292` установил отдельную границу между domain validation и workflow failure. `Проверить #2 evidence Targeted Recheck` типизирует только собственные deterministic model contract/evidence violations. Такие ошибки устанавливают `technical_fallback_required=true`, оставляют `evidence_validated=false` и `candidates=[]`, затем отдельной веткой материализуют terminal `requires_review`. Raw response/content, точная validation error/stage, source metadata, original aggregation и existing candidates сохраняются. Допустимы только source states `requires_recheck` и `no_initial_candidates`; неизвестные ошибки кода и upstream invariants не перехватываются. Валидный полностью обработанный `insufficient_evidence` сохраняет прежнюю безопасную семантику `not_found`.
+
 Protected production Aggregator не менялся. Production promotion и fresh full 27/27 run остаются отдельными архитектурными gates.
 
 ---

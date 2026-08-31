@@ -55,7 +55,7 @@ local export version = 7f82ae43-2ddc-4568-8d76-a6d460c13924
 local nodes = 63
 ```
 
-Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. Core Round 2 parameters совпадают live/local для:
+Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ` отключена от production path. На момент read-only audit core Round 2 parameters совпадали live/local для:
 
 ```text
 Собрать candidates для Round 2
@@ -64,15 +64,38 @@ Live-only node `Проверить #2 evidence Targeted Recheck ТЕСТОВАЯ
 Сформировать FINAL после Round 2
 ```
 
-Structural guarantees этих нод сильные: schema, candidate allow-list, cardinality, linking и evidence validation fail closed. Но они не доказывают semantic completeness составного поля. Для `application_documents` один новый confirmed candidate может позволить Round 2 вернуть частичный `resolved`, не закрыв остальные material clauses. Это P0 `TR-10`; Targeted Recheck нельзя считать готовым к автоматическому клиентскому отчёту до terminal RED-regression и отдельно согласованного fix.
+Structural guarantees этих нод сильные: schema, candidate allow-list, cardinality, linking и evidence validation fail closed. Но authoritative LIVE не доказывает semantic completeness составного поля: для `application_documents` один новый confirmed candidate может позволить Round 2 вернуть частичный `resolved`, не закрыв остальные material clauses.
 
-Provider/checker failures не создают ложный FINAL, но terminal field result и гарантированный alert для них не подтверждены (`TR-11`). Это отдельный operational gap.
+Local canonical candidate содержит минимальный field-specific containment только в `Проверить ответ #2 Semantic Aggregator`. После всех raw structural/status validations `tender_fields_v1 + Round 2 + reported resolved` детерминированно становится effective `requires_review/insufficient_evidence`, `needs_recheck=false` для трёх полей:
+
+```text
+application_documents
+participation_guarantee
+required_official_certificates
+```
+
+Для `participation_guarantee` policy фиксирует отсутствие deterministic proof фактической применимости/размера обеспечения; для `required_official_certificates` — отсутствие proof полноты material official documents о participant/status. Candidate decisions, lists, provisional text, evidence и upstream audit сохраняются; FINAL получает `requires_human_review=true`, а `semantic_aggregator_meta` фиксирует reported/effective statuses, policy и containment reason. Для остальных `field_key` `resolved` остаётся допустимым, а raw `requires_review` для containment fields проходит без подмены reason/note.
+
+Baseline canary `14279 → 14280 → 14281/14285 → 14289` завершился exact 27/27 и прошёл semantic audit 27/27. Первая confirmation attempt `14290 → 14291 → 14292` не засчитана: Targeted Recheck остановился на точном evidence mismatch `results_date candidate[0].evidence[4]`, поэтому серия 3/3 не началась.
+
+Execution-derived contract `14292` теперь покрывает все семь ответов. Валидные `candidate_found` / `insufficient_evidence` проходят прежние strict guards. Только локально типизированные model-response contract/evidence violations становятся `technical_fallback_required=true`, `evidence_validated=false`, пустым validated `candidates` и идут через отдельный IF до terminal `requires_review`. Raw AI response/content, точная ошибка/stage, source metadata, original aggregation и existing candidates сохраняются. Для `no_initial_candidates` допустим null provisional value/evidence; `not_found` недоступен этой ветке. Неизвестные programming errors и upstream source invariants остаются hard-fail.
+
+Unpublished test Targeted Recheck draft: `nI47FcgzYwGzwGqy@13b3c124-4fef-4a6f-9d5f-8befa3725bc1`; active version `c43b4ed3-c384-41e9-b1d9-3636cff42ac5` не изменена. Runtime GREEN для technical fallback не заявляется до review/publish/fresh confirmation. Production workflow не изменён.
+
+Execution-derived regression `14256` выявил отдельное противоречие evidence contract: Extractor prompt разрешал использовать `TARGETED CONTEXT` и `EXISTING CANDIDATES`, а `Проверить #2 evidence Targeted Recheck` строил trusted map только из `allowed_semantic_blocks`. Поэтому первый exact existing-only reference падал fail-closed на `candidate[0].evidence[7]`; Validator, Round 2 и FINAL не выполнялись.
+
+Local canonical candidate теперь формирует trusted union из targeted context и только структурно полных existing evidence (`candidate.analysis_unit_id` + `evidence.semantic_block_id` + `evidence.quote`). Stored existing quote является единственным доверенным source text. Для неизвестной reported pair допускается только deterministic repair `analysis_unit_id`, если тот же `semantic_block_id` и exact normalized quote дают ровно одну trusted pair. Известная pair с quote mismatch, zero/ambiguous matches, unknown block и изменённые word/digit по-прежнему не проходят validation; после `14292` они материализуются только как audited technical `requires_review`, без принятия AI candidates. Repair записывается в `targeted_recheck_meta.evidence_coordinate_repairs`; stable evidence item contract не расширяется.
+
+Offline exact-execution harness прошёл для всех пяти items `14256`: `application_documents` сохранил 43/43 evidence, 25 existing-only references прошли exact grounding, `doc_3_au_0007 / sb_0227` детерминированно исправлен на `doc_3_au_0006 / sb_0227`, а текущая Validator preparation сохранила все 43 evidence и audit. После local GREEN два Code body перенесены только в unpublished draft тестового workflow `nI47FcgzYwGzwGqy`, version `bca1746c-abcb-4490-a455-1daa6ac22092`; activeVersionId `d74f1f17-c80f-4499-bf56-b0f7daab594b` не изменён. Это не runtime GREEN: PIN-data canary и publish выполняются отдельно после review.
+
+Полная versioned prompt-копия: `prompts/targeted-recheck-extractor-system-prompt-v1.1-2026-08-31.txt`.
 
 Source conflict зафиксирован явно:
 
 ```text
 FIELD_CATALOG.md: application_documents Round 2 = ❌
-live workflow: общий Round 2 profile реализован
+live workflow: общий Round 2 profile реализован и partial resolved допускается
+local canonical candidate: application_documents resolved containment реализован
 ```
 
 `FIELD_CATALOG.md` authoritative для смысла поля; live workflow authoritative для текущего runtime поведения. Документация каталога не изменяется молча: regression должен применить канонический смысл поля к фактическому live contract.
@@ -1490,11 +1513,11 @@ TENDER - Targeted Recheck
 ### TR-10 — partial `false_resolved` для composite Round 2
 
 **Severity:** Critical / semantic safety
-**Status:** Open / RED regression required
+**Status:** Mitigated / GREEN in local canonical candidate; LIVE promotion pending
 
 Round 2 checker проверяет структуру ответа, IDs, cardinality и linking, но не доказывает, что `resolved` покрывает все существенные clauses составного поля.
 
-Execution-derived terminal regression должен использовать `application_documents` fixture `14173`:
+Execution-derived terminal regression использует `application_documents` fixture `14173`:
 
 ```text
 28 existing candidates
@@ -1506,15 +1529,17 @@ synthetic Validator confirmation
 schema-valid partial Round 2 resolved
 ```
 
-Требуемое доказательство RED:
+Historical immutable LIVE diagnostic доказывает:
 
 ```text
-current checker accepts
-→ current FINAL materializes
+LIVE checker accepts
+→ LIVE FINAL materializes
 → application_documents semantic oracle fails
 ```
 
-До этого нельзя считать безопасным автоматическое `resolved` после Round 2 для composite fields. GREEN implementation не начинать без отдельного согласования protected workflow.
+Mutable local canonical gate теперь GREEN: тот же schema-valid partial `resolved` после raw validations получает effective terminal `requires_review`, сохраняет decisions/evidence/audit и материализует FINAL с обязательной ручной проверкой. Neutral `procurement_subject/resolved` и raw `application_documents/requires_review` controls остаются GREEN.
+
+Ограничение статуса: LIVE workflow не изменён; production promotion, runtime canary и fresh 27/27 run остаются отдельными gates.
 
 ---
 
@@ -1864,14 +1889,18 @@ selective retry только данного item
 
 ### R13 — composite field completeness after Round 2
 
-Ожидание после исправления `TR-10`:
+Проверенный local canonical contract:
 
 ```text
 частичный grounded candidate
 не может единолично закрыть unresolved material clauses
 
-resolved допустим только при доказанной полноте
-иначе requires_review
+application_documents + Round 2 + reported resolved
+→ effective requires_review / insufficient_evidence
+→ needs_recheck=false / requires_human_review=true
+
+другие field_key:
+resolved остаётся допустимым
 ```
 
 ---
@@ -1888,12 +1917,12 @@ TR-3
 закрыты.
 ```
 
-Новый P0 gate:
+Следующий production gate:
 
 ```text
-TR-10 terminal RED regression
-→ отдельно согласованный minimal fix
-→ runtime verification application_documents
+TR-10 local GREEN candidate
+→ promotion decision / live update отдельным шагом
+→ runtime canary application_documents
 → только затем full client run
 ```
 
@@ -1946,10 +1975,10 @@ TR-3
 закрыты.
 ```
 
-Но Targeted Recheck нельзя считать готовым для автоматического клиентского отчёта до закрытия:
+Local canonical candidate содержит TR-10 containment, но production Targeted Recheck нельзя считать готовым для автоматического клиентского отчёта до закрытия:
 
 ```text
-TR-10 — composite Round 2 completeness false_resolved
+TR-10 — LIVE promotion/runtime verification local containment
 TR-11 — terminal failure / alert semantics
 ```
 
@@ -1963,4 +1992,4 @@ TR-8
 TR-9
 ```
 
-и не должен смешиваться с минимальным `TR-10` fix.
+и не должен смешиваться с production promotion `TR-10` containment.

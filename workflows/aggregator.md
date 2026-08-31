@@ -682,6 +682,36 @@ primaryCount = 1
 conflict\\\_fact\\\_ids.length = 0
 ```
 
+Field-specific containment существует только для комбинаций:
+
+```text
+field_catalog_version = tender_fields_v1
+source.field_key = result.field_key
+reported status = resolved
+field_key ∈ {
+  application_documents,
+  participation_guarantee,
+  required_official_certificates
+}
+```
+
+Все universal schema, allow-list, candidate-cardinality и linking проверки всё
+равно выполняются до containment. Для `participation_guarantee` containment
+фиксирует отсутствие deterministic proof применимости/размера, а для
+`required_official_certificates` — отсутствие proof полноты material official
+documents. Их schema-valid reported `resolved` становится effective
+`requires_recheck/insufficient_evidence`; provisional value, decisions и evidence
+сохраняются. Специальное подавление invalid top-level roles при
+`primaryCount != 1` остаётся только для historical `application_documents`
+regression; checker не выбирает primary и не ослабляет правило для других полей.
+Полный raw response сохраняется в `semantic_aggregator_meta.reported_result`.
+Audit фиксирует `reported_status`, `effective_status`, `containment_applied`,
+`primary_count`, `raw_validation_issue`, policy version и `containment_reason`.
+
+Execution-derived fixture `14260` защищает оба новых случая и anti-overfit
+controls: unrelated `resolved` и raw `requires_recheck` проходят без подмены;
+malformed schema, linking и cardinality по-прежнему hard-fail.
+
 ### Для `requires\\\_recheck`
 
 Обязательно:
@@ -1334,6 +1364,19 @@ expected exit code = 3
 ```
 
 Это подтверждает предотвращение false-resolved, но не полноту terminal result. Targeted Recheck фактически не запускался. Production Aggregator, Targeted Recheck, SQL, checker и topology не менялись.
+
+Execution `14254` выявил новый structural regression до safe-deferral boundary:
+Gemini вернул 124/124 уникальных decisions, три `primary` для
+квалификационной, технической и коммерческой частей и `status=resolved`.
+Checker падал на resolved-only cardinality guard до containment. Regression
+`tests/aggregator-application-documents-execution-14254.test.mjs` фиксирует
+точную форму 124 decisions / 3 primary и neutral hard-failure controls.
+
+В test Aggregator draft `01ff5e9d-30d2-4530-b2ff-4513224e9056` checker теперь
+применяет exact eligibility до resolved primary guard, сохраняет полный raw
+result, очищает invalid effective role arrays и маршрутизирует поле в Targeted
+Recheck. Active version `2a0f8aff-a899-4665-a464-0508face767f` не изменена;
+workflow не публиковался и после draft update не исполнялся.
 
 \---
 

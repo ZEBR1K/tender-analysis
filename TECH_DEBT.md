@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-08-29
+**Последнее обновление:** 2026-08-31
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -122,14 +122,20 @@ Naming, comments, cleanup, future hardening.
 |TR-3|✅ Closed|Исправлены зависимости дочернего workflow от parent workflow nodes. Targeted Recheck workflow теперь получает необходимые данные через входной JSON и успешно выполняется отдельно.|
 |`DW-14 / EW-3`|handled evidence error может тихо закончить ветку и не вызвать Error Workflow|Document Worker / Error Workflow|
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
+|`DW-17`|Evidence Repair требует от модели дословно реконструировать canonical quote; observed executions `14234` и `14238` подтвердили повторяемый exact-grounding failure. Нужен reference-only repair без ослабления fail-closed проверки.|Document Worker / evidence grounding|
+|`DW-18 / AG-11`|DOCX ActiveX radio/checkbox state теряется до semantic blocks. На КТ172 это скрыло выбранные `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`; Aggregator затем materialized `national_regime` как `resolved` по общим положениям ПП 1875. Нужны deterministic option-state extraction и fail-closed applicability containment.|Document Worker / Aggregator semantic safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
-|`AG-9`|⚠ Mitigated / safe-deferred in test: `application_documents` execution `14173` покрыт offline oracle и paid runtime canary, который вернул `requires_recheck/ambiguous_scope` без Round 1 FINAL. Остаётся открытой до Targeted Recheck verification, production promotion и fresh full run.|Aggregator / Targeted Recheck semantic safety|
-|`TR-10`|Round 2 не доказывает полноту составного поля: schema-valid частичный `application_documents` может стать `resolved` и материализовать неполный FINAL. Read-only audit 2026-08-30; RED terminal regression ещё не создан.|Targeted Recheck semantic safety|
+|`AG-9`|⚠ Mitigated / safe-deferred in test: `application_documents` execution `14173` покрыт offline oracle и paid runtime canary. Regression `14254` (124/124 decisions, 3 primary, raw resolved) теперь детерминированно получает effective `requires_recheck/insufficient_evidence` до resolved-only primary guard; invalid top-level roles очищаются, raw response сохраняется в audit. Test draft обновлён без publish, active version не менялась. Остаётся открытой до Targeted Recheck verification, production promotion, runtime canary и fresh full run.|Aggregator / Targeted Recheck semantic safety|
+|`AG-10`|⚠ Offline GREEN / unpublished draft: execution `14260` доказал critical false-resolved для `participation_guarantee` и `required_official_certificates`. Round 1 containment переводит reported `resolved` в effective `requires_recheck/insufficient_evidence`, сохраняя provisional value/candidates/audit. Test draft `91c17313-…`; active `01ff5e9d-…` unchanged. Runtime GREEN не заявляется.|Aggregator semantic applicability/completeness|
+|`TR-10`|⚠ Mitigated / GREEN in local canonical candidate: `application_documents` Round 2 reported `resolved` детерминированно становится effective `requires_review/insufficient_evidence` с audit и без потери decisions/evidence. LIVE `4e0858c9-…` не изменён и остаётся vulnerable до promotion/runtime canary.|Targeted Recheck semantic safety|
+|`TR-13`|✅ Baseline canary GREEN: terminal containment для `participation_guarantee` и `required_official_certificates` прошёл exact 27/27 + semantic audit 27/27 в `14279/14280/14281/14285/14289`. Confirmation series не началась из-за отдельного technical failure `TR-14`.|Targeted Recheck terminal semantic containment|
+|`TR-14`|⚠ Offline GREEN / unpublished draft: execution `14292` зафиксировал четыре model contract/evidence failures из семи ответов. Typed local validation fallback сохраняет raw response/error/source/original candidates, не принимает unvalidated candidates и terminally materializes `requires_review` для `requires_recheck` или `no_initial_candidates`. Test draft `13b3c124-…`; active `c43b4ed3-…` unchanged. Publish/fresh confirmation pending.|Targeted Recheck technical validation containment|
+|`TR-12`|⚠ Mitigated / offline GREEN, test publish completed: execution `14256` подтвердил prompt/checker mismatch для existing-candidate evidence. Checker использует exact trusted union и допускает только unique `analysis_unit_id` coordinate repair при неизменных block ID/quote; 43/43 evidence и Validator handoff проверены. Test version `bca1746c-…` опубликована; runtime PIN-data canary остаётся pending.|Targeted Recheck evidence grounding|
 
 Document Worker packaging checkpoint 2026-08-29:
 
@@ -845,9 +851,9 @@ workflow implementation: общий Round 2 profile существует
 
 Каталог authoritative для канонического смысла поля; live workflow authoritative для текущего поведения. Противоречие нельзя закрывать молчаливым изменением каталога.
 
-### Следующий gate
+### Local canonical mitigation
 
-Сначала RED-only regression без MCP write, БД и paid AI:
+Execution-derived mutable candidate gate использует:
 
 ```text
 fixture 14173
@@ -859,17 +865,89 @@ fixture 14173
    Подготовить запрос #2 Semantic Aggregator
    Проверить ответ #2 Semantic Aggregator
    Сформировать FINAL после Round 2
-→ structural acceptance + materialized FINAL
-→ application_documents oracle FAIL
+→ raw structural acceptance
+→ field-specific effective requires_review / insufficient_evidence
+→ terminal FINAL + requires_human_review=true
+→ decisions/evidence/audit preserved
+→ application_documents safe terminal oracle PASS
 ```
 
-GREEN implementation требует отдельного согласования protected workflow.
+Containment находится только в `Проверить ответ #2 Semantic Aggregator`, применяется после всех raw structural/status validations и только для:
+
+```text
+field_catalog_version=tender_fields_v1
+aggregation_round=2
+field_key=application_documents
+reported_status=resolved
+```
+
+Raw `application_documents/requires_review` сохраняет исходные reason/note; `procurement_subject/resolved` остаётся допустимым. Clause coverage, `not_found` и `TR-11` не менялись.
+
+### Remaining gate
+
+```text
+local canonical review
+→ отдельное production promotion decision
+→ runtime canary
+→ fresh 27/27 run
+```
+
+Immutable LIVE snapshot продолжает доказывать production defect. До promotion LIVE workflow остаётся vulnerable.
 
 ### Приоритет
 
 ```text
 P0 before client report
 ```
+
+\---
+
+## C5a — `AG-10` / `TR-13`
+
+### Проблема
+
+Полный E2E run `3caa7a89-b137-4cf6-b23d-941fb465c8f9` технически достиг `completed` и 27/27, но semantic audit отверг canary:
+
+```text
+participation_guarantee = resolved/0.92
+→ только общие/условные/template правила
+→ applicability и размер не доказаны
+
+required_official_certificates = resolved/0.95
+→ только два варианта налоговой справки
+→ material official documents из application_documents не покрыты
+```
+
+Structural checker выполнил schema, linking, cardinality и allow-list contracts. Root cause — отсутствие независимого deterministic proof применимости/полноты для этих field profiles.
+
+### Minimal containment
+
+Execution-derived fixture `14260` применяется без tender/run literals:
+
+```text
+Round 1 reported resolved
+→ effective requires_recheck / insufficient_evidence
+
+Round 2 reported resolved
+→ effective requires_review / insufficient_evidence
+→ needs_recheck=false / requires_human_review=true
+```
+
+Provisional text, candidates/evidence, reported/effective statuses, policy и reason audit сохраняются. Raw review/recheck и malformed/schema/linking/cardinality guards не изменены. Отсутствие proof не превращается в отрицательный факт или `not_found`.
+
+### Runtime gate
+
+```text
+test Aggregator draft 91c17313-a593-4fb9-9072-79320a958dd7
+test Targeted Recheck baseline c43b4ed3-c384-41e9-b1d9-3636cff42ac5
+test Targeted Recheck technical fallback draft 13b3c124-4fef-4a6f-9d5f-8befa3725bc1
+```
+
+Baseline canary `14279/14280/14281/14285/14289` прошёл exact 27/27 и semantic audit 27/27. Confirmation attempt `14290/14291/14292` не засчитана из-за отдельного `TR-14`; новая серия не началась. Prompts не менялись.
+
+### `TR-14` technical validation containment
+
+Execution `14292` первым остановился на exact evidence mismatch `results_date candidate[0].evidence[4]`; всего четыре из семи AI payload нарушили schema/contract/evidence validation. Typed checker fallback ловит только собственные deterministic model-response violations, сохраняет raw response/content, точную ошибку/stage, source metadata, original aggregation и existing candidates, не принимает AI candidates и оставляет `evidence_validated=false`. Dedicated route terminally материализует `requires_review` для ровно двух ожидаемых source states: `requires_recheck` и `no_initial_candidates`. Валидный `insufficient_evidence` остаётся на прежнем пути и может дать `not_found`; неизвестные programming errors и upstream invariants остаются hard-fail. Runtime GREEN не заявляется до publish и fresh confirmation.
 
 \---
 
@@ -890,6 +968,184 @@ no FINAL / no guaranteed alert
 ```
 
 Это P1 operational reliability gap. Его нужно исправлять отдельно от `TR-10`, чтобы не смешивать semantic completeness и error lifecycle.
+
+\---
+
+## C7 — `DW-17`
+
+### Статус
+
+```text
+P0 / Critical / observed
+```
+
+### Runtime evidence
+
+Проблема воспроизведена в executions:
+
+```text
+14234
+14238
+```
+
+Точный scope:
+
+```text
+document_id = d5b88b18-b9a7-4bbe-8d29-6203759ed967
+analysis_unit_id = doc_9_au_0002
+semantic_block_id = sb_0106
+semantic_block_id = sb_0091
+```
+
+Evidence Repair требует от модели дословно перепечатывать canonical evidence. Модель может изменить символы как в OCR-corrupted, так и в обычном тексте, после чего точная проверка quote закономерно отклоняет результат.
+
+### Safety boundary
+
+Exact grounding правильно работает fail-closed:
+
+```text
+materialized quote !== canonical semantic block substring
+→ reject
+```
+
+Эту проверку нельзя ослаблять fuzzy matching, дополнительной нормализацией символов или принятием «почти совпавшей» цитаты. Иначе repair создаст недостоверный provenance и откроет путь к false-confirmed facts.
+
+### Root cause
+
+```text
+модель реконструирует quote
+вместо
+модель выбирает ссылку на immutable canonical evidence
+```
+
+### Target architecture
+
+Reference-only repair:
+
+```text
+1. Модель выбирает только allow-listed semantic_block_id / evidence_ref.
+2. Code node отклоняет unknown refs.
+3. Code node детерминированно материализует точную canonical quote и provenance.
+4. Downstream AI Validator проверяет semantic relevance уже grounded evidence.
+```
+
+Модель не должна перепечатывать или исправлять текст источника.
+
+### Regression gate
+
+Debt закрывается только после выполнения всех условий:
+
+```text
+fixtures из executions 14234 и 14238
+unknown refs rejected
+no fuzzy matching
+materialized quote = exact canonical quote
+existing grounded evidence preserved
+primary-evidence constraints preserved
+resource limits preserved
+audit/provenance preserved
+full repair → Validator → persistence runtime canary
+```
+
+Временный partial report по 11 из 12 документов не является проверкой fix и не закрывает `DW-17`.
+
+### Приоритет
+
+```text
+P0 before full/client-ready report
+```
+
+\---
+
+## C8 — `DW-18 / AG-11`
+
+### Статус
+
+```text
+P0 / Critical / observed false_resolved
+```
+
+### Runtime и source evidence
+
+Проблема подтверждена на клиентском run:
+
+```text
+analysis_run_id = 3caa7a89-b137-4cf6-b23d-941fb465c8f9
+Aggregator execution = 14336
+Targeted Recheck executions = 14337 / 14341
+Report replay execution = 14345
+```
+
+В исходном `Блок_2_Информационная_карта.docx` визуально и в OOXML controls выбраны:
+
+```text
+national_regime → Не применимо
+participation_guarantee → Не предусмотрены
+bank requirements → Не применимо
+other guarantor requirements → Не применимо
+```
+
+DOCX хранит эти отметки не как обычный текст, а через связанные ActiveX controls (`w:control` + `word/activeX/*`). Текущий parser/normalizer переносит подписи всех вариантов, но не переносит их selected/unselected state. Поэтому downstream видит взаимоисключающие option labels как обычный текст без выбора.
+
+Фактические последствия:
+
+```text
+national_regime
+→ 7 candidates
+→ 6 generic/conditional PP 1875 candidates accepted
+→ Round 1 resolved
+→ false_resolved: "режим применяется / преимущество 15%"
+
+participation_guarantee
+→ 6 generic/template candidates
+→ Round 1 requires_recheck
+→ Targeted Recheck insufficient_evidence
+→ terminal requires_review
+→ explicit selected negative was not recovered
+```
+
+`participation_guarantee` containment предотвратил false-resolved, но не восстановил исходное значение. Для `national_regime` существующий checker доказал только structural contract и не доказал applicability конкретной меры.
+
+### Safety boundary
+
+Нельзя:
+
+```text
+- поручать LLM угадывать выбранный вариант по соседнему тексту;
+- считать все option labels одновременно применимыми;
+- materialize positive resolved по generic/conditional policy clauses,
+  если option-state отсутствует или неоднозначен;
+- хардкодить вывод только под КТ172.
+```
+
+### Target architecture
+
+```text
+DOCX controls / rendered option state
+→ deterministic selected/unselected representation
+→ semantic block с явной связью option label ↔ state
+→ Extractor candidates только из выбранных вариантов
+→ Aggregator applicability guard для option-table ambiguity
+```
+
+### Regression gate
+
+Debt закрывается только после:
+
+```text
+exact source fixture: Блок_2_Информационная_карта.docx
+national_regime = explicit "Не применимо"
+participation_guarantee = explicit "Не предусмотрены"
+unselected positive options не становятся candidates применимости
+generic PP 1875 boilerplate не доказывает concrete measure
+option-state missing/ambiguous → no positive resolved
+Worker → facts → Aggregator runtime canary
+fresh clean 12/12 run и ручная проверка 27/27
+```
+
+### Связанное, но отдельное ограничение
+
+Сумма `24 900` для `participation_cost` отсутствует во всех предоставленных DOCX, text-readable PDF и OCR data execution `14234`; `tender_metadata` также пуст. В `Блок_1_Извещение.docx` выбранное `Плата не предусмотрена` относится к плате за предоставление документации, а не к тарифу ЭТП. Значение `24 900` нельзя добавлять без отдельного grounded внешнего источника.
 
 \---
 
@@ -1595,13 +1851,15 @@ tender_analysis_field_results
 
 # 16\. Что исправлять до первого стабильного end-to-end MVP
 
-TR-0…TR-3 закрыты как исторические edge-case fixes, но свежий `TR-10` снова делает Targeted Recheck P0 gate: terminal completeness составного `application_documents` не доказана.
+TR-0…TR-3 закрыты как исторические edge-case fixes. `TR-10` mitigated/GREEN в local canonical candidate, но остаётся production P0 gate до promotion/runtime canary: authoritative LIVE containment не содержит.
 
 Минимальный текущий обязательный пакет:
 
 ```text
 DW-14 / EW-3
 DW-15
+DW-17
+DW-18 / AG-11
 DW-8
 DW-3
 
@@ -1630,10 +1888,10 @@ tender\\\\\\\\\\\\\\\_id
 2. TR-1 ✅
 3. TR-2 ✅ (MVP)
 4. TR-3 ✅
-5. TR-10 — RED terminal regression → отдельно согласованный minimal fix
+5. TR-10 — local GREEN containment; LIVE promotion/runtime verification pending
 ```
 
-TR-0…TR-3 закрыты. Это не доказывает общую terminal correctness: `TR-10` показывает отдельный риск partial `false_resolved` для composite fields. До закрытия `TR-10` Targeted Recheck нельзя считать готовым к автоматическому клиентскому отчёту.
+TR-0…TR-3 закрыты. Local `TR-10` containment не является production proof: до promotion/runtime canary LIVE Targeted Recheck нельзя считать готовым к автоматическому клиентскому отчёту.
 
 \---
 
@@ -1877,7 +2135,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
-Дополнительные Critical gates: `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` остаётся P0 до `TR-10`, production promotion и full run. `TR-11` — отдельный High operational gate для terminal failure/alert semantics.
+Дополнительные Critical gates: `DW-17 — reference-only Evidence Repair` открыт до regression на executions `14234`/`14238` и полного runtime canary; `DW-18 / AG-11 — DOCX option-state loss / national_regime false-resolved` открыт до deterministic ActiveX control extraction, downstream applicability containment и exact source runtime canary; `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` и `TR-10` mitigated/GREEN локально, но остаются P0 до Targeted Recheck/Aggregator production promotion, runtime canary и full run. `TR-11` — отдельный High operational gate для terminal failure/alert semantics.
 
 ## High
 
