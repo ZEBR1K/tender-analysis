@@ -466,12 +466,12 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - визуальный и OOXML audit исходного `Блок_2_Информационная_карта.docx` подтвердил explicit selections `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`;
 - Aggregator execution `14336` подтвердил первый incorrect terminal state для `national_regime`: Round 1 accepted `resolved` по generic/conditional PP 1875 candidates;
 - Targeted Recheck `14337` корректно зафиксировал `insufficient_evidence` для `participation_guarantee`, потому что его context уже не содержал option-state.
-- `DW-18` source-derived nested-table fixture и 46 focused regressions offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; malformed/orphan/cyclic/out-of-range structures fail closed.
+- `DW-18` source-derived nested-table fixture и 61 focused regression offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; parser input загружается из checked-in OOXML независимо от manifest; malformed/orphan/cyclic/out-of-range structures и unsafe archive paths fail closed.
 - executions `14350–14352` локализовали три runtime gaps прежнего canonical candidate: split `directory + fileName`, потерю `docx_part_path/docx_part_kind` после Extract From File/XML и ancestor-table duplicate mapping (`578 controls / 126 decoded / partial`). Canonical Worker исправляет только эти boundaries и сохраняет настоящую ambiguity fail-closed.
 - Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
-- fresh branch verification: focused `DW-18 46/46` и `AG-11 31/31`; full suite `324 total / 318 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: intentional `AG-8` gate и пять дополнительных pre-existing failures; новых failures нет.
+- fresh branch verification: focused `DW-18 61/61` и `AG-11 31/31`; full suite `339 total / 333 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: intentional `AG-8` gate и пять дополнительных pre-existing failures; новых failures нет.
 
 ### Not verified
 
@@ -509,7 +509,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 
 ```text
 DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
-→ canonical runtime hardening + offline deterministic contract (46/46 GREEN)
+→ canonical runtime hardening + offline deterministic contract (61/61 GREEN)
 → read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
 → Worker/Aggregator runtime canary на national_regime и participation_guarantee
 → DW-17 reference-only evidence repair для failed OCR document

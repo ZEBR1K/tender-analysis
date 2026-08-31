@@ -5237,10 +5237,12 @@ Focused GREEN: `46/46 PASS`. Exact states: activeX5/6/7 unselected, activeX8 sel
 Final offline verification:
 
 ```text
-DW-18 focused: 46/46 PASS
+DW-18 focused: 61/61 PASS
 AG-11 focused: 31/31 PASS
-document-worker related: 156 total / 154 pass / 2 exact baseline failures
-full suite: 324 total / 318 pass / 6 exact baseline failures
+document-worker related: 171 total / 169 pass / 2 exact baseline failures
+full suite: 339 total / 333 pass / 6 exact baseline failures
 ```
 
 Full-suite failure set совпал с checkpoint `da7bb7a`: intentional AG-8 current-scope gate; два execution-14104 A/B artifact/hash gates; immutable Worker beta hash; validator prompt CRLF/LF mismatch; Targeted Recheck evidence-coordinate mismatch. Packaging projection вне reviewed DW-18 nodes прошла; `git diff --check` не обнаружил whitespace errors.
+
+Quality-review TDD добавил отдельный RED `8f4e959`: `61 total / 46 pass / 15 fail`. Один failure доказал, что прежний exact-six harness синтезировал XML из manifest вместо checked-in fixture; ещё 14 failures показали принятие absolute/UNC, drive/URI и dot-segment Compression paths. GREEN `3c9903f` загружает structured parser input напрямую из sanitised OOXML tree и отклоняет unsafe descriptors до OPC normalization с `invalid_extracted_part_path`. Valid full `fileName` и split `directory + fileName` regressions остаются GREEN.

@@ -1148,7 +1148,7 @@ fresh clean 12/12 run и ручная проверка 27/27
 Execution-derived hardening выполнен в canonical export, но debt остаётся открытым до post-fix runtime gate.
 
 ```text
-DW-18 focused source-derived matrix: 46/46 GREEN
+DW-18 focused source-derived matrix: 61/61 GREEN
 AG-11 focused containment matrix: 31/31 GREEN
 exact controls: 5/6/7/56 unselected; 8/55 selected
 orphan/unlinked contents, invalid directory pointers и cycles: unknown + audit warning
@@ -1159,7 +1159,7 @@ test Aggregator draft: ftvmrEHoMbPOAqZG@f11906df-f760-4c54-a59e-16f4423ab534
 published test Aggregator remains: 91c17313-a593-4fb9-9072-79320a958dd7
 ```
 
-Minimal fix сохраняет обе Compression формы (`fileName` full path и `directory + fileName`), направляет исходный True item `OOXML часть XML?` на input 0 `Привязать parsed XML к части`, parsed XML — на input 1, и исключает вложенные таблицы из ancestor-cell content. Настоящие one-control/multiple-label и multiple-controls/one-label cases остаются `unknown` с audit warnings. Production n8n не изменялся. Следующий gate — bounded post-fix Worker → facts → test Aggregator canary.
+Minimal fix сохраняет обе Compression формы (`fileName` full path и `directory + fileName`), до нормализации отклоняет absolute/UNC, drive/URI prefixes и `.`/`..` segments с audit-only `unknown`, направляет исходный True item `OOXML часть XML?` на input 0 `Привязать parsed XML к части`, parsed XML — на input 1, и исключает вложенные таблицы из ancestor-cell content. Exact-six parser input загружается независимо из checked-in source-derived OOXML, а manifest остаётся отдельным oracle. Настоящие one-control/multiple-label и multiple-controls/one-label cases остаются `unknown` с audit warnings. Production n8n не изменялся. Следующий gate — bounded post-fix Worker → facts → test Aggregator canary.
 
 ### Связанное, но отдельное ограничение
 
