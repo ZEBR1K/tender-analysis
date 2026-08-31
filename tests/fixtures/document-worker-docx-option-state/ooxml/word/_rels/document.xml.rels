@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId18" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX5.xml"/>
+  <Relationship Id="rId21" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX6.xml"/>
+  <Relationship Id="rId23" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX7.xml"/>
+  <Relationship Id="rId26" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX8.xml"/>
+  <Relationship Id="rId82" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX55.xml"/>
+  <Relationship Id="rId83" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/control" Target="activeX/activeX56.xml"/>
+</Relationships>

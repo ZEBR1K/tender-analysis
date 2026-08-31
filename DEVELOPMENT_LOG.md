@@ -5070,3 +5070,32 @@ current unpublished draft = 778dfb50-72be-434d-ba82-2f8fcf90daec / 52 nodes
 Старый `[3 TEST]` Worker `2T7szFpiGcfNpKkB@55664cef-…` inactive и в текущем клиентском run не участвовал. Следующий исполнитель обязан сначала сравнить active/draft `[PROD CANDIDATE]`; нельзя применять execution-derived fix к неподтверждённой 52-node draft topology как к source of truth.
 
 Workflow, production n8n, PostgreSQL, credentials и prompts на этом audit checkpoint не изменялись.
+
+---
+
+## 2026-08-31 — DW-18 Task 2 exact-source fixture RED
+
+Recovery baseline в isolated worktree `codex/dw18-ag11-option-state` не воспроизвёл документированный итог `245/246`: фактический full suite дал `240/246` и пять дополнительных pre-existing failures. Пользователь явно разрешил продолжить DW-18/AG-11, сохранив их как pre-existing baseline; исправление этих тестов не входит в scope.
+
+Raw Docling execution `14234` содержит пустой `form_items` и не содержит структурных `checked`/`selected`/ActiveX state. Поэтому выбран только standards-based OOXML relationships → CFB named `contents` stream → MS-OFORMS `Value` путь.
+
+Создан минимальный производный fixture без полного клиентского DOCX. Он содержит sanitised `word/document.xml`/relationships только для шести требуемых control-label rows и exact source ActiveX XML/relationships/CFB parts. Full-source SHA-256:
+
+```text
+32f79d377ad3b775497e70754bdfdce8ec0928cfeb2626d60ca65ef519f7437b
+```
+
+Initial focused RED:
+
+```text
+node --test tests/document-worker-docx-option-state.test.mjs
+11 tests / 1 pass / 10 fail / exit 1
+```
+
+Fixture integrity прошла. Все десять поведенческих сценариев упали по ожидаемой причине:
+
+```text
+Workflow node not found: Разобрать состояния DOCX ActiveX
+```
+
+RED охватывает exact `activeX5/6/7/8/55/56`, missing relationships, unknown CLSID, malformed CFB, unsupported persistence, missing/indeterminate `Value` и ambiguous control-label mappings. Production workflow, production n8n, DB, credentials и prompts не изменялись.

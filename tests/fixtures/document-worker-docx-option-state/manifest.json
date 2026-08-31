@@ -1,0 +1,44 @@
+{
+  "contract_version": "docx_option_state_fixture_v1",
+  "source_file_name": "Блок_2_Информационная_карта.docx",
+  "source_sha256": "32f79d377ad3b775497e70754bdfdce8ec0928cfeb2626d60ca65ef519f7437b",
+  "source_document_xml_sha256": "4094c95cf3c12fdaea3e7e25d438d080e69c3184d4d0d27d5f12721cc9aa40d4",
+  "source_document_rels_sha256": "79b7e428cca626e003744480a9e7bdbcda9e821a3e0a8ef28fd80cf22d67b5a3",
+  "content_review": {
+    "full_client_docx_included": false,
+    "credentials_or_secrets_found": false,
+    "personal_data_found": false,
+    "unrelated_procurement_content_included": false,
+    "notes": "document.xml and its relationships are minimal structural derivatives containing only the six required control-label rows; ActiveX XML, relationships, and CFB binaries are exact source parts."
+  },
+  "derived_parts": [
+    { "path": "word/_rels/document.xml.rels", "size": 1012, "sha256": "36c9611717eeda979d6cea47d886c0d573b6b8eef3bfdd4f77e85c4ffe499a4d", "origin": "minimal_sanitized" },
+    { "path": "word/activeX/_rels/activeX5.xml.rels", "size": 287, "sha256": "650f0d480233f1639c6ebbf70b7c7eabbf4ba4ee9ea740bb2f08a7f783e1cbbb", "origin": "exact_source_part" },
+    { "path": "word/activeX/_rels/activeX55.xml.rels", "size": 288, "sha256": "468c9239701a2699370735f5ee6975fca2b7092306da0ef7a26b23ba205c89ab", "origin": "exact_source_part" },
+    { "path": "word/activeX/_rels/activeX56.xml.rels", "size": 288, "sha256": "d728b22077abaf2c95c471a0ccd31b00fee2b45acfc2297593a713c7717386af", "origin": "exact_source_part" },
+    { "path": "word/activeX/_rels/activeX6.xml.rels", "size": 287, "sha256": "d8ea4ff5a028bd3634f039c5e2fe1018b3b8b3ae81ef589c6312c566acf86793", "origin": "exact_source_part" },
+    { "path": "word/activeX/_rels/activeX7.xml.rels", "size": 287, "sha256": "e7950de49fa1ba8fc5b47d602651b36a256fbd4dc932fc5b407a5000cc2e891f", "origin": "exact_source_part" },
+    { "path": "word/activeX/_rels/activeX8.xml.rels", "size": 287, "sha256": "a8c155ed6b5e48a7258062212ab7991edd1ed26eca46337b0064b5fb7430f76f", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX5.bin", "size": 2560, "sha256": "15dd5d5de83ab74705284b7a87ddd66148f6db5f796c36da1fd75c0888e36c14", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX5.xml", "size": 299, "sha256": "57be8ac9b9d5f97fa68810b921b83fce82bcf585346efa9aacba5f7883a9f3a4", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX55.bin", "size": 2560, "sha256": "361e9486321be741ac3eda445a44a93e3a7b3a3c191bfd23f6dc6682b3b8db76", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX55.xml", "size": 299, "sha256": "ec73a93e583de41cceef114addca1400548914e11245fcb22fc404a6b9e97e6c", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX56.bin", "size": 2560, "sha256": "490ef8e515e822174fd3b4b9fa6435e233acb6ddb8391eb84e4204514e967795", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX56.xml", "size": 299, "sha256": "ec73a93e583de41cceef114addca1400548914e11245fcb22fc404a6b9e97e6c", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX6.bin", "size": 2560, "sha256": "4d1b0d4d989d7e4aa4bcecf8ff88ea0cc982ce17018ecd250d8237460b545f17", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX6.xml", "size": 299, "sha256": "57be8ac9b9d5f97fa68810b921b83fce82bcf585346efa9aacba5f7883a9f3a4", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX7.bin", "size": 2560, "sha256": "97f7667e7c49ae57c1bc4fbfdbda9bf4471bafab2184fc39bb03a23891e3aec4", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX7.xml", "size": 299, "sha256": "57be8ac9b9d5f97fa68810b921b83fce82bcf585346efa9aacba5f7883a9f3a4", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX8.bin", "size": 2560, "sha256": "ed44eab4795cbb1940409c62f0ccdc6a10168c99d85cc54db8296e21e5cc0e15", "origin": "exact_source_part" },
+    { "path": "word/activeX/activeX8.xml", "size": 299, "sha256": "57be8ac9b9d5f97fa68810b921b83fce82bcf585346efa9aacba5f7883a9f3a4", "origin": "exact_source_part" },
+    { "path": "word/document.xml", "size": 3291, "sha256": "b222d1182afc5dabffc2f4b087aa197c08ca76f01db9e773141dc3ab6b6d0959", "origin": "minimal_sanitized" }
+  ],
+  "expected_controls": [
+    { "control_name": "CommonSupplierCheckBox11", "control_type": "checkbox", "state": "unselected", "exact_label": "запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];", "source_row_ref": "word/document.xml#table[1]/row[1]", "control_rel_target": "word/activeX/activeX5.xml", "binary_rel_target": "word/activeX/activeX5.bin" },
+    { "control_name": "CommonSupplierCheckBox12", "control_type": "checkbox", "state": "unselected", "exact_label": "ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];", "source_row_ref": "word/document.xml#table[1]/row[2]", "control_rel_target": "word/activeX/activeX6.xml", "binary_rel_target": "word/activeX/activeX6.bin" },
+    { "control_name": "CommonSupplierCheckBox13", "control_type": "checkbox", "state": "unselected", "exact_label": "преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];", "source_row_ref": "word/document.xml#table[1]/row[3]", "control_rel_target": "word/activeX/activeX7.xml", "binary_rel_target": "word/activeX/activeX7.bin" },
+    { "control_name": "CommonSupplierCheckBox14", "control_type": "checkbox", "state": "selected", "exact_label": "Не применимо.", "source_row_ref": "word/document.xml#table[1]/row[4]", "control_rel_target": "word/activeX/activeX8.xml", "binary_rel_target": "word/activeX/activeX8.bin" },
+    { "control_name": "OptionButton25221111131", "control_type": "option_button", "state": "selected", "exact_label": "Не предусмотрены;", "source_row_ref": "word/document.xml#table[2]/row[1]", "control_rel_target": "word/activeX/activeX55.xml", "binary_rel_target": "word/activeX/activeX55.bin" },
+    { "control_name": "OptionButton252211111211", "control_type": "option_button", "state": "unselected", "exact_label": "Предусмотрены. Обеспечение заявки должно соответствовать следующим требованиям:", "source_row_ref": "word/document.xml#table[2]/row[2]", "control_rel_target": "word/activeX/activeX56.xml", "binary_rel_target": "word/activeX/activeX56.bin" }
+  ]
+}

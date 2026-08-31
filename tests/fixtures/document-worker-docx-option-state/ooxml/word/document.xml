@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:body>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId18" w:name="CommonSupplierCheckBox11" w:shapeid="_x0000_i1363"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId21" w:name="CommonSupplierCheckBox12" w:shapeid="_x0000_i1365"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId23" w:name="CommonSupplierCheckBox13" w:shapeid="_x0000_i1367"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId26" w:name="CommonSupplierCheckBox14" w:shapeid="_x0000_i1369"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Не применимо.</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId82" w:name="OptionButton25221111131" w:shapeid="_x0000_i1463"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Не предусмотрены;</w:t></w:r></w:p></w:tc>
+      </w:tr>
+      <w:tr>
+        <w:tc><w:p><w:r><w:object><w:control r:id="rId83" w:name="OptionButton252211111211" w:shapeid="_x0000_i1465"/></w:object></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>Предусмотрены. Обеспечение заявки должно соответствовать следующим требованиям:</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+    <w:sectPr/>
+  </w:body>
+</w:document>
