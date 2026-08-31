@@ -162,6 +162,20 @@ function tableForControls(expectedControls) {
   };
 }
 
+function sourceShapedOuterTable(groupContext, expectedControls) {
+  return {
+    'w:tr': [{
+      'w:tc': [
+        { 'w:p': [textParagraph(groupContext)] },
+        {
+          'w:p': [textParagraph('')],
+          'w:tbl': [tableForControls(expectedControls)],
+        },
+      ],
+    }],
+  };
+}
+
 function structuredXmlItems() {
   const nationalRegime = manifest.expected_controls.slice(0, 4);
   const participationGuarantee = manifest.expected_controls.slice(4);
@@ -172,8 +186,8 @@ function structuredXmlItems() {
       'w:document': {
         'w:body': [{
           'w:tbl': [
-            tableForControls(nationalRegime),
-            tableForControls(participationGuarantee),
+            sourceShapedOuterTable('Раздел 3.3.1', nationalRegime),
+            sourceShapedOuterTable('Раздел 3.7.1', participationGuarantee),
           ],
           'w:sectPr': [''],
         }],
@@ -705,13 +719,13 @@ test('workflow connections isolate DOCX extraction and restore the original bina
   ]);
   assert.deepEqual(connectedTargets(workflow, nodeNames.routeXml, 0), [
     { node: nodeNames.extractXmlText, index: 0 },
+    { node: nodeNames.bindParsedXml, index: 0 },
   ]);
   assert.deepEqual(connectedTargets(workflow, nodeNames.routeXml, 1), [
     { node: nodeNames.collectParts, index: 1 },
   ]);
   assert.deepEqual(connectedTargets(workflow, nodeNames.extractXmlText), [
     { node: nodeNames.parseXml, index: 0 },
-    { node: nodeNames.bindParsedXml, index: 0 },
   ]);
   assert.deepEqual(connectedTargets(workflow, nodeNames.parseXml), [
     { node: nodeNames.bindParsedXml, index: 1 },
@@ -842,6 +856,26 @@ test('part preparation identifies required members by descriptor.fileName, never
   assert.ok(results.every(({ binary: outputBinary }) => Object.keys(outputBinary).join() === 'data'));
 });
 
+test('part preparation reconstructs the OPC path from live Compression directory and fileName', async () => {
+  const workflow = loadWorkflow();
+  const shuffledParts = [...manifest.derived_parts].reverse();
+  const binary = Object.fromEntries(shuffledParts.map((part, index) => {
+    const data = fs.readFileSync(path.join(ooxmlRoot, ...part.path.split('/')));
+    return [
+      `opaque_${String(index).padStart(4, '0')}`,
+      binaryDescriptor(data, path.posix.basename(part.path), {
+        directory: path.posix.dirname(part.path),
+      }),
+    ];
+  }));
+
+  const results = await runCodeNode(workflow, nodeNames.unfoldParts, [{ json: {}, binary }]);
+  assert.deepEqual(
+    results.map(({ json }) => json.docx_part_path).sort(),
+    manifest.derived_parts.map(({ path: partPath }) => partPath).sort(),
+  );
+});
+
 test('extracted part count limit returns an audit-only unknown boundary', async () => {
   const workflow = loadWorkflow();
   const binary = {};
@@ -880,6 +914,17 @@ test('exact source controls preserve selected and unselected state with exact ro
     assert.equal(record.document_part, 'word/document.xml');
     assert.deepEqual(record.warnings, []);
   }
+});
+
+test('source-shaped nested multi-control tables map each control only to its exact inner-row label', async () => {
+  const result = await runOptionParser();
+  assert.equal(result.json.docx_option_states.length, 6);
+  assert.equal(new Set(result.json.docx_option_states.map(({ control_name: name }) => name)).size, 6);
+  assert.deepEqual(
+    result.json.docx_option_states.map(exactStateProjection),
+    manifest.expected_controls.map(expectedStateProjection),
+  );
+  assert.ok(result.json.docx_option_states.every(({ warnings }) => warnings.length === 0));
 });
 
 test('CFB version 4 with 4096-byte sectors decodes through the standards-based path', async () => {
@@ -1424,7 +1469,8 @@ test('one control mapping to multiple labels is unknown', async () => {
   const result = await runOptionParser({
     xmlMutator(items) {
       const document = findStructuredPart(items, 'word/document.xml');
-      document['w:document']['w:body'][0]['w:tbl'][0]['w:tr'][0]['w:tc'].push({
+      document['w:document']['w:body'][0]['w:tbl'][0]['w:tr'][0]['w:tc'][1]
+        ['w:tbl'][0]['w:tr'][0]['w:tc'].push({
         'w:p': [textParagraph('Вторая независимая подпись')],
       });
     },
@@ -1437,7 +1483,8 @@ test('one label mapping to multiple controls is unknown', async () => {
     xmlMutator(items) {
       const document = findStructuredPart(items, 'word/document.xml');
       const object = document['w:document']['w:body'][0]['w:tbl'][0]
-        ['w:tr'][0]['w:tc'][0]['w:p'][0]['w:r'][0]['w:object'][0];
+        ['w:tr'][0]['w:tc'][1]['w:tbl'][0]['w:tr'][0]
+        ['w:tc'][0]['w:p'][0]['w:r'][0]['w:object'][0];
       object['w:control'].push({ $: { 'r:id': 'rId91', 'w:name': 'DuplicateFixtureControl' } });
       const rels = findStructuredPart(items, 'word/_rels/document.xml.rels');
       rels.Relationships.Relationship.push({
