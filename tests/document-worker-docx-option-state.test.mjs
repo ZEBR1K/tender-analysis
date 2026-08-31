@@ -85,6 +85,86 @@ function binaryDescriptor(data, fileName, overrides = {}) {
   };
 }
 
+function decodeXmlEntities(value) {
+  return value
+    .replace(/&#x([0-9a-f]+);/giu, (_, hex) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#([0-9]+);/gu, (_, decimal) => String.fromCodePoint(Number.parseInt(decimal, 10)))
+    .replace(/&quot;/gu, '"')
+    .replace(/&apos;/gu, "'")
+    .replace(/&lt;/gu, '<')
+    .replace(/&gt;/gu, '>')
+    .replace(/&amp;/gu, '&');
+}
+
+function parseXmlLikeN8n(xml) {
+  const tokens = xml.match(
+    /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z_][^>]*>|<[A-Za-z_][^>]*>|[^<]+/gu,
+  ) ?? [];
+  const stack = [];
+  let root = null;
+
+  function materialize(frame) {
+    const keys = Object.keys(frame.children);
+    const text = decodeXmlEntities(frame.text.join(''));
+    if (Object.keys(frame.attributes).length === 0 && keys.length === 0) return text;
+    const value = { ...frame.children };
+    if (Object.keys(frame.attributes).length > 0) value.$ = frame.attributes;
+    if (text.trim()) value._ = text;
+    return value;
+  }
+
+  function attach(frame) {
+    const value = materialize(frame);
+    const parent = stack.at(-1);
+    if (!parent) {
+      assert.equal(root, null, 'XML fixture must contain exactly one root element');
+      root = { [frame.name]: value };
+      return;
+    }
+    parent.children[frame.name] ??= [];
+    parent.children[frame.name].push(value);
+  }
+
+  for (const token of tokens) {
+    if (token.startsWith('<?') || token.startsWith('<!--')) continue;
+    if (token.startsWith('<![CDATA[')) {
+      assert.ok(stack.length > 0, 'CDATA must be inside an element');
+      stack.at(-1).text.push(token.slice(9, -3));
+      continue;
+    }
+    if (token.startsWith('</')) {
+      const name = token.slice(2, -1).trim();
+      const frame = stack.pop();
+      assert.equal(frame?.name, name, `Unexpected XML closing tag: ${name}`);
+      attach(frame);
+      continue;
+    }
+    if (token.startsWith('<')) {
+      const selfClosing = /\/\s*>$/u.test(token);
+      const body = token.slice(1, selfClosing ? token.lastIndexOf('/') : -1).trim();
+      const name = body.match(/^[^\s]+/u)?.[0];
+      assert.ok(name, `Malformed XML start tag: ${token}`);
+      const attributes = {};
+      const attributeSource = body.slice(name.length);
+      const attributePattern = /([^\s=]+)\s*=\s*(["'])([\s\S]*?)\2/gu;
+      let match;
+      while ((match = attributePattern.exec(attributeSource)) !== null) {
+        attributes[match[1]] = decodeXmlEntities(match[3]);
+      }
+      const frame = { name, attributes, children: {}, text: [] };
+      if (selfClosing) attach(frame);
+      else stack.push(frame);
+      continue;
+    }
+    if (stack.length > 0) stack.at(-1).text.push(token);
+    else assert.equal(token.trim(), '', 'Text outside XML root is unsupported');
+  }
+
+  assert.equal(stack.length, 0, 'XML fixture contains unclosed tags');
+  assert.ok(root, 'XML fixture root is missing');
+  return root;
+}
+
 async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = {} } = {}) {
   const node = findNode(workflow, nodeName);
   assert.equal(node.type, 'n8n-nodes-base.code');
@@ -652,6 +732,18 @@ test('fixture is a reviewed minimal derivative with exact source ActiveX parts',
   }
 });
 
+test('structured parser input is loaded from the checked-in source-derived XML fixture', () => {
+  const parsedFixture = parseXmlLikeN8n(
+    fs.readFileSync(path.join(ooxmlRoot, 'word', 'document.xml'), 'utf8'),
+  );
+  const documentPart = findStructuredPart(structuredXmlItems(), 'word/document.xml');
+  assert.deepEqual(documentPart, {
+    docx_part_path: 'word/document.xml',
+    docx_part_kind: 'structured_xml',
+    ...parsedFixture,
+  });
+});
+
 test('workflow uses native Compression and XML nodes with the reviewed structured contract', () => {
   const workflow = loadWorkflow();
   const decompress = findNode(workflow, nodeNames.decompress);
@@ -875,6 +967,40 @@ test('part preparation reconstructs the OPC path from live Compression directory
     manifest.derived_parts.map(({ path: partPath }) => partPath).sort(),
   );
 });
+
+const rejectedDescriptorPaths = [
+  { name: 'leading slash full path', fileName: '/word/document.xml' },
+  { name: 'leading backslash full path', fileName: '\\word\\document.xml' },
+  { name: 'UNC full path', fileName: '\\\\server\\share\\word\\document.xml' },
+  { name: 'drive-prefixed full path', fileName: 'C:\\word\\document.xml' },
+  { name: 'URI full path', fileName: 'https://example.invalid/word/document.xml' },
+  { name: 'leading slash split directory', directory: '/word', fileName: 'document.xml' },
+  { name: 'leading backslash split directory', directory: '\\word', fileName: 'document.xml' },
+  { name: 'UNC split directory', directory: '\\\\server\\share\\word', fileName: 'document.xml' },
+  { name: 'drive-prefixed split directory', directory: 'C:\\word', fileName: 'document.xml' },
+  { name: 'URI split directory', directory: 'https://example.invalid/word', fileName: 'document.xml' },
+  { name: 'dot segment in split directory', directory: 'word/.', fileName: 'document.xml' },
+  { name: 'parent segment in split directory', directory: 'word/../word', fileName: 'document.xml' },
+  { name: 'dot segment in split fileName', directory: 'word', fileName: './document.xml' },
+  { name: 'parent segment in split fileName', directory: 'word', fileName: '../document.xml' },
+];
+
+for (const descriptorPath of rejectedDescriptorPaths) {
+  test(`part preparation rejects ${descriptorPath.name} before OPC normalization`, async () => {
+    const workflow = loadWorkflow();
+    const descriptor = binaryDescriptor(Buffer.from('fixture'), descriptorPath.fileName, {
+      ...(descriptorPath.directory === undefined ? {} : { directory: descriptorPath.directory }),
+    });
+    const [result] = await runCodeNode(workflow, nodeNames.unfoldParts, [{
+      json: {},
+      binary: { opaque: descriptor },
+    }]);
+    assert.equal(result.json.docx_option_state_status, 'unknown');
+    assert.ok(result.json.docx_option_state_source_warnings.some(
+      ({ code }) => code === 'invalid_extracted_part_path',
+    ));
+  });
+}
 
 test('extracted part count limit returns an audit-only unknown boundary', async () => {
   const workflow = loadWorkflow();
