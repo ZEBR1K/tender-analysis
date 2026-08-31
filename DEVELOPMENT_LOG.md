@@ -5075,7 +5075,7 @@ Workflow, production n8n, PostgreSQL, credentials и prompts на этом audit
 
 ## 2026-08-31 — DW-18 Task 2 exact-source fixture RED
 
-Recovery baseline в isolated worktree `codex/dw18-ag11-option-state` не воспроизвёл документированный итог `245/246`: фактический full suite дал `240/246` и пять дополнительных pre-existing failures. Пользователь явно разрешил продолжить DW-18/AG-11, сохранив их как pre-existing baseline; исправление этих тестов не входит в scope.
+Recovery baseline в isolated worktree `codex/dw18-ag11-option-state` не воспроизвёл документированный итог `245/246`: фактический full suite дал `240/246` и пять дополнительных pre-existing failures. Технический оркестратор принял решение продолжить DW-18/AG-11, сохранив их как pre-existing baseline; исправление этих тестов не входит в scope.
 
 Raw Docling execution `14234` содержит пустой `form_items` и не содержит структурных `checked`/`selected`/ActiveX state. Поэтому выбран только standards-based OOXML relationships → CFB named `contents` stream → MS-OFORMS `Value` путь.
 
@@ -5099,3 +5099,24 @@ Workflow node not found: Разобрать состояния DOCX ActiveX
 ```
 
 RED охватывает exact `activeX5/6/7/8/55/56`, missing relationships, unknown CLSID, malformed CFB, unsupported persistence, missing/indeterminate `Value` и ambiguous control-label mappings. Production workflow, production n8n, DB, credentials и prompts не изменялись.
+
+---
+
+## 2026-08-31 — DW-18 Task 3 deterministic source parsing GREEN
+
+Focused contract расширен по замечаниям review до 27 сценариев. XML структурно разбирается native n8n `Extract From File` + `XML` nodes; Code node получает parsed objects и выполняет только OPC relationship joining, bounded CFB FAT/miniFAT traversal, MS-OFORMS `Value` decoding и формирование fail-closed audit records.
+
+Preparation boundary сохраняет исходный `binary.data`, создаёт только для DOCX отдельный `.zip` alias для Compression и определяет извлечённые OPC parts по `binary descriptor.fileName`. PDF/XLSX bypass сохраняет прежний JSON/binary contract.
+
+Review RED/GREEN evidence:
+
+```text
+initial reviewed RED: 26 tests / 1 pass / 25 fail
+first implementation run: 26 tests / 25 pass / 1 fail
+cause: source_row_ref serialization differed from fixture contract
+focused GREEN after minimal fix: 26 tests / 26 pass
+additional CFB v4 sector-boundary RED: 1 test / 0 pass / 1 fail
+final focused GREEN: 27 tests / 27 pass
+```
+
+Resource gates покрывают extracted-part count, суммарный размер требуемых частей, CFB v3/v4 sector sizes, sector indexes, FAT/miniFAT chain length, cycles, `contents` size и malformed/out-of-range structures. Exact source states подтверждены: 5/6/7 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`, 56 cleared. Все 11 добавленных нод прошли read-only schema validation `validate_node_config`. Production n8n, production DB, credentials и prompts не изменялись.

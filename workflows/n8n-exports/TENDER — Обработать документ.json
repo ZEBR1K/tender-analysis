@@ -1301,6 +1301,212 @@
       ],
       "id": "9f14362f-2b99-402f-8c8d-cbe6cdef1f0d",
       "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.first();\nconst extension = String(item.json?.document?.file_extension ?? '').toLowerCase();\n\nif (extension !== 'docx') {\n  return item;\n}\n\nconst original = item.binary?.data;\nif (!original) {\n  throw new Error('DOCX binary data is missing before archive preparation');\n}\n\nconst originalName = String(original.fileName ?? item.json?.document?.file_name ?? 'document.docx');\nconst archiveName = /\\.docx$/iu.test(originalName)\n  ? originalName.replace(/\\.docx$/iu, '.zip')\n  : originalName + '.zip';\n\nreturn {\n  json: item.json,\n  binary: {\n    ...item.binary,\n    docx_archive: {\n      ...original,\n      fileName: archiveName,\n      fileExtension: 'zip',\n      mimeType: 'application/zip',\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        160
+      ],
+      "id": "2fd7acb4-6d57-4711-9f80-18fe0a03d001",
+      "name": "Подготовить DOCX archive alias"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "622a698f-9e66-42f0-b69a-3ade0ea03002",
+              "leftValue": "={{ String($json.document?.file_extension ?? '').toLowerCase() }}",
+              "rightValue": "docx",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        160
+      ],
+      "id": "bc6d9438-9b58-4d78-8943-ee7f4a1bd003",
+      "name": "DOCX option-state extraction?"
+    },
+    {
+      "parameters": {
+        "operation": "decompress",
+        "binaryPropertyName": "docx_archive",
+        "outputPrefix": "docx_part_"
+      },
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        64
+      ],
+      "id": "3519fe4a-3ef1-419a-9517-39e68e52d004",
+      "name": "Извлечь DOCX OOXML"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const MAX_EXTRACTED_PARTS = 1500;\nconst MAX_REQUIRED_PART_BYTES = 4 * 1024 * 1024;\nconst item = $input.first();\nconst entries = Object.entries(item.binary ?? {});\n\nfunction audit(code, message, details = {}) {\n  return [{\n    json: {\n      ...item.json,\n      docx_part_kind: 'audit',\n      docx_option_state_status: 'unknown',\n      docx_option_state_source_warnings: [{ code, message, details }],\n    },\n  }];\n}\n\nif (entries.length > MAX_EXTRACTED_PARTS) {\n  return audit(\n    'extracted_part_limit_exceeded',\n    'DOCX archive contains more extracted parts than the deterministic safety limit',\n    { actual: entries.length, limit: MAX_EXTRACTED_PARTS },\n  );\n}\n\nfunction normalizePartName(value) {\n  const normalized = String(value ?? '').replace(/\\\\/gu, '/').replace(/^\\/+|\\/+$/gu, '');\n  if (!normalized || normalized.split('/').some((segment) => segment === '..' || segment === '.')) return null;\n  return normalized;\n}\n\nfunction isRequiredPart(partName) {\n  return partName === 'word/document.xml'\n    || partName === 'word/_rels/document.xml.rels'\n    || /^word\\/activeX\\/[^/]+\\.xml$/iu.test(partName)\n    || /^word\\/activeX\\/_rels\\/[^/]+\\.xml\\.rels$/iu.test(partName)\n    || /^word\\/activeX\\/[^/]+\\.bin$/iu.test(partName);\n}\n\nconst required = [];\nlet totalBytes = 0;\nfor (const [binaryKey, descriptor] of entries) {\n  const partName = normalizePartName(descriptor?.fileName);\n  if (!partName || !isRequiredPart(partName)) continue;\n  const contents = await this.helpers.getBinaryDataBuffer(0, binaryKey);\n  totalBytes += contents.length;\n  if (totalBytes > MAX_REQUIRED_PART_BYTES) {\n    return audit(\n      'required_parts_size_limit_exceeded',\n      'Required DOCX option-state parts exceed the deterministic byte limit',\n      { actual: totalBytes, limit: MAX_REQUIRED_PART_BYTES },\n    );\n  }\n  required.push({ partName, descriptor });\n}\n\nif (!required.some(({ partName }) => partName === 'word/document.xml')\n  || !required.some(({ partName }) => partName === 'word/_rels/document.xml.rels')) {\n  return audit('missing_required_ooxml_parts', 'Required DOCX document or relationship part is missing');\n}\n\nreturn required.map(({ partName, descriptor }) => ({\n  json: {\n    ...item.json,\n    docx_part_path: partName,\n    docx_part_kind: partName.toLowerCase().endsWith('.bin') ? 'binary' : 'structured_xml',\n  },\n  binary: { data: descriptor },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        64
+      ],
+      "id": "84cd21b9-57f1-412c-af98-d4fa58e2d005",
+      "name": "Развернуть DOCX OOXML части"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "25bf9052-c6b6-4e72-aecf-1f27627fd006",
+              "leftValue": "={{ $json.docx_part_kind }}",
+              "rightValue": "structured_xml",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        64
+      ],
+      "id": "7252d647-bd53-4452-a238-2cabf278d007",
+      "name": "OOXML часть XML?"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "destinationKey": "xml_text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        2240,
+        -48
+      ],
+      "id": "40131b69-486f-48bd-a234-52f0cf2fd008",
+      "name": "Прочитать DOCX XML"
+    },
+    {
+      "parameters": {
+        "mode": "xmlToJson",
+        "dataPropertyName": "xml_text",
+        "options": {
+          "explicitArray": true,
+          "explicitRoot": true,
+          "ignoreAttrs": false,
+          "mergeAttrs": false,
+          "normalize": false,
+          "normalizeTags": false,
+          "trim": false
+        }
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        -144
+      ],
+      "id": "0960eabb-b155-40dd-9afd-ac91e24ed009",
+      "name": "Разобрать DOCX XML"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2688,
+        -48
+      ],
+      "id": "ae88c0e4-0acf-4356-b5c5-925bf609d010",
+      "name": "Привязать parsed XML к части"
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "numberInputs": 2
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2912,
+        64
+      ],
+      "id": "39acdf40-afaa-426b-b328-4d1a4ebed011",
+      "name": "Собрать DOCX parts для parser"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const CONTRACT_VERSION = 'docx_option_state_v1';\nconst DOCUMENT_PART = 'word/document.xml';\nconst DOCUMENT_RELS_PART = 'word/_rels/document.xml.rels';\nconst CONTROL_REL_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/control';\nconst BINARY_REL_TYPE = 'http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary';\nconst CLASS_IDS = Object.freeze({\n  '{8BD21D40-EC42-11CE-9E0D-00AA006002F3}': 'checkbox',\n  '{8BD21D50-EC42-11CE-9E0D-00AA006002F3}': 'option_button',\n});\nconst MAX_CFB_BYTES = 16 * 1024 * 1024;\nconst MAX_CONTENTS_BYTES = 1024 * 1024;\nconst MAX_CHAIN_LENGTH = 4096;\nconst MAX_FAT_SECTORS = 128;\nconst FREE = 0xffffffff;\nconst END = 0xfffffffe;\n\nfunction warning(code, message, details = undefined) {\n  return details === undefined ? { code, message } : { code, message, details };\n}\n\nfunction fail(code, message) {\n  const error = new Error(message);\n  error.optionStateCode = code;\n  throw error;\n}\n\nfunction localName(key) {\n  const value = String(key);\n  const colon = value.lastIndexOf(':');\n  if (colon >= 0) return value.slice(colon + 1);\n  const underscore = value.lastIndexOf('_');\n  return underscore >= 0 ? value.slice(underscore + 1) : value;\n}\n\nfunction childValues(node, wanted) {\n  if (!node || typeof node !== 'object') return [];\n  const values = [];\n  for (const [key, raw] of Object.entries(node)) {\n    if (localName(key) !== wanted) continue;\n    values.push(...(Array.isArray(raw) ? raw : [raw]));\n  }\n  return values;\n}\n\nfunction attr(node, wanted) {\n  const attributes = node?.$ ?? node?.attributes ?? {};\n  for (const [key, value] of Object.entries(attributes)) {\n    if (localName(key) === wanted) return value;\n  }\n  return undefined;\n}\n\nfunction firstDescendant(node, wanted) {\n  if (!node || typeof node !== 'object') return null;\n  for (const [key, raw] of Object.entries(node)) {\n    if (key === '$' || key === 'attributes') continue;\n    const values = Array.isArray(raw) ? raw : [raw];\n    if (localName(key) === wanted && values.length) return values[0];\n    for (const value of values) {\n      const found = firstDescendant(value, wanted);\n      if (found) return found;\n    }\n  }\n  return null;\n}\n\nfunction collectCellContent(node, result = { controls: [], text: [] }, root = true) {\n  if (node === null || node === undefined) return result;\n  if (typeof node === 'string' || typeof node === 'number') return result;\n  if (Array.isArray(node)) {\n    for (const value of node) collectCellContent(value, result, false);\n    return result;\n  }\n  for (const [key, raw] of Object.entries(node)) {\n    if (key === '$' || key === 'attributes') continue;\n    const name = localName(key);\n    const values = Array.isArray(raw) ? raw : [raw];\n    if (!root && name === 'tbl') continue;\n    if (name === 'control') {\n      result.controls.push(...values);\n      continue;\n    }\n    if (name === 't') {\n      for (const value of values) {\n        if (typeof value === 'string' || typeof value === 'number') result.text.push(String(value));\n        else if (typeof value?._ === 'string') result.text.push(value._);\n      }\n      continue;\n    }\n    for (const value of values) collectCellContent(value, result, false);\n  }\n  return result;\n}\n\nfunction cleanText(parts) {\n  return parts.join('').replace(/\\s+/gu, ' ').trim();\n}\n\nfunction controlsFromDocument(documentJson) {\n  const records = [];\n  let tableIndex = 0;\n  function scan(node) {\n    if (!node || typeof node !== 'object') return;\n    for (const [key, raw] of Object.entries(node)) {\n      if (key === '$' || key === 'attributes') continue;\n      const values = Array.isArray(raw) ? raw : [raw];\n      if (localName(key) === 'tbl') {\n        for (const table of values) {\n          tableIndex += 1;\n          const currentTable = tableIndex;\n          const rows = childValues(table, 'tr');\n          rows.forEach((row, rowOffset) => {\n            const cells = childValues(row, 'tc').map((cell) => collectCellContent(cell));\n            const rowControls = cells.flatMap((cell) => cell.controls);\n            const labels = cells\n              .filter((cell) => cell.controls.length === 0)\n              .map((cell) => cleanText(cell.text))\n              .filter(Boolean);\n            for (const control of rowControls) {\n              const warnings = [];\n              if (rowControls.length !== 1) warnings.push(warning('ambiguous_control_mapping', 'Table row contains more than one control'));\n              if (labels.length !== 1) warnings.push(warning('ambiguous_label_mapping', 'Control row does not map to exactly one non-control label cell'));\n              records.push({\n                control_name: attr(control, 'name') ?? null,\n                document_rel_id: attr(control, 'id') ?? null,\n                exact_label: labels.length === 1 ? labels[0] : null,\n                source_row_ref: 'word/document.xml#table[' + currentTable + ']/row[' + (rowOffset + 1) + ']',\n                mapping_warnings: warnings,\n              });\n            }\n          });\n          scan(table);\n        }\n      } else {\n        for (const value of values) scan(value);\n      }\n    }\n  }\n  scan(documentJson);\n  return records;\n}\n\nfunction relationships(partJson) {\n  const root = firstDescendant({ root: partJson }, 'Relationships');\n  if (!root) return [];\n  return childValues(root, 'Relationship').map((relationship) => ({\n    id: attr(relationship, 'Id'),\n    type: attr(relationship, 'Type'),\n    target: attr(relationship, 'Target'),\n    targetMode: attr(relationship, 'TargetMode'),\n  }));\n}\n\nfunction resolvePart(sourcePart, target) {\n  const raw = String(target ?? '').replace(/\\\\/gu, '/');\n  if (!raw || raw.startsWith('/') || /^[a-z][a-z0-9+.-]*:/iu.test(raw)) return null;\n  const base = sourcePart.split('/').slice(0, -1);\n  for (const segment of raw.split('/')) {\n    if (!segment || segment === '.') continue;\n    if (segment === '..') {\n      if (!base.length) return null;\n      base.pop();\n    } else {\n      base.push(segment);\n    }\n  }\n  return base.join('/');\n}\n\nfunction relationshipPart(sourcePart) {\n  const segments = sourcePart.split('/');\n  const fileName = segments.pop();\n  return [...segments, '_rels', fileName + '.rels'].join('/');\n}\n\nfunction ensureRange(buffer, offset, length, code = 'malformed_cfb') {\n  if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset + length > buffer.length) {\n    fail(code, 'Binary structure references bytes outside the available buffer');\n  }\n}\n\nfunction decodeDirectoryName(buffer, offset) {\n  const byteLength = buffer.readUInt16LE(offset + 64);\n  if (byteLength < 2 || byteLength > 64 || byteLength % 2 !== 0) return '';\n  return buffer.subarray(offset, offset + byteLength - 2).toString('utf16le');\n}\n\nfunction readCfbContents(buffer) {\n  if (!Buffer.isBuffer(buffer) || buffer.length < 512 || buffer.length > MAX_CFB_BYTES) fail('malformed_cfb', 'ActiveX persistence is not a bounded CFB file');\n  if (!buffer.subarray(0, 8).equals(Buffer.from('d0cf11e0a1b11ae1', 'hex'))) fail('malformed_cfb', 'CFB signature is missing');\n  const majorVersion = buffer.readUInt16LE(26);\n  const byteOrder = buffer.readUInt16LE(28);\n  const sectorShift = buffer.readUInt16LE(30);\n  const miniSectorShift = buffer.readUInt16LE(32);\n  const versionMatchesSectorSize = (majorVersion === 3 && sectorShift === 9) || (majorVersion === 4 && sectorShift === 12);\n  if (byteOrder !== 0xfffe || !versionMatchesSectorSize || miniSectorShift !== 6) fail('unsupported_sector_size', 'Unsupported CFB version, byte order, or sector size');\n  const sectorSize = 2 ** sectorShift;\n  const miniSectorSize = 2 ** miniSectorShift;\n  if (buffer.length < sectorSize * 2 || buffer.length % sectorSize !== 0) fail('malformed_cfb', 'CFB sector layout is truncated or misaligned');\n  const sectorCount = (buffer.length - sectorSize) / sectorSize;\n  const sectorOffset = (index) => {\n    if (!Number.isInteger(index) || index < 0 || index >= sectorCount) fail('cfb_sector_out_of_range', 'CFB sector index is out of range');\n    return sectorSize + (index * sectorSize);\n  };\n  const sector = (index) => buffer.subarray(sectorOffset(index), sectorOffset(index) + sectorSize);\n  const numFatSectors = buffer.readUInt32LE(44);\n  const firstDirectorySector = buffer.readUInt32LE(48);\n  const miniStreamCutoff = buffer.readUInt32LE(56);\n  const firstMiniFatSector = buffer.readUInt32LE(60);\n  const numMiniFatSectors = buffer.readUInt32LE(64);\n  const firstDifatSector = buffer.readUInt32LE(68);\n  const numDifatSectors = buffer.readUInt32LE(72);\n  if (numFatSectors < 1 || numFatSectors > MAX_FAT_SECTORS) fail('cfb_chain_limit_exceeded', 'CFB FAT sector count exceeds the safety limit');\n  if (numMiniFatSectors > MAX_CHAIN_LENGTH || numDifatSectors > MAX_CHAIN_LENGTH) fail('cfb_chain_limit_exceeded', 'CFB auxiliary chain count exceeds the safety limit');\n  if (miniStreamCutoff !== 4096) fail('malformed_cfb', 'Unsupported CFB mini stream cutoff');\n\n  const fatSectorIndexes = [];\n  for (let offset = 76; offset < 512 && fatSectorIndexes.length < numFatSectors; offset += 4) {\n    const index = buffer.readUInt32LE(offset);\n    if (index !== FREE) fatSectorIndexes.push(index);\n  }\n  let difatIndex = firstDifatSector;\n  const difatSeen = new Set();\n  for (let count = 0; fatSectorIndexes.length < numFatSectors; count += 1) {\n    if (count >= numDifatSectors || count >= MAX_CHAIN_LENGTH) fail('cfb_chain_limit_exceeded', 'CFB DIFAT chain is incomplete or too long');\n    if (difatSeen.has(difatIndex)) fail('cfb_chain_cycle', 'CFB DIFAT chain contains a cycle');\n    difatSeen.add(difatIndex);\n    const data = sector(difatIndex);\n    for (let offset = 0; offset < sectorSize - 4 && fatSectorIndexes.length < numFatSectors; offset += 4) {\n      const index = data.readUInt32LE(offset);\n      if (index !== FREE) fatSectorIndexes.push(index);\n    }\n    difatIndex = data.readUInt32LE(sectorSize - 4);\n  }\n  if (fatSectorIndexes.length !== numFatSectors) fail('malformed_cfb', 'CFB FAT sector inventory is inconsistent');\n  const fat = [];\n  for (const fatSectorIndex of fatSectorIndexes) {\n    const data = sector(fatSectorIndex);\n    for (let offset = 0; offset < sectorSize; offset += 4) fat.push(data.readUInt32LE(offset));\n  }\n\n  function chainIndexes(start, table, label, declaredLimit = MAX_CHAIN_LENGTH) {\n    if (start === END) return [];\n    const indexes = [];\n    const seen = new Set();\n    let current = start;\n    while (current !== END) {\n      if (indexes.length >= declaredLimit || indexes.length >= MAX_CHAIN_LENGTH) fail('cfb_chain_limit_exceeded', 'CFB ' + label + ' chain exceeds the safety limit');\n      if (!Number.isInteger(current) || current < 0 || current >= table.length || current === FREE) fail('cfb_sector_out_of_range', 'CFB ' + label + ' chain references an invalid sector');\n      if (seen.has(current)) fail('cfb_chain_cycle', 'CFB ' + label + ' chain contains a cycle');\n      seen.add(current);\n      indexes.push(current);\n      current = table[current];\n    }\n    return indexes;\n  }\n\n  const directoryIndexes = chainIndexes(firstDirectorySector, fat, 'directory');\n  const directory = Buffer.concat(directoryIndexes.map(sector));\n  const entries = [];\n  for (let offset = 0; offset + 128 <= directory.length; offset += 128) {\n    const type = directory[offset + 66];\n    if (type !== 2 && type !== 5) continue;\n    entries.push({\n      name: decodeDirectoryName(directory, offset),\n      type,\n      start: directory.readUInt32LE(offset + 116),\n      size: Number(directory.readBigUInt64LE(offset + 120)),\n    });\n  }\n  const roots = entries.filter(({ type }) => type === 5);\n  const contentsEntries = entries.filter(({ type, name }) => type === 2 && name.toLowerCase() === 'contents');\n  if (roots.length !== 1 || contentsEntries.length !== 1) fail('malformed_cfb', 'CFB must contain one root and one contents stream');\n  const root = roots[0];\n  const contentsEntry = contentsEntries[0];\n  if (!Number.isSafeInteger(root.size) || root.size < 0 || root.size > MAX_CFB_BYTES) fail('malformed_cfb', 'CFB root mini stream size is invalid');\n  if (!Number.isSafeInteger(contentsEntry.size) || contentsEntry.size < 0) fail('malformed_cfb', 'CFB contents stream size is invalid');\n  if (contentsEntry.size > MAX_CONTENTS_BYTES) fail('contents_stream_too_large', 'CFB contents stream exceeds the safety limit');\n\n  const miniFatIndexes = numMiniFatSectors === 0\n    ? []\n    : chainIndexes(firstMiniFatSector, fat, 'miniFAT', numMiniFatSectors);\n  if (miniFatIndexes.length !== numMiniFatSectors) fail('malformed_cfb', 'CFB miniFAT declared length is inconsistent');\n  const miniFat = [];\n  for (const index of miniFatIndexes) {\n    const data = sector(index);\n    for (let offset = 0; offset < sectorSize; offset += 4) miniFat.push(data.readUInt32LE(offset));\n  }\n  const rootIndexes = root.size === 0 ? [] : chainIndexes(root.start, fat, 'root mini stream');\n  const miniStream = Buffer.concat(rootIndexes.map(sector)).subarray(0, root.size);\n\n  if (contentsEntry.size < miniStreamCutoff) {\n    const needed = Math.ceil(contentsEntry.size / miniSectorSize);\n    const indexes = chainIndexes(contentsEntry.start, miniFat, 'contents mini stream', Math.max(needed + 1, 1));\n    if (indexes.length !== needed) fail('malformed_cfb', 'CFB contents mini stream length is inconsistent');\n    const chunks = indexes.map((index) => {\n      const offset = index * miniSectorSize;\n      ensureRange(miniStream, offset, miniSectorSize, 'cfb_sector_out_of_range');\n      return miniStream.subarray(offset, offset + miniSectorSize);\n    });\n    return Buffer.concat(chunks).subarray(0, contentsEntry.size);\n  }\n  const needed = Math.ceil(contentsEntry.size / sectorSize);\n  const indexes = chainIndexes(contentsEntry.start, fat, 'contents stream', Math.max(needed + 1, 1));\n  if (indexes.length !== needed) fail('malformed_cfb', 'CFB contents stream length is inconsistent');\n  return Buffer.concat(indexes.map(sector)).subarray(0, contentsEntry.size);\n}\n\nfunction align4(value) {\n  return (value + 3) & ~3;\n}\n\nfunction decodeFmString(buffer, descriptor, cursor) {\n  const compressed = (descriptor & 0x80000000) !== 0;\n  const length = descriptor & 0x7fffffff;\n  if (length > 65536) fail('malformed_msoforms', 'MS-OFORMS string exceeds the safety limit');\n  const byteLength = compressed ? length : length * 2;\n  ensureRange(buffer, cursor, byteLength, 'malformed_msoforms');\n  const value = buffer.subarray(cursor, cursor + byteLength).toString(compressed ? 'latin1' : 'utf16le');\n  return { value, cursor: cursor + byteLength };\n}\n\nfunction readMorphData(contents, expectedType) {\n  ensureRange(contents, 0, 12, 'malformed_msoforms');\n  if (contents[0] !== 0 || contents[1] !== 2) fail('malformed_msoforms', 'Unsupported MS-OFORMS MorphData version');\n  const cbMorphData = contents.readUInt16LE(2);\n  const morphEnd = 4 + cbMorphData;\n  ensureRange(contents, 0, morphEnd, 'malformed_msoforms');\n  const mask = contents.readBigUInt64LE(4);\n  const allowedBits = [0n, 1n, 2n, 6n, 8n, 22n, 31n, 32n];\n  let allowedMask = 0n;\n  for (const bit of allowedBits) allowedMask |= 1n << bit;\n  if ((mask & ~allowedMask) !== 0n) fail('unsupported_msoforms_properties', 'MS-OFORMS property mask contains unsupported fields');\n  const has = (bit) => (mask & (1n << BigInt(bit))) !== 0n;\n  let cursor = 12;\n  for (const bit of [0, 1, 2]) {\n    if (has(bit)) {\n      ensureRange(contents, cursor, 4, 'malformed_msoforms');\n      cursor += 4;\n    }\n  }\n  let displayStyle = null;\n  if (has(6)) {\n    ensureRange(contents, cursor, 1, 'malformed_msoforms');\n    displayStyle = contents[cursor];\n    cursor += 1;\n  }\n  cursor = align4(cursor);\n  let valueDescriptor = null;\n  if (has(22)) {\n    ensureRange(contents, cursor, 4, 'malformed_msoforms');\n    valueDescriptor = contents.readUInt32LE(cursor);\n    cursor += 4;\n  }\n  let groupDescriptor = null;\n  if (has(32)) {\n    ensureRange(contents, cursor, 4, 'malformed_msoforms');\n    groupDescriptor = contents.readUInt32LE(cursor);\n    cursor += 4;\n  }\n  cursor = align4(cursor);\n  if (!has(8) || !has(31)) fail('malformed_msoforms', 'MS-OFORMS required size or reserved property is absent');\n  ensureRange(contents, cursor, 8, 'malformed_msoforms');\n  cursor += 8;\n  if (valueDescriptor === null) fail('missing_value', 'MS-OFORMS Value property is absent');\n  const decodedValue = decodeFmString(contents, valueDescriptor, cursor);\n  cursor = decodedValue.cursor;\n  let groupName = null;\n  if (groupDescriptor !== null) {\n    cursor = align4(cursor);\n    const decodedGroup = decodeFmString(contents, groupDescriptor, cursor);\n    groupName = decodedGroup.value;\n  }\n  const expectedDisplayStyle = expectedType === 'checkbox' ? 4 : 5;\n  if (displayStyle !== expectedDisplayStyle) fail('unsupported_control_encoding', 'MS-OFORMS display style does not match the ActiveX class');\n  if (decodedValue.value === '1') return { state: 'selected', rawValue: '1', groupName };\n  if (decodedValue.value === '0') return { state: 'unselected', rawValue: '0', groupName };\n  return { state: 'indeterminate', rawValue: decodedValue.value, groupName };\n}\n\nconst items = $input.all();\nconst partItems = new Map();\nconst sourceWarnings = [];\nitems.forEach((item, index) => {\n  const partPath = item.json?.docx_part_path;\n  if (partPath) {\n    if (partItems.has(partPath)) sourceWarnings.push(warning('duplicate_part_path', 'Multiple extracted items have the same OPC part path', { partPath }));\n    else partItems.set(partPath, { item, index });\n  }\n  for (const sourceWarning of item.json?.docx_option_state_source_warnings ?? []) sourceWarnings.push(sourceWarning);\n});\n\nconst documentItem = partItems.get(DOCUMENT_PART)?.item;\nconst documentRelsItem = partItems.get(DOCUMENT_RELS_PART)?.item;\nif (!documentItem || documentItem.json?.docx_part_kind !== 'structured_xml' || !documentRelsItem) {\n  sourceWarnings.push(warning('missing_required_ooxml_parts', 'Structured document or relationship part is unavailable'));\n  return [{ json: { docx_option_state_status: 'unknown', docx_option_states: [], docx_option_state_audit: { contract_version: 'docx_option_state_audit_v1', warnings: sourceWarnings } } }];\n}\n\nconst documentRelationships = relationships(documentRelsItem.json);\nconst controls = controlsFromDocument(documentItem.json);\nconst states = [];\nfor (const control of controls) {\n  const record = {\n    contract_version: CONTRACT_VERSION,\n    document_part: DOCUMENT_PART,\n    control_name: control.control_name,\n    control_type: null,\n    state: 'unknown',\n    raw_value: null,\n    exact_label: control.exact_label,\n    group_context: null,\n    source_row_ref: control.source_row_ref,\n    control_rel_target: null,\n    binary_rel_target: null,\n    warnings: [...control.mapping_warnings],\n  };\n  const matchingDocumentRels = documentRelationships.filter((relationship) => relationship.id === control.document_rel_id && relationship.type === CONTROL_REL_TYPE && relationship.targetMode !== 'External');\n  if (matchingDocumentRels.length !== 1) {\n    record.warnings.push(warning('missing_document_relationship', 'Control does not map to exactly one internal document relationship'));\n    states.push(record);\n    continue;\n  }\n  const controlPart = resolvePart(DOCUMENT_PART, matchingDocumentRels[0].target);\n  record.control_rel_target = controlPart;\n  if (!controlPart) {\n    record.warnings.push(warning('invalid_relationship_target', 'Document control relationship target is invalid'));\n    states.push(record);\n    continue;\n  }\n  const controlPartItem = partItems.get(controlPart)?.item;\n  const ocx = controlPartItem ? firstDescendant({ root: controlPartItem.json }, 'ocx') : null;\n  if (!ocx) {\n    record.warnings.push(warning('missing_activex_part', 'ActiveX XML part is unavailable'));\n    states.push(record);\n    continue;\n  }\n  const classId = String(attr(ocx, 'classid') ?? '').toUpperCase();\n  record.control_type = CLASS_IDS[classId] ?? 'unsupported';\n  if (record.control_type === 'unsupported') {\n    record.warnings.push(warning('unsupported_control_class', 'ActiveX CLSID is not a supported option-state control'));\n    states.push(record);\n    continue;\n  }\n  if (attr(ocx, 'persistence') !== 'persistStorage') {\n    record.warnings.push(warning('unsupported_persistence', 'ActiveX persistence mode is not persistStorage'));\n    states.push(record);\n    continue;\n  }\n  const binaryRelId = attr(ocx, 'id');\n  const relsPart = relationshipPart(controlPart);\n  const activeRelsItem = partItems.get(relsPart)?.item;\n  const activeRelationships = activeRelsItem ? relationships(activeRelsItem.json) : [];\n  const matchingBinaryRels = activeRelationships.filter((relationship) => relationship.id === binaryRelId && relationship.type === BINARY_REL_TYPE && relationship.targetMode !== 'External');\n  if (matchingBinaryRels.length !== 1) {\n    record.warnings.push(warning('missing_activex_relationship', 'ActiveX XML does not map to exactly one internal persistence relationship'));\n    states.push(record);\n    continue;\n  }\n  const binaryPart = resolvePart(controlPart, matchingBinaryRels[0].target);\n  record.binary_rel_target = binaryPart;\n  const binaryEntry = binaryPart ? partItems.get(binaryPart) : null;\n  if (!binaryEntry?.item?.binary?.data) {\n    record.warnings.push(warning('missing_activex_binary', 'ActiveX persistence binary part is unavailable'));\n    states.push(record);\n    continue;\n  }\n  try {\n    const binaryBuffer = await this.helpers.getBinaryDataBuffer(binaryEntry.index, 'data');\n    const decoded = readMorphData(readCfbContents(binaryBuffer), record.control_type);\n    record.raw_value = decoded.rawValue;\n    record.group_context = decoded.groupName;\n    if (record.warnings.length === 0) {\n      record.state = decoded.state;\n      if (decoded.state === 'indeterminate') record.warnings.push(warning('indeterminate_value', 'MS-OFORMS Value is neither 0 nor 1'));\n    }\n  } catch (error) {\n    const code = error?.optionStateCode ?? 'malformed_activex_persistence';\n    record.warnings.push(warning(code, String(error?.message ?? 'ActiveX persistence decoding failed')));\n  }\n  states.push(record);\n}\n\nconst resolvedCount = states.filter(({ state }) => state === 'selected' || state === 'unselected').length;\nconst status = sourceWarnings.length > 0 || states.length === 0\n  ? 'unknown'\n  : resolvedCount === states.length ? 'resolved' : resolvedCount > 0 ? 'partial' : 'unknown';\nreturn [{\n  json: {\n    docx_option_state_status: status,\n    docx_option_states: states,\n    docx_option_state_audit: {\n      contract_version: 'docx_option_state_audit_v1',\n      controls_count: states.length,\n      resolved_count: resolvedCount,\n      warnings: sourceWarnings,\n    },\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        64
+      ],
+      "id": "563311a2-bf76-464f-91fd-30d13e85d012",
+      "name": "Разобрать состояния DOCX ActiveX"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3360,
+        160
+      ],
+      "id": "79703afb-49f8-4b15-85c8-bd0ece55d013",
+      "name": "Вернуть DOCX binary для Docling"
     }
   ],
   "pinData": {},
@@ -1353,7 +1559,7 @@
       "main": [
         [
           {
-            "node": "определить тип файла",
+            "node": "Подготовить DOCX archive alias",
             "type": "main",
             "index": 0
           }
@@ -1897,6 +2103,151 @@
         [
           {
             "node": "Проверить вход Worker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить DOCX archive alias": {
+      "main": [
+        [
+          {
+            "node": "DOCX option-state extraction?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DOCX option-state extraction?": {
+      "main": [
+        [
+          {
+            "node": "Извлечь DOCX OOXML",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Вернуть DOCX binary для Docling",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "определить тип файла",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Извлечь DOCX OOXML": {
+      "main": [
+        [
+          {
+            "node": "Развернуть DOCX OOXML части",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Развернуть DOCX OOXML части": {
+      "main": [
+        [
+          {
+            "node": "OOXML часть XML?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OOXML часть XML?": {
+      "main": [
+        [
+          {
+            "node": "Прочитать DOCX XML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Собрать DOCX parts для parser",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Прочитать DOCX XML": {
+      "main": [
+        [
+          {
+            "node": "Разобрать DOCX XML",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Привязать parsed XML к части",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разобрать DOCX XML": {
+      "main": [
+        [
+          {
+            "node": "Привязать parsed XML к части",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Привязать parsed XML к части": {
+      "main": [
+        [
+          {
+            "node": "Собрать DOCX parts для parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать DOCX parts для parser": {
+      "main": [
+        [
+          {
+            "node": "Разобрать состояния DOCX ActiveX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разобрать состояния DOCX ActiveX": {
+      "main": [
+        [
+          {
+            "node": "Вернуть DOCX binary для Docling",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Вернуть DOCX binary для Docling": {
+      "main": [
+        [
+          {
+            "node": "Загрузка файла в Docling",
             "type": "main",
             "index": 0
           }
