@@ -304,6 +304,29 @@ Docling artifact URL имеет ограниченный TTL и не являе�
 
 ---
 
+## 9A. DOCX ActiveX option-state boundary (`DW-18`)
+
+Для DOCX между file-type route и существующим Docling route добавлена параллельная deterministic ветка. Исходный `binary.data` не переименовывается и не изменяется: `Подготовить DOCX archive alias` создаёт отдельный binary alias с `.zip` descriptor только для native `Compression / Decompress`. PDF и XLSX обходят эту ветку с прежним JSON/binary contract.
+
+OOXML извлекается native `Compression`, XML parts структурно разбираются native `XML` node. Code nodes выполняют только:
+
+```text
+OPC relationship joining
+→ bounded CFB directory/FAT/miniFAT traversal
+→ MS-OFORMS Value decoding
+→ fail-closed audit records
+```
+
+`Value = 1` означает `selected`, `Value = 0` — `unselected`; иное значение остаётся `indeterminate`. Отсутствующие, malformed, unsupported или неоднозначные structures дают `unknown`/`indeterminate` с audit warning, а не synthetic negative. `contents` принимается только среди stream entries, достижимых bounded traversal от `Root Entry.child`; orphan/stale stream не authoritative.
+
+Resource gates ограничивают число extracted parts, суммарный размер нужных parts, допустимые CFB sector sizes/indexes, FAT/miniFAT/directory-tree chain length, cycles и размер `contents`. Связь state с подписью строится через OOXML relationships и exact source row, без byte offsets, control names, ActiveX part numbers или tender-specific literals.
+
+После нормализации canonical block text остаётся неизменным. State/provenance передаются отдельно в source/semantic blocks и AI-visible marker; evidence validators принимают quotes только из canonical text. Для `national_regime` и `participation_guarantee` exact-grounded `unselected` становится audited rejected fact, `unknown`/`indeterminate` — review-only, а `selected` сохраняет structured applicability proof в `validator_meta.option_state`. AI Validator не извлекает и не создаёт option-state facts.
+
+Offline exact-source fixture подтверждает cleared controls 5/6/7/56 и selected controls 8 (`Не применимо`) / 55 (`Не предусмотрены`). Native runtime path в test Worker ещё не подтверждён: live candidate `csnDg78NzN1nIjUT` недоступен текущему MCP и не изменялся.
+
+---
+
 ## 10. Universal Docling Normalizer
 
 `Нормализовать документ Docling` принимает `DoclingDocument` и превращает provider-specific структуру в наш универсальный document representation.

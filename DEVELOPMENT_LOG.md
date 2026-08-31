@@ -5162,3 +5162,29 @@ AG-8/AG-9/AG-10/Targeted Recheck related: 156 tests / 152 pass / 4 accepted pre-
 Без proof generic/conditional policy, labels-only и ambiguous/review-only candidates получают effective `requires_recheck/insufficient_evidence`. Selected negative и explicit current-procurement proof допускают `resolved`; raw recheck и unrelated field сохраняют прежнее поведение. Candidate SQL переносит из JSONB audit только `option_state` и `applicability_proof`; reported response, effective status, decisions, evidence и containment reason остаются в audit.
 
 Четыре related RED совпадают с зафиксированным baseline: intentional AG-8 canonical prompt gate, два execution-14104 fixture SHA/report gates и Targeted Recheck coordinate mismatch. Production n8n, production DB и credentials не изменялись; runtime GREEN не заявляется.
+
+---
+
+## 2026-08-31 — DW-18 / AG-11 Task 6 test packaging checkpoint
+
+Offline graph audit подтвердил canonical Worker `62` nodes и test Aggregator export `24` nodes: duplicate node names/IDs, missing connection targets и disabled nodes отсутствуют. Focused Worker + Aggregator tests прошли `75/75`; related Worker packaging run дал `153/154`, единственный RED — ранее зафиксированный immutable beta hash baseline (`cd7b76…` фактически против старой константы `02e4e5…`).
+
+Test Aggregator `ftvmrEHoMbPOAqZG` был read-back на published/draft version `91c17313-a593-4fb9-9072-79320a958dd7`. Трёхстороннее сравнение live pre ↔ Task 5 base ↔ Task 5 target показало отсутствие conflict в трёх изменяемых нодах. Atomic update применил ровно `3/3` operations:
+
+```text
+Загрузить факты закупки
+Подготовить запрос Semantic Aggregator
+Проверить ответ Semantic Aggregator
+```
+
+Новый test draft `f11906df-f760-4c54-a59e-16f4423ab534` прочитан обратно: `24` nodes, parameters трёх нод совпадают с repository target, connections сохранены, unexpected node drift = `0`. Active version оставлен `91c17313-a593-4fb9-9072-79320a958dd7`; publish и runtime execution не выполнялись. Immutable snapshots:
+
+```text
+pre  workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.live-91c17313-a593-4fb9-9072-79320a958dd7.json
+SHA-256 017093e027f781864b7fe261e77f8a704ccbcca5524102136300d65121e1063d
+
+post workflows/n8n-exports/beta/[TEST CODEX] TENDER — Агрегация закупки.live-f11906df-f760-4c54-a59e-16f4423ab534.json
+SHA-256 4d1b737efe64fe1fb870917c48f7d6d799c76cbd9b40bc1266db38a4cea06d7f
+```
+
+Exact Worker candidate `csnDg78NzN1nIjUT` имеет `availableInMCP=false`; MCP read/history возвращают explicit access error. UI подтвердил, что enable-MCP flow принимает только published workflows с webhook/form/schedule/chat trigger, а candidate — subworkflow/manual contour. По плану старый `[3 TEST]` Worker не использован как подмена, candidate не изменён, production n8n/DB/credentials не затронуты. Поэтому native Worker runtime path и end-to-end canary остаются непроверенным gate.

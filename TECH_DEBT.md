@@ -1143,6 +1143,21 @@ Worker → facts → Aggregator runtime canary
 fresh clean 12/12 run и ручная проверка 27/27
 ```
 
+### Implementation checkpoint 2026-08-31
+
+Offline implementation выполнена, но debt остаётся открытым до runtime gate.
+
+```text
+DW-18 focused exact-source matrix: 44/44 GREEN
+AG-11 focused containment matrix: 31/31 GREEN
+exact controls: 5/6/7/56 unselected; 8/55 selected
+orphan/unlinked contents, invalid directory pointers и cycles: unknown + audit warning
+test Aggregator draft: ftvmrEHoMbPOAqZG@f11906df-f760-4c54-a59e-16f4423ab534
+published test Aggregator remains: 91c17313-a593-4fb9-9072-79320a958dd7
+```
+
+Live Worker candidate `csnDg78NzN1nIjUT` не exposed текущему MCP. n8n UI допускает MCP exposure только для published workflows с webhook/form/schedule/chat trigger, тогда как этот Worker является subworkflow/manual contour. По fail-closed boundary плана Worker не подменялся старым `[3 TEST]`, не мутировался через UI и native runtime canary не выполнялся. Следующий gate — предоставить read/write test access к exact candidate без изменения production и затем выполнить bounded Worker → facts → test Aggregator canary.
+
 ### Связанное, но отдельное ограничение
 
 Сумма `24 900` для `participation_cost` отсутствует во всех предоставленных DOCX, text-readable PDF и OCR data execution `14234`; `tender_metadata` также пуст. В `Блок_1_Извещение.docx` выбранное `Плата не предусмотрена` относится к плате за предоставление документации, а не к тарифу ЭТП. Значение `24 900` нельзя добавлять без отдельного grounded внешнего источника.
@@ -2135,7 +2150,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
 
-Дополнительные Critical gates: `DW-17 — reference-only Evidence Repair` открыт до regression на executions `14234`/`14238` и полного runtime canary; `DW-18 / AG-11 — DOCX option-state loss / national_regime false-resolved` открыт до deterministic ActiveX control extraction, downstream applicability containment и exact source runtime canary; `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` и `TR-10` mitigated/GREEN локально, но остаются P0 до Targeted Recheck/Aggregator production promotion, runtime canary и full run. `TR-11` — отдельный High operational gate для terminal failure/alert semantics.
+Дополнительные Critical gates: `DW-17 — reference-only Evidence Repair` открыт до regression на executions `14234`/`14238` и полного runtime canary; `DW-18 / AG-11 — DOCX option-state loss / national_regime false-resolved` имеет offline deterministic extraction и downstream containment, но остаётся открыт до exact source Worker/Aggregator runtime canary; `AG-8 — procurement_subject current-scope false-resolved` mitigated/verified в test, но остаётся открытым до production promotion и fresh full run; `AG-9 — application_documents` и `TR-10` mitigated/GREEN локально, но остаются P0 до Targeted Recheck/Aggregator production promotion, runtime canary и full run. `TR-11` — отдельный High operational gate для terminal failure/alert semantics.
 
 ## High
 

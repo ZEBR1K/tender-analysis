@@ -460,12 +460,16 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - neutral `procurement_subject/resolved` и raw `application_documents/requires_review` controls проходят без containment;
 - execution-derived `AG-10/TR-13` containment для `participation_guarantee` и `required_official_certificates` проходит offline tests и не ослабляет universal structural guards;
 - E2E runner drafts сохраняют exact post-claim Aggregator parity `22/22` после переноса containment;
-- immutable Document Worker beta snapshot сохранён с ожидаемым SHA-256;
-- canonical Document Worker JSON является clean offline production candidate, а beta→canonical packaging contract проходит regression.
+- immutable Document Worker beta snapshot сохранён, но его старая expected-hash assertion остаётся принятым pre-existing RED baseline;
+- canonical Document Worker JSON сохраняет beta packaging вне reviewed `DW-18` nodes; соответствующая selective packaging regression проходит.
 - executions `14336`, `14337`, `14341` и report replay `14345` успешно завершили сохранённый partial `11/12` contour до HTML;
 - визуальный и OOXML audit исходного `Блок_2_Информационная_карта.docx` подтвердил explicit selections `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`;
 - Aggregator execution `14336` подтвердил первый incorrect terminal state для `national_regime`: Round 1 accepted `resolved` по generic/conditional PP 1875 candidates;
 - Targeted Recheck `14337` корректно зафиксировал `insufficient_evidence` для `participation_guarantee`, потому что его context уже не содержал option-state.
+- `DW-18` exact-source derivative fixture и 44 focused regressions offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; malformed/orphan/cyclic/out-of-range structures fail closed.
+- Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
+- `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
+- test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
 
 ### Not verified
 
@@ -479,8 +483,8 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
-- deterministic extraction/preservation DOCX ActiveX radio/checkbox state (`DW-18`);
-- Aggregator fail-closed applicability boundary для ambiguous option tables и generic national-regime clauses (`AG-11`);
+- native runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; offline `DW-18` GREEN не является runtime proof;
+- published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
 - финальный клиентский отчёт без известных `national_regime`/option-state расхождений.
 
@@ -489,8 +493,8 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 На snapshot date exports имеют разные роли:
 
 - `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` — неизменяемый 60-node test/calibration snapshot;
-- Document Worker canonical path — clean inactive 51-node offline production candidate без instance identity и test state;
-- test Aggregator published active `91c17313-…` содержит execution-derived `AG-10` containment;
+- Document Worker canonical path — clean inactive 62-node offline candidate с `DW-18`, без instance identity и test state;
+- test Aggregator published active `91c17313-…` содержит execution-derived `AG-10`; unpublished test draft `f11906df-…` добавляет ровно три `AG-11` parameter changes без connection drift;
 - test Targeted Recheck published active `13b3c124-…` содержит `TR-10/TR-13` containment и audited technical `requires_review` fallback для execution `14292`;
 - 24-нoded production Aggregator draft не опубликован и соответствует очищенному core graph без disabled legacy/test nodes;
 - защищённые workflow JSON не изменялись автоматически в рамках этого checkpoint.
@@ -503,7 +507,8 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 
 ```text
 DW-18 / AG-11 execution-derived RED на исходном DOCX
-→ deterministic selected/unselected option-state contract
+→ offline deterministic selected/unselected option-state contract (GREEN)
+→ expose/read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
 → Worker/Aggregator runtime canary на national_regime и participation_guarantee
 → DW-17 reference-only evidence repair для failed OCR document
 → clean 12/12 document run from Orchestrator
