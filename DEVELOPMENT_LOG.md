@@ -5206,3 +5206,41 @@ node --test tests/*.test.mjs
 ```
 
 Full-suite RED set не изменился относительно принятой границы: intentional AG-8 current-scope gate; два execution-14104 A/B artifact/hash gates; immutable Worker beta hash; validator prompt CRLF/LF mismatch; Targeted Recheck evidence-coordinate mismatch. Новых failures нет.
+
+---
+
+## 2026-09-01 — DW-18 runtime hardening from executions 14350–14352
+
+Recovery audit подтвердил clean branch HEAD `6796809` и exact source SHA-256 `32f79d377ad3b775497e70754bdfdce8ec0928cfeb2626d60ca65ef519f7437b`. Focused baseline был `44/44 PASS`.
+
+Execution-derived RED (`3e6556c`) воспроизвёл три первые runtime boundaries:
+
+```text
+14350: Compression descriptor = directory + fileName, canonical использовал только fileName
+14351: Extract From File/XML заменяет JSON и теряет docx_part_path/docx_part_kind
+14352: 578 controls / 126 decoded / partial; target raw 0/0/0/1 оставались unknown из-за ancestor-table ambiguity
+```
+
+Sanitised fixture сохраняет реальную вложенную multi-control table structure без полного DOCX, PII, secrets или unrelated procurement content. RED: `46 total / 39 pass / 7 fail`; первичные assertions упали на missing Merge input 0, missing reconstructed OPC parts и `12` duplicate records вместо exact `6`.
+
+Minimal GREEN (`20568db`) изменил только canonical Worker:
+
+```text
+full fileName OR directory + fileName → единый normalized OPC path
+OOXML часть XML? True → Привязать parsed XML к части input 0
+parsed XML → Привязать parsed XML к части input 1
+direct table rows/cells only; nested w:tbl excluded from ancestor-cell content
+```
+
+Focused GREEN: `46/46 PASS`. Exact states: activeX5/6/7 unselected, activeX8 selected (`Не применимо.`), activeX55 selected (`Не предусмотрены;`), activeX56 unselected (`Предусмотрены…`). Настоящие multiple-label/multiple-control cases остаются `unknown`; unselected/review-only AG-11 semantics не ослаблены. Production n8n/DB, credentials, prompts и полный клиентский DOCX не изменялись. Post-fix runtime canary остаётся обязательным gate.
+
+Final offline verification:
+
+```text
+DW-18 focused: 46/46 PASS
+AG-11 focused: 31/31 PASS
+document-worker related: 156 total / 154 pass / 2 exact baseline failures
+full suite: 324 total / 318 pass / 6 exact baseline failures
+```
+
+Full-suite failure set совпал с checkpoint `da7bb7a`: intentional AG-8 current-scope gate; два execution-14104 A/B artifact/hash gates; immutable Worker beta hash; validator prompt CRLF/LF mismatch; Targeted Recheck evidence-coordinate mismatch. Packaging projection вне reviewed DW-18 nodes прошла; `git diff --check` не обнаружил whitespace errors.

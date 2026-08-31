@@ -1,8 +1,8 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-08-31
+**Snapshot date:** 2026-09-01
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/fix-aggregator-execution-14254`
+**Branch at snapshot:** `codex/dw18-ag11-option-state`
 
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
@@ -466,11 +466,12 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - визуальный и OOXML audit исходного `Блок_2_Информационная_карта.docx` подтвердил explicit selections `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`;
 - Aggregator execution `14336` подтвердил первый incorrect terminal state для `national_regime`: Round 1 accepted `resolved` по generic/conditional PP 1875 candidates;
 - Targeted Recheck `14337` корректно зафиксировал `insufficient_evidence` для `participation_guarantee`, потому что его context уже не содержал option-state.
-- `DW-18` exact-source derivative fixture и 44 focused regressions offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; malformed/orphan/cyclic/out-of-range structures fail closed.
+- `DW-18` source-derived nested-table fixture и 46 focused regressions offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; malformed/orphan/cyclic/out-of-range structures fail closed.
+- executions `14350–14352` локализовали три runtime gaps прежнего canonical candidate: split `directory + fileName`, потерю `docx_part_path/docx_part_kind` после Extract From File/XML и ancestor-table duplicate mapping (`578 controls / 126 decoded / partial`). Canonical Worker исправляет только эти boundaries и сохраняет настоящую ambiguity fail-closed.
 - Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
-- fresh branch verification: focused `DW-18 44/44` и `AG-11 31/31`; full suite `322 total / 316 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: один intentional `AG-8` promotion gate и пять дополнительных pre-existing failures; новых failures нет.
+- fresh branch verification: focused `DW-18 46/46` и `AG-11 31/31`; full suite `324 total / 318 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: intentional `AG-8` gate и пять дополнительных pre-existing failures; новых failures нет.
 
 ### Not verified
 
@@ -484,7 +485,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - полный clean run новой закупки от Orchestrator до нового отчёта после текущего hardening;
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
-- native runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; offline `DW-18` GREEN не является runtime proof;
+- post-fix runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; executions `14350–14352` являются pre-fix diagnostic evidence, а не GREEN canary;
 - published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
 - финальный клиентский отчёт без известных `national_regime`/option-state расхождений.
@@ -507,9 +508,9 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 Следующий статус можно считать лучше текущего только после:
 
 ```text
-DW-18 / AG-11 execution-derived RED на исходном DOCX
-→ offline deterministic selected/unselected option-state contract (GREEN)
-→ expose/read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
+DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
+→ canonical runtime hardening + offline deterministic contract (46/46 GREEN)
+→ read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
 → Worker/Aggregator runtime canary на national_regime и participation_guarantee
 → DW-17 reference-only evidence repair для failed OCR document
 → clean 12/12 document run from Orchestrator

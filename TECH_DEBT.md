@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-08-31
+**Последнее обновление:** 2026-09-01
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -123,7 +123,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-14 / EW-3`|handled evidence error может тихо закончить ветку и не вызвать Error Workflow|Document Worker / Error Workflow|
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
 |`DW-17`|Evidence Repair требует от модели дословно реконструировать canonical quote; observed executions `14234` и `14238` подтвердили повторяемый exact-grounding failure. Нужен reference-only repair без ослабления fail-closed проверки.|Document Worker / evidence grounding|
-|`DW-18 / AG-11`|DOCX ActiveX radio/checkbox state теряется до semantic blocks. На КТ172 это скрыло выбранные `national_regime = Не применимо` и `participation_guarantee = Не предусмотрены`; Aggregator затем materialized `national_regime` как `resolved` по общим положениям ПП 1875. Нужны deterministic option-state extraction и fail-closed applicability containment.|Document Worker / Aggregator semantic safety|
+|`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` выявили split Compression path, XML metadata loss и nested-table ancestor ambiguity. Canonical Worker теперь восстанавливает OPC path, сохраняет original part metadata через отдельный Merge input и связывает controls только с exact direct row; AG-11 containment остаётся fail-closed. Нужен post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
@@ -1143,20 +1143,23 @@ Worker → facts → Aggregator runtime canary
 fresh clean 12/12 run и ручная проверка 27/27
 ```
 
-### Implementation checkpoint 2026-08-31
+### Implementation checkpoint 2026-09-01
 
-Offline implementation выполнена, но debt остаётся открытым до runtime gate.
+Execution-derived hardening выполнен в canonical export, но debt остаётся открытым до post-fix runtime gate.
 
 ```text
-DW-18 focused exact-source matrix: 44/44 GREEN
+DW-18 focused source-derived matrix: 46/46 GREEN
 AG-11 focused containment matrix: 31/31 GREEN
 exact controls: 5/6/7/56 unselected; 8/55 selected
 orphan/unlinked contents, invalid directory pointers и cycles: unknown + audit warning
+execution 14350: Compression member path split across directory + fileName
+execution 14351: Extract From File/XML output loses docx_part_path/docx_part_kind
+execution 14352: 578 controls / 126 decoded / partial; target raw states 0/0/0/1 were unknown from ancestor-table mapping ambiguity
 test Aggregator draft: ftvmrEHoMbPOAqZG@f11906df-f760-4c54-a59e-16f4423ab534
 published test Aggregator remains: 91c17313-a593-4fb9-9072-79320a958dd7
 ```
 
-Live Worker candidate `csnDg78NzN1nIjUT` не exposed текущему MCP. n8n UI допускает MCP exposure только для published workflows с webhook/form/schedule/chat trigger, тогда как этот Worker является subworkflow/manual contour. По fail-closed boundary плана Worker не подменялся старым `[3 TEST]`, не мутировался через UI и native runtime canary не выполнялся. Следующий gate — предоставить read/write test access к exact candidate без изменения production и затем выполнить bounded Worker → facts → test Aggregator canary.
+Minimal fix сохраняет обе Compression формы (`fileName` full path и `directory + fileName`), направляет исходный True item `OOXML часть XML?` на input 0 `Привязать parsed XML к части`, parsed XML — на input 1, и исключает вложенные таблицы из ancestor-cell content. Настоящие one-control/multiple-label и multiple-controls/one-label cases остаются `unknown` с audit warnings. Production n8n не изменялся. Следующий gate — bounded post-fix Worker → facts → test Aggregator canary.
 
 ### Связанное, но отдельное ограничение
 

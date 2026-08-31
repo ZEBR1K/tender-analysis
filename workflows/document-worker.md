@@ -319,11 +319,11 @@ OPC relationship joining
 
 `Value = 1` означает `selected`, `Value = 0` — `unselected`; иное значение остаётся `indeterminate`. Отсутствующие, malformed, unsupported или неоднозначные structures дают `unknown`/`indeterminate` с audit warning, а не synthetic negative. `contents` принимается только среди stream entries, достижимых bounded traversal от `Root Entry.child`; orphan/stale stream не authoritative.
 
-Resource gates ограничивают число extracted parts, суммарный размер нужных parts, допустимые CFB sector sizes/indexes, FAT/miniFAT/directory-tree chain length, cycles и размер `contents`. Связь state с подписью строится через OOXML relationships и exact source row, без byte offsets, control names, ActiveX part numbers или tender-specific literals.
+Resource gates ограничивают число extracted parts, суммарный размер нужных parts, допустимые CFB sector sizes/indexes, FAT/miniFAT/directory-tree chain length, cycles и размер `contents`. Compression descriptor поддерживается в обеих наблюдаемых формах: полный OPC path в `fileName` и split `directory + fileName`; обе формы проходят единый path-normalization/traversal guard. Связь state с подписью строится через OOXML relationships и exact direct row/cell structure. Вложенные `w:tbl` не считаются содержимым ancestor cell, поэтому один control не дублируется на внешней строке. Byte offsets, control names, ActiveX part numbers и tender-specific literals не используются как mapping rules.
 
 После нормализации canonical block text остаётся неизменным. State/provenance передаются отдельно в source/semantic blocks и AI-visible marker; evidence validators принимают quotes только из canonical text. Для `national_regime` и `participation_guarantee` exact-grounded `unselected` становится audited rejected fact, `unknown`/`indeterminate` — review-only, а `selected` сохраняет structured applicability proof в `validator_meta.option_state`. AI Validator не извлекает и не создаёт option-state facts.
 
-Offline exact-source fixture подтверждает cleared controls 5/6/7/56 и selected controls 8 (`Не применимо`) / 55 (`Не предусмотрены`). Native runtime path в test Worker ещё не подтверждён: live candidate `csnDg78NzN1nIjUT` недоступен текущему MCP и не изменялся.
+Offline source-derived nested-table fixture подтверждает cleared controls 5/6/7/56 и selected controls 8 (`Не применимо`) / 55 (`Не предусмотрены`). Executions `14350–14352` подтвердили native Compression descriptor shape, потерю metadata после Extract From File/XML и ancestor-table ambiguity прежнего mapper. Canonical export содержит execution-derived hardening, но post-fix Worker/Aggregator runtime canary ещё не выполнен; production n8n не изменялся.
 
 ---
 
