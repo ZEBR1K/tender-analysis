@@ -1,0 +1,157 @@
+{
+  "contract_version": "national_regime_option_state_controls_v1",
+  "provenance": {
+    "shape_source": "sanitized_execution_derived_false_resolved",
+    "tender_or_run_literals_included": false,
+    "paid_ai_required": false
+  },
+  "cases": [
+    {
+      "id": "generic_policy_only",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-generic",
+        "value_text": "Нормативный акт описывает возможные меры национального режима и условия их применения.",
+        "validator_verdict": "confirmed",
+        "evidence": [{
+          "semantic_block_id": "sb_generic",
+          "quote": "Меры применяются в случаях и порядке, установленных нормативным актом.",
+          "scope": "primary"
+        }]
+      },
+      "reported_status": "resolved",
+      "expected_status": "requires_recheck",
+      "expected_proof_kind": null
+    },
+    {
+      "id": "selected_negative_with_provenance",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-selected-negative",
+        "value_text": "Не применимо.",
+        "validator_verdict": "confirmed",
+        "evidence": [{
+          "semantic_block_id": "sb_selected_negative",
+          "quote": "Не применимо.",
+          "scope": "primary"
+        }],
+        "option_state": {
+          "contract_version": "docx_option_state_fact_audit_v1",
+          "applicability": "applicable",
+          "evidence": [{
+            "semantic_block_id": "sb_selected_negative",
+            "state": "selected",
+            "exact_label": "Не применимо."
+          }],
+          "warnings": []
+        }
+      },
+      "reported_status": "resolved",
+      "expected_status": "resolved",
+      "expected_proof_kind": "selected_option_state"
+    },
+    {
+      "id": "explicit_current_procurement_measure",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-explicit-measure",
+        "value_text": "Ограничение допуска прямо установлено для текущей закупки.",
+        "validator_verdict": "confirmed",
+        "evidence": [{
+          "semantic_block_id": "sb_explicit_measure",
+          "quote": "Для текущей закупки устанавливается ограничение допуска.",
+          "scope": "primary"
+        }],
+        "applicability_proof": {
+          "contract_version": "current_procurement_applicability_v1",
+          "applicability": "applicable",
+          "source": "deterministic_source_contract",
+          "evidence_refs": [{
+            "semantic_block_id": "sb_explicit_measure",
+            "quote": "Для текущей закупки устанавливается ограничение допуска."
+          }]
+        }
+      },
+      "reported_status": "resolved",
+      "expected_status": "resolved",
+      "expected_proof_kind": "explicit_current_procurement"
+    },
+    {
+      "id": "option_labels_without_state",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-labels-only",
+        "value_text": "Применяется / Не применимо.",
+        "validator_verdict": "confirmed",
+        "evidence": [{
+          "semantic_block_id": "sb_labels_only",
+          "quote": "Применяется / Не применимо.",
+          "scope": "primary"
+        }]
+      },
+      "reported_status": "resolved",
+      "expected_status": "requires_recheck",
+      "expected_proof_kind": null
+    },
+    {
+      "id": "ambiguous_option_state",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-ambiguous",
+        "value_text": "Один из вариантов национального режима.",
+        "validator_verdict": "requires_review",
+        "evidence": [{
+          "semantic_block_id": "sb_ambiguous",
+          "quote": "Один из вариантов национального режима.",
+          "scope": "primary"
+        }],
+        "option_state": {
+          "contract_version": "docx_option_state_fact_audit_v1",
+          "applicability": "review_only",
+          "evidence": [],
+          "warnings": [{
+            "code": "ambiguous_semantic_option_label",
+            "message": "Fixture ambiguity"
+          }]
+        }
+      },
+      "reported_status": "resolved",
+      "expected_status": "requires_recheck",
+      "expected_proof_kind": null
+    },
+    {
+      "id": "raw_requires_recheck_preserved",
+      "field_key": "national_regime",
+      "candidate": {
+        "fact_id": "fixture-national-raw-review",
+        "value_text": "Условное положение требует дополнительной проверки применимости.",
+        "validator_verdict": "requires_review",
+        "evidence": [{
+          "semantic_block_id": "sb_raw_review",
+          "quote": "Применимость зависит от дополнительных условий.",
+          "scope": "primary"
+        }]
+      },
+      "reported_status": "requires_recheck",
+      "expected_status": "requires_recheck",
+      "expected_proof_kind": null
+    },
+    {
+      "id": "unrelated_field_resolved",
+      "field_key": "procurement_subject",
+      "candidate": {
+        "fact_id": "fixture-unrelated-resolved",
+        "value_text": "Поставка оборудования.",
+        "validator_verdict": "confirmed",
+        "evidence": [{
+          "semantic_block_id": "sb_unrelated",
+          "quote": "Предмет закупки: поставка оборудования.",
+          "scope": "primary"
+        }]
+      },
+      "reported_status": "resolved",
+      "expected_status": "resolved",
+      "expected_proof_kind": null
+    }
+  ]
+}

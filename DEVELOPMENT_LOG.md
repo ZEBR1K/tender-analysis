@@ -5144,3 +5144,21 @@ related document-worker suite: 154 tests / 152 pass / 2 accepted pre-existing fa
 Downstream review RED обнаружил и воспроизвёл четыре fail-open/runtime path: option-state rejection не принимался existing overlap-only converters, AI Validator мог повысить `review_only` до `confirmed`, ambiguous semantic ownership терял audit sentinel, а глобальный parser/resource `unknown` с пустым state array оставлял guarded fact обычным `found`. Все три deterministic converters теперь отдельно валидируют `deterministic_option_applicability_v1`; post-AI mapping сохраняет provenance и запрещает повышение `review_only`; exact-label mapping warnings и source-level `unknown` доходят до evidence context и terminal dispatch. Option-state audit упаковывается в сохраняемый `validator_meta.option_state` без изменения DB schema. Package assertions больше не маскируются старым beta hash failure.
 
 Оставшиеся related failures — ранее зафиксированные baseline gates: immutable beta hash отличается от старой константы, а validator prompt artifact имеет CRLF/LF mismatch. Новый topology failure от DOCX Merge nodes устранён с сохранением запрета неожиданных Merge в Validator dispatch path. Runtime native execution всё ещё не проверялся.
+
+---
+
+## 2026-08-31 — AG-11 Task 5 Aggregator containment GREEN
+
+Добавлен независимый fail-closed boundary после полного Round 1 structural validation и до FINAL materialization. Для `national_regime/resolved` checker принимает только `confirmed` primary с versioned structured applicability proof, точно связанным с candidate evidence: selected `docx_option_state_fact_audit_v1` либо `current_procurement_applicability_v1` от deterministic source contract. Конкретные option labels, control names, ActiveX part numbers и execution IDs production code не интерпретирует.
+
+```text
+Task 5 focused RED: 17 tests / 5 pass / 12 fail
+exact quote binding RED: 27 tests / 25 pass / 2 fail
+FINAL value binding RED: 31 tests / 27 pass / 4 fail
+Task 5 final focused GREEN: 31 tests / 31 pass
+AG-8/AG-9/AG-10/Targeted Recheck related: 156 tests / 152 pass / 4 accepted pre-existing failures
+```
+
+Без proof generic/conditional policy, labels-only и ambiguous/review-only candidates получают effective `requires_recheck/insufficient_evidence`. Selected negative и explicit current-procurement proof допускают `resolved`; raw recheck и unrelated field сохраняют прежнее поведение. Candidate SQL переносит из JSONB audit только `option_state` и `applicability_proof`; reported response, effective status, decisions, evidence и containment reason остаются в audit.
+
+Четыре related RED совпадают с зафиксированным baseline: intentional AG-8 canonical prompt gate, два execution-14104 fixture SHA/report gates и Targeted Recheck coordinate mismatch. Production n8n, production DB и credentials не изменялись; runtime GREEN не заявляется.

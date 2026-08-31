@@ -52,7 +52,7 @@ const GEMINI_37_FLASH_ALIAS =
 const FIXTURE_SHA256 =
   '6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75';
 const BETA_WORKFLOW_SHA256 =
-  'a482b979250ff7a728e177c80e0408fa2d509ab0377b6d2e52c6befb5ed8fcc8';
+  '3e8b0323a13a74c498c9c28c069fae02fb2907dd3d53aaccd8325fd3d8ce3be8';
 
 function sha256File(filePath) {
   return crypto

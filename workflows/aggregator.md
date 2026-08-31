@@ -1380,6 +1380,45 @@ workflow не публиковался и после draft update не испо�
 
 \---
 
+### AG-11 — `national_regime` applicability / option-state containment
+
+**Severity:** Critical / P0 before client report
+**Status:** Offline GREEN in local canonical and explicit test export; runtime canary pending
+
+Round 1 больше не может materialize `national_regime/resolved` только потому,
+что модель назначила generic или conditional policy clause ролью `primary`.
+После полного structural validation checker требует versioned structured proof
+применимости именно primary candidate:
+
+```text
+confirmed primary
++ docx_option_state_fact_audit_v1 / selected / exact evidence binding
+  или
++ current_procurement_applicability_v1 / deterministic source / exact evidence binding
+→ resolved допустим
+
+proof отсутствует, ambiguous, review-only или не связан с candidate evidence
+→ effective requires_recheck / insufficient_evidence
+→ Round 1 FINAL не выполняется
+```
+
+Candidate query передаёт только два audit-поля из `validator_meta`:
+`option_state` и `applicability_proof`. Checker не интерпретирует конкретные
+option labels, control names, ActiveX part numbers или execution-specific text.
+Selected option proof обязан содержать exact label в canonical candidate quote
+того же semantic block; совпадения только с `value_text` недостаточно. Для обоих
+proof contracts нормализованный FINAL обязан точно совпадать с proven primary
+candidate value, иначе поле fail-closed уходит в Targeted Recheck.
+Raw `requires_recheck`, полный model response, candidate decisions, evidence,
+reported/effective status, proof kind и containment reason сохраняются в audit.
+
+Offline regression matrix покрывает generic policy, selected negative option,
+explicit current-procurement measure, labels без state, ambiguous state,
+raw recheck и unrelated resolved field. Production n8n, PostgreSQL и credentials
+на этом этапе не изменялись; native runtime path остаётся gate Task 6–7.
+
+\---
+
 ## 28\. Safe Modification Checklist
 
 Перед изменением Aggregator проверить:
