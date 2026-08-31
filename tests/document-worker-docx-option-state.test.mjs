@@ -50,11 +50,6 @@ const nodeNames = Object.freeze({
   collectDocumentFacts: 'Собрать факты документа1',
 });
 
-const classIds = Object.freeze({
-  checkbox: '{8BD21D40-EC42-11CE-9E0D-00AA006002F3}',
-  option_button: '{8BD21D50-EC42-11CE-9E0D-00AA006002F3}',
-});
-
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
@@ -216,116 +211,29 @@ function textParagraph(text) {
   return { 'w:r': [{ 'w:t': [text] }] };
 }
 
-function controlParagraph(expected) {
-  return {
-    'w:r': [{
-      'w:object': [{
-        'w:control': [{
-          $: {
-            'r:id': expected.document_rel_id,
-            'w:name': expected.control_name,
-          },
-        }],
-      }],
-    }],
-  };
-}
-
-function tableForControls(expectedControls) {
-  return {
-    'w:tr': expectedControls.map((expected) => ({
-      'w:tc': [
-        { 'w:p': [controlParagraph(expected)] },
-        { 'w:p': [textParagraph(expected.exact_label)] },
-      ],
-    })),
-  };
-}
-
-function sourceShapedOuterTable(groupContext, expectedControls) {
-  return {
-    'w:tr': [{
-      'w:tc': [
-        { 'w:p': [textParagraph(groupContext)] },
-        {
-          'w:p': [textParagraph('')],
-          'w:tbl': [tableForControls(expectedControls)],
-        },
-      ],
-    }],
-  };
+function fixturePartPaths(directory = ooxmlRoot, prefix = '') {
+  return fs.readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const partPath = path.posix.join(prefix, entry.name);
+      return entry.isDirectory()
+        ? fixturePartPaths(path.join(directory, entry.name), partPath)
+        : [partPath];
+    })
+    .sort();
 }
 
 function structuredXmlItems() {
-  const nationalRegime = manifest.expected_controls.slice(0, 4);
-  const participationGuarantee = manifest.expected_controls.slice(4);
-  const items = [{
-    json: {
-      docx_part_path: 'word/document.xml',
-      docx_part_kind: 'structured_xml',
-      'w:document': {
-        'w:body': [{
-          'w:tbl': [
-            sourceShapedOuterTable('Раздел 3.3.1', nationalRegime),
-            sourceShapedOuterTable('Раздел 3.7.1', participationGuarantee),
-          ],
-          'w:sectPr': [''],
-        }],
-      },
-    },
-  }, {
-    json: {
-      docx_part_path: 'word/_rels/document.xml.rels',
-      docx_part_kind: 'structured_xml',
-      Relationships: {
-        Relationship: manifest.expected_controls.map((expected) => ({
-          $: {
-            Id: expected.document_rel_id,
-            Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/control',
-            Target: expected.control_rel_target.replace(/^word\//u, ''),
-          },
-        })),
-      },
-    },
-  }];
-
-  for (const expected of manifest.expected_controls) {
-    const xmlPath = expected.control_rel_target;
-    const relsPath = path.posix.join(
-      path.posix.dirname(xmlPath),
-      '_rels',
-      `${path.posix.basename(xmlPath)}.rels`,
-    );
-    items.push({
+  return fixturePartPaths()
+    .filter((partPath) => !partPath.endsWith('.bin'))
+    .map((partPath) => ({
       json: {
-        docx_part_path: xmlPath,
+        docx_part_path: partPath,
         docx_part_kind: 'structured_xml',
-        'ax:ocx': {
-          $: {
-            'ax:classid': classIds[expected.control_type],
-            'ax:persistence': 'persistStorage',
-            'r:id': expected.binary_rel_id,
-          },
-        },
+        ...parseXmlLikeN8n(
+          fs.readFileSync(path.join(ooxmlRoot, ...partPath.split('/')), 'utf8'),
+        ),
       },
-    });
-    items.push({
-      json: {
-        docx_part_path: relsPath,
-        docx_part_kind: 'structured_xml',
-        Relationships: {
-          Relationship: [{
-            $: {
-              Id: expected.binary_rel_id,
-              Type: 'http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary',
-              Target: path.posix.basename(expected.binary_rel_target),
-            },
-          }],
-        },
-      },
-    });
-  }
-  return items;
+    }));
 }
 
 function binaryPartItems(overrides = new Map()) {
