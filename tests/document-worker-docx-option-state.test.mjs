@@ -36,6 +36,18 @@ const nodeNames = Object.freeze({
   collectParts: 'Собрать DOCX parts для parser',
   parseOptionState: 'Разобрать состояния DOCX ActiveX',
   restoreBinary: 'Вернуть DOCX binary для Docling',
+  joinDoclingResult: 'связать результат Docling и метаданные',
+  normalizeDocling: 'Нормализовать документ Docling',
+  prepareBlocks: 'подготовить блоки к анализу',
+  buildSemantic: 'Собрать смысловые разделы v1.4',
+  expandForAi: 'Развернуть части для AI v1.2',
+  validateEvidence: 'Проверить и привязать evidence',
+  dispatchValidator: 'Подготовить dispatch AI Validator',
+  expandValidator: 'Развернуть units для AI Validator',
+  checkValidator: 'Проверить ответ AI Validator',
+  withoutValidator: 'Сформировать units without AI Validator',
+  convergeValidator: 'Свести AI и units without AI',
+  collectDocumentFacts: 'Собрать факты документа1',
 });
 
 const classIds = Object.freeze({
@@ -73,7 +85,7 @@ function binaryDescriptor(data, fileName, overrides = {}) {
   };
 }
 
-async function runCodeNode(workflow, nodeName, inputItems) {
+async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = {} } = {}) {
   const node = findNode(workflow, nodeName);
   assert.equal(node.type, 'n8n-nodes-base.code');
   const items = structuredClone(inputItems);
@@ -98,6 +110,20 @@ async function runCodeNode(workflow, nodeName, inputItems) {
       all: () => items,
       first: () => firstItem,
       item: firstItem,
+    },
+    $: (sourceNodeName) => {
+      if (!Object.hasOwn(sourceJsonByNode, sourceNodeName)) {
+        throw new Error(`Unknown workflow source node: ${sourceNodeName}`);
+      }
+      const raw = sourceJsonByNode[sourceNodeName];
+      const sourceJsons = Array.isArray(raw) ? raw : [raw];
+      const sourceItems = sourceJsons.map((json) => ({ json: structuredClone(json) }));
+      return {
+        all: () => sourceItems,
+        first: () => sourceItems[0],
+        itemMatching: (index) => sourceItems[index] ?? sourceItems[0],
+        item: sourceItems[0],
+      };
     },
   });
   const result = await new vm.Script(
@@ -401,6 +427,196 @@ function expectedStateProjection(expected) {
   };
 }
 
+function sourceOptionStates() {
+  return manifest.expected_controls.map((expected) => ({
+    contract_version: 'docx_option_state_v1',
+    document_part: 'word/document.xml',
+    control_name: expected.control_name,
+    control_type: expected.control_type,
+    state: expected.state,
+    raw_value: expected.state === 'selected' ? '1' : '0',
+    exact_label: expected.exact_label,
+    group_context: null,
+    source_row_ref: expected.source_row_ref,
+    control_rel_target: expected.control_rel_target,
+    binary_rel_target: expected.binary_rel_target,
+    warnings: [],
+  }));
+}
+
+function doclingTable(expectedControls, tableIndex) {
+  const tableCells = [];
+  expectedControls.forEach((expected, rowIndex) => {
+    tableCells.push({
+      start_row_offset_idx: rowIndex,
+      end_row_offset_idx: rowIndex + 1,
+      start_col_offset_idx: 0,
+      end_col_offset_idx: 1,
+      text: '',
+    });
+    tableCells.push({
+      start_row_offset_idx: rowIndex,
+      end_row_offset_idx: rowIndex + 1,
+      start_col_offset_idx: 1,
+      end_col_offset_idx: 2,
+      text: expected.exact_label,
+    });
+  });
+  return {
+    self_ref: `#/tables/${tableIndex}`,
+    label: 'table',
+    prov: [],
+    data: {
+      num_rows: expectedControls.length,
+      num_cols: 2,
+      table_cells: tableCells,
+    },
+  };
+}
+
+function optionStateDoclingDocument() {
+  return {
+    schema_name: 'DoclingDocument',
+    version: 'fixture',
+    name: 'fixture.docx',
+    origin: {
+      filename: 'fixture.docx',
+      mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      binary_hash: 'fixture',
+    },
+    body: {
+      children: [{ $ref: '#/tables/0' }, { $ref: '#/tables/1' }],
+    },
+    furniture: { children: [] },
+    texts: [],
+    tables: [
+      doclingTable(manifest.expected_controls.slice(0, 4), 0),
+      doclingTable(manifest.expected_controls.slice(4), 1),
+    ],
+    pictures: [],
+    groups: [],
+    key_value_items: [],
+    form_items: [],
+    pages: {},
+  };
+}
+
+async function buildOptionStateSemanticFixture() {
+  const workflow = loadWorkflow();
+  const sourceContext = {
+    analysis_run_id: 'fixture-run',
+    document: {
+      document_id: 'fixture-document',
+      file_name: 'fixture.docx',
+      file_extension: 'docx',
+      mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    },
+    docx_option_state_status: 'resolved',
+    docx_option_states: sourceOptionStates(),
+    docx_option_state_audit: {
+      contract_version: 'docx_option_state_audit_v1',
+      warnings: [],
+    },
+  };
+  const [normalizedItem] = await runCodeNode(
+    workflow,
+    nodeNames.normalizeDocling,
+    [{ json: optionStateDoclingDocument() }],
+    { sourceJsonByNode: { 'связать результат Docling и метаданные': sourceContext } },
+  );
+  const [preparedItem] = await runCodeNode(
+    workflow,
+    nodeNames.prepareBlocks,
+    [normalizedItem],
+  );
+  const [semanticItem] = await runCodeNode(
+    workflow,
+    nodeNames.buildSemantic,
+    [preparedItem],
+  );
+  return { workflow, normalizedItem, semanticItem };
+}
+
+function buildOptionSource(segment, analysisUnitId = 'option-state-unit') {
+  return {
+    tender: { tender_id: 'fixture' },
+    document: { document_id: 'fixture-document' },
+    analysis_batch: { units_total: 1 },
+    analysis_unit_meta: { analysis_unit_id: analysisUnitId },
+    ai_segments: [segment],
+    provenance: {
+      index: {
+        [segment.semantic_block_id]: {
+          scope: segment.scope,
+          source_block_ids: [],
+          sources: [],
+        },
+      },
+    },
+    ai_request: {
+      prompt_version: 'fixture',
+      schema_version: 'ai_extractor_v1',
+      field_catalog_version: 'tender_fields_v1',
+    },
+  };
+}
+
+function buildOptionFact(fieldKey, label, semanticBlockId) {
+  return {
+    field_key: fieldKey,
+    value_text: label,
+    status: 'found',
+    confidence: 0.99,
+    evidence: [{ semantic_block_id: semanticBlockId, quote: label }],
+    review_reason_code: null,
+    review_note: null,
+  };
+}
+
+function buildExtractorResponse(facts, analysisUnitId = 'option-state-unit') {
+  return {
+    id: 'fixture-response',
+    model: 'fixture-model',
+    choices: [{
+      finish_reason: 'stop',
+      message: {
+        content: JSON.stringify({
+          schema_version: 'ai_extractor_v1',
+          field_catalog_version: 'tender_fields_v1',
+          analysis_unit_id: analysisUnitId,
+          facts,
+        }),
+      },
+    }],
+    usage: {},
+  };
+}
+
+function buildValidatorResponse(unit, verdict = 'confirmed') {
+  return {
+    id: `validator-${unit.analysis_unit_meta.analysis_unit_id}`,
+    model: 'fixture-validator',
+    choices: [{
+      finish_reason: 'stop',
+      message: {
+        content: JSON.stringify({
+          schema_version: 'ai_validator_v1',
+          analysis_unit_id: unit.analysis_unit_meta.analysis_unit_id,
+          validations: unit.verified_facts.map((fact) => ({
+            fact_index: fact.fact_index,
+            field_key: fact.field_key,
+            verdict,
+            confidence: 0.98,
+            reason_code: verdict === 'confirmed' ? null : 'source_quality_issue',
+            reason_note: verdict === 'confirmed' ? null : 'fixture review',
+          })),
+        }),
+      },
+    }],
+    usage: {},
+  };
+}
+
 test('fixture is a reviewed minimal derivative with exact source ActiveX parts', () => {
   assert.equal(manifest.contract_version, 'docx_option_state_fixture_v1');
   assert.equal(manifest.source_sha256, '32f79d377ad3b775497e70754bdfdce8ec0928cfeb2626d60ca65ef519f7437b');
@@ -549,6 +765,68 @@ for (const extension of ['pdf', 'xlsx']) {
   });
 }
 
+test('Docling result context carries DOCX option audit and leaves non-DOCX output unchanged', async () => {
+  const workflow = loadWorkflow();
+  const resultEnvelope = {
+    documents: [{
+      status: 'success',
+      source_index: 0,
+      source_uri: 'fixture',
+      filename: 'fixture.docx',
+      artifacts: [
+        { artifact_type: 'json', uri: 'https://fixture.invalid/document.json' },
+        { artifact_type: 'markdown', uri: 'https://fixture.invalid/document.md' },
+      ],
+      errors: [],
+    }],
+    processing_time: 1,
+  };
+  const baseSource = {
+    analysis_run_id: 'fixture-run',
+    tender_meta: { tender_id: 'fixture' },
+    document: { document_id: 'fixture-document', file_name: 'fixture.docx', file_extension: 'docx' },
+  };
+  const parserResult = {
+    docx_option_state_status: 'resolved',
+    docx_option_states: sourceOptionStates(),
+    docx_option_state_audit: { contract_version: 'docx_option_state_audit_v1', warnings: [] },
+  };
+  const [docx] = await runCodeNode(
+    workflow,
+    nodeNames.joinDoclingResult,
+    [{ json: resultEnvelope }],
+    {
+      sourceJsonByNode: {
+        'Связать метаданные и файл': baseSource,
+        'Разобрать состояния DOCX ActiveX': parserResult,
+        'Загрузка файла в Docling': { task_id: 'fixture-task' },
+      },
+    },
+  );
+  assert.equal(docx.json.docx_option_state_status, 'resolved');
+  assert.deepEqual(docx.json.docx_option_states, parserResult.docx_option_states);
+  assert.deepEqual(docx.json.docx_option_state_audit, parserResult.docx_option_state_audit);
+
+  const pdfSource = {
+    ...baseSource,
+    document: { ...baseSource.document, file_name: 'fixture.pdf', file_extension: 'pdf' },
+  };
+  const [pdf] = await runCodeNode(
+    workflow,
+    nodeNames.joinDoclingResult,
+    [{ json: resultEnvelope }],
+    {
+      sourceJsonByNode: {
+        'Связать метаданные и файл': pdfSource,
+        'Загрузка файла в Docling': { task_id: 'fixture-task' },
+      },
+    },
+  );
+  assert.equal(Object.hasOwn(pdf.json, 'docx_option_state_status'), false);
+  assert.equal(Object.hasOwn(pdf.json, 'docx_option_states'), false);
+  assert.equal(Object.hasOwn(pdf.json, 'docx_option_state_audit'), false);
+});
+
 test('part preparation identifies required members by descriptor.fileName, never binary key or order', async () => {
   const workflow = loadWorkflow();
   const shuffledParts = [...manifest.derived_parts].reverse();
@@ -616,6 +894,462 @@ test('CFB version 4 with 4096-byte sectors decodes through the standards-based p
   const record = stateByName(result, 'CommonSupplierCheckBox11');
   assert.equal(record.state, 'unselected');
   assert.deepEqual(record.warnings, []);
+});
+
+test('normalization maps exact option labels to owning source blocks and semantic blocks', async () => {
+  const { normalizedItem, semanticItem } = await buildOptionStateSemanticFixture();
+  assert.equal(normalizedItem.json.docx_option_state_status, 'resolved');
+  assert.equal(normalizedItem.json.docx_option_states.length, 6);
+  assert.equal(normalizedItem.json.docx_option_state_audit.semantic_mapping_warnings.length, 0);
+
+  const normalizedOptionStates = normalizedItem.json.blocks.flatMap(
+    (block) => block.docx_option_states ?? [],
+  );
+  assert.deepEqual(
+    normalizedOptionStates.map(({ control_name }) => control_name),
+    manifest.expected_controls.map(({ control_name }) => control_name),
+  );
+
+  const semanticOptionStates = semanticItem.json.semantic_blocks.flatMap(
+    (block) => block.docx_option_states ?? [],
+  );
+  assert.deepEqual(
+    semanticOptionStates.map(({ control_name }) => control_name),
+    manifest.expected_controls.map(({ control_name }) => control_name),
+  );
+  for (const block of semanticItem.json.semantic_blocks) {
+    assert.doesNotMatch(block.text, /\[OPTION_STATE/u);
+  }
+});
+
+test('ambiguous normalized ownership does not attach an option state to either source block', async () => {
+  const workflow = loadWorkflow();
+  const document = optionStateDoclingDocument();
+  const ambiguous = manifest.expected_controls[0];
+  document.tables[1].data.table_cells.push({
+    start_row_offset_idx: 2,
+    end_row_offset_idx: 3,
+    start_col_offset_idx: 1,
+    end_col_offset_idx: 2,
+    text: ambiguous.exact_label,
+  });
+  const sourceContext = {
+    document: { file_name: 'fixture.docx', file_extension: 'docx' },
+    docx_option_state_status: 'resolved',
+    docx_option_states: sourceOptionStates(),
+    docx_option_state_audit: { contract_version: 'docx_option_state_audit_v1', warnings: [] },
+  };
+  const [normalized] = await runCodeNode(
+    workflow,
+    nodeNames.normalizeDocling,
+    [{ json: document }],
+    { sourceJsonByNode: { 'связать результат Docling и метаданные': sourceContext } },
+  );
+  assert.ok(normalized.json.docx_option_state_audit.semantic_mapping_warnings.some(
+    ({ code, control_name: controlName }) =>
+      code === 'ambiguous_semantic_option_label' && controlName === ambiguous.control_name,
+  ));
+  assert.equal(
+    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
+      .some(({ control_name: controlName }) => controlName === ambiguous.control_name),
+    false,
+  );
+
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'ambiguous-option-unit',
+    primary_semantic_block_ids: semantic.json.semantic_blocks.map(
+      ({ semantic_block_id: semanticBlockId }) => semanticBlockId,
+    ),
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const ambiguousSegment = expanded.json.ai_segments.find(
+    ({ canonical_text: text }) => text.includes(ambiguous.exact_label),
+  );
+  assert.ok(ambiguousSegment);
+  assert.ok(ambiguousSegment.docx_option_state_mapping_warnings.some(
+    ({ code, exact_label: exactLabel }) =>
+      code === 'ambiguous_semantic_option_label' && exactLabel === ambiguous.exact_label,
+  ));
+
+  const source = buildOptionSource(ambiguousSegment, 'ambiguous-option-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', ambiguous.exact_label, ambiguousSegment.semantic_block_id),
+    ], 'ambiguous-option-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  assert.equal(dispatch.json.units_for_ai[0].verified_facts[0].status, 'requires_review');
+  assert.equal(
+    dispatch.json.units_for_ai[0].verified_facts[0].option_state_applicability,
+    'review_only',
+  );
+});
+
+test('AI segments expose deterministic option markers without replacing canonical semantic text', async () => {
+  const { workflow, semanticItem } = await buildOptionStateSemanticFixture();
+  const semanticBlocks = semanticItem.json.semantic_blocks;
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [{
+    json: {
+      ...semanticItem.json,
+      analysis_units: [{
+        analysis_unit_id: 'option-state-unit',
+        primary_semantic_block_ids: semanticBlocks.map(({ semantic_block_id }) => semantic_block_id),
+        overlap_semantic_block_ids: [],
+      }],
+    },
+  }]);
+  const selected = manifest.expected_controls.find(
+    ({ state, exact_label: label }) => state === 'selected' && label === 'Не применимо.',
+  );
+  const segment = expanded.json.ai_segments.find(({ docx_option_states: states }) =>
+    states?.some(({ control_name }) => control_name === selected.control_name));
+  const semanticBlock = semanticBlocks.find(
+    ({ semantic_block_id: id }) => id === segment.semantic_block_id,
+  );
+  assert.equal(segment.canonical_text, semanticBlock.text);
+  assert.ok(segment.text.includes(semanticBlock.text));
+  assert.ok(segment.text.includes(`[OPTION_STATE selected] ${selected.exact_label}`));
+  assert.ok(segment.docx_option_states.some(
+    ({ control_name }) => control_name === selected.control_name,
+  ));
+  assert.match(
+    findNode(workflow, 'подготовить части для анализа v1.3').parameters.jsCode,
+    /block\?\.ai_text\s*\?\?/u,
+  );
+});
+
+for (const candidateCase of [
+  { fieldKey: 'national_regime', expected: manifest.expected_controls[0] },
+  { fieldKey: 'participation_guarantee', expected: manifest.expected_controls[5] },
+]) {
+  test(`unselected ${candidateCase.fieldKey} option is deterministically excluded from applicable candidates`, async () => {
+    const workflow = loadWorkflow();
+    const optionState = sourceOptionStates().find(
+      ({ control_name }) => control_name === candidateCase.expected.control_name,
+    );
+    const segment = {
+      semantic_block_id: 'sb_option_state',
+      scope: 'primary',
+      type: 'table',
+      role: 'table',
+      canonical_text: candidateCase.expected.exact_label,
+      text: `${candidateCase.expected.exact_label}\n[OPTION_STATE unselected] ${candidateCase.expected.exact_label}`,
+      docx_option_states: [optionState],
+    };
+    const source = buildOptionSource(segment);
+    const response = buildExtractorResponse([
+      buildOptionFact(candidateCase.fieldKey, candidateCase.expected.exact_label, segment.semantic_block_id),
+    ]);
+    const [evidenceResult] = await runCodeNode(
+      workflow,
+      nodeNames.validateEvidence,
+      [{ json: response }],
+      { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+    );
+    const [dispatch] = await runCodeNode(
+      workflow,
+      nodeNames.dispatchValidator,
+      [evidenceResult],
+    );
+    const result = dispatch.json.units_without_ai[0];
+    assert.equal(result.verified_facts.length, 0);
+    assert.equal(result.deterministically_rejected_facts.length, 1);
+    assert.equal(
+      result.deterministically_rejected_facts[0].deterministic_rejection.reason_code,
+      'unselected_option_not_applicable',
+    );
+    const terminal = await runCodeNode(
+      workflow,
+      nodeNames.withoutValidator,
+      [dispatch],
+    );
+    assert.equal(terminal[0].json.validated_facts[0].processing_status, 'rejected');
+    assert.equal(
+      terminal[0].json.validated_facts[0].option_state_applicability,
+      'excluded',
+    );
+  });
+}
+
+for (const state of ['unknown', 'indeterminate']) {
+  test(`${state} option state remains review-only and cannot stay found`, async () => {
+    const workflow = loadWorkflow();
+    const expected = manifest.expected_controls[0];
+    const optionState = {
+      ...sourceOptionStates()[0],
+      state,
+      raw_value: state === 'indeterminate' ? '2' : null,
+      warnings: [{ code: `${state}_fixture`, message: 'fixture' }],
+    };
+    const segment = {
+      semantic_block_id: 'sb_option_state',
+      scope: 'primary',
+      type: 'table',
+      role: 'table',
+      canonical_text: expected.exact_label,
+      text: `${expected.exact_label}\n[OPTION_STATE ${state}] ${expected.exact_label}`,
+      docx_option_states: [optionState],
+    };
+    const source = buildOptionSource(segment);
+    const response = buildExtractorResponse([
+      buildOptionFact('national_regime', expected.exact_label, segment.semantic_block_id),
+    ]);
+    const [evidenceResult] = await runCodeNode(
+      workflow,
+      nodeNames.validateEvidence,
+      [{ json: response }],
+      { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+    );
+    const [dispatch] = await runCodeNode(
+      workflow,
+      nodeNames.dispatchValidator,
+      [evidenceResult],
+    );
+    const result = dispatch.json.units_for_ai[0];
+    assert.equal(result.deterministically_rejected_facts.length, 0);
+    assert.equal(result.verified_facts[0].status, 'requires_review');
+    assert.equal(result.verified_facts[0].review_reason_code, 'source_quality_issue');
+    assert.equal(result.verified_facts[0].option_state_applicability, 'review_only');
+
+    const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+    const [checked] = await runCodeNode(
+      workflow,
+      nodeNames.checkValidator,
+      [{ json: buildValidatorResponse(expanded.json, 'confirmed') }],
+      { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+    );
+    const finalFact = checked.json.validated_facts[0];
+    assert.equal(finalFact.processing_status, 'requires_review');
+    assert.equal(finalFact.accepted_for_normalization, false);
+    assert.equal(finalFact.option_state_applicability, 'review_only');
+    assert.equal(finalFact.option_state_evidence[0].state, state);
+  });
+}
+
+test('global unknown DOCX option-state source keeps guarded facts review-only', async () => {
+  const workflow = loadWorkflow();
+  const expected = manifest.expected_controls[0];
+  const segment = {
+    semantic_block_id: 'sb_global_unknown_option_state',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: expected.exact_label,
+    text: expected.exact_label,
+    docx_option_states: [],
+    docx_option_state_status: 'unknown',
+    docx_option_state_source_warnings: [{ code: 'resource_gate', message: 'fixture' }],
+  };
+  const source = buildOptionSource(segment, 'global-unknown-option-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', expected.exact_label, segment.semantic_block_id),
+    ], 'global-unknown-option-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const guarded = dispatch.json.units_for_ai[0].verified_facts[0];
+  assert.equal(guarded.status, 'requires_review');
+  assert.equal(guarded.option_state_applicability, 'review_only');
+  assert.equal(guarded.option_state_audit_warnings[0].code, 'resource_gate');
+
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(expanded.json, 'confirmed') }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+  );
+  assert.equal(checked.json.validated_facts[0].processing_status, 'requires_review');
+  assert.equal(checked.json.validated_facts[0].accepted_for_normalization, false);
+});
+
+test('selected grounded negative option remains an applicable candidate with option provenance', async () => {
+  const workflow = loadWorkflow();
+  const expected = manifest.expected_controls[3];
+  const optionState = sourceOptionStates()[3];
+  const segment = {
+    semantic_block_id: 'sb_option_state',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: expected.exact_label,
+    text: `${expected.exact_label}\n[OPTION_STATE selected] ${expected.exact_label}`,
+    docx_option_states: [optionState],
+  };
+  const source = buildOptionSource(segment);
+  const response = buildExtractorResponse([
+    buildOptionFact('national_regime', expected.exact_label, segment.semantic_block_id),
+  ]);
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: response }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(
+    workflow,
+    nodeNames.dispatchValidator,
+    [evidenceResult],
+  );
+  const result = dispatch.json.units_for_ai[0];
+  assert.equal(result.verified_facts.length, 1);
+  assert.equal(result.verified_facts[0].status, 'found');
+  assert.equal(result.verified_facts[0].option_state_applicability, 'applicable');
+  assert.equal(result.verified_facts[0].option_state_evidence[0].state, 'selected');
+
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(expanded.json) }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+  );
+  assert.equal(checked.json.validated_facts[0].processing_status, 'confirmed');
+  assert.equal(checked.json.validated_facts[0].option_state_applicability, 'applicable');
+  assert.equal(checked.json.validated_facts[0].option_state_evidence[0].state, 'selected');
+
+  const [documentFacts] = await runCodeNode(
+    workflow,
+    nodeNames.collectDocumentFacts,
+    [checked],
+    {
+      sourceJsonByNode: {
+        'Сохранить analysis unit': {
+          analysis_run_id: 'fixture-run',
+          tender: source.tender,
+          document: source.document,
+          analysis_batch: { units_total: 1 },
+          analysis_unit_id: 'option-state-unit',
+          analysis_unit: { analysis_unit_id: 'option-state-unit' },
+          unit_db_id: 'fixture-unit-db',
+        },
+      },
+    },
+  );
+  const storedAudit = documentFacts.json.facts[0].validator_meta.option_state;
+  assert.equal(storedAudit.applicability, 'applicable');
+  assert.equal(storedAudit.evidence[0].state, 'selected');
+});
+
+test('mixed selected and unselected facts survive Validator mapping without reviving the excluded fact', async () => {
+  const workflow = loadWorkflow();
+  const selected = sourceOptionStates()[3];
+  const unselected = sourceOptionStates()[0];
+  const segment = {
+    semantic_block_id: 'sb_mixed_option_state',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: `${selected.exact_label}\n${unselected.exact_label}`,
+    text: `${selected.exact_label}\n${unselected.exact_label}`,
+    docx_option_states: [selected, unselected],
+  };
+  const source = buildOptionSource(segment, 'mixed-option-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', selected.exact_label, segment.semantic_block_id),
+      buildOptionFact('national_regime', unselected.exact_label, segment.semantic_block_id),
+    ], 'mixed-option-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(expanded.json) }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+  );
+  assert.equal(checked.json.validated_facts.length, 2);
+  assert.equal(checked.json.validated_facts[0].processing_status, 'confirmed');
+  assert.equal(checked.json.validated_facts[0].option_state_applicability, 'applicable');
+  assert.equal(checked.json.validated_facts[1].processing_status, 'rejected');
+  assert.equal(checked.json.validated_facts[1].option_state_applicability, 'excluded');
+});
+
+test('convergence converts option-state rejection-only units without weakening AI units', async () => {
+  const workflow = loadWorkflow();
+  const states = [sourceOptionStates()[3], sourceOptionStates()[0]];
+  const evidenceItems = [];
+  for (let index = 0; index < states.length; index += 1) {
+    const optionState = states[index];
+    const analysisUnitId = `converge-option-${index}`;
+    const segment = {
+      semantic_block_id: `sb_converge_${index}`,
+      scope: 'primary',
+      type: 'table',
+      role: 'table',
+      canonical_text: optionState.exact_label,
+      text: optionState.exact_label,
+      docx_option_states: [optionState],
+    };
+    const [evidenceResult] = await runCodeNode(
+      workflow,
+      nodeNames.validateEvidence,
+      [{ json: buildExtractorResponse([
+        buildOptionFact('national_regime', optionState.exact_label, segment.semantic_block_id),
+      ], analysisUnitId) }],
+      { sourceJsonByNode: { 'Подготовить запрос для AI': buildOptionSource(segment, analysisUnitId) } },
+    );
+    evidenceResult.json.analysis_batch.units_total = 2;
+    evidenceItems.push(evidenceResult);
+  }
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, evidenceItems);
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(expanded.json) }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+  );
+  const converged = await runCodeNode(
+    workflow,
+    nodeNames.convergeValidator,
+    [checked],
+    { sourceJsonByNode: { 'Подготовить dispatch AI Validator': dispatch.json } },
+  );
+  assert.equal(converged.length, 2);
+  assert.deepEqual(
+    converged.map(({ json }) => json.validated_facts[0].processing_status),
+    ['confirmed', 'rejected'],
+  );
+});
+
+test('AI-only option marker cannot be accepted as a canonical evidence quote', async () => {
+  const workflow = loadWorkflow();
+  const expected = manifest.expected_controls[3];
+  const marker = `[OPTION_STATE selected] ${expected.exact_label}`;
+  const segment = {
+    semantic_block_id: 'sb_option_state',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: expected.exact_label,
+    text: `${expected.exact_label}\n${marker}`,
+    docx_option_states: [sourceOptionStates()[3]],
+  };
+  const source = buildOptionSource(segment);
+  const fact = buildOptionFact('national_regime', expected.exact_label, segment.semantic_block_id);
+  fact.evidence[0].quote = marker;
+  const [result] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([fact]) }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  assert.equal(result.json.validation_passed, false);
+  assert.ok(result.json.violations.some(({ code }) => code === 'quote_not_found'));
 });
 
 test('missing document relationship is unknown with audit warning', async () => {

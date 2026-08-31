@@ -5122,3 +5122,25 @@ final focused GREEN: 27 tests / 27 pass
 Resource gates покрывают extracted-part count, суммарный размер требуемых частей, CFB v3/v4 sector sizes, sector indexes, FAT/miniFAT chain length, cycles, `contents` size и malformed/out-of-range structures. Exact source states подтверждены: 5/6/7 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`, 56 cleared. Все 11 добавленных нод прошли read-only schema validation `validate_node_config`. Production n8n, production DB, credentials и prompts не изменялись.
 
 Дополнительный review gate устранил принятие orphan/stale CFB stream: `contents` теперь выбирается только среди directory entries, достижимых bounded traversal от `Root Entry.child` через child/left/right pointers. Focused directory-tree RED был `0/4`, GREEN — `4/4`; orphan `contents`, out-of-range child/sibling и cycle дают `unknown` с audit warning. Runtime native path этим не подтверждён и остаётся gate Task 6–7.
+
+---
+
+## 2026-08-31 — DW-18 Task 4 semantic propagation GREEN
+
+Option-state metadata проходит через реальную Worker chain: Docling result context → normalized source block с exact-label ownership → semantic block → AI segment → evidence context. Канонический `semantic_block.text` не изменяется; AI-visible `ai_text` добавляет отдельный marker `[OPTION_STATE <state>] <exact label>`. Evidence validators проверяют цитаты только по `canonical_text`, поэтому AI-only marker не может стать новым evidence; resource budgeting при этом учитывает фактический `ai_text`.
+
+Terminal applicability guard размещён в `Подготовить dispatch AI Validator`, после схождения attempt 1, Evidence Repair и Lossless Fact Partition. Для `national_regime` и `participation_guarantee` exact-grounded `unselected` переносится в audited deterministic rejection, `unknown`/`indeterminate` — в `requires_review`, а `selected` сохраняется как applicable с `option_state_evidence`. AI Validator не создаёт новых facts.
+
+```text
+Task 4 focused RED: 38 tests / 31 pass / 7 fail
+AI-only marker/budgeting RED: 2 tests / 0 pass / 2 fail
+AI-only marker/budgeting GREEN: 2 tests / 2 pass
+downstream review RED: 43 tests / 35 pass / 8 fail
+global-unknown/persistence RED: 44 tests / 42 pass / 2 fail
+Task 4 final focused GREEN: 44 tests / 44 pass
+related document-worker suite: 154 tests / 152 pass / 2 accepted pre-existing failures
+```
+
+Downstream review RED обнаружил и воспроизвёл четыре fail-open/runtime path: option-state rejection не принимался existing overlap-only converters, AI Validator мог повысить `review_only` до `confirmed`, ambiguous semantic ownership терял audit sentinel, а глобальный parser/resource `unknown` с пустым state array оставлял guarded fact обычным `found`. Все три deterministic converters теперь отдельно валидируют `deterministic_option_applicability_v1`; post-AI mapping сохраняет provenance и запрещает повышение `review_only`; exact-label mapping warnings и source-level `unknown` доходят до evidence context и terminal dispatch. Option-state audit упаковывается в сохраняемый `validator_meta.option_state` без изменения DB schema. Package assertions больше не маскируются старым beta hash failure.
+
+Оставшиеся related failures — ранее зафиксированные baseline gates: immutable beta hash отличается от старой константы, а validator prompt artifact имеет CRLF/LF mismatch. Новый topology failure от DOCX Merge nodes устранён с сохранением запрета неожиданных Merge в Validator dispatch path. Runtime native execution всё ещё не проверялся.

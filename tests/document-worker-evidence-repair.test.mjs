@@ -1781,9 +1781,16 @@ test('dispatch topology has no Merge or new Loop and both document branches feed
     connectedTargets(workflow, 'Сформировать units without AI Validator'),
     ['Собрать факты документа1'],
   );
-  assert.equal(
-    workflow.nodes.filter(({ type }) => type === 'n8n-nodes-base.merge').length,
-    0,
+  assert.deepEqual(
+    workflow.nodes
+      .filter(({ type }) => type === 'n8n-nodes-base.merge')
+      .map(({ name }) => name)
+      .sort(),
+    [
+      'Вернуть DOCX binary для Docling',
+      'Привязать parsed XML к части',
+      'Собрать DOCX parts для parser',
+    ].sort(),
   );
   assert.deepEqual(
     workflow.nodes
@@ -3393,7 +3400,19 @@ test('completeness barrier references the canonical upstream persistence node by
   );
 });
 
-test('production import candidate is the exact clean packaging projection of the immutable beta snapshot', () => {
+test('immutable beta Worker snapshot retains its reviewed packaging hash', () => {
+  const betaHash = crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(betaWorkflowPath))
+    .digest('hex');
+
+  assert.equal(
+    betaHash,
+    '02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd',
+  );
+});
+
+test('production import candidate preserves beta packaging outside reviewed DW-18 nodes', () => {
   const workflow = loadWorkflow();
   const betaWorkflow = loadBetaWorkflow();
   const expectedRemovedNodes = [
@@ -3407,20 +3426,39 @@ test('production import candidate is the exact clean packaging projection of the
     'режем огромную таблицу на части для теста',
     'статистика аномальных блоков',
   ].sort();
-  const betaHash = crypto
-    .createHash('sha256')
-    .update(fs.readFileSync(betaWorkflowPath))
-    .digest('hex');
-
-  assert.equal(
-    betaHash,
-    '02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd',
-  );
-
+  const expectedDw18Nodes = [
+    'Вернуть DOCX binary для Docling',
+    'Извлечь DOCX OOXML',
+    'Подготовить DOCX archive alias',
+    'Привязать parsed XML к части',
+    'Прочитать DOCX XML',
+    'Развернуть DOCX OOXML части',
+    'Разобрать состояния DOCX ActiveX',
+    'Разобрать DOCX XML',
+    'Собрать DOCX parts для parser',
+    'DOCX option-state extraction?',
+    'OOXML часть XML?',
+  ].sort();
+  const expectedChangedSharedNodes = new Set([
+    'связать результат Docling и метаданные',
+    'Нормализовать документ Docling',
+    'Собрать смысловые разделы v1.4',
+    'подготовить части для анализа v1.3',
+    'Развернуть части для AI v1.2',
+    'Проверить и привязать evidence',
+    'Проверить evidence — попытка 2',
+    'Классифицировать bounded retry',
+    'Проверить Lossless Fact Partition',
+    'Подготовить dispatch AI Validator',
+    'Проверить ответ AI Validator',
+    'Сформировать units without AI Validator',
+    'Свести AI и units without AI',
+    'Собрать факты документа1',
+  ]);
   const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));
   const candidateNodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
   assert.equal(betaNodesByName.size, 60);
-  assert.equal(candidateNodesByName.size, 51);
+  assert.equal(candidateNodesByName.size, 62);
   assert.deepEqual(
     [...betaNodesByName.keys()]
       .filter((name) => !candidateNodesByName.has(name))
@@ -3431,13 +3469,21 @@ test('production import candidate is the exact clean packaging projection of the
     [...candidateNodesByName.keys()]
       .filter((name) => !betaNodesByName.has(name))
       .sort(),
-    [],
+    expectedDw18Nodes,
   );
 
   for (const [name, candidateNode] of candidateNodesByName) {
     const betaNode = betaNodesByName.get(name);
-    assert.ok(betaNode, `Shared node missing from beta snapshot: ${name}`);
-    assert.deepEqual(candidateNode.parameters, betaNode.parameters, `${name}: parameters drift`);
+    if (!betaNode) {
+      assert.ok(expectedDw18Nodes.includes(name), `Unexpected candidate-only node: ${name}`);
+      continue;
+    }
+    if (!expectedChangedSharedNodes.has(name)) {
+      assert.deepEqual(candidateNode.parameters, betaNode.parameters, `${name}: parameters drift`);
+    }
+    else {
+      assert.notDeepEqual(candidateNode.parameters, betaNode.parameters, `${name}: expected DW-18 parameters drift`);
+    }
     assert.deepEqual(candidateNode.credentials ?? null, betaNode.credentials ?? null, `${name}: credentials drift`);
     assert.equal(candidateNode.type, betaNode.type, `${name}: type drift`);
     assert.equal(candidateNode.typeVersion, betaNode.typeVersion, `${name}: typeVersion drift`);
@@ -3452,15 +3498,22 @@ test('production import candidate is the exact clean packaging projection of the
   const candidateEdges = workflowConnectionEdges(workflow);
   assert.deepEqual(
     betaEdges.filter((edge) => !candidateEdges.includes(edge)),
-    ['When clicking ‘Execute workflow’|main|0|Сохранить analysis unit|main|0'],
+    [
+      'Связать метаданные и файл|main|0|определить тип файла|main|0',
+      'When clicking ‘Execute workflow’|main|0|Сохранить analysis unit|main|0',
+    ].sort(),
   );
+  const candidateOnlyEdges = candidateEdges.filter((edge) => !betaEdges.includes(edge));
   assert.deepEqual(
-    candidateEdges.filter((edge) => !betaEdges.includes(edge)),
+    candidateOnlyEdges.filter((edge) => !expectedDw18Nodes.some(
+      (nodeName) => edge.startsWith(`${nodeName}|`) || edge.includes(`|${nodeName}|`),
+    )),
     [
       'When Executed by Another Workflow|main|0|Проверить вход Worker|main|0',
       'Развернуть части для AI v1.2|main|0|Сохранить analysis unit|main|0',
     ].sort(),
   );
+  assert.ok(candidateOnlyEdges.length > 2, 'DW-18 graph edges must be present');
 
   assert.equal(Object.hasOwn(workflow, 'id'), false);
   assert.equal(Object.hasOwn(workflow, 'versionId'), false);
