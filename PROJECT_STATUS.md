@@ -470,6 +470,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
+- fresh branch verification: focused `DW-18 44/44` и `AG-11 31/31`; full suite `322 total / 316 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: один intentional `AG-8` promotion gate и пять дополнительных pre-existing failures; новых failures нет.
 
 ### Not verified
 

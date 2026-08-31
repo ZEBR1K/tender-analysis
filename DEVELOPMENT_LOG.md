@@ -5188,3 +5188,21 @@ SHA-256 4d1b737efe64fe1fb870917c48f7d6d799c76cbd9b40bc1266db38a4cea06d7f
 ```
 
 Exact Worker candidate `csnDg78NzN1nIjUT` имеет `availableInMCP=false`; MCP read/history возвращают explicit access error. UI подтвердил, что enable-MCP flow принимает только published workflows с webhook/form/schedule/chat trigger, а candidate — subworkflow/manual contour. По плану старый `[3 TEST]` Worker не использован как подмена, candidate не изменён, production n8n/DB/credentials не затронуты. Поэтому native Worker runtime path и end-to-end canary остаются непроверенным gate.
+
+Final offline verification:
+
+```text
+node --test tests/document-worker-docx-option-state.test.mjs
+44/44 PASS
+
+node --test tests/aggregator-national-regime-option-state.test.mjs
+31/31 PASS
+
+node --test tests/document-worker-*.test.mjs
+154 total / 152 pass / 2 accepted pre-existing failures
+
+node --test tests/*.test.mjs
+322 total / 316 pass / 6 accepted baseline failures
+```
+
+Full-suite RED set не изменился относительно принятой границы: intentional AG-8 current-scope gate; два execution-14104 A/B artifact/hash gates; immutable Worker beta hash; validator prompt CRLF/LF mismatch; Targeted Recheck evidence-coordinate mismatch. Новых failures нет.

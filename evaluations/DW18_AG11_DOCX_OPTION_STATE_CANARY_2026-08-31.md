@@ -60,6 +60,18 @@ post: 4d1b737efe64fe1fb870917c48f7d6d799c76cbd9b40bc1266db38a4cea06d7f
 
 The draft contains the AG-11 fail-closed rule, but its native execution is not claimed. Offline tests prove that generic/conditional PP 1875 candidates cannot authorize positive `national_regime/resolved` without a confirmed primary and exact-bound structured applicability proof.
 
+## Final offline repository verification
+
+```text
+document-worker focused: 44/44 PASS
+aggregator focused: 31/31 PASS
+document-worker related: 154 total / 152 pass / 2 accepted pre-existing failures
+full suite: 322 total / 316 pass / 6 accepted baseline failures
+new failures: 0
+```
+
+The six full-suite failures are the previously accepted boundary: one intentional AG-8 promotion RED plus five additional pre-existing failures (two execution-14104 artifact/hash gates, immutable Worker beta hash, validator prompt line-ending mismatch, and Targeted Recheck evidence-coordinate mismatch).
+
 ## Unavailable Worker gate
 
 Required Worker candidate:
