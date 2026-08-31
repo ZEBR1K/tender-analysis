@@ -300,6 +300,8 @@ function buildMorphDataContents({ displayStyle = 4, value }) {
 function writeDirectoryEntry(buffer, offset, {
   name,
   type,
+  left = 0xffffffff,
+  right = 0xffffffff,
   child = 0xffffffff,
   startSector = 0xfffffffe,
   streamSize = 0,
@@ -310,8 +312,8 @@ function writeDirectoryEntry(buffer, offset, {
   buffer.writeUInt16LE(encodedName.length, offset + 64);
   buffer[offset + 66] = type;
   buffer[offset + 67] = 1;
-  buffer.writeUInt32LE(0xffffffff, offset + 68);
-  buffer.writeUInt32LE(0xffffffff, offset + 72);
+  buffer.writeUInt32LE(left, offset + 68);
+  buffer.writeUInt32LE(right, offset + 72);
   buffer.writeUInt32LE(child, offset + 76);
   buffer.writeUInt32LE(startSector, offset + 116);
   buffer.writeBigUInt64LE(BigInt(streamSize), offset + 120);
@@ -351,13 +353,15 @@ function buildCfbWithContents(contents, options = {}) {
   writeDirectoryEntry(directory, 0, {
     name: 'Root Entry',
     type: 5,
-    child: 1,
+    child: options.rootChild ?? 1,
     startSector: 3,
     streamSize: miniSectorCount * 64,
   });
   writeDirectoryEntry(directory, 128, {
     name: 'contents',
     type: 2,
+    left: options.contentsLeft ?? FREE,
+    right: options.contentsRight ?? FREE,
     startSector: 0,
     streamSize: options.declaredStreamSize ?? contents.length,
   });
@@ -750,6 +754,26 @@ const cfbGateCases = [
     name: 'out-of-range CFB FAT sector',
     warning: 'cfb_sector_out_of_range',
     options: { fatSectorIndex: 99 },
+  },
+  {
+    name: 'orphan CFB contents stream',
+    warning: 'missing_reachable_contents',
+    options: { rootChild: 0xffffffff },
+  },
+  {
+    name: 'out-of-range CFB root child',
+    warning: 'cfb_directory_entry_out_of_range',
+    options: { rootChild: 99 },
+  },
+  {
+    name: 'out-of-range CFB directory sibling',
+    warning: 'cfb_directory_entry_out_of_range',
+    options: { contentsRight: 99 },
+  },
+  {
+    name: 'cyclic CFB directory tree',
+    warning: 'cfb_directory_tree_cycle',
+    options: { contentsLeft: 1 },
   },
 ];
 

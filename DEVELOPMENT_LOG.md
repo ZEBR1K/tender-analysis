@@ -5120,3 +5120,5 @@ final focused GREEN: 27 tests / 27 pass
 ```
 
 Resource gates покрывают extracted-part count, суммарный размер требуемых частей, CFB v3/v4 sector sizes, sector indexes, FAT/miniFAT chain length, cycles, `contents` size и malformed/out-of-range structures. Exact source states подтверждены: 5/6/7 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`, 56 cleared. Все 11 добавленных нод прошли read-only schema validation `validate_node_config`. Production n8n, production DB, credentials и prompts не изменялись.
+
+Дополнительный review gate устранил принятие orphan/stale CFB stream: `contents` теперь выбирается только среди directory entries, достижимых bounded traversal от `Root Entry.child` через child/left/right pointers. Focused directory-tree RED был `0/4`, GREEN — `4/4`; orphan `contents`, out-of-range child/sibling и cycle дают `unknown` с audit warning. Runtime native path этим не подтверждён и остаётся gate Task 6–7.
