@@ -78,9 +78,10 @@ async function runEvidenceValidator(apiResponse, source, sourceLookup = null) {
       };
     },
   });
-  return new vm.Script(
+  const result = await new vm.Script(
     `(async () => { ${node.parameters.jsCode}\n })()`,
   ).runInContext(context);
+  return JSON.parse(JSON.stringify(result));
 }
 
 function buildSource(analysisUnitId, text = 'Требуется точный документ') {
@@ -325,6 +326,10 @@ test('RED: missing schema_version is attached only after exact facts validation 
 
   assert.equal(output.json.validation_passed, true);
   assert.deepEqual(semanticProjection(output.json.verified_facts[0]), fact);
+  assert.equal(
+    JSON.stringify(output.json.evidence_context).includes('envelope_attachment'),
+    false,
+  );
   assertAttachmentAudit(output, {
     reportedSchemaVersion: null,
     reportedAnalysisUnitId: analysisUnitId,
@@ -347,6 +352,10 @@ test('RED: missing analysis_unit_id uses one linked upstream identity and record
 
   assert.equal(output.json.analysis_unit_meta.analysis_unit_id, analysisUnitId);
   assert.deepEqual(semanticProjection(output.json.verified_facts[0]), fact);
+  assert.equal(
+    JSON.stringify(output.json.verified_facts).includes('envelope_attachment'),
+    false,
+  );
   assertAttachmentAudit(output, {
     reportedSchemaVersion: 'ai_extractor_v1',
     reportedAnalysisUnitId: null,
