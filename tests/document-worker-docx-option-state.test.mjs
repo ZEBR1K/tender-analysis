@@ -918,6 +918,14 @@ test('workflow connections isolate DOCX extraction and restore the original bina
   );
 });
 
+test('execution 14361 archive preparation uses the current item API in per-item mode', () => {
+  const workflow = loadWorkflow();
+  const node = findNode(workflow, nodeNames.prepareArchive);
+  assert.equal(node.parameters.mode, 'runOnceForEachItem');
+  assert.doesNotMatch(node.parameters.jsCode, /\$input\.first\s*\(/u);
+  assert.match(node.parameters.jsCode, /^const item = \$input\.item;/u);
+});
+
 test('DOCX preparation creates a zip alias without changing the original binary descriptor', async () => {
   const workflow = loadWorkflow();
   const original = binaryDescriptor(
