@@ -8,9 +8,11 @@
     "notes": "Minimal exact-live target controls plus independently captured normalized table cells and competing duplicate-label cells. Unrelated document content is omitted."
   },
   "source_geometry_counts": {
-    "option_controls": 290,
-    "docling_tables": 64,
-    "docling_body_children": 528
+    "raw_option_controls": 290,
+    "raw_docling_tables": 64,
+    "raw_docling_body_children": 6,
+    "downstream_normalized_blocks": 647,
+    "downstream_semantic_blocks": 528
   },
   "source_option_states": [
     {

@@ -547,7 +547,7 @@ function doclingTableFromCapturedCells(tableRef, cells) {
 }
 
 function execution14359SemanticDocument({ cloneGuaranteeStructure = false } = {}) {
-  const tableCount = semanticBindingFixture.source_geometry_counts.docling_tables;
+  const tableCount = semanticBindingFixture.source_geometry_counts.raw_docling_tables;
   const tables = Array.from({ length: tableCount }, () => null);
   const bodyChildren = [];
   for (const captured of semanticBindingFixture.normalized_table_cells) {
@@ -756,11 +756,15 @@ test('execution 14359 semantic-binding fixture is sanitized and preserves only r
   assert.equal(semanticBindingFixture.sanitization.credentials_or_secrets_included, false);
   assert.equal(semanticBindingFixture.sanitization.personal_data_included, false);
   assert.equal(semanticBindingFixture.source_option_states.length, 6);
-  assert.deepEqual(semanticBindingFixture.source_geometry_counts, {
-    option_controls: 290,
-    docling_tables: 64,
-    docling_body_children: 528,
-  });
+  assert.equal(semanticBindingFixture.source_geometry_counts.raw_option_controls, 290);
+  assert.equal(semanticBindingFixture.source_geometry_counts.raw_docling_tables, 64);
+  assert.equal(semanticBindingFixture.source_geometry_counts.raw_docling_body_children, 6);
+  assert.equal(semanticBindingFixture.source_geometry_counts.downstream_normalized_blocks, 647);
+  assert.equal(semanticBindingFixture.source_geometry_counts.downstream_semantic_blocks, 528);
+  assert.notEqual(
+    semanticBindingFixture.source_geometry_counts.raw_docling_body_children,
+    semanticBindingFixture.source_geometry_counts.downstream_semantic_blocks,
+  );
   assert.equal(semanticBindingFixture.normalized_table_cells.length, 4);
   assert.equal(semanticBindingFixture.oracle.bindings.length, 2);
   assert.deepEqual(
