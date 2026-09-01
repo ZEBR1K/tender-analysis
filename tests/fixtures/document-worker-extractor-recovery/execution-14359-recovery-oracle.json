@@ -31,10 +31,33 @@
   "explicit_carry_contract": {
     "transport_errors": "hard_stop",
     "http_error_outputs": 0,
+    "http_retry_on_fail": false,
     "regular_success_wrapper_fields": ["source", "attempt", "provider_response"],
     "contract_failure_output": "typed_regular_decision",
     "fallback_prep_source": "current_input_only",
     "merge_nodes": 0
+  },
+  "primary_decision_contract": {
+    "version": "ai_extractor_primary_decision_v1",
+    "accepted": "accepted",
+    "fallback_required": "fallback_required",
+    "fallback_failure_class": "contract",
+    "fallback_failure_codes": [
+      "invalid_json",
+      "invalid_root_contract",
+      "conflicting_analysis_unit_id",
+      "invalid_field_catalog_version",
+      "invalid_schema_version",
+      "invalid_fact_contract",
+      "invalid_evidence_contract"
+    ],
+    "unknown_decision_or_failure_code": "hard_stop"
+  },
+  "shared_validation_contract": {
+    "version": "ai_extractor_strict_validator_v3",
+    "source_start_marker": "/* AI_EXTRACTOR_STRICT_VALIDATOR_SHARED_START */",
+    "source_end_marker": "/* AI_EXTRACTOR_STRICT_VALIDATOR_SHARED_END */",
+    "primary_and_fallback_body": "byte_identical"
   },
   "source_execution": {
     "execution_id": "14359",

@@ -93,6 +93,18 @@ function outputsFrom(name, outputIndex = 0, graph = workflow) {
   );
 }
 
+function assertExactHardStop(name, { requireRetryDisabled = true } = {}) {
+  const node = findNode(name);
+  assert.ok(
+    node.onError === undefined || node.onError === 'stopWorkflow',
+    `${name}: onError must be absent or stopWorkflow`,
+  );
+  assert.notEqual(node.onError, 'continueRegularOutput');
+  assert.notEqual(node.onError, 'continueErrorOutput');
+  if (requireRetryDisabled) assert.equal(node.retryOnFail, false, `${name}: retryOnFail`);
+  assert.deepEqual(outputsFrom(name, 1), [], `${name}: error output must be disconnected`);
+}
+
 function inboundTo(name, graph = workflow) {
   const inbound = [];
   for (const [source, connection] of Object.entries(graph.connections)) {
@@ -319,6 +331,60 @@ function buildProviderResponse(payload) {
   };
 }
 
+function buildProviderTextResponse(content) {
+  return {
+    id: 'sanitized-response',
+    model: 'sanitized-model',
+    choices: [{ finish_reason: 'stop', message: { content } }],
+    usage: {},
+  };
+}
+
+function buildStrictProviderFact(unitId) {
+  const fact = buildFact(unitId);
+  delete fact.fact_index;
+  fact.evidence = fact.evidence.map(({ semantic_block_id, quote }) => ({
+    semantic_block_id,
+    quote,
+  }));
+  return fact;
+}
+
+function buildStrictProviderPayload(unitId) {
+  return {
+    schema_version: 'ai_extractor_v1',
+    field_catalog_version: 'tender_fields_v1',
+    analysis_unit_id: unitId,
+    facts: [buildStrictProviderFact(unitId)],
+  };
+}
+
+function buildModelContractDefectCorpus(unitId) {
+  const valid = buildStrictProviderPayload(unitId);
+  const conflictingIdentity = structuredClone(valid);
+  conflictingIdentity.analysis_unit_id = `${unitId}_other`;
+  const missingCatalog = structuredClone(valid);
+  delete missingCatalog.field_catalog_version;
+  const wrongSchema = structuredClone(valid);
+  wrongSchema.schema_version = 'ai_extractor_v2';
+  const invalidRoot = structuredClone(valid);
+  invalidRoot.schema = invalidRoot.schema_version;
+  delete invalidRoot.schema_version;
+  const invalidFact = structuredClone(valid);
+  invalidFact.facts = [{ field: 'application_documents', value: 'wrong contract' }];
+  const invalidEvidence = structuredClone(valid);
+  delete invalidEvidence.facts[0].evidence[0].quote;
+  return [
+    { axis: 'json', code: 'invalid_json', response: buildProviderTextResponse('{') },
+    { axis: 'root', code: 'invalid_root_contract', response: buildProviderResponse(invalidRoot) },
+    { axis: 'identity', code: 'conflicting_analysis_unit_id', response: buildProviderResponse(conflictingIdentity) },
+    { axis: 'catalog', code: 'invalid_field_catalog_version', response: buildProviderResponse(missingCatalog) },
+    { axis: 'schema', code: 'invalid_schema_version', response: buildProviderResponse(wrongSchema) },
+    { axis: 'fact', code: 'invalid_fact_contract', response: buildProviderResponse(invalidFact) },
+    { axis: 'evidence', code: 'invalid_evidence_contract', response: buildProviderResponse(invalidEvidence) },
+  ];
+}
+
 function buildAttemptEnvelope(source, response, attempt = 'primary') {
   const modelAlias = attempt === 'primary'
     ? fixture.models.primary_alias
@@ -370,6 +436,21 @@ async function runStrictClassifier(nodeName, attemptEnvelope) {
   return new vm.Script(
     `(async () => { ${node.parameters.jsCode}\n })()`,
   ).runInContext(context);
+}
+
+function extractSharedValidationBody(nodeName) {
+  const code = findNode(nodeName).parameters.jsCode;
+  const contract = fixture.shared_validation_contract;
+  const startIndex = code.indexOf(contract.source_start_marker);
+  const endIndex = code.indexOf(contract.source_end_marker);
+  assert.ok(startIndex >= 0, `${nodeName}: shared validator start marker missing`);
+  assert.ok(endIndex > startIndex, `${nodeName}: shared validator end marker missing`);
+  const body = code.slice(
+    startIndex + contract.source_start_marker.length,
+    endIndex,
+  );
+  assert.match(body, new RegExp(contract.version));
+  return body;
 }
 
 function semanticProjection(unit) {
@@ -430,19 +511,87 @@ test('execution 14359 recovery fixture is sanitized and independently preserves 
   assert.deepEqual(fixture.explicit_carry_contract, {
     transport_errors: 'hard_stop',
     http_error_outputs: 0,
+    http_retry_on_fail: false,
     regular_success_wrapper_fields: ['source', 'attempt', 'provider_response'],
     contract_failure_output: 'typed_regular_decision',
     fallback_prep_source: 'current_input_only',
     merge_nodes: 0,
   });
+  assert.deepEqual(fixture.primary_decision_contract, {
+    version: 'ai_extractor_primary_decision_v1',
+    accepted: 'accepted',
+    fallback_required: 'fallback_required',
+    fallback_failure_class: 'contract',
+    fallback_failure_codes: [
+      'invalid_json',
+      'invalid_root_contract',
+      'conflicting_analysis_unit_id',
+      'invalid_field_catalog_version',
+      'invalid_schema_version',
+      'invalid_fact_contract',
+      'invalid_evidence_contract',
+    ],
+    unknown_decision_or_failure_code: 'hard_stop',
+  });
+  assert.deepEqual(fixture.shared_validation_contract, {
+    version: 'ai_extractor_strict_validator_v3',
+    source_start_marker: '/* AI_EXTRACTOR_STRICT_VALIDATOR_SHARED_START */',
+    source_end_marker: '/* AI_EXTRACTOR_STRICT_VALIDATOR_SHARED_END */',
+    primary_and_fallback_body: 'byte_identical',
+  });
+});
+
+test('RED: primary/fallback HTTP and recovery internals have exact hard-stop settings', () => {
+  for (const httpNode of [NODES.primaryHttp, NODES.fallbackHttp]) {
+    assert.equal(findNode(httpNode).type, 'n8n-nodes-base.httpRequest');
+    assertExactHardStop(httpNode);
+  }
+  for (const internalNode of [
+    NODES.primaryWrapper,
+    NODES.primaryValidator,
+    NODES.prepareFallback,
+    NODES.fallbackWrapper,
+    NODES.fallbackValidator,
+    NODES.primaryAudit,
+    NODES.fallbackAudit,
+    NODES.recoveryBarrier,
+  ]) assertExactHardStop(internalNode);
+});
+
+test('RED: Primary Extractor accepted IF has one strict accepted-only condition', () => {
+  const primaryDecision = findNode(NODES.primaryDecision);
+  assert.equal(primaryDecision.type, 'n8n-nodes-base.if');
+  assert.equal(primaryDecision.typeVersion, 2.2);
+  assert.deepEqual(primaryDecision.parameters.conditions.options, {
+    caseSensitive: true,
+    leftValue: '',
+    typeValidation: 'strict',
+    version: 3,
+  });
+  assert.deepEqual(primaryDecision.parameters.options, {});
+  assert.equal(primaryDecision.parameters.conditions.combinator, 'and');
+  assert.equal(primaryDecision.parameters.conditions.conditions.length, 1);
+  const [acceptedCondition] = primaryDecision.parameters.conditions.conditions;
+  assert.equal(
+    acceptedCondition.leftValue,
+    "={{ $json.extractor_recovery_decision.decision === 'accepted' }}",
+  );
+  assert.equal(acceptedCondition.rightValue, '');
+  assert.deepEqual(acceptedCondition.operator, {
+    type: 'boolean',
+    operation: 'true',
+    singleValue: true,
+  });
+  assert.deepEqual(outputsFrom(NODES.primaryDecision, 0), [{ node: NODES.primaryAudit, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryDecision, 1), [{ node: NODES.prepareFallback, index: 0 }]);
 });
 
 test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-done persistence path', () => {
   const loop = findNode(NODES.loop);
-  const primaryHttp = findNode(NODES.primaryHttp);
-  const primaryValidator = findNode(NODES.primaryValidator);
-  const fallbackHttp = findNode(NODES.fallbackHttp);
-  const fallbackValidator = findNode(NODES.fallbackValidator);
+  findNode(NODES.primaryHttp);
+  findNode(NODES.primaryValidator);
+  findNode(NODES.fallbackHttp);
+  findNode(NODES.fallbackValidator);
   findNode(NODES.primaryWrapper);
   findNode(NODES.fallbackWrapper);
   findNode(NODES.primaryDecision);
@@ -456,8 +605,6 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
   assert.deepEqual(outputsFrom(NODES.loop, 1), [{ node: NODES.primaryHttp, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.loop, 0), [{ node: NODES.recoveryBarrier, index: 0 }]);
 
-  assert.notEqual(primaryHttp.onError, 'continueErrorOutput');
-  assert.notEqual(primaryValidator.onError, 'continueErrorOutput');
   assert.deepEqual(outputsFrom(NODES.primaryHttp, 0), [{ node: NODES.primaryWrapper, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), []);
   assert.deepEqual(outputsFrom(NODES.primaryWrapper), [{ node: NODES.primaryValidator, index: 0 }]);
@@ -473,11 +620,6 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
   assert.deepEqual(outputsFrom(NODES.primaryAudit), [{ node: NODES.evidenceDecision, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.fallbackAudit), [{ node: NODES.evidenceDecision, index: 0 }]);
 
-  assert.notEqual(fallbackHttp.onError, 'continueErrorOutput');
-  assert.notEqual(fallbackValidator.onError, 'continueErrorOutput');
-  assert.deepEqual(outputsFrom(NODES.fallbackValidator, 1), []);
-  assert.equal(primaryHttp.retryOnFail, false);
-  assert.notEqual(fallbackHttp.retryOnFail, true);
   assert.deepEqual(inboundTo(NODES.fallbackHttp), [
     { source: NODES.prepareFallback, outputIndex: 0, inputIndex: 0 },
   ]);
@@ -579,36 +721,92 @@ test('RED: a mixed batch falls back only for the invalid subset and retains sour
   );
 });
 
-test('RED: an invalid fallback response uses the same strict validator and hard-fails', async () => {
-  const primaryValidator = findNode(NODES.primaryValidator);
-  const fallbackValidator = findNode(NODES.fallbackValidator);
-  assert.match(primaryValidator.parameters.jsCode, /evidence_validator_v2/);
-  assert.match(fallbackValidator.parameters.jsCode, /evidence_validator_v2/);
-  assert.notEqual(fallbackValidator.onError, 'continueErrorOutput');
-
-  const unitId = 'sanitized_invalid_fallback';
+test('RED: primary and fallback share one strict validator body and defect corpus', async () => {
+  assert.equal(
+    extractSharedValidationBody(NODES.primaryValidator),
+    extractSharedValidationBody(NODES.fallbackValidator),
+  );
+  const unitId = 'sanitized_validator_parity';
   const source = buildStrictSource(unitId);
-  const invalidEnvelope = buildAttemptEnvelope(
-    source,
-    buildProviderResponse({ facts: [] }),
+  const corpus = buildModelContractDefectCorpus(unitId);
+  assert.deepEqual(
+    corpus.map(({ code }) => code),
+    fixture.primary_decision_contract.fallback_failure_codes,
   );
-  const primaryDecision = await runStrictClassifier(NODES.primaryValidator, invalidEnvelope);
-  assert.deepEqual(primaryDecision.json.extractor_recovery_decision, {
-    version: 'ai_extractor_primary_decision_v1',
-    analysis_unit_id: unitId,
-    decision: 'fallback_required',
-    primary_failure_class: 'contract',
-    primary_failure_code: 'invalid_field_catalog_version',
-  });
-  assert.deepEqual(primaryDecision.json.source, source);
-  assert.equal(JSON.stringify(primaryDecision).includes('choices'), false);
-  await assert.rejects(
-    runStrictClassifier(
-      NODES.fallbackValidator,
-      buildAttemptEnvelope(source, buildProviderResponse({ facts: [] }), 'fallback'),
-    ),
-    /field_catalog_version/,
+
+  for (const defect of corpus) {
+    const primary = await runStrictClassifier(
+      NODES.primaryValidator,
+      buildAttemptEnvelope(source, defect.response),
+    );
+    assert.deepEqual(primary.json.extractor_recovery_decision, {
+      version: fixture.primary_decision_contract.version,
+      analysis_unit_id: unitId,
+      decision: fixture.primary_decision_contract.fallback_required,
+      primary_failure_class: fixture.primary_decision_contract.fallback_failure_class,
+      primary_failure_code: defect.code,
+    }, defect.axis);
+    assert.deepEqual(primary.json.source, source, defect.axis);
+    assert.equal(JSON.stringify(primary).includes('choices'), false, defect.axis);
+    await assert.rejects(
+      runStrictClassifier(
+        NODES.fallbackValidator,
+        buildAttemptEnvelope(source, defect.response, 'fallback'),
+      ),
+      undefined,
+      defect.axis,
+    );
+  }
+
+  const validResponse = buildProviderResponse(buildStrictProviderPayload(unitId));
+  const accepted = await runStrictClassifier(
+    NODES.primaryValidator,
+    buildAttemptEnvelope(source, validResponse),
   );
+  assert.equal(accepted.json.extractor_recovery_decision.decision, 'accepted');
+  const fallbackValidated = await runStrictClassifier(
+    NODES.fallbackValidator,
+    buildAttemptEnvelope(source, validResponse, 'fallback'),
+  );
+  assert.deepEqual(
+    semanticProjection(accepted.json.validated_unit),
+    semanticProjection(fallbackValidated.json),
+  );
+});
+
+test('RED: unknown decisions/codes and malformed explicit envelopes hard-stop before fallback HTTP', async () => {
+  findNode(NODES.prepareFallback);
+  findNode(NODES.fallbackHttp);
+  const unitId = 'sanitized_hard_stop_contract';
+  const source = buildStrictSource(unitId);
+  const decision = buildFallbackDecision(source, 'contract', 'unknown_model_failure');
+  await assert.rejects(runPrepareFallback(decision), /failure.*code|allow|unknown/i);
+
+  const unknownDecision = structuredClone(decision);
+  unknownDecision.extractor_recovery_decision.decision = 'retry_anyway';
+  unknownDecision.extractor_recovery_decision.primary_failure_code = 'invalid_json';
+  await assert.rejects(runPrepareFallback(unknownDecision), /decision|fallback_required/i);
+
+  const internalFailure = buildFallbackDecision(source, 'internal', 'invalid_json');
+  await assert.rejects(runPrepareFallback(internalFailure), /failure.*class|contract/i);
+
+  const validResponse = buildProviderResponse(buildStrictProviderPayload(unitId));
+  const primaryMissingSource = buildAttemptEnvelope(source, validResponse);
+  delete primaryMissingSource.attempt_transport.source;
+  const primaryWrongAttempt = buildAttemptEnvelope(source, validResponse);
+  primaryWrongAttempt.attempt_transport.attempt = 'fallback';
+  for (const malformed of [{}, primaryMissingSource, primaryWrongAttempt]) {
+    await assert.rejects(runStrictClassifier(NODES.primaryValidator, malformed));
+  }
+  const fallbackMissingSource = buildAttemptEnvelope(source, validResponse, 'fallback');
+  delete fallbackMissingSource.attempt_transport.source;
+  const fallbackWrongAttempt = buildAttemptEnvelope(source, validResponse, 'fallback');
+  fallbackWrongAttempt.attempt_transport.attempt = 'primary';
+  for (const malformed of [{}, fallbackMissingSource, fallbackWrongAttempt]) {
+    await assert.rejects(runStrictClassifier(NODES.fallbackValidator, malformed));
+  }
+  assert.deepEqual(outputsFrom(NODES.prepareFallback), [{ node: NODES.fallbackHttp, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.fallbackHttp, 1), []);
 });
 
 test('RED: convergence rejects missing, duplicate, unknown, cardinality, and order defects', async () => {

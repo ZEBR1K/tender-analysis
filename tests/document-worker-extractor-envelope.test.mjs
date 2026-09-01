@@ -20,9 +20,16 @@ const fixturePath = path.join(
   'document-worker-extractor-envelope',
   'execution-14359-response-matrix.json',
 );
+const recoveryFixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-extractor-recovery',
+  'execution-14359-recovery-oracle.json',
+);
 
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+const recoveryFixture = JSON.parse(fs.readFileSync(recoveryFixturePath, 'utf8'));
 
 function findNode(name) {
   const node = workflow.nodes.find((candidate) => candidate.name === name);
@@ -51,10 +58,32 @@ async function runRequestPreparation(inputJson) {
   ).runInContext(context);
 }
 
-async function runEvidenceValidator(apiResponse, source, sourceLookup = null) {
-  const node = findNode('Проверить и привязать evidence');
-  const inputItem = { json: structuredClone(apiResponse) };
-  const sourceItem = { json: structuredClone(source) };
+function buildAttemptEnvelope(apiResponse, source, attempt = 'primary') {
+  return {
+    attempt_transport: {
+      version: 'ai_extractor_attempt_transport_v1',
+      attempt,
+      analysis_unit_id: source?.analysis_unit_meta?.analysis_unit_id ?? null,
+      model_alias: attempt === 'primary'
+        ? recoveryFixture.models.primary_alias
+        : recoveryFixture.models.fallback_alias,
+      transport_status: 'succeeded',
+      source: structuredClone(source),
+      provider_response: structuredClone(apiResponse),
+      failure_class: null,
+      failure_code: null,
+    },
+  };
+}
+
+async function runEvidenceValidator(apiResponse, source, attempt = 'primary') {
+  const nodeName = attempt === 'primary'
+    ? 'Проверить и привязать evidence'
+    : 'Проверить fallback и привязать evidence';
+  const node = findNode(nodeName);
+  const inputItem = {
+    json: buildAttemptEnvelope(apiResponse, source, attempt),
+  };
   const context = vm.createContext({
     console,
     structuredClone,
@@ -64,24 +93,41 @@ async function runEvidenceValidator(apiResponse, source, sourceLookup = null) {
       first: () => inputItem,
       item: inputItem,
     },
-    $: (nodeName) => {
-      assert.equal(nodeName, 'Подготовить запрос для AI');
-      if (sourceLookup) return sourceLookup(sourceItem);
-      return {
-        all: () => [sourceItem],
-        first: () => sourceItem,
-        itemMatching: (index) => {
-          assert.equal(index, 0);
-          return sourceItem;
-        },
-        item: sourceItem,
-      };
+    $: () => {
+      throw new Error('explicit attempt-envelope validator must not use linked-item lookup');
     },
   });
   const result = await new vm.Script(
     `(async () => { ${node.parameters.jsCode}\n })()`,
   ).runInContext(context);
   return JSON.parse(JSON.stringify(result));
+}
+
+function acceptedUnit(output) {
+  const unit = output.json.validated_unit;
+  assert.deepEqual(output.json.extractor_recovery_decision, {
+    version: recoveryFixture.primary_decision_contract.version,
+    analysis_unit_id: unit.analysis_unit_meta.analysis_unit_id,
+    decision: recoveryFixture.primary_decision_contract.accepted,
+    primary_failure_class: null,
+    primary_failure_code: null,
+  });
+  return unit;
+}
+
+function assertFallbackDecision(output, expectedCode, expectedUnitId) {
+  assert.deepEqual(output.json.extractor_recovery_decision, {
+    version: recoveryFixture.primary_decision_contract.version,
+    analysis_unit_id: expectedUnitId,
+    decision: recoveryFixture.primary_decision_contract.fallback_required,
+    primary_failure_class: recoveryFixture.primary_decision_contract.fallback_failure_class,
+    primary_failure_code: expectedCode,
+  });
+  assert.equal(
+    recoveryFixture.primary_decision_contract.fallback_failure_codes.includes(expectedCode),
+    true,
+  );
+  assert.equal(JSON.stringify(output).includes('choices'), false);
 }
 
 function buildSource(analysisUnitId, text = 'Требуется точный документ') {
@@ -163,9 +209,9 @@ function semanticProjection(fact) {
   };
 }
 
-function assertAttachmentAudit(output, expected) {
+function assertAttachmentAudit(unit, expected) {
   assert.deepEqual(
-    JSON.parse(JSON.stringify(output.json.extractor.envelope_attachment)),
+    JSON.parse(JSON.stringify(unit.extractor.envelope_attachment)),
     {
       version: 'ai_extractor_envelope_attachment_v1',
       reported_schema_version: expected.reportedSchemaVersion,
@@ -323,14 +369,15 @@ test('RED: missing schema_version is attached only after exact facts validation 
   });
 
   const output = await runEvidenceValidator(response, source);
+  const unit = acceptedUnit(output);
 
-  assert.equal(output.json.validation_passed, true);
-  assert.deepEqual(semanticProjection(output.json.verified_facts[0]), fact);
+  assert.equal(unit.validation_passed, true);
+  assert.deepEqual(semanticProjection(unit.verified_facts[0]), fact);
   assert.equal(
-    JSON.stringify(output.json.evidence_context).includes('envelope_attachment'),
+    JSON.stringify(unit.evidence_context).includes('envelope_attachment'),
     false,
   );
-  assertAttachmentAudit(output, {
+  assertAttachmentAudit(unit, {
     reportedSchemaVersion: null,
     reportedAnalysisUnitId: analysisUnitId,
     effectiveAnalysisUnitId: analysisUnitId,
@@ -338,7 +385,7 @@ test('RED: missing schema_version is attached only after exact facts validation 
   });
 });
 
-test('RED: missing analysis_unit_id uses one linked upstream identity and records reported/effective IDs', async () => {
+test('RED: missing analysis_unit_id uses one explicit source identity and records reported/effective IDs', async () => {
   const analysisUnitId = 'safe_missing_identity';
   const source = buildSource(analysisUnitId);
   const fact = buildFact(analysisUnitId);
@@ -349,14 +396,15 @@ test('RED: missing analysis_unit_id uses one linked upstream identity and record
   });
 
   const output = await runEvidenceValidator(response, source);
+  const unit = acceptedUnit(output);
 
-  assert.equal(output.json.analysis_unit_meta.analysis_unit_id, analysisUnitId);
-  assert.deepEqual(semanticProjection(output.json.verified_facts[0]), fact);
+  assert.equal(unit.analysis_unit_meta.analysis_unit_id, analysisUnitId);
+  assert.deepEqual(semanticProjection(unit.verified_facts[0]), fact);
   assert.equal(
-    JSON.stringify(output.json.verified_facts).includes('envelope_attachment'),
+    JSON.stringify(unit.verified_facts).includes('envelope_attachment'),
     false,
   );
-  assertAttachmentAudit(output, {
+  assertAttachmentAudit(unit, {
     reportedSchemaVersion: 'ai_extractor_v1',
     reportedAnalysisUnitId: null,
     effectiveAnalysisUnitId: analysisUnitId,
@@ -390,9 +438,10 @@ test('RED: bounded attachment preserves response cardinality and order without s
       buildResponse(payload, outputs.length + 1),
       source,
     );
-    outputs.push(output);
-    assert.deepEqual(semanticProjection(output.json.verified_facts[0]), fact);
-    assertAttachmentAudit(output, {
+    const unit = acceptedUnit(output);
+    outputs.push(unit);
+    assert.deepEqual(semanticProjection(unit.verified_facts[0]), fact);
+    assertAttachmentAudit(unit, {
       reportedSchemaVersion: payload.schema_version ?? null,
       reportedAnalysisUnitId: payload.analysis_unit_id ?? null,
       effectiveAnalysisUnitId: analysisUnitId,
@@ -402,12 +451,12 @@ test('RED: bounded attachment preserves response cardinality and order without s
 
   assert.equal(outputs.length, cases.length);
   assert.deepEqual(
-    outputs.map((output) => output.json.analysis_unit_meta.analysis_unit_id),
+    outputs.map((unit) => unit.analysis_unit_meta.analysis_unit_id),
     cases.map(([analysisUnitId]) => analysisUnitId),
   );
 });
 
-test('conflicting non-empty identity and ambiguous linked identity both fail closed', async () => {
+test('RED: conflicting reported identity is fallback-eligible but missing explicit source hard-stops', async () => {
   const source = buildSource('expected_identity');
   const fact = buildFact('expected_identity');
   const conflicting = buildResponse({
@@ -416,76 +465,101 @@ test('conflicting non-empty identity and ambiguous linked identity both fail clo
     analysis_unit_id: 'reported_other_identity',
     facts: [fact],
   });
+  assertFallbackDecision(
+    await runEvidenceValidator(conflicting, source),
+    'conflicting_analysis_unit_id',
+    'expected_identity',
+  );
   await assert.rejects(
-    runEvidenceValidator(conflicting, source),
-    /analysis_unit_id не совпадает/,
+    runEvidenceValidator(conflicting, source, 'fallback'),
+    /analysis_unit_id|identity/i,
   );
 
-  const missingIdentity = buildResponse({
+  const otherwiseValid = buildResponse({
     schema_version: 'ai_extractor_v1',
     field_catalog_version: 'tender_fields_v1',
+    analysis_unit_id: 'expected_identity',
     facts: [fact],
   });
   await assert.rejects(
-    runEvidenceValidator(missingIdentity, source, () => {
-      throw new Error('ambiguous linked upstream identity');
-    }),
-    /ambiguous linked upstream identity/,
+    runEvidenceValidator(otherwiseValid, null),
+    /source|attempt.*envelope|analysis_unit_id/i,
   );
 });
 
-test('missing field catalog and incompatible schema variants are never coerced', async () => {
+test('RED: missing catalog and incompatible root/schema variants use only typed allow-listed fallback', async () => {
   const analysisUnitId = 'incompatible_envelope';
   const source = buildSource(analysisUnitId);
   const fact = buildFact(analysisUnitId);
 
-  await assert.rejects(
-    runEvidenceValidator(buildResponse({
-      schema_version: 'ai_extractor_v1',
-      analysis_unit_id: analysisUnitId,
-      facts: [fact],
-    }), source),
-    /Неверный field_catalog_version/,
-  );
-  await assert.rejects(
-    runEvidenceValidator(buildResponse({
-      schema: 'ai_extractor_v1',
-      field_catalog_version: 'tender_fields_v1',
-      analysis_unit_id: analysisUnitId,
-      facts: [fact],
-    }), source),
-    /недопустимое поле schema/,
-  );
-  await assert.rejects(
-    runEvidenceValidator(buildResponse({
-      schema_version: 'ai_extractor_v2',
-      field_catalog_version: 'tender_fields_v1',
-      analysis_unit_id: analysisUnitId,
-      facts: [fact],
-    }), source),
-    /Неверный schema_version/,
-  );
+  const cases = [
+    [
+      'invalid_field_catalog_version',
+      buildResponse({
+        schema_version: 'ai_extractor_v1',
+        analysis_unit_id: analysisUnitId,
+        facts: [fact],
+      }),
+    ],
+    [
+      'invalid_root_contract',
+      buildResponse({
+        schema: 'ai_extractor_v1',
+        field_catalog_version: 'tender_fields_v1',
+        analysis_unit_id: analysisUnitId,
+        facts: [fact],
+      }),
+    ],
+    [
+      'invalid_schema_version',
+      buildResponse({
+        schema_version: 'ai_extractor_v2',
+        field_catalog_version: 'tender_fields_v1',
+        analysis_unit_id: analysisUnitId,
+        facts: [fact],
+      }),
+    ],
+  ];
+  for (const [failureCode, response] of cases) {
+    assertFallbackDecision(
+      await runEvidenceValidator(response, source),
+      failureCode,
+      analysisUnitId,
+    );
+    await assert.rejects(runEvidenceValidator(response, source, 'fallback'));
+  }
 });
 
-test('missing identity never authorizes invalid facts or invalid evidence', async () => {
+test('RED: missing identity never authorizes invalid facts or invalid evidence', async () => {
   const analysisUnitId = 'unsafe_semantics';
   const source = buildSource(analysisUnitId);
-
+  const invalidFactResponse = buildResponse({
+    schema_version: 'ai_extractor_v1',
+    field_catalog_version: 'tender_fields_v1',
+    facts: [{ field: 'application_documents', value: 'different schema' }],
+  });
+  assertFallbackDecision(
+    await runEvidenceValidator(invalidFactResponse, source),
+    'invalid_fact_contract',
+    analysisUnitId,
+  );
   await assert.rejects(
-    runEvidenceValidator(buildResponse({
-      schema_version: 'ai_extractor_v1',
-      field_catalog_version: 'tender_fields_v1',
-      facts: [{ field: 'application_documents', value: 'different schema' }],
-    }), source),
+    runEvidenceValidator(invalidFactResponse, source, 'fallback'),
   );
 
   const invalidEvidenceFact = buildFact(analysisUnitId);
-  invalidEvidenceFact.evidence[0].quote = 'Текст отсутствует в source block';
+  delete invalidEvidenceFact.evidence[0].quote;
+  const invalidEvidenceResponse = buildResponse({
+    schema_version: 'ai_extractor_v1',
+    field_catalog_version: 'tender_fields_v1',
+    facts: [invalidEvidenceFact],
+  });
+  assertFallbackDecision(
+    await runEvidenceValidator(invalidEvidenceResponse, source),
+    'invalid_evidence_contract',
+    analysisUnitId,
+  );
   await assert.rejects(
-    runEvidenceValidator(buildResponse({
-      schema_version: 'ai_extractor_v1',
-      field_catalog_version: 'tender_fields_v1',
-      facts: [invalidEvidenceFact],
-    }), source),
+    runEvidenceValidator(invalidEvidenceResponse, source, 'fallback'),
   );
 });
