@@ -468,10 +468,12 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - Targeted Recheck `14337` корректно зафиксировал `insufficient_evidence` для `participation_guarantee`, потому что его context уже не содержал option-state.
 - `DW-18` source-derived nested-table fixture и 61 focused regression offline подтверждают standards-based OOXML relationships → bounded CFB → MS-OFORMS parsing: controls 5/6/7/56 cleared, 8 selected `Не применимо`, 55 selected `Не предусмотрены`; parser input загружается из checked-in OOXML независимо от manifest; malformed/orphan/cyclic/out-of-range structures и unsafe archive paths fail closed.
 - executions `14350–14352` локализовали три runtime gaps прежнего canonical candidate: split `directory + fileName`, потерю `docx_part_path/docx_part_kind` после Extract From File/XML и ancestor-table duplicate mapping (`578 controls / 126 decoded / partial`). Canonical Worker исправляет только эти boundaries и сохраняет настоящую ambiguity fail-closed.
+- execution `14359` локализовал следующий первый incorrect state после корректного raw parser: global label-only normalizer не связывал selected state с нужным semantic owner при повторяющихся labels. Stage 1 TDD checkpoints: RED `4f6f23f`, GREEN `a5a1cb7`, Critical RED `e7e1987`, Critical GREEN `3643b29`, fixture-geometry correction `e8db92b`.
+- exact read-only replay полного input execution `14359` после local fix подтвердил: activeX5/6/7/8 привязаны только к `#/tables/2` как `unselected/unselected/unselected/selected`, activeX55/56 — только к `#/tables/25` как `selected/unselected`. Replay остаётся fail-closed: `docx_option_state_semantic_status = unknown`, `33` warning groups и semantic owners только для `83/290` controls; guarded fields должны оставаться `requires_review` до post-fix canary.
 - Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
-- fresh branch verification: focused `DW-18 61/61` и `AG-11 31/31`; full suite `339 total / 333 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: intentional `AG-8` gate и пять дополнительных pre-existing failures; новых failures нет.
+- fresh Stage 1 branch verification: focused `DW-18 69/69`; full suite `347 total / 341 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: `RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary`; `RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit`; `RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256`; `immutable beta Worker snapshot retains its reviewed packaging hash`; `v1.2 prompt artifact is an exact clean copy of the imported validator system prompt`; `Targeted Recheck prompt aligns evidence coordinates with both trusted sources`. Новых failures нет.
 
 ### Not verified
 
@@ -486,6 +488,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
 - post-fix runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; executions `14350–14352` являются pre-fix diagnostic evidence, а не GREEN canary;
+- reproducible sanitized full-payload replay для semantic binding execution `14359`: checked-in regression намеренно сокращён до `6` controls и `4` meaningful tables, хотя отдельно хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен воспроизводимый sanitized full-payload replay либо точное переименование fixture/replay contract, исключающее впечатление полного replay;
 - published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
 - финальный клиентский отчёт без известных `national_regime`/option-state расхождений.
@@ -510,6 +513,8 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 ```text
 DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
 → canonical runtime hardening + offline deterministic contract (61/61 GREEN)
+→ execution 14359 semantic binding: structural local owner + bounded fail-closed audit (69/69 GREEN)
+→ sanitized full-payload replay или точное переименование сокращённого replay contract
 → read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
 → Worker/Aggregator runtime canary на national_regime и participation_guarantee
 → DW-17 reference-only evidence repair для failed OCR document
@@ -520,4 +525,4 @@ DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
 
 Текущий test PIN-data contour готов по согласованному gate: fresh canary и три последовательных подтверждения дошли до отчёта, каждый semantic audit дал `27/27 acceptable` и zero observed critical false statuses. Ограничение: это replay сохранённых Aggregator PIN data, сформированных после ранее согласованного обхода одного failed документа; это не новый clean full run всех `12/12` документов.
 
-Immediate business state: предварительный отчёт можно отправить Дмитрию только как partial `11/12` с перечислением известных ограничений. Технический следующий шаг для Hermes — не новый model benchmark, а минимальный TDD fix `DW-18 / AG-11` на exact source document.
+Immediate business state: предварительный отчёт можно отправить Дмитрию только как partial `11/12` с перечислением известных ограничений. Технический следующий шаг для Hermes — не новый model benchmark, а promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator canary `DW-18 / AG-11`; local Stage 1 GREEN не является production runtime GREEN.

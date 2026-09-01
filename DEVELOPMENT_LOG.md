@@ -5246,3 +5246,53 @@ full suite: 339 total / 333 pass / 6 exact baseline failures
 Full-suite failure set совпал с checkpoint `da7bb7a`: intentional AG-8 current-scope gate; два execution-14104 A/B artifact/hash gates; immutable Worker beta hash; validator prompt CRLF/LF mismatch; Targeted Recheck evidence-coordinate mismatch. Packaging projection вне reviewed DW-18 nodes прошла; `git diff --check` не обнаружил whitespace errors.
 
 Quality-review TDD добавил отдельный RED `8f4e959`: `61 total / 46 pass / 15 fail`. Один failure доказал, что прежний exact-six harness синтезировал XML из manifest вместо checked-in fixture; ещё 14 failures показали принятие absolute/UNC, drive/URI и dot-segment Compression paths. GREEN `3c9903f` загружает structured parser input напрямую из sanitised OOXML tree и отклоняет unsafe descriptors до OPC normalization с `invalid_extracted_part_path`. Valid full `fileName` и split `directory + fileName` regressions остаются GREEN.
+
+---
+
+## 2026-09-01 — DW-18 Stage 1 structural semantic binding from execution 14359
+
+Read-only execution `14359` подтвердил правильный raw ActiveX parser state и первый incorrect downstream state в `Нормализовать документ Docling`: global label-only lookup дал ambiguity для повторяющихся labels и не привязал selected national-regime state к target semantic owner. TDD был разделён на checkpoints:
+
+```text
+4f6f23f test: reproduce DOCX semantic binding drift
+a5a1cb7 fix: bind DOCX option state by source structure
+e7e1987 test: expose remaining DOCX binding gaps
+3643b29 fix: close remaining DOCX binding gaps
+e8db92b test: correct execution 14359 geometry counts
+```
+
+Initial RED: `66 total / 61 pass / 5 intended fail`. Spec-review RED после exact-live fixture: `69 total / 65 pass / 4 intended fail`. Final focused GREEN: `69/69 PASS`.
+
+Production logic теперь использует generic structural contract без tender-specific literals: строгий source `table/row`, stable-control identity consistency, единый relative row offset внутри source-table group и exact local label equality с matching-only Unicode whitespace normalization. OOXML и Docling table ordinals не приравниваются. Missing/contradictory/multiple ownership fail closed. Canonical block text/evidence не изменяются; mapping warning arrays сохраняются один раз, segments несут bounded issue IDs и scalar semantic status. Document-level `unknown`, даже без candidate block refs, принудительно оставляет guarded facts review-only во всех трёх evidence paths и Validator dispatch.
+
+Exact read-only replay полного execution `14359` input (`290` controls, `64` raw tables) подтвердил:
+
+```text
+activeX5/6/7/8 → #/tables/2 → unselected/unselected/unselected/selected
+activeX55/56 → #/tables/25 → selected/unselected
+docx_option_state_semantic_status = unknown
+mapping warning groups = 33
+semantic owners = 83/290 controls
+```
+
+Поэтому replay является diagnostic structural evidence, но не runtime GREEN canary: `national_regime` и `participation_guarantee` обязаны оставаться не выше `requires_review`, пока fail-closed document status не пройдёт post-fix canary. Production n8n, PostgreSQL, credentials, Extractor/Validator prompts и model settings не изменялись; paid AI не запускался.
+
+Final full-suite gate:
+
+```text
+node --test tests/*.test.mjs
+347 total / 341 pass / 6 fail
+```
+
+Exact accepted pre-existing failures:
+
+```text
+RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary
+RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit
+RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256
+immutable beta Worker snapshot retains its reviewed packaging hash
+v1.2 prompt artifact is an exact clean copy of the imported validator system prompt
+Targeted Recheck prompt aligns evidence coordinates with both trusted sources
+```
+
+Неблокирующий promotion debt: checked-in semantic-binding fixture replay сокращён до `6` controls и `4` meaningful tables, хотя metadata точно разделяет observed raw/downstream cardinalities: `290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks. Перед promotion нужен reproducible sanitized full-payload replay либо точное переименование fixture/replay contract. Post-fix production runtime canary остаётся pending.

@@ -123,7 +123,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-14 / EW-3`|handled evidence error может тихо закончить ветку и не вызвать Error Workflow|Document Worker / Error Workflow|
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
 |`DW-17`|Evidence Repair требует от модели дословно реконструировать canonical quote; observed executions `14234` и `14238` подтвердили повторяемый exact-grounding failure. Нужен reference-only repair без ослабления fail-closed проверки.|Document Worker / evidence grounding|
-|`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` выявили split Compression path, XML metadata loss и nested-table ancestor ambiguity. Canonical Worker теперь восстанавливает OPC path, сохраняет original part metadata через отдельный Merge input и связывает controls только с exact direct row; AG-11 containment остаётся fail-closed. Нужен post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
+|`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
@@ -1160,6 +1160,34 @@ published test Aggregator remains: 91c17313-a593-4fb9-9072-79320a958dd7
 ```
 
 Minimal fix сохраняет обе Compression формы (`fileName` full path и `directory + fileName`), до нормализации отклоняет absolute/UNC, drive/URI prefixes и `.`/`..` segments с audit-only `unknown`, направляет исходный True item `OOXML часть XML?` на input 0 `Привязать parsed XML к части`, parsed XML — на input 1, и исключает вложенные таблицы из ancestor-cell content. Exact-six parser input загружается независимо из checked-in source-derived OOXML, а manifest остаётся отдельным oracle. Настоящие one-control/multiple-label и multiple-controls/one-label cases остаются `unknown` с audit warnings. Production n8n не изменялся. Следующий gate — bounded post-fix Worker → facts → test Aggregator canary.
+
+### Stage 1 semantic binding checkpoint 2026-09-01
+
+Execution `14359` подтвердил корректный raw parser и первый неправильный downstream state в global label-only binding. Реализованный local contract группирует controls по строгому `word/document.xml#table[n]/row[m]`, отклоняет противоречивую stable control identity, ищет ровно один normalized table с единым relative row offset и проверяет labels только точным сравнением после matching-only Unicode whitespace normalization. Canonical source text и evidence quotes не переписываются. Нулевая/множественная structural ownership, отсутствующая coordinate и document-level semantic ambiguity остаются review-only; полный warning audit сохраняется один раз, а segments несут только bounded issue IDs и scalar semantic status.
+
+```text
+RED semantic fixture: 4f6f23f
+initial GREEN: a5a1cb7
+Critical RED after spec review: e7e1987
+Critical GREEN: 3643b29
+fixture geometry correction: e8db92b
+focused: 69/69 PASS
+full: 347 total / 341 pass / 6 accepted pre-existing failures
+```
+
+Exact read-only replay полного input execution `14359` дал целевые bindings:
+
+```text
+activeX5/6/7/8 → #/tables/2 → unselected/unselected/unselected/selected
+activeX55/56 → #/tables/25 → selected/unselected
+docx_option_state_semantic_status = unknown
+mapping warning groups = 33
+semantic owners = 83/290 controls
+```
+
+Это read-only replay, а не post-fix production canary. Production n8n, PostgreSQL, credentials, prompts и model settings не изменялись. Пока global semantic status остаётся `unknown`, `national_regime` и `participation_guarantee` должны materialize не выше `requires_review`.
+
+Неблокирующий follow-up debt для promotion: checked-in semantic-binding replay намеренно сокращён до шести controls и четырёх meaningful tables, хотя fixture отдельно фиксирует observed source cardinalities (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен reproducible sanitized full-payload replay либо точное переименование fixture/replay contract, чтобы сокращённый harness нельзя было принять за полный execution replay.
 
 ### Связанное, но отдельное ограничение
 
