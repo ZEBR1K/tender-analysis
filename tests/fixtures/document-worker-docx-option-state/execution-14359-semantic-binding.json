@@ -1,68 +1,149 @@
 {
-  "contract_version": "docx_option_state_semantic_binding_fixture_v1",
+  "contract_version": "docx_option_state_semantic_binding_fixture_v2",
   "source_execution": 14359,
   "sanitization": {
     "full_document_included": false,
     "credentials_or_secrets_included": false,
     "personal_data_included": false,
-    "notes": "Minimal execution-derived table/row geometry and option labels required to reproduce global-label contamination."
+    "notes": "Minimal exact-live target controls plus independently captured normalized table cells and competing duplicate-label cells. Unrelated document content is omitted."
+  },
+  "source_geometry_counts": {
+    "option_controls": 290,
+    "docling_tables": 64,
+    "docling_body_children": 528
   },
   "source_option_states": [
     {
-      "control_name": "national_option_1",
+      "control_name": "CommonSupplierCheckBox11",
+      "control_rel_target": "word/activeX/activeX5.xml",
       "state": "unselected",
-      "exact_label": "Запрет закупок [пункты ТЗ];",
+      "exact_label": "запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];",
       "source_row_ref": "word/document.xml#table[3]/row[1]"
     },
     {
-      "control_name": "national_option_2",
+      "control_name": "CommonSupplierCheckBox12",
+      "control_rel_target": "word/activeX/activeX6.xml",
       "state": "unselected",
-      "exact_label": "Ограничение закупок [пункты ТЗ];",
+      "exact_label": "ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];",
       "source_row_ref": "word/document.xml#table[3]/row[2]"
     },
     {
-      "control_name": "national_option_3",
+      "control_name": "CommonSupplierCheckBox13",
+      "control_rel_target": "word/activeX/activeX7.xml",
       "state": "unselected",
-      "exact_label": "Преимущество российским товарам [пункты ТЗ];",
+      "exact_label": "преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];",
       "source_row_ref": "word/document.xml#table[3]/row[3]"
     },
     {
-      "control_name": "national_option_4",
+      "control_name": "CommonSupplierCheckBox14",
+      "control_rel_target": "word/activeX/activeX8.xml",
       "state": "selected",
       "exact_label": "Не применимо.",
       "source_row_ref": "word/document.xml#table[3]/row[4]"
     },
     {
-      "control_name": "guarantee_option_1",
+      "control_name": "OptionButton25221111131",
+      "control_rel_target": "word/activeX/activeX55.xml",
       "state": "selected",
       "exact_label": "Не предусмотрены;",
       "source_row_ref": "word/document.xml#table[28]/row[1]"
     },
     {
-      "control_name": "guarantee_option_2",
+      "control_name": "OptionButton252211111211",
+      "control_rel_target": "word/activeX/activeX56.xml",
       "state": "unselected",
-      "exact_label": "Предусмотрены. Обеспечение заявки должно соответствовать требованиям:",
+      "exact_label": "Предусмотрены. Обеспечение заявки должно соответствовать следующим требованиям:",
       "source_row_ref": "word/document.xml#table[28]/row[2]"
     }
   ],
-  "normalized_tables": {
-    "national_regime": {
+  "normalized_table_cells": [
+    {
       "docling_table_ref": "#/tables/2",
-      "semantic_block_id": "sb_0019"
+      "cells": [
+        {
+          "row_start": 0,
+          "col_start": 1,
+          "text": "запрет\u00a0закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];"
+        },
+        {
+          "row_start": 1,
+          "col_start": 1,
+          "text": "ограничение\u00a0закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];"
+        },
+        {
+          "row_start": 2,
+          "col_start": 1,
+          "text": "преимущество\u00a0в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];"
+        },
+        {
+          "row_start": 3,
+          "col_start": 1,
+          "text": "Не применимо."
+        }
+      ]
     },
-    "participation_guarantee": {
+    {
       "docling_table_ref": "#/tables/25",
-      "semantic_block_id": "sb_0154"
+      "cells": [
+        {
+          "row_start": 0,
+          "col_start": 1,
+          "text": "Не предусмотрены;"
+        },
+        {
+          "row_start": 1,
+          "col_start": 1,
+          "text": "Предусмотрены. Обеспечение заявки должно соответствовать следующим требованиям:"
+        }
+      ]
     },
-    "duplicate_national_label": {
-      "docling_table_ref": "#/tables/52",
-      "row": 6,
-      "label": "Не применимо."
-    },
-    "duplicate_guarantee_label": {
+    {
       "docling_table_ref": "#/tables/31",
-      "row": 1,
-      "label": "Не предусмотрены;"
+      "cells": [
+        {
+          "row_start": 0,
+          "col_start": 1,
+          "text": "Не предусмотрены;"
+        }
+      ]
+    },
+    {
+      "docling_table_ref": "#/tables/52",
+      "cells": [
+        {
+          "row_start": 5,
+          "col_start": 1,
+          "text": "Не применимо."
+        }
+      ]
     }
+  ],
+  "oracle": {
+    "bindings": [
+      {
+        "source_table_ref": "word/document.xml#table[3]",
+        "expected_docling_table_ref": "#/tables/2",
+        "observed_semantic_block_id": "sb_0019",
+        "control_rel_targets": [
+          "word/activeX/activeX5.xml",
+          "word/activeX/activeX6.xml",
+          "word/activeX/activeX7.xml",
+          "word/activeX/activeX8.xml"
+        ]
+      },
+      {
+        "source_table_ref": "word/document.xml#table[28]",
+        "expected_docling_table_ref": "#/tables/25",
+        "observed_semantic_block_id": "sb_0154",
+        "control_rel_targets": [
+          "word/activeX/activeX55.xml",
+          "word/activeX/activeX56.xml"
+        ]
+      }
+    ],
+    "duplicate_only_table_refs": [
+      "#/tables/31",
+      "#/tables/52"
+    ]
   }
 }

@@ -524,30 +524,22 @@ function bindingFixtureOptionStates(overrides = new Map()) {
   }));
 }
 
-function doclingTableFromLabels(tableIndex, labelsByRow = new Map()) {
-  const tableCells = [];
-  for (const [rowIndex, label] of [...labelsByRow.entries()].sort((a, b) => a[0] - b[0])) {
-    tableCells.push({
-      start_row_offset_idx: rowIndex,
-      end_row_offset_idx: rowIndex + 1,
-      start_col_offset_idx: 0,
-      end_col_offset_idx: 1,
-      text: '',
-    });
-    tableCells.push({
-      start_row_offset_idx: rowIndex,
-      end_row_offset_idx: rowIndex + 1,
-      start_col_offset_idx: 1,
-      end_col_offset_idx: 2,
-      text: label,
-    });
-  }
+function doclingTableFromCapturedCells(tableRef, cells) {
+  const tableIndex = Number(tableRef.match(/^#\/tables\/(\d+)$/u)?.[1]);
+  assert.equal(Number.isSafeInteger(tableIndex), true, tableRef);
+  const tableCells = cells.map(({ row_start: rowStart, col_start: colStart, text }) => ({
+    start_row_offset_idx: rowStart,
+    end_row_offset_idx: rowStart + 1,
+    start_col_offset_idx: colStart,
+    end_col_offset_idx: colStart + 1,
+    text,
+  }));
   return {
     self_ref: `#/tables/${tableIndex}`,
     label: 'table',
     prov: [],
     data: {
-      num_rows: labelsByRow.size,
+      num_rows: Math.max(...cells.map(({ row_start: rowStart }) => rowStart + 1)),
       num_cols: 2,
       table_cells: tableCells,
     },
@@ -555,24 +547,24 @@ function doclingTableFromLabels(tableIndex, labelsByRow = new Map()) {
 }
 
 function execution14359SemanticDocument({ cloneGuaranteeStructure = false } = {}) {
-  const tableCount = 154;
-  const tables = Array.from({ length: tableCount }, (_, tableIndex) =>
-    doclingTableFromLabels(tableIndex, new Map([[0, `sanitized filler ${tableIndex}`]])));
-  const states = semanticBindingFixture.source_option_states;
-  const nationalLabels = new Map(states.slice(0, 4).map((state, index) => [index, state.exact_label]));
-  const guaranteeLabels = new Map(states.slice(4).map((state, index) => [index, state.exact_label]));
-  tables[2] = doclingTableFromLabels(2, nationalLabels);
-  tables[25] = doclingTableFromLabels(25, guaranteeLabels);
-  tables[52] = doclingTableFromLabels(52, new Map([[5, states[3].exact_label]]));
-  tables[31] = doclingTableFromLabels(31, new Map([[0, states[4].exact_label]]));
-  if (cloneGuaranteeStructure) tables[63] = doclingTableFromLabels(63, guaranteeLabels);
-
-  const tableOrder = Array.from({ length: tableCount }, (_, index) => index)
-    .filter((index) => index !== 2 && index !== 25);
-  tableOrder.splice(18, 0, 2);
-  tableOrder.splice(153, 0, 25);
-  assert.equal(tableOrder[18], 2);
-  assert.equal(tableOrder[153], 25);
+  const tableCount = semanticBindingFixture.source_geometry_counts.docling_tables;
+  const tables = Array.from({ length: tableCount }, () => null);
+  const bodyChildren = [];
+  for (const captured of semanticBindingFixture.normalized_table_cells) {
+    const table = doclingTableFromCapturedCells(captured.docling_table_ref, captured.cells);
+    const tableIndex = Number(captured.docling_table_ref.split('/').at(-1));
+    tables[tableIndex] = table;
+    bodyChildren.push({ $ref: captured.docling_table_ref });
+  }
+  if (cloneGuaranteeStructure) {
+    const guaranteeBinding = semanticBindingFixture.oracle.bindings[1];
+    const guaranteeCells = semanticBindingFixture.normalized_table_cells.find(
+      ({ docling_table_ref: tableRef }) =>
+        tableRef === guaranteeBinding.expected_docling_table_ref,
+    ).cells;
+    tables[63] = doclingTableFromCapturedCells('#/tables/63', guaranteeCells);
+    bodyChildren.push({ $ref: '#/tables/63' });
+  }
 
   return {
     schema_name: 'DoclingDocument',
@@ -583,7 +575,7 @@ function execution14359SemanticDocument({ cloneGuaranteeStructure = false } = {}
       mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       binary_hash: 'sanitized',
     },
-    body: { children: tableOrder.map((index) => ({ $ref: `#/tables/${index}` })) },
+    body: { children: bodyChildren },
     furniture: { children: [] },
     texts: [],
     tables,
@@ -757,16 +749,36 @@ test('fixture is a reviewed minimal derivative with exact source ActiveX parts',
 test('execution 14359 semantic-binding fixture is sanitized and preserves only required geometry', () => {
   assert.equal(
     semanticBindingFixture.contract_version,
-    'docx_option_state_semantic_binding_fixture_v1',
+    'docx_option_state_semantic_binding_fixture_v2',
   );
   assert.equal(semanticBindingFixture.source_execution, 14359);
   assert.equal(semanticBindingFixture.sanitization.full_document_included, false);
   assert.equal(semanticBindingFixture.sanitization.credentials_or_secrets_included, false);
   assert.equal(semanticBindingFixture.sanitization.personal_data_included, false);
   assert.equal(semanticBindingFixture.source_option_states.length, 6);
+  assert.deepEqual(semanticBindingFixture.source_geometry_counts, {
+    option_controls: 290,
+    docling_tables: 64,
+    docling_body_children: 528,
+  });
+  assert.equal(semanticBindingFixture.normalized_table_cells.length, 4);
+  assert.equal(semanticBindingFixture.oracle.bindings.length, 2);
   assert.deepEqual(
     semanticBindingFixture.source_option_states.map(({ state }) => state),
     ['unselected', 'unselected', 'unselected', 'selected', 'selected', 'unselected'],
+  );
+  const capturedNationalTable = semanticBindingFixture.normalized_table_cells.find(
+    ({ docling_table_ref: tableRef }) => tableRef === '#/tables/2',
+  );
+  assert.notEqual(
+    semanticBindingFixture.source_option_states[0].exact_label,
+    capturedNationalTable.cells[0].text,
+  );
+  assert.match(capturedNationalTable.cells[0].text, /\u00a0/u);
+  assert.deepEqual(
+    semanticBindingFixture.oracle.bindings[0].control_rel_targets,
+    semanticBindingFixture.source_option_states.slice(0, 4)
+      .map(({ control_rel_target: target }) => target),
   );
 });
 
@@ -1135,43 +1147,41 @@ test('execution 14359 binds duplicate labels only through their unique source ta
   const workflow = loadWorkflow();
   const normalized = await normalizeBindingFixture(execution14359SemanticDocument());
   assert.equal(normalized.json.docx_option_state_audit.semantic_mapping_warnings.length, 0);
+  const [nationalBinding, guaranteeBinding] = semanticBindingFixture.oracle.bindings;
 
   const nationalBlock = normalized.json.blocks.find(
     ({ block_id: blockId }) =>
-      blockId === semanticBindingFixture.normalized_tables.national_regime.docling_table_ref,
+      blockId === nationalBinding.expected_docling_table_ref,
   );
   const guaranteeBlock = normalized.json.blocks.find(
     ({ block_id: blockId }) =>
-      blockId === semanticBindingFixture.normalized_tables.participation_guarantee.docling_table_ref,
+      blockId === guaranteeBinding.expected_docling_table_ref,
   );
   assert.deepEqual(
-    nationalBlock.docx_option_states.map(({ control_name: name }) => name),
-    ['national_option_1', 'national_option_2', 'national_option_3', 'national_option_4'],
+    nationalBlock.docx_option_states.map(({ control_rel_target: target }) => target),
+    nationalBinding.control_rel_targets,
   );
   assert.deepEqual(
-    guaranteeBlock.docx_option_states.map(({ control_name: name }) => name),
-    ['guarantee_option_1', 'guarantee_option_2'],
+    guaranteeBlock.docx_option_states.map(({ control_rel_target: target }) => target),
+    guaranteeBinding.control_rel_targets,
   );
-  assert.equal(
-    normalized.json.blocks.find(({ block_id: blockId }) => blockId === '#/tables/52')
-      .docx_option_states?.length ?? 0,
-    0,
-  );
-  assert.equal(
-    normalized.json.blocks.find(({ block_id: blockId }) => blockId === '#/tables/31')
-      .docx_option_states?.length ?? 0,
-    0,
-  );
+  for (const duplicateRef of semanticBindingFixture.oracle.duplicate_only_table_refs) {
+    assert.equal(
+      normalized.json.blocks.find(({ block_id: blockId }) => blockId === duplicateRef)
+        .docx_option_states?.length ?? 0,
+      0,
+    );
+  }
 
   const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
   const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
   const nationalSemantic = semantic.json.semantic_blocks.find(
-    ({ semantic_block_id: id }) =>
-      id === semanticBindingFixture.normalized_tables.national_regime.semantic_block_id,
+    ({ source_block_ids: sourceBlockIds = [] }) =>
+      sourceBlockIds.includes(nationalBinding.expected_docling_table_ref),
   );
   const guaranteeSemantic = semantic.json.semantic_blocks.find(
-    ({ semantic_block_id: id }) =>
-      id === semanticBindingFixture.normalized_tables.participation_guarantee.semantic_block_id,
+    ({ source_block_ids: sourceBlockIds = [] }) =>
+      sourceBlockIds.includes(guaranteeBinding.expected_docling_table_ref),
   );
   assert.deepEqual(
     nationalSemantic.docx_option_states.map(({ state }) => state),
@@ -1184,27 +1194,29 @@ test('execution 14359 binds duplicate labels only through their unique source ta
 });
 
 test('missing source row coordinate fails closed without label-only attachment', async () => {
-  const overrides = new Map([['national_option_4', { source_row_ref: null }]]);
+  const target = semanticBindingFixture.source_option_states[3];
+  const overrides = new Map([[target.control_name, { source_row_ref: null }]]);
   const normalized = await normalizeBindingFixture(
     execution14359SemanticDocument(),
     bindingFixtureOptionStates(overrides),
   );
   const warning = normalized.json.docx_option_state_audit.semantic_mapping_warnings.find(
     ({ code, control_name: controlName }) =>
-      code === 'missing_structural_option_coordinate' && controlName === 'national_option_4',
+      code === 'missing_structural_option_coordinate' && controlName === target.control_name,
   );
   assert.ok(warning);
   assert.match(warning.issue_id, /^docx_option_mapping_issue_\d{4}$/u);
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_name: name }) => name === 'national_option_4'),
+      .some(({ control_name: name }) => name === target.control_name),
     false,
   );
 });
 
 test('conflicting source row coordinate fails closed instead of searching the label globally', async () => {
+  const target = semanticBindingFixture.source_option_states[3];
   const overrides = new Map([[
-    'national_option_4',
+    target.control_name,
     { source_row_ref: 'word/document.xml#table[3]/row[1]' },
   ]]);
   const normalized = await normalizeBindingFixture(
@@ -1216,7 +1228,8 @@ test('conflicting source row coordinate fails closed instead of searching the la
   ));
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_name: name }) => name.startsWith('national_option_')),
+      .some(({ control_rel_target: relTarget }) =>
+        semanticBindingFixture.oracle.bindings[0].control_rel_targets.includes(relTarget)),
     false,
   );
 });
@@ -1233,14 +1246,114 @@ test('multiple structural table matches fail closed for the whole source-table g
   ));
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_name: name }) => name.startsWith('guarantee_option_')),
+      .some(({ control_rel_target: relTarget }) =>
+        semanticBindingFixture.oracle.bindings[1].control_rel_targets.includes(relTarget)),
     false,
   );
 });
 
+test('one stable control identity with contradictory table coordinates fails closed everywhere', async () => {
+  const target = semanticBindingFixture.source_option_states[4];
+  const contradictory = {
+    ...target,
+    source_row_ref: 'word/document.xml#table[99]/row[1]',
+  };
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    [...bindingFixtureOptionStates(), contradictory],
+  );
+  const warnings = normalized.json.docx_option_state_audit.semantic_mapping_warnings;
+  assert.ok(warnings.some(
+    ({ code, control_rel_target: relTarget }) =>
+      code === 'conflicting_control_structural_identity' &&
+      relTarget === target.control_rel_target,
+  ));
+  assert.equal(
+    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
+      .some(({ control_rel_target: relTarget }) => relTarget === target.control_rel_target),
+    false,
+  );
+});
+
+test('document semantic unknown with no candidate block remains bounded and guards facts globally', async () => {
+  const workflow = loadWorkflow();
+  const selected = semanticBindingFixture.source_option_states[4];
+  const optionStates = [
+    ...bindingFixtureOptionStates(),
+    {
+      contract_version: 'docx_option_state_v1',
+      document_part: 'word/document.xml',
+      control_type: 'option_button',
+      control_name: 'sanitized_absent_control',
+      control_rel_target: 'word/activeX/sanitized-absent.xml',
+      binary_rel_target: null,
+      raw_value: '1',
+      state: 'selected',
+      exact_label: 'sanitized structurally absent option',
+      source_row_ref: 'word/document.xml#table[99]/row[1]',
+      group_context: null,
+      warnings: [],
+    },
+  ];
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    optionStates,
+  );
+  const warning = normalized.json.docx_option_state_audit.semantic_mapping_warnings.find(
+    ({ code, source_table_ref: sourceTableRef }) =>
+      code === 'missing_structural_semantic_owner' &&
+      sourceTableRef === 'word/document.xml#table[99]',
+  );
+  assert.ok(warning);
+  assert.deepEqual(warning.candidate_block_ids, []);
+  assert.equal(normalized.json.docx_option_state_semantic_status, 'unknown');
+
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const guaranteeRef = semanticBindingFixture.oracle.bindings[1].expected_docling_table_ref;
+  const semanticBlock = semantic.json.semantic_blocks.find(
+    ({ source_block_ids: sourceBlockIds = [] }) => sourceBlockIds.includes(guaranteeRef),
+  );
+  assert.ok(semanticBlock);
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'document-semantic-unknown-unit',
+    primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const segment = expanded.json.ai_segments[0];
+  assert.deepEqual(segment.docx_option_state_mapping_issue_ids, []);
+  assert.equal(segment.docx_option_state_semantic_status, 'unknown');
+  assert.equal('docx_option_state_mapping_warnings' in segment, false);
+
+  const source = buildOptionSource(segment, 'document-semantic-unknown-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact(
+        'participation_guarantee',
+        selected.exact_label,
+        segment.semantic_block_id,
+      ),
+    ], 'document-semantic-unknown-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const fact = dispatch.json.units_for_ai[0].verified_facts[0];
+  assert.equal(fact.status, 'requires_review');
+  assert.equal(fact.option_state_applicability, 'review_only');
+  assert.deepEqual(
+    fact.evidence.map(({ semantic_block_id: blockId, quote }) => ({ blockId, quote })),
+    [{ blockId: segment.semantic_block_id, quote: selected.exact_label }],
+  );
+  assert.ok(fact.evidence.every((entry) => !('issue_id' in entry)));
+});
+
 test('document-level mapping warnings are stored once and segments carry bounded issue references', async () => {
   const workflow = loadWorkflow();
-  const overrides = new Map([['national_option_4', { source_row_ref: null }]]);
+  const target = semanticBindingFixture.source_option_states[3];
+  const overrides = new Map([[target.control_name, { source_row_ref: null }]]);
   const normalized = await normalizeBindingFixture(
     execution14359SemanticDocument(),
     bindingFixtureOptionStates(overrides),
