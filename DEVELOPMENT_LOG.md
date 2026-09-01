@@ -5368,3 +5368,23 @@ Execution `14361` подтвердил official manual pin semantics и correcte
 Первый incorrect node — `Подготовить DOCX archive alias`. Его current contract противоречив: `mode = runOnceForEachItem`, но line 1 — `const item = $input.first();`; runtime hard-stop: `.first()` доступен только в `runOnceForAllItems`. Ошибка возникла до parser и всех AI nodes. Paid calls `0`, DB writes `0`; live-патча и второго execution не было.
 
 Temporary draft `c5fef07d-…` восстановлен из source `3016111f-…` в `b8a06968-…`. Read-back: nodes/connections/nodeGroups exact equal, `71` nodes / `68` connection sources, no `[CANARY]` nodes, PIN SHA-256/credentials unchanged, published `a7d04a95-…` unchanged. Runtime recovery gate остаётся pending; следующий шаг — отдельный execution-derived TDD fix Code-node mode/input API mismatch, затем новый reviewed canary. Sanitized evidence: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14361_2026-09-01.md`.
+
+---
+
+## 2026-09-01 — Execution 14361 DOCX archive per-item API local GREEN
+
+Execution-derived RED `bdba85e` зафиксировал exact runtime mismatch ноды `Подготовить DOCX archive alias`: `mode = runOnceForEachItem` при первом выражении `const item = $input.first();`. Installed runtime execution `14361` authoritative: hard-stop `Can't use .first() here`. Локальная official n8n documentation перечисляет `$input.first()` как Code-node API в общем виде, но не фиксирует эту наблюдаемую runtime-границу достаточно точно; для данного checkpoint runtime evidence имеет приоритет.
+
+Minimal GREEN `a4c3853` изменил только current-input access на `const item = $input.item;`. Node ID/name/type/version/position/mode, connections и остальной JavaScript не менялись. Regression сохраняет per-item JSON+binary contract: non-DOCX items проходят без изменений, DOCX сохраняет original `binary.data` и получает `docx_archive` alias с тем же payload и ZIP metadata.
+
+Verification:
+
+```text
+focused DOCX option-state suite: 70/70 PASS
+all document-worker-* suites: 203 total / 201 pass / 2 accepted known failures
+full suite: 371 total / 365 pass / exact 6 accepted known failures
+git diff --check: PASS
+secret/client-DOCX scans: PASS
+```
+
+Test workflow draft `pDTFwbq6B19qNAVI@b8a06968-…`, published workflow, pinData, credentials и PostgreSQL не изменялись. Новый execution и paid AI не запускались. Поэтому local GREEN не является runtime GREEN; следующий canary требует отдельного review и явного обновления isolated test draft.
