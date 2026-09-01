@@ -1426,9 +1426,14 @@ test('structural mapping issue references remain fail-closed through evidence an
   );
   assert.ok(fact.evidence.every((entry) => !('issue_id' in entry)));
   assert.deepEqual(
-    fact.option_state_audit_warnings.map(({ issue_id: issueId }) => issueId),
+    fact.option_state_audit_warnings
+      .map(({ issue_id: issueId }) => issueId)
+      .filter(Boolean),
     segment.docx_option_state_mapping_issue_ids,
   );
+  assert.ok(fact.option_state_audit_warnings.some(
+    ({ code }) => code === 'document_structural_option_mapping_unknown',
+  ));
 });
 
 test('AI segments expose deterministic option markers without replacing canonical semantic text', async () => {
