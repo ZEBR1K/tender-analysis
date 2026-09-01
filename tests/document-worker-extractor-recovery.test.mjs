@@ -5,6 +5,22 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
+/*
+ * Runtime design evidence (metadata-only; no issue payload is checked in):
+ * - Local official n8n docs: Loop Over Items output 0 is the completed batch;
+ *   feedback reaches the Loop input only after an iteration tail succeeds.
+ * - Local item-linking docs: `.item`/`itemMatching()` require paired lineage;
+ *   `.first()` is positional and does not resolve a paired item.
+ * - n8n upstream issues #12558 and #30050 report paired lineage unavailable
+ *   after `Continue (using error output)`.
+ *
+ * Therefore HTTP transport errors hard-stop and have no recovery output. Only
+ * a regular successful HTTP result reaches a small wrapper, which immediately
+ * emits an explicit source + attempt + provider_response envelope. Strict
+ * primary contract failures then become typed regular-output decisions. No
+ * recovery node reconstructs source through linked-item APIs.
+ */
+
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
 const workflowPath = path.join(
@@ -34,9 +50,12 @@ const NODES = {
   prepare: 'Подготовить запрос для AI',
   loop: 'Обработать evidence units по одной',
   primaryHttp: 'AI Extractor v1.0',
+  primaryWrapper: 'Связать primary Extractor response с source',
   primaryValidator: 'Проверить и привязать evidence',
+  primaryDecision: 'Primary Extractor accepted?',
   prepareFallback: 'Подготовить fallback Extractor',
   fallbackHttp: 'AI Extractor fallback v1.0',
+  fallbackWrapper: 'Связать fallback Extractor response с source',
   fallbackValidator: 'Проверить fallback и привязать evidence',
   primaryAudit: 'Зафиксировать primary Extractor attempt',
   fallbackAudit: 'Зафиксировать fallback Extractor attempt',
@@ -44,6 +63,11 @@ const NODES = {
   recoveryBarrier: 'Проверить полноту Extractor recovery',
   evidenceCollector: 'Собрать units после evidence validation',
   saveFacts: 'Сохранить факты документа',
+  validatorDispatch: 'Подготовить dispatch AI Validator',
+  evidenceRepairDecision: 'Evidence repair passed?',
+  factPartitionDecision: 'Fact partition passed?',
+  retryUnavailableStop: 'Завершить unit: retry route unavailable',
+  evidenceFailedStop: 'Завершить unit: evidence validation failed',
 };
 
 const AUDIT_KEYS = [
@@ -63,15 +87,15 @@ function findNode(name) {
   return node;
 }
 
-function outputsFrom(name, outputIndex = 0) {
-  return (workflow.connections[name]?.main?.[outputIndex] ?? []).map(
+function outputsFrom(name, outputIndex = 0, graph = workflow) {
+  return (graph.connections[name]?.main?.[outputIndex] ?? []).map(
     ({ node, index }) => ({ node, index }),
   );
 }
 
-function inboundTo(name) {
+function inboundTo(name, graph = workflow) {
   const inbound = [];
-  for (const [source, connection] of Object.entries(workflow.connections)) {
+  for (const [source, connection] of Object.entries(graph.connections)) {
     for (let outputIndex = 0; outputIndex < (connection.main ?? []).length; outputIndex += 1) {
       for (const edge of connection.main[outputIndex] ?? []) {
         if (edge.node === name) inbound.push({ source, outputIndex, inputIndex: edge.index });
@@ -79,6 +103,23 @@ function inboundTo(name) {
     }
   }
   return inbound;
+}
+
+function reachableNodes(startEdges, options = {}) {
+  const excludedOutput = options.excludedOutput ?? (() => false);
+  const seen = new Set();
+  const queue = [...startEdges.map(({ node }) => node)];
+  while (queue.length > 0) {
+    const name = queue.shift();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const main = workflow.connections[name]?.main ?? [];
+    for (let outputIndex = 0; outputIndex < main.length; outputIndex += 1) {
+      if (excludedOutput(name, outputIndex)) continue;
+      for (const edge of main[outputIndex] ?? []) queue.push(edge.node);
+    }
+  }
+  return seen;
 }
 
 function buildFact(unitId) {
@@ -190,10 +231,33 @@ async function runRecoveryBarrier(units, expectedUnitIds) {
   return JSON.parse(JSON.stringify(result));
 }
 
-async function runPrepareFallback(errorJson, source) {
+async function runPrepareFallback(decisionJson) {
   const node = findNode(NODES.prepareFallback);
   assert.equal(node.parameters.mode, 'runOnceForEachItem');
-  const inputItem = { json: structuredClone(errorJson) };
+  const inputItem = { json: structuredClone(decisionJson) };
+  const context = vm.createContext({
+    console,
+    structuredClone,
+    $json: inputItem.json,
+    $input: {
+      all: () => [inputItem],
+      first: () => inputItem,
+      item: inputItem,
+    },
+    $: () => {
+      throw new Error('linked-item lookup is forbidden in fallback preparation');
+    },
+  });
+  const result = await new vm.Script(
+    `(async () => { ${node.parameters.jsCode}\n })()`,
+  ).runInContext(context);
+  return JSON.parse(JSON.stringify(result));
+}
+
+async function runResponseWrapper(nodeName, response, source, linkedSourceNode) {
+  const node = findNode(nodeName);
+  assert.equal(node.parameters.mode, 'runOnceForEachItem');
+  const inputItem = { json: structuredClone(response) };
   const sourceItem = { json: structuredClone(source) };
   const context = vm.createContext({
     console,
@@ -204,14 +268,9 @@ async function runPrepareFallback(errorJson, source) {
       first: () => inputItem,
       item: inputItem,
     },
-    $: (nodeName) => {
-      assert.equal(nodeName, NODES.loop);
-      return {
-        all: () => [sourceItem],
-        first: () => sourceItem,
-        itemMatching: () => sourceItem,
-        item: sourceItem,
-      };
+    $: (nodeNameLookup) => {
+      assert.equal(nodeNameLookup, linkedSourceNode);
+      return { item: sourceItem, itemMatching: () => sourceItem };
     },
   });
   const result = await new vm.Script(
@@ -260,10 +319,41 @@ function buildProviderResponse(payload) {
   };
 }
 
-async function runStrictValidator(nodeName, response, source) {
+function buildAttemptEnvelope(source, response, attempt = 'primary') {
+  const modelAlias = attempt === 'primary'
+    ? fixture.models.primary_alias
+    : fixture.models.fallback_alias;
+  return {
+    attempt_transport: {
+      version: 'ai_extractor_attempt_transport_v1',
+      attempt,
+      analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+      model_alias: modelAlias,
+      transport_status: 'succeeded',
+      source: structuredClone(source),
+      provider_response: structuredClone(response),
+      failure_class: null,
+      failure_code: null,
+    },
+  };
+}
+
+function buildFallbackDecision(source, failureClass, failureCode) {
+  return {
+    source: structuredClone(source),
+    extractor_recovery_decision: {
+      version: 'ai_extractor_primary_decision_v1',
+      analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+      decision: 'fallback_required',
+      primary_failure_class: failureClass,
+      primary_failure_code: failureCode,
+    },
+  };
+}
+
+async function runStrictClassifier(nodeName, attemptEnvelope) {
   const node = findNode(nodeName);
-  const inputItem = { json: structuredClone(response) };
-  const sourceItem = { json: structuredClone(source) };
+  const inputItem = { json: structuredClone(attemptEnvelope) };
   const context = vm.createContext({
     console,
     structuredClone,
@@ -273,14 +363,8 @@ async function runStrictValidator(nodeName, response, source) {
       first: () => inputItem,
       item: inputItem,
     },
-    $: (nodeNameLookup) => {
-      assert.equal(nodeNameLookup, NODES.prepare);
-      return {
-        all: () => [sourceItem],
-        first: () => sourceItem,
-        itemMatching: () => sourceItem,
-        item: sourceItem,
-      };
+    $: () => {
+      throw new Error('linked-item lookup is forbidden in Extractor classification');
     },
   });
   return new vm.Script(
@@ -335,14 +419,34 @@ test('execution 14359 recovery fixture is sanitized and independently preserves 
     contains_client_document_text: false,
     contains_full_execution_payload: false,
   });
+  assert.equal(
+    fixture.runtime_semantics_evidence.design_consequence,
+    'never_recover_source_with_item_or_itemMatching_after_error_output',
+  );
+  assert.deepEqual(
+    fixture.runtime_semantics_evidence.upstream_n8n_issues.map(({ issue }) => issue),
+    [12558, 30050],
+  );
+  assert.deepEqual(fixture.explicit_carry_contract, {
+    transport_errors: 'hard_stop',
+    http_error_outputs: 0,
+    regular_success_wrapper_fields: ['source', 'attempt', 'provider_response'],
+    contract_failure_output: 'typed_regular_decision',
+    fallback_prep_source: 'current_input_only',
+    merge_nodes: 0,
+  });
 });
 
-test('RED: graph serializes one primary plus at most one fallback and converges only on Loop done', () => {
+test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-done persistence path', () => {
   const loop = findNode(NODES.loop);
   const primaryHttp = findNode(NODES.primaryHttp);
   const primaryValidator = findNode(NODES.primaryValidator);
   const fallbackHttp = findNode(NODES.fallbackHttp);
   const fallbackValidator = findNode(NODES.fallbackValidator);
+  findNode(NODES.primaryWrapper);
+  findNode(NODES.fallbackWrapper);
+  findNode(NODES.primaryDecision);
+  findNode(NODES.recoveryBarrier);
 
   assert.equal(loop.type, 'n8n-nodes-base.splitInBatches');
   assert.equal(loop.typeVersion, 3);
@@ -352,32 +456,79 @@ test('RED: graph serializes one primary plus at most one fallback and converges 
   assert.deepEqual(outputsFrom(NODES.loop, 1), [{ node: NODES.primaryHttp, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.loop, 0), [{ node: NODES.recoveryBarrier, index: 0 }]);
 
-  assert.equal(primaryHttp.onError, 'continueErrorOutput');
-  assert.equal(primaryValidator.onError, 'continueErrorOutput');
-  assert.deepEqual(outputsFrom(NODES.primaryHttp, 0), [{ node: NODES.primaryValidator, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), [{ node: NODES.prepareFallback, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.primaryValidator, 0), [{ node: NODES.primaryAudit, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.primaryValidator, 1), [{ node: NODES.prepareFallback, index: 0 }]);
+  assert.notEqual(primaryHttp.onError, 'continueErrorOutput');
+  assert.notEqual(primaryValidator.onError, 'continueErrorOutput');
+  assert.deepEqual(outputsFrom(NODES.primaryHttp, 0), [{ node: NODES.primaryWrapper, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), []);
+  assert.deepEqual(outputsFrom(NODES.primaryWrapper), [{ node: NODES.primaryValidator, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.primaryDecision, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator, 1), []);
+  assert.deepEqual(outputsFrom(NODES.primaryDecision, 0), [{ node: NODES.primaryAudit, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryDecision, 1), [{ node: NODES.prepareFallback, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.prepareFallback), [{ node: NODES.fallbackHttp, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.fallbackHttp), [{ node: NODES.fallbackValidator, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.fallbackHttp), [{ node: NODES.fallbackWrapper, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.fallbackHttp, 1), []);
+  assert.deepEqual(outputsFrom(NODES.fallbackWrapper), [{ node: NODES.fallbackValidator, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.fallbackValidator), [{ node: NODES.fallbackAudit, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryAudit), [{ node: NODES.evidenceDecision, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.fallbackAudit), [{ node: NODES.evidenceDecision, index: 0 }]);
 
   assert.notEqual(fallbackHttp.onError, 'continueErrorOutput');
   assert.notEqual(fallbackValidator.onError, 'continueErrorOutput');
-  assert.deepEqual(outputsFrom(NODES.fallbackHttp, 1), []);
   assert.deepEqual(outputsFrom(NODES.fallbackValidator, 1), []);
   assert.equal(primaryHttp.retryOnFail, false);
   assert.notEqual(fallbackHttp.retryOnFail, true);
   assert.deepEqual(inboundTo(NODES.fallbackHttp), [
     { source: NODES.prepareFallback, outputIndex: 0, inputIndex: 0 },
   ]);
+  assert.deepEqual(outputsFrom(NODES.recoveryBarrier), [{ node: NODES.evidenceCollector, index: 0 }]);
+
+  const expectedLoopInbound = [
+    { source: NODES.prepare, outputIndex: 0, inputIndex: 0 },
+    { source: NODES.evidenceDecision, outputIndex: 0, inputIndex: 0 },
+    { source: NODES.evidenceRepairDecision, outputIndex: 0, inputIndex: 0 },
+    { source: NODES.factPartitionDecision, outputIndex: 0, inputIndex: 0 },
+  ].sort((left, right) => left.source.localeCompare(right.source));
+  assert.deepEqual(
+    inboundTo(NODES.loop).sort((left, right) => left.source.localeCompare(right.source)),
+    expectedLoopInbound,
+  );
+  for (const tail of [
+    NODES.evidenceDecision,
+    NODES.evidenceRepairDecision,
+    NODES.factPartitionDecision,
+  ]) {
+    assert.deepEqual(outputsFrom(tail, 0), [{ node: NODES.loop, index: 0 }]);
+  }
+  assert.equal(outputsFrom(NODES.primaryValidator).some(({ node }) => node === NODES.loop), false);
+  assert.deepEqual(outputsFrom(NODES.retryUnavailableStop), []);
+  assert.deepEqual(outputsFrom(NODES.evidenceFailedStop), []);
+
   assert.deepEqual(inboundTo(NODES.recoveryBarrier), [
     { source: NODES.loop, outputIndex: 0, inputIndex: 0 },
   ]);
-  assert.deepEqual(outputsFrom(NODES.recoveryBarrier), [{ node: NODES.evidenceCollector, index: 0 }]);
-  assert.equal(inboundTo(NODES.saveFacts).some(({ source }) => source === NODES.recoveryBarrier), false);
+  assert.deepEqual(inboundTo(NODES.evidenceCollector), [
+    { source: NODES.recoveryBarrier, outputIndex: 0, inputIndex: 0 },
+  ]);
+  assert.deepEqual(inboundTo(NODES.validatorDispatch), [
+    { source: NODES.evidenceCollector, outputIndex: 0, inputIndex: 0 },
+  ]);
+  const beforeDoneReachable = reachableNodes(outputsFrom(NODES.loop, 1), {
+    excludedOutput: (name, outputIndex) => name === NODES.loop && outputIndex === 0,
+  });
+  for (const forbidden of [
+    NODES.recoveryBarrier,
+    NODES.evidenceCollector,
+    NODES.validatorDispatch,
+    NODES.saveFacts,
+  ]) assert.equal(beforeDoneReachable.has(forbidden), false, `pre-done path reaches ${forbidden}`);
+  assert.deepEqual(
+    [...beforeDoneReachable]
+      .map((name) => findNode(name))
+      .filter(({ type }) => type === 'n8n-nodes-base.merge')
+      .map(({ name }) => name),
+    [],
+  );
 });
 
 test('RED: all-primary-valid 16/16 preserves cardinality and invokes no fallback path', async () => {
@@ -431,13 +582,31 @@ test('RED: a mixed batch falls back only for the invalid subset and retains sour
 test('RED: an invalid fallback response uses the same strict validator and hard-fails', async () => {
   const primaryValidator = findNode(NODES.primaryValidator);
   const fallbackValidator = findNode(NODES.fallbackValidator);
-  assert.equal(fallbackValidator.parameters.jsCode, primaryValidator.parameters.jsCode);
+  assert.match(primaryValidator.parameters.jsCode, /evidence_validator_v2/);
+  assert.match(fallbackValidator.parameters.jsCode, /evidence_validator_v2/);
   assert.notEqual(fallbackValidator.onError, 'continueErrorOutput');
 
   const unitId = 'sanitized_invalid_fallback';
   const source = buildStrictSource(unitId);
+  const invalidEnvelope = buildAttemptEnvelope(
+    source,
+    buildProviderResponse({ facts: [] }),
+  );
+  const primaryDecision = await runStrictClassifier(NODES.primaryValidator, invalidEnvelope);
+  assert.deepEqual(primaryDecision.json.extractor_recovery_decision, {
+    version: 'ai_extractor_primary_decision_v1',
+    analysis_unit_id: unitId,
+    decision: 'fallback_required',
+    primary_failure_class: 'contract',
+    primary_failure_code: 'invalid_field_catalog_version',
+  });
+  assert.deepEqual(primaryDecision.json.source, source);
+  assert.equal(JSON.stringify(primaryDecision).includes('choices'), false);
   await assert.rejects(
-    runStrictValidator(NODES.fallbackValidator, buildProviderResponse({ facts: [] }), source),
+    runStrictClassifier(
+      NODES.fallbackValidator,
+      buildAttemptEnvelope(source, buildProviderResponse({ facts: [] }), 'fallback'),
+    ),
     /field_catalog_version/,
   );
 });
@@ -465,32 +634,54 @@ test('RED: convergence rejects missing, duplicate, unknown, cardinality, and ord
   await assert.rejects(runRecoveryBarrier(missingId, ids), /missing.*analysis_unit_id/i);
 });
 
-test('RED: primary transport errors route once to fallback with bounded transport audit', async () => {
-  assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), [{ node: NODES.prepareFallback, index: 0 }]);
-  const id = 'sanitized_transport_failure';
+test('RED: successful primary response is explicitly carried and fallback prep rejects missing source', async () => {
+  assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), []);
+  const primaryHttp = findNode(NODES.primaryHttp);
+  assert.notEqual(primaryHttp.onError, 'continueErrorOutput');
+  const id = 'sanitized_explicit_source';
   const source = buildStrictSource(id);
-  const rawTransportMessage = 'sanitized provider body must not enter audit';
-  const prepared = await runPrepareFallback({ error: { message: rawTransportMessage } }, source);
+  const response = buildProviderResponse({ facts: [] });
+  const wrapped = await runResponseWrapper(
+    NODES.primaryWrapper,
+    response,
+    source,
+    NODES.prepare,
+  );
+  assert.deepEqual(wrapped.json, buildAttemptEnvelope(source, response));
+
+  const decision = await runStrictClassifier(NODES.primaryValidator, wrapped.json);
+  assert.equal(decision.json.extractor_recovery_decision.decision, 'fallback_required');
+  assert.deepEqual(decision.json.source, source);
+  const fallbackNode = findNode(NODES.prepareFallback);
+  assert.doesNotMatch(fallbackNode.parameters.jsCode, /\.item(?:Matching)?\b/);
+  await assert.rejects(
+    runPrepareFallback({
+      extractor_recovery_decision: decision.json.extractor_recovery_decision,
+    }),
+    /explicit source|source.*missing|source.*required/i,
+  );
+  const prepared = await runPrepareFallback(decision.json);
   assert.deepEqual(prepared.json.ai_request, source.ai_request);
   assert.deepEqual(prepared.json.extractor_recovery, {
     version: 'ai_extractor_recovery_context_v1',
     analysis_unit_id: id,
     primary_model: fixture.models.primary_alias,
     fallback_model: fixture.models.fallback_alias,
-    primary_failure_class: 'transport',
-    primary_failure_code: 'primary_transport_error',
+    primary_failure_class: 'contract',
+    primary_failure_code: 'invalid_field_catalog_version',
     next_attempt: 2,
   });
-  assert.equal(JSON.stringify(prepared).includes(rawTransportMessage), false);
+  assert.deepEqual(prepared.json.source, source);
+  assert.equal(JSON.stringify(prepared).includes('choices'), false);
 
   const unit = buildFinalUnit(id, 'fallback', {
-    failure_class: 'transport',
-    failure_code: 'primary_transport_error',
+    failure_class: 'contract',
+    failure_code: 'invalid_field_catalog_version',
   });
   const [output] = await runRecoveryBarrier([unit], [id]);
   assert.deepEqual(output.json.extractor.attempt_audit, buildAudit(id, 'fallback', {
-    failure_class: 'transport',
-    failure_code: 'primary_transport_error',
+    failure_class: 'contract',
+    failure_code: 'invalid_field_catalog_version',
   }));
 });
 
@@ -504,18 +695,23 @@ test('RED: safe deterministic envelope attachment remains primary and cannot ent
     semantic_block_id,
     quote,
   }));
-  const output = await runStrictValidator(NODES.primaryValidator, buildProviderResponse({
-    field_catalog_version: 'tender_fields_v1',
-    analysis_unit_id: unitId,
-    facts: [strictFact],
-  }), source);
+  const output = await runStrictClassifier(
+    NODES.primaryValidator,
+    buildAttemptEnvelope(source, buildProviderResponse({
+      field_catalog_version: 'tender_fields_v1',
+      analysis_unit_id: unitId,
+      facts: [strictFact],
+    })),
+  );
 
-  assert.equal(output.json.validation_passed, true);
+  assert.equal(output.json.extractor_recovery_decision.decision, 'accepted');
+  assert.equal(output.json.validated_unit.validation_passed, true);
   assert.deepEqual(
-    output.json.extractor.envelope_attachment.repair_reasons,
+    output.json.validated_unit.extractor.envelope_attachment.repair_reasons,
     ['missing_schema_version'],
   );
-  assert.deepEqual(outputsFrom(NODES.primaryValidator, 0), [{ node: NODES.primaryAudit, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.primaryDecision, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryDecision, 0), [{ node: NODES.primaryAudit, index: 0 }]);
   assert.equal(outputsFrom(NODES.primaryAudit).some(({ node }) => node === NODES.prepareFallback), false);
 });
 
@@ -531,6 +727,36 @@ test('RED: fallback request is the approved alias on the same provider and audit
   assert.match(fallbackHttp.parameters.jsonBody, /max_tokens\s*:\s*16384/);
 
   const id = 'sanitized_audit_projection';
+  const source = buildStrictSource(id);
+  const strictFact = buildFact(id);
+  delete strictFact.fact_index;
+  strictFact.evidence = strictFact.evidence.map(({ semantic_block_id, quote }) => ({
+    semantic_block_id,
+    quote,
+  }));
+  const fallbackResponse = buildProviderResponse({
+    schema_version: 'ai_extractor_v1',
+    field_catalog_version: 'tender_fields_v1',
+    analysis_unit_id: id,
+    facts: [strictFact],
+  });
+  const wrappedFallback = await runResponseWrapper(
+    NODES.fallbackWrapper,
+    fallbackResponse,
+    { source, ai_request: source.ai_request },
+    NODES.prepareFallback,
+  );
+  assert.deepEqual(
+    wrappedFallback.json,
+    buildAttemptEnvelope(source, fallbackResponse, 'fallback'),
+  );
+  const strictFallback = await runStrictClassifier(
+    NODES.fallbackValidator,
+    wrappedFallback.json,
+  );
+  assert.equal(strictFallback.json.validation_passed, true);
+  assert.equal(strictFallback.json.analysis_unit_meta.analysis_unit_id, id);
+
   const unit = buildFinalUnit(id, 'fallback', {
     failure_class: 'contract',
     failure_code: 'invalid_evidence_contract',

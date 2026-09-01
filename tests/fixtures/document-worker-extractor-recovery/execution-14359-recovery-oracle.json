@@ -6,6 +6,36 @@
     "contains_client_document_text": false,
     "contains_full_execution_payload": false
   },
+  "runtime_semantics_evidence": {
+    "official_local_docs": [
+      "integrations/builtin/core-nodes/n8n-nodes-base.httprequest/README.md",
+      "build/understand-workflows/workflow-components/work-with-nodes.md",
+      "build/work-with-data/reference-data/reference-previous-nodes.md",
+      "build/work-with-data/reference-data/link-data-items/item-linking-errors.md",
+      "integrations/builtin/core-nodes/n8n-nodes-base.splitinbatches.md"
+    ],
+    "upstream_n8n_issues": [
+      {
+        "issue": 12558,
+        "status_observed": "closed_not_planned",
+        "finding": "continue_error_output_can_lose_paired_item_lineage"
+      },
+      {
+        "issue": 30050,
+        "status_observed": "open_2026_09_01",
+        "finding": "paired_item_unavailable_on_continue_error_output"
+      }
+    ],
+    "design_consequence": "never_recover_source_with_item_or_itemMatching_after_error_output"
+  },
+  "explicit_carry_contract": {
+    "transport_errors": "hard_stop",
+    "http_error_outputs": 0,
+    "regular_success_wrapper_fields": ["source", "attempt", "provider_response"],
+    "contract_failure_output": "typed_regular_decision",
+    "fallback_prep_source": "current_input_only",
+    "merge_nodes": 0
+  },
   "source_execution": {
     "execution_id": "14359",
     "response_count": 16,
