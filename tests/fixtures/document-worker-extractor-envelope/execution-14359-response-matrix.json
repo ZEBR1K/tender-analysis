@@ -1,0 +1,86 @@
+{
+  "fixture_version": "execution_14359_extractor_envelope_matrix_v1",
+  "sanitization": {
+    "contains_model_reasoning": false,
+    "contains_provider_content": false,
+    "contains_client_document_text": false,
+    "contains_full_execution_payload": false,
+    "content_is_represented_by_sha256_and_structural_counts_only": true
+  },
+  "source_execution": {
+    "execution_id": "14359",
+    "workflow_id": "pDTFwbq6B19qNAVI",
+    "workflow_version_id": "a7d04a95-a7d4-4098-aaa9-4a5955920f7b",
+    "workflow_name": "[DW-18 TEST] TENDER — Обработать документ",
+    "status": "error",
+    "response_count": 16,
+    "first_rejecting_node": "Проверить и привязать evidence",
+    "first_reject_signature": "[Evidence validator] Неверный schema_version. [line 39]"
+  },
+  "request_contract_comparison": {
+    "classification": "model_contract_noncompliance_not_prompt_or_request_drift",
+    "shared_request_json_body_sha256": "7d6f2c01a1dc0376d2a41e13939b2cd10d12d3380c93dd409d0b27e1ee64d6fd",
+    "shared_system_prompt_sha256": "91392595979e27c0e1c869fa507e7649d7e5e84a0ec617e63cb184775ccb45b3",
+    "shared_response_schema_sha256": "d8a5d702772e2752411efed9c6dd7af3f3cb0d6e14b515dc0ec9f7316621119d",
+    "prompt_version": "tender_extractor_prompt_v2",
+    "schema_version_requested": "ai_extractor_v1",
+    "field_catalog_version_requested": "tender_fields_v1",
+    "response_model": "z-ai/glm-5.3-flash",
+    "response_provider": "openrouter",
+    "known_good_controls": [
+      {
+        "execution_id": "14117",
+        "workflow_version_id": "5229b324-d1d1-4603-ae10-9ff4cd063559",
+        "full_contract_responses": 16
+      },
+      {
+        "execution_id": "14119",
+        "workflow_version_id": "8d49ab5e-c65c-4cd8-b814-10235f04ee8d",
+        "full_contract_responses": 16
+      }
+    ],
+    "execution_14359_full_contract_responses": 0
+  },
+  "observed_totals": {
+    "json_parseable": 16,
+    "finish_reason_stop": 16,
+    "missing_schema_version": 15,
+    "missing_field_catalog_version": 16,
+    "missing_analysis_unit_id": 12,
+    "reported_matching_analysis_unit_id": 4,
+    "reported_conflicting_analysis_unit_id": 0,
+    "facts_array": 16,
+    "empty_facts": 6,
+    "nonempty_incompatible_facts": 10,
+    "safely_recoverable_under_stage_2_boundary": 0
+  },
+  "response_classification_defaults": {
+    "json_parseable": true,
+    "finish_reason": "stop",
+    "facts_type": "array",
+    "first_rejecting_node": "Проверить и привязать evidence"
+  },
+  "facts_shape_classification": {
+    "strictly_valid_empty_fact_ordinals": [1, 2, 3, 10, 12, 13],
+    "incompatible_nonempty_fact_ordinals": [4, 5, 6, 7, 8, 9, 11, 14, 15, 16],
+    "exact_fact_key_shape_but_invalid_semantics_ordinals": [16]
+  },
+  "responses": [
+    { "ordinal": 1, "upstream_analysis_unit_id": "doc_3_au_0001", "content_sha256": "669cee2aff9f78fbd03c6bc83409c30a4da6c144d6885f0ca3de9704b4362de6", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 2, "upstream_analysis_unit_id": "doc_3_au_0002", "content_sha256": "669cee2aff9f78fbd03c6bc83409c30a4da6c144d6885f0ca3de9704b4362de6", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 3, "upstream_analysis_unit_id": "doc_3_au_0003", "content_sha256": "669cee2aff9f78fbd03c6bc83409c30a4da6c144d6885f0ca3de9704b4362de6", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 4, "upstream_analysis_unit_id": "doc_3_au_0004", "content_sha256": "095ec62efbdc00a4a107da938cd5a9bdaaba5f6f019ed8009a245c69b995918d", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 5, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 5, "upstream_analysis_unit_id": "doc_3_au_0005", "content_sha256": "cfd2b6420782ea80b46d1fdb2e979238d209db3c2915d6b7debd8f400fe85015", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 4, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 6, "upstream_analysis_unit_id": "doc_3_au_0006", "content_sha256": "03056e1cf9b6ae2b62b230615c433f5f64abd62ce643779d30670168962353b5", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 3, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 7, "upstream_analysis_unit_id": "doc_3_au_0007", "content_sha256": "f84a4aa1297eca68cc5be23b85c4f49f98f9c017ea4ada9744649a03118016d7", "top_level_keys": ["analysis_unit_id", "facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": "doc_3_au_0007", "fact_count": 7, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 8, "upstream_analysis_unit_id": "doc_3_au_0008", "content_sha256": "d7cf7226cddb40d3a9f43922aaca3923d23c74d7a86b906724166feb32a39acc", "top_level_keys": ["facts", "schema_version"], "schema_version_actual": "ai_extractor_v1", "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 3, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный field_catalog_version." },
+    { "ordinal": 9, "upstream_analysis_unit_id": "doc_3_au_0009", "content_sha256": "3875b0f76a14a19b7052e95ab78f5bd0624058cff60f1a5b60c4f22b085c666c", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 1, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 2, "exact_grounded_evidence_count": 1, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 10, "upstream_analysis_unit_id": "doc_3_au_0010", "content_sha256": "78e6af024d3ae379935546b5d76e46ef8e45d58de16e8ca6bc60336d34f40aa3", "top_level_keys": ["analysis_unit_id", "facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": "doc_3_au_0010", "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 11, "upstream_analysis_unit_id": "doc_3_au_0011", "content_sha256": "be829a9a861bbb52cead84b40e6742aa2ce3363f4e56270f0d588dab6ecec06b", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 6, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 12, "upstream_analysis_unit_id": "doc_3_au_0012", "content_sha256": "669cee2aff9f78fbd03c6bc83409c30a4da6c144d6885f0ca3de9704b4362de6", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 13, "upstream_analysis_unit_id": "doc_3_au_0013", "content_sha256": "da67822f5d75bcdd0900d8069ba70328b9e22095ae5d58db0891883c73020c87", "top_level_keys": ["analysis_unit_id", "facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": "doc_3_au_0013", "fact_count": 0, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": true, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 14, "upstream_analysis_unit_id": "doc_3_au_0014", "content_sha256": "50c109ff02d068993dfdfd1a98357a77ee6c08f4689f064fd3013ada20f7a74a", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 2, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 8, "exact_grounded_evidence_count": 8, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 15, "upstream_analysis_unit_id": "doc_3_au_0015", "content_sha256": "de7d440d68b3ef16acc3e311047e5c6062c6468d5206880e7ea49b66d41eaa4a", "top_level_keys": ["facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": null, "fact_count": 42, "strict_fact_count": 0, "canonical_field_key_count": 0, "evidence_count": 0, "exact_grounded_evidence_count": 0, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." },
+    { "ordinal": 16, "upstream_analysis_unit_id": "doc_3_au_0016", "content_sha256": "14205a3ad3aaf1d6edcc68dd17c63f890f7c0713e75b45457aed97fcf7e7b42a", "top_level_keys": ["analysis_unit_id", "facts"], "schema_version_actual": null, "field_catalog_version_actual": null, "analysis_unit_id_actual": "doc_3_au_0016", "fact_count": 1, "strict_fact_count": 1, "canonical_field_key_count": 0, "evidence_count": 2, "exact_grounded_evidence_count": 1, "semantic_payload_valid": false, "safely_recoverable": false, "independent_first_reject_signature": "Неверный schema_version." }
+  ]
+}
