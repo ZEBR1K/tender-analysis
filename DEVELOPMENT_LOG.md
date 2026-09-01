@@ -5414,3 +5414,15 @@ Minimal GREEN `b0255d1` изменил только helper source projection н�
 Fallback runtime gap остаётся: execution `14362` дал `0` Gemini calls. Предлагаемый следующий canary, ещё не реализованный: temporary post-wrapper node заменяет `provider_response` ровно для первого ordered ID из `Подготовить запрос для AI` на checked-in sanitized execution-14359 case `{ facts: [] }`, где отсутствует `field_catalog_version`. Остальные primary envelopes проходят неизменными. Strict primary validator должен детерминированно выдать один `invalid_field_catalog_version`, real fallback HTTP выполняется ровно один раз, strict fallback validator и bounded attempt audit остаются production-identical. Тот же post-materialization expected-ID source, DB isolation, barrier-only summary и rollback сохраняются; conservative cap для максимум `16` units — `16 primary + 1 fallback + 16 evidence retry = 33` calls. Это не stochastic GLM failure и не изменение production logic.
 
 Draft `50f43b3d-…`, published workflow, pinData, credentials и PostgreSQL не изменялись; execution и paid AI не запускались. Stage 4 не начинался.
+
+---
+
+## 2026-09-01 — Exactly-one fallback canary 14363 blocked by temporary Code sandbox incompatibility
+
+Offline deterministic injector contract был зафиксирован commits `921576b` / `73a93ce`: first ID берётся из post-materialization `Подготовить запрос для AI`, wrapper/source/order проверяются fail-closed, меняется только target `provider_response`, а actual canonical primary classifier должен выдавать `invalid_field_catalog_version`. Canonical Worker не менялся.
+
+Temporary draft `b96333fa-…` прошёл read-back safety gate: `75` nodes / `70` connection sources, `58` reachable nodes, только pinned claim среди PostgreSQL, zero path к collector/Validator/persistence/Aggregator, barrier-only summary, pin SHA/13 credential refs/published `a7d04a95-…` unchanged. Approved paid-call cap был `<=33`.
+
+Выполнен ровно один manual execution `14363`. Corrected `$input.item`, DOCX OOXML/Docling path и Normalizer прошли; подготовлено `12` ordered unique units. Normalizer снова дал semantic `unknown`, `33` warning groups и expected target ActiveX bindings. Один primary GLM call и primary wrapper завершились. Первый incorrect node — temporary `[CANARY] Inject one invalid primary envelope`: installed Code sandbox hard-stop `structuredClone is not defined [line 46]`. Strict classifier, fallback, evidence retry/partition, Loop done, barrier и summary не запускались. No patch/retry/second run.
+
+Pinned claim output exact совпал с execution pin; все non-pinned PostgreSQL nodes имели run count `0`, DB writes `0`. Restore создал draft `a62a7f29-…`, exact equal corrected rollback `50f43b3d/0800032b`: `71/68`, no CANARY nodes, `$input.item`, pin SHA, credential refs и published version unchanged. Runtime fallback gate остаётся pending; Stage 4 не начинался. Sanitized audit: `evaluations/DOCUMENT_WORKER_EXACTLY_ONE_FALLBACK_CANARY_14363_2026-09-01.md`.
