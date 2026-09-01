@@ -132,6 +132,14 @@ Implementation chain: RED `dff07a9`, safe-attachment GREEN `507e12e`, recovery R
 
 Временный draft восстановлен из `3016111f-…` в `b8a06968-…`; exact nodes/connections/nodeGroups равны, итог `71/68`, `[CANARY]` nodes отсутствуют, pin-data SHA-256/credentials/published `a7d04a95-…` неизменны. Stage 2 runtime gate всё ещё открыт. Sanitized audit: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14361_2026-09-01.md`.
 
+### Post-fix recovery canary 14362 — Loop complete, temporary barrier rejected
+
+Approved local `$input.item` fix был синхронизирован только в isolated test draft и runtime прошёл прежний hard-stop: DOCX archive alias, OOXML parser, Docling normalization и подготовка units завершились. Execution `14362` обработал `12` units: `12/12` strict primary GLM decisions accepted, Gemini fallback `0`, Evidence Repair `5`, partition `0`, всего `17` paid calls при cap `<=48`. Loop выполнил `12` batches и done-run; non-pinned PostgreSQL nodes не исполнялись, DB writes `0`.
+
+Первый incorrect node — временная canary-версия `Проверить полноту Extractor recovery`. Barrier искал `analysis_unit_meta.analysis_unit_id` в `[CANARY] Bypass analysis-unit persistence`, но bypass сохраняет pre-preparation shape с `analysis_unit`; все `12` unique IDs материализуются только следующей `Подготовить запрос для AI`. Hard-stop произошёл до bounded summary, Validator и persistence. Это canary-harness expected-ID source defect, не model-contract failure; live patch/retry/second run не выполнялись.
+
+Normalizer runtime сохранил fail-closed `docx_option_state_semantic_status=unknown`, `33` warning groups и exact target bindings activeX5/6/7/8 → `#/tables/2`, activeX55/56 → `#/tables/25`. Final guarded-field behavior не доказан, потому что Validator/persistence были недостижимы. Draft восстановлен в `50f43b3d-…`, exact равный corrected rollback `0800032b-…`: `71/68`, no `[CANARY]`, `$input.item` сохранён, pin/credentials/published неизменны. Sanitized audit: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14362_2026-09-01.md`.
+
 Текущий `[PROD CANDIDATE]` Worker является отдельным live test contour и не равен ни `[3 TEST]`, ни canonical repository export. Перед исправлением `DW-17` или `DW-18` нужно сначала получить exact active/draft diff `c5977af5-… → 778dfb50-…` и определить назначение draft-only 52-й ноды; молчаливо редактировать draft как эквивалент execution `14234` нельзя.
 
 ### Runtime evidence
@@ -531,7 +539,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - post-fix runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; executions `14350–14352` являются pre-fix diagnostic evidence, а не GREEN canary;
 - post-fix runtime verification bounded Extractor fallback: execution `14359` остаётся `0/16` safely attachable по primary evidence, а local GREEN `58556f6` ещё не доказывает успешный Gemini fallback, exact batch convergence или отсутствие partial persistence в n8n runtime;
 - isolated execution `14360` не закрыл этот gate: canary harness остановился до AI на missing paired-item ancestry в `Связать метаданные и файл`; следующий run допустим только после отдельного reviewed source-carry design, который не зависит от `.item` к pinned-but-unexecuted claim node;
-- corrected pinned-claim execution `14361` закрыл item-linking diagnosis и выявил следующий hard-stop в `Подготовить DOCX archive alias`; local execution-derived TDD fix `bdba85e` / `a4c3853` GREEN, но test draft не обновлялся и новый runtime canary ещё не выполнялся;
+- corrected pinned-claim execution `14361` выявил hard-stop в `Подготовить DOCX archive alias`, а execution `14362` подтвердил `$input.item` fix и завершение `12` recovery loop items, но temporary completeness barrier hard-stop на неверном expected-ID source; новый run допустим только после отдельного reviewed/TDD canary identity-source contract;
 - reproducible sanitized full-payload replay для semantic binding execution `14359`: checked-in regression намеренно сокращён до `6` controls и `4` meaningful tables, хотя отдельно хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен воспроизводимый sanitized full-payload replay либо точное переименование fixture/replay contract, исключающее впечатление полного replay;
 - published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;

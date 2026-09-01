@@ -5388,3 +5388,17 @@ secret/client-DOCX scans: PASS
 ```
 
 Test workflow draft `pDTFwbq6B19qNAVI@b8a06968-…`, published workflow, pinData, credentials и PostgreSQL не изменялись. Новый execution и paid AI не запускались. Поэтому local GREEN не является runtime GREEN; следующий canary требует отдельного review и явного обновления isolated test draft.
+
+---
+
+## 2026-09-01 — Recovery canary 14362: archive fix confirmed, temporary barrier rejected
+
+Approved one-line archive fix был синхронизирован в isolated test Worker как draft `0800032b-…`; read-back подтвердил единственную изменённую ноду, сохранённые graph/pin/credentials и неизменный published `a7d04a95-…`. Temporary corrected contour `a175b809-…` повторил reviewed pinned-claim ancestry и DB isolation: `57` reachable nodes, только pinned claim среди PostgreSQL, zero path к collector/Validator/persistence/Aggregator, paid cap `<=48`.
+
+Единственный manual execution `14362` прошёл `Подготовить DOCX archive alias` с `$input.item`, OOXML parser и normalizer. Runtime создал `12` ordered unique units (`au_0001…au_0012`), не исторические `16`. Все `12` primary GLM payloads strict-accepted, fallback `0`; `7` units прошли evidence validation напрямую, `5` прошли один Evidence Repair, partition `0`. Итого `17` paid calls. Loop завершил `12` batches и done-run.
+
+Первый incorrect node — temporary `Проверить полноту Extractor recovery`: canary barrier ожидал `analysis_unit_meta.analysis_unit_id` из bypass до `Подготовить запрос для AI`, тогда как bypass items имеют только pre-preparation `analysis_unit`. Все `12` IDs появились в следующей prepare node. Barrier hard-stop до summary/Validator/persistence; live patch, retry и второй execution не выполнялись.
+
+Pinned claim output exact совпал с сохранённым pin; единственный Postgres-type run был pin-substituted claim, все non-pinned PostgreSQL run counts `0`, DB writes `0`. Normalizer сохранил semantic fail-closed state `unknown`, `33` warning groups и target ActiveX bindings; final guarded-field contract остался непроверенным из-за intentionally unreachable Validator.
+
+Restore создал draft `50f43b3d-…`, exact равный corrected rollback `0800032b-…`: `71` nodes / `68` connection sources, no `[CANARY]`, `$input.item` сохранён, pin SHA/credentials/published неизменны. Полный sanitized audit: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14362_2026-09-01.md`. Stage 4 не начинался.
