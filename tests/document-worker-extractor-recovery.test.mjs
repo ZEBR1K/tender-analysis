@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { injectExactlyOneFallbackEnvelope } from './helpers/document-worker-canary-fallback-injector.mjs';
 
 /*
  * Runtime design evidence (metadata-only; no issue payload is checked in):
@@ -41,10 +42,19 @@ const envelopeFixturePath = path.join(
   'document-worker-extractor-envelope',
   'execution-14359-response-matrix.json',
 );
+const fallbackInjectorFixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-extractor-recovery',
+  'exactly-one-fallback-injector.json',
+);
 
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(recoveryFixturePath, 'utf8'));
 const envelopeFixture = JSON.parse(fs.readFileSync(envelopeFixturePath, 'utf8'));
+const fallbackInjectorFixture = JSON.parse(
+  fs.readFileSync(fallbackInjectorFixturePath, 'utf8'),
+);
 
 const NODES = {
   prepare: 'Подготовить запрос для AI',
@@ -757,6 +767,126 @@ test('RED: a mixed batch falls back only for the invalid subset and retains sour
     output.map(({ json }) => json.extractor.attempt_audit.attempt_count),
     [1, 2, 1, 2],
   );
+});
+
+test('RED: temporary canary injector mutates exactly the first validated wrapper and canonical validation forces one fallback', async () => {
+  const ids = [
+    'sanitized_injector_unit_alpha',
+    'sanitized_injector_unit_beta',
+    'sanitized_injector_unit_gamma',
+    'sanitized_injector_unit_delta',
+  ];
+  const postMaterializationItems = ids.map((analysisUnitId) => ({
+    json: { analysis_unit_meta: { analysis_unit_id: analysisUnitId } },
+  }));
+  const wrappedItems = ids.map((analysisUnitId, index) => {
+    const source = buildStrictSource(analysisUnitId);
+    return {
+      json: buildAttemptEnvelope(
+        source,
+        buildProviderResponse(buildStrictProviderPayload(analysisUnitId)),
+      ),
+      pairedItem: { item: index },
+    };
+  });
+  const originalSnapshots = structuredClone(wrappedItems);
+  const replacementProviderResponse = buildProviderResponse(
+    fallbackInjectorFixture.replacement_provider_payload,
+  );
+
+  const cost = fallbackInjectorFixture.cost_bound;
+  assert.equal(
+    (cost.max_source_units * cost.primary_calls_per_source_unit)
+      + cost.forced_fallback_calls
+      + cost.max_mutually_exclusive_evidence_retry_calls,
+    cost.max_total_paid_calls,
+  );
+  assert.equal(cost.max_total_paid_calls, 33);
+  assert.deepEqual(fallbackInjectorFixture.future_canary_unreachable_nodes, [
+    NODES.validatorDispatch,
+    NODES.saveFacts,
+    "Call 'TENDER — Агрегация закупки'",
+  ]);
+
+  const injected = injectExactlyOneFallbackEnvelope({
+    wrappedItems,
+    postMaterializationItems,
+    replacementProviderResponse,
+  });
+  const mutationIndexes = injected.flatMap((item, index) => (
+    JSON.stringify(item.json.attempt_transport.provider_response)
+      === JSON.stringify(originalSnapshots[index].json.attempt_transport.provider_response)
+      ? []
+      : [index]
+  ));
+  assert.deepEqual(
+    mutationIndexes,
+    [0],
+    'the absent temporary injector must be RED until exactly one wrapper is mutated',
+  );
+
+  const expectedTarget = structuredClone(originalSnapshots[0]);
+  expectedTarget.json.attempt_transport.provider_response = replacementProviderResponse;
+  assert.deepEqual(injected[0], expectedTarget);
+  assert.equal(
+    injected[0].json.attempt_transport.analysis_unit_id,
+    postMaterializationItems[0].json.analysis_unit_meta.analysis_unit_id,
+  );
+  assert.deepEqual(
+    injected[0].json.attempt_transport.source,
+    originalSnapshots[0].json.attempt_transport.source,
+  );
+  for (let index = 1; index < wrappedItems.length; index += 1) {
+    assert.strictEqual(injected[index], wrappedItems[index], `non-target ${index} identity`);
+    assert.equal(JSON.stringify(injected[index]), JSON.stringify(originalSnapshots[index]));
+  }
+
+  const forcedDecision = await runStrictClassifier(NODES.primaryValidator, injected[0].json);
+  assert.equal(
+    forcedDecision.json.extractor_recovery_decision.decision,
+    fallbackInjectorFixture.expected_primary_decision,
+  );
+  assert.equal(
+    forcedDecision.json.extractor_recovery_decision.primary_failure_class,
+    fallbackInjectorFixture.expected_primary_failure_class,
+  );
+  assert.equal(
+    forcedDecision.json.extractor_recovery_decision.primary_failure_code,
+    fallbackInjectorFixture.expected_primary_failure_code,
+  );
+  for (const control of injected.slice(1)) {
+    const decision = await runStrictClassifier(NODES.primaryValidator, control.json);
+    assert.equal(decision.json.extractor_recovery_decision.decision, 'accepted');
+  }
+
+  assert.throws(() => injectExactlyOneFallbackEnvelope({
+    wrappedItems,
+    postMaterializationItems: [],
+    replacementProviderResponse,
+  }), /target|empty|item/i);
+  assert.throws(() => injectExactlyOneFallbackEnvelope({
+    wrappedItems,
+    postMaterializationItems: [{ json: { analysis_unit_meta: {} } }],
+    replacementProviderResponse,
+  }), /missing analysis_unit_id/i);
+  assert.throws(() => injectExactlyOneFallbackEnvelope({
+    wrappedItems,
+    postMaterializationItems: [
+      postMaterializationItems[0],
+      postMaterializationItems[0],
+    ],
+    replacementProviderResponse,
+  }), /duplicate analysis_unit_id/i);
+  assert.throws(() => injectExactlyOneFallbackEnvelope({
+    wrappedItems: [wrappedItems[1], wrappedItems[0], ...wrappedItems.slice(2)],
+    postMaterializationItems,
+    replacementProviderResponse,
+  }), /order|identity|analysis_unit_id/i);
+  assert.throws(() => injectExactlyOneFallbackEnvelope({
+    wrappedItems: wrappedItems.slice(1),
+    postMaterializationItems,
+    replacementProviderResponse,
+  }), /cardinality|target/i);
 });
 
 test('RED: primary and fallback share one strict validator body and defect corpus', async () => {

@@ -1,0 +1,32 @@
+{
+  "contract_version": "document_worker_exactly_one_fallback_injector_v1",
+  "selection": {
+    "source_node": "Подготовить запрос для AI",
+    "strategy": "first_validated_ordered_analysis_unit_id",
+    "required_target_count": 1
+  },
+  "replacement_provider_payload": {
+    "facts": []
+  },
+  "expected_primary_decision": "fallback_required",
+  "expected_primary_failure_class": "contract",
+  "expected_primary_failure_code": "invalid_field_catalog_version",
+  "cost_bound": {
+    "max_source_units": 16,
+    "primary_calls_per_source_unit": 1,
+    "forced_fallback_calls": 1,
+    "max_mutually_exclusive_evidence_retry_calls": 16,
+    "max_total_paid_calls": 33
+  },
+  "future_canary_unreachable_nodes": [
+    "Подготовить dispatch AI Validator",
+    "Сохранить факты документа",
+    "Call 'TENDER — Агрегация закупки'"
+  ],
+  "sanitization": {
+    "contains_client_text": false,
+    "contains_provider_content": false,
+    "contains_credentials": false,
+    "contains_concrete_analysis_unit_id": false
+  }
+}
