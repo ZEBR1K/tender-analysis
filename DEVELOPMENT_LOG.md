@@ -5402,3 +5402,15 @@ Approved one-line archive fix был синхронизирован в isolated 
 Pinned claim output exact совпал с сохранённым pin; единственный Postgres-type run был pin-substituted claim, все non-pinned PostgreSQL run counts `0`, DB writes `0`. Normalizer сохранил semantic fail-closed state `unknown`, `33` warning groups и target ActiveX bindings; final guarded-field contract остался непроверенным из-за intentionally unreachable Validator.
 
 Restore создал draft `50f43b3d-…`, exact равный corrected rollback `0800032b-…`: `71` nodes / `68` connection sources, no `[CANARY]`, `$input.item` сохранён, pin SHA/credentials/published неизменны. Полный sanitized audit: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14362_2026-09-01.md`. Stage 4 не начинался.
+
+---
+
+## 2026-09-01 — Canary barrier expected-ID source offline TDD
+
+Execution-derived RED `b7b5987` добавил sanitized `12`-item fixture и side-effect-free temporary-canary helper. RED `3 total / 2 pass / 1 intended fail` точно воспроизвёл ошибочный source: `[CANARY] Bypass analysis-unit persistence` вместо post-materialization `Подготовить запрос для AI`. Missing/duplicate ID guards и order/cardinality assertions уже были GREEN.
+
+Minimal GREEN `b0255d1` изменил только helper source projection на `postMaterializationItems`; production Worker JSON не менялся. Verification: focused `3/3`, Extractor recovery+envelope `26/26`, all Worker `206/204` с двумя известными baseline failures, full `374/368` с exact six baseline failures.
+
+Fallback runtime gap остаётся: execution `14362` дал `0` Gemini calls. Предлагаемый следующий canary, ещё не реализованный: temporary post-wrapper node заменяет `provider_response` ровно для первого ordered ID из `Подготовить запрос для AI` на checked-in sanitized execution-14359 case `{ facts: [] }`, где отсутствует `field_catalog_version`. Остальные primary envelopes проходят неизменными. Strict primary validator должен детерминированно выдать один `invalid_field_catalog_version`, real fallback HTTP выполняется ровно один раз, strict fallback validator и bounded attempt audit остаются production-identical. Тот же post-materialization expected-ID source, DB isolation, barrier-only summary и rollback сохраняются; conservative cap для максимум `16` units — `16 primary + 1 fallback + 16 evidence retry = 33` calls. Это не stochastic GLM failure и не изменение production logic.
+
+Draft `50f43b3d-…`, published workflow, pinData, credentials и PostgreSQL не изменялись; execution и paid AI не запускались. Stage 4 не начинался.
