@@ -5296,3 +5296,51 @@ Targeted Recheck prompt aligns evidence coordinates with both trusted sources
 ```
 
 Неблокирующий promotion debt: checked-in semantic-binding fixture replay сокращён до `6` controls и `4` meaningful tables, хотя metadata точно разделяет observed raw/downstream cardinalities: `290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks. Перед promotion нужен reproducible sanitized full-payload replay либо точное переименование fixture/replay contract. Post-fix production runtime canary остаётся pending.
+
+---
+
+## 2026-09-01 — Document Worker Stage 2 Extractor envelope recovery local GREEN
+
+Read-only diagnosis execution `14359` классифицировал все `16` primary GLM responses: transport завершился успешно, но deterministic envelope attachment был безопасен для `0/16`. Каждый response нарушал обязательный exact `field_catalog_version`; часть одновременно не сообщала `schema_version` и/или `analysis_unit_id`. Exact request body, system prompt, response contract и workflow version совпали с canonical и known-good controls. Root cause — model contract noncompliance, не prompt/version drift.
+
+TDD checkpoints:
+
+```text
+dff07a9 test: diagnose Extractor envelope noncompliance
+507e12e fix: attach only safe missing schema/identity envelopes
+581ed5c test: define bounded Extractor fallback recovery
+e690528 test: require explicit source carry without error-output pairing
+78935b8 test: hard-stop settings, exact IF, shared parity and done barrier
+58556f6 feat: implement one bounded Gemini fallback recovery
+```
+
+Safe deterministic attachment остаётся разрешён только для отсутствующего `schema_version` и/или `analysis_unit_id`, если root allow-list, `field_catalog_version`, unique explicit source identity и весь facts/evidence contract точны. Wrong schema, conflicting reported ID, missing catalog, alias/extra keys и invalid facts/evidence не coerc-ятся.
+
+Для genuinely invalid primary model payload canonical Worker вызывает максимум один Gemini 3.7 Flash low fallback с original prompts/response contract и той же credential family. Primary и fallback используют byte-identical `ai_extractor_strict_validator_v3`; invalid fallback hard-stops document. HTTP transport/internal/source failures также hard-stop и не используют error outputs. Accepted primary items fallback не вызывают.
+
+Existing Loop перенесён перед primary HTTP: output 1 обрабатывает один unit, а output 0 ведёт только в новый completeness barrier. Successful primary/fallback audit затем проходит прежние evidence validation/repair/fact-partition tails и возвращается в Loop ровно один раз. Barrier до collector/Validator/persistence проверяет exact cardinality, unique identities, deterministic source order и bounded attempt audit; partial batch не сохраняется. Merge не добавлен.
+
+Self-review TDD выявил omission первоначального RED contract: fallback audit использовал positional `.first()` и мог взять context другой Loop iteration. Дополнительный focused RED: `23 total / 22 pass / 1 intended fail`. GREEN переносит exact seven-field `recovery_context` только через current input, валидирует allow-list/identity/model/failure/attempt вне semantic provider payload и удаляет context после materialization audit. Provider content и дополнительные context fields fail closed.
+
+Final verification:
+
+```text
+focused envelope + recovery: 23/23 PASS
+relevant Worker: 171 total / 170 pass / 1 accepted immutable-beta-hash failure
+full: 370 total / 364 pass / exact 6 accepted failures
+```
+
+Exact six failures не изменились: intentional procurement-subject current-scope gate; два Aggregator A/B report/hash gates; immutable Worker beta hash; Validator prompt CRLF/LF mismatch; Targeted Recheck coordinate prompt mismatch. JSON/Code syntax/graph checks, `git diff --check`, secret и client-document literal scans прошли.
+
+```text
+RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary
+RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit
+RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256
+immutable beta Worker snapshot retains its reviewed packaging hash
+v1.2 prompt artifact is an exact clean copy of the imported validator system prompt
+Targeted Recheck prompt aligns evidence coordinates with both trusted sources
+```
+
+Production n8n, PostgreSQL и credentials не изменялись; paid AI и push не выполнялись. Runtime canary остаётся pending, поэтому Stage 2 не является runtime complete и execution `14359` не объявляется исправленным в production.
+
+Неблокирующий audit debt: pre-existing `extractor.provider = deepseek` остаётся legacy полем, несмотря на GLM primary и Gemini fallback. Authoritative actual aliases и `primary|fallback` source записаны в bounded `extractor.attempt_audit`; отдельная versioned migration legacy field отложена.

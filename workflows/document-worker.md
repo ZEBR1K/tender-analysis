@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-29
+**Последнее обновление:** 2026-09-01
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -16,7 +16,7 @@
 
 > Production metadata выше относится к неизменённому live workflow `1Pw61ZY3HgBSvcUr`. Test/calibration workflow `2T7szFpiGcfNpKkB` сохранён локально как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical path содержит clean inactive offline production candidate с именем `TENDER — Обработать документ`, без top-level instance identity и test state. Candidate ещё не promoted/wired и не прошёл runtime canary; точная граница зафиксирована в `PROJECT_STATUS.md`.
 
-Beta snapshot и clean candidate используют GLM 5.3 Flash с `reasoning_effort=low` для Extractor и Gemini 3.7 Flash с `reasoning_effort=low` для Validator. Они содержат bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Extractor выбран как provisional baseline после model benchmark на одинаковых 16 pinned units; сводный отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`. Offline packaging/completeness tests GREEN; выбор модели и offline tests не доказывают full runtime behavior.
+Beta snapshot и clean candidate используют GLM 5.3 Flash с `reasoning_effort=low` для primary Extractor и Gemini 3.7 Flash с `reasoning_effort=low` для Validator. Canonical local candidate дополнительно использует Gemini 3.7 Flash low как максимум один Extractor fallback после typed primary contract failure. Он содержит bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Extractor выбран как provisional baseline после model benchmark на одинаковых 16 pinned units; сводный отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`. Offline packaging/completeness tests GREEN; выбор модели и offline tests не доказывают full runtime behavior.
 
 ---
 
@@ -134,8 +134,18 @@ When Executed by Another Workflow
       → Развернуть части для AI v1.2
       → Сохранить analysis unit
       → Подготовить запрос для AI
-      → AI Extractor v1.0
-      → Проверить и привязать evidence
+      → Обработать evidence units по одной (batchSize=1)
+         → AI Extractor v1.0 (primary GLM)
+         → explicit primary attempt envelope
+         → shared strict Extractor validator
+            ├─ accepted → primary attempt audit
+            └─ typed fallback_required → AI Extractor fallback v1.0 (Gemini, max 1)
+               → explicit fallback attempt envelope
+               → тот же strict Extractor validator
+               → fallback attempt audit
+         → существующие evidence repair / fact partition tails
+      → done-only Extractor recovery completeness barrier
+      → Собрать units после evidence validation
       → AI Validator v1
       → Проверить ответ AI Validator
       → Собрать факты документа
@@ -330,6 +340,51 @@ Offline source-derived nested-table fixture подтверждает cleared con
 Exact read-only replay полного execution `14359` input связал activeX5/6/7/8 только с `#/tables/2` и activeX55/56 только с `#/tables/25`, сохранив состояния `0/0/0/1` и `1/0`. Общий `docx_option_state_semantic_status` при этом остаётся `unknown`: `33` warning groups, semantic owners `83/290`, поэтому guarded fields должны оставаться `requires_review` до canary. Это diagnostic replay, не production runtime GREEN; production n8n/DB/credentials не изменялись.
 
 Promotion follow-up: checked-in semantic replay сокращён до `6` controls и `4` meaningful tables, хотя fixture хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен reproducible sanitized full-payload replay либо точное переименование сокращённого fixture/replay contract. Post-fix Worker/Aggregator runtime canary ещё не выполнен.
+
+---
+
+## 9B. AI Extractor envelope and bounded fallback boundary (`DW-19`)
+
+Execution `14359` дал `16/16` transport-success responses, но `0/16` были безопасно attachable: каждый model payload нарушал exact `field_catalog_version`; missing `schema_version`/`analysis_unit_id` не разрешает attachment без exact catalog/root, unique explicit source identity и полного strict facts/evidence validation. Exact request/system prompt и workflow version совпали с canonical/known-good contract, поэтому это model noncompliance, а не prompt/version drift.
+
+Analysis units сохраняются до AI как и раньше. Затем существующий `Loop Over Items` с `batchSize=1` запускает primary GLM. HTTP transport errors hard-stop, `retryOnFail=false`, error outputs отсутствуют. Regular-success wrapper немедленно формирует explicit `ai_extractor_attempt_transport_v1` с source, attempt и provider response; strict classifier не восстанавливает source через error-output item linking.
+
+Primary classifier использует shared `ai_extractor_strict_validator_v3` и выдаёт только:
+
+```text
+accepted
+fallback_required:
+  invalid_json
+  invalid_root_contract
+  conflicting_analysis_unit_id
+  invalid_field_catalog_version
+  invalid_schema_version
+  invalid_fact_contract
+  invalid_evidence_contract
+```
+
+Unknown decision/code, internal/programmer error, malformed source/envelope и transport failure hard-stop. Safe attachment отсутствующего schema/identity сохраняет `ai_extractor_envelope_attachment_v1`, но не меняет facts/evidence/status/value/confidence, order или cardinality и не обходит downstream guards.
+
+Только `fallback_required` вызывает один `AI Extractor fallback v1.0` с Gemini 3.7 Flash low, теми же original system/user prompts, response contract и credential family. Fallback снова проходит byte-identical shared validator; invalid fallback hard-stops document. `recovery_context` содержит только version, unit ID, две model aliases, primary failure class/code и next attempt. Он переносится через текущий input, валидируется вне semantic model payload и удаляется при materialization final audit.
+
+Final `ai_extractor_attempt_audit_v1` bounded полями:
+
+```text
+version
+analysis_unit_id
+primary_model
+fallback_model
+primary_failure_class
+primary_failure_code
+attempt_count (1..2)
+final_source (primary|fallback)
+```
+
+Audit не является evidence. После каждого successful evidence tail ровно один item возвращается в Loop; Loop output 0 — единственный input completeness barrier. Barrier проверяет исходную cardinality, unique IDs, deterministic order и audit до существующего collector, AI Validator dispatch и persistence. Partial batch не проходит дальше; Merge отсутствует.
+
+TDD chain: `dff07a9` → `507e12e` → `581ed5c` → `e690528` → `78935b8` → `58556f6`. Focused `23/23`; relevant Worker `171/170` с единственным accepted immutable-beta-hash failure; full `370/364` с exact six accepted failures. Production n8n/DB/credentials не изменялись, paid AI не запускался. Post-fix runtime canary pending; Stage 2 нельзя считать runtime complete.
+
+Неблокирующий audit debt: pre-existing `extractor.provider` остаётся legacy `deepseek` даже для GLM/Gemini. Authoritative actual aliases и выбранный source находятся в `extractor.attempt_audit.primary_model`, `fallback_model`, `final_source`. Legacy field не исправлялся в этом checkpoint, чтобы не расширять downstream audit contract.
 
 ---
 

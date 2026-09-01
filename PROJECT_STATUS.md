@@ -86,11 +86,35 @@ DeepSeek V4 Flash 0731
 z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low
 ```
 
-Gemini 3.7 Flash low оставлен fallback-кандидатом. Поиск новых моделей на этом fixture остановлен; сводный evidence-backed отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`.
+Gemini 3.7 Flash low был выбран benchmark fallback-кандидатом; canonical local Worker теперь использует его в bounded one-fallback contour, runtime canary которого ещё не выполнен. Поиск новых моделей на этом fixture остановлен; сводный evidence-backed отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`.
 
 MCP read-back тестового Worker подтвердил атомарное изменение только `AI Extractor v1.0`: alias приведён с временного `@provider=deepinfra/fp8` к протестированному `@provider=cloudflare`; workflow остался inactive/unpublished, node count `60`, connections, settings, pin data и credentials не изменились.
 
 Этот выбор подтверждает только сравнительный Extractor result. Full path Evidence Repair → AI Validator → persistence с выбранной связкой ещё требует отдельного runtime canary.
+
+### Extractor envelope recovery checkpoint — local GREEN, runtime pending
+
+Read-only diagnosis execution `14359` классифицировал все `16/16` primary GLM responses как nonrecoverable для deterministic attachment: каждый ответ нарушал обязательный exact `field_catalog_version` contract; часть ответов также не сообщала `schema_version` и/или `analysis_unit_id`. Сравнение exact request/system prompt и workflow version с canonical и последним known-good Extractor contract не выявило prompt/version drift. Root cause на этом execution — model contract noncompliance; безопасно attachable responses: `0/16`.
+
+Canonical local Worker теперь имеет bounded recovery contour:
+
+```text
+persisted analysis unit
+→ Loop Over Items, batchSize=1
+→ primary GLM response → explicit attempt envelope → shared strict validator v3
+   ├─ accepted → primary attempt audit
+   └─ exact allow-listed model contract failure → максимум один Gemini 3.7 Flash low fallback
+      → explicit fallback envelope → тот же strict validator → fallback attempt audit
+→ existing evidence repair / fact partition tails
+→ Loop done-only cardinality/order/identity barrier
+→ existing Validator dispatch and persistence
+```
+
+Primary/fallback transport и internal errors hard-stop; accepted primary items не вызывают fallback. Разрешены только семь typed primary model failures: invalid JSON, root contract, conflicting identity, field catalog, schema, fact contract и evidence contract. Safe deterministic attachment для отсутствующего `schema_version`/`analysis_unit_id` сохраняется только при exact catalog/root/source и полном strict facts/evidence validation. Audit bounded, не является evidence и не изменяет semantic fields.
+
+Implementation chain: RED `dff07a9`, safe-attachment GREEN `507e12e`, recovery RED `581ed5c`, explicit-source RED `e690528`, fail-closed/parity RED `78935b8`, local GREEN `58556f6`. Focused recovery/envelope suite: `23/23`. Relevant Worker suite: `171 total / 170 pass / 1` accepted immutable-beta-hash failure. Full suite: `370 total / 364 pass / 6` exact accepted failures, без нового failure signature.
+
+Это не runtime GREEN. Canonical candidate не promoted; production n8n, PostgreSQL и credentials не изменялись, paid AI не запускался. Post-fix canary должен доказать fallback cardinality/order, максимум две попытки, strict acceptance и отсутствие partial persistence на реальном execution path.
 
 Текущий `[PROD CANDIDATE]` Worker является отдельным live test contour и не равен ни `[3 TEST]`, ни canonical repository export. Перед исправлением `DW-17` или `DW-18` нужно сначала получить exact active/draft diff `c5977af5-… → 778dfb50-…` и определить назначение draft-only 52-й ноды; молчаливо редактировать draft как эквивалент execution `14234` нельзя.
 
@@ -132,13 +156,13 @@ Canonical path теперь содержит clean offline production candidate:
 ```text
 workflows/n8n-exports/TENDER — Обработать документ.json
 name = TENDER — Обработать документ
-51 nodes
+71 nodes after local DW-18 + Extractor recovery checkpoints
 active = false
 settings.availableInMCP = false
 pinData = {}
 ```
 
-Из beta удалены только девять test/calibration nodes; shared node parameters, credentials, types и runtime settings защищены beta→canonical regression. Canonical persistence path подключён к completeness barrier, Manual Trigger отсутствует, top-level `id`, `versionId` и `meta` удалены.
+Initial packaging удалил из beta девять test/calibration nodes. Последующие `DW-18` и Stage 2 checkpoints добавили только reviewed deterministic/recovery nodes и selective graph changes; beta→canonical regression разрешает именно этот перечисленный drift, сохраняя остальные parameters, credentials, types и runtime settings. Canonical persistence path подключён к done-only completeness barriers, Manual Trigger отсутствует, top-level `id`, `versionId` и `meta` удалены.
 
 Это только import packaging: live production Worker `1Pw61ZY3HgBSvcUr` не изменён, candidate ещё не promoted/wired и runtime canary для него не выполнялся.
 
@@ -474,6 +498,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
 - fresh Stage 1 branch verification: focused `DW-18 69/69`; full suite `347 total / 341 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: `RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary`; `RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit`; `RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256`; `immutable beta Worker snapshot retains its reviewed packaging hash`; `v1.2 prompt artifact is an exact clean copy of the imported validator system prompt`; `Targeted Recheck prompt aligns evidence coordinates with both trusted sources`. Новых failures нет.
+- Stage 2 exact execution diagnosis подтвердил `0/16` safely attachable primary responses без prompt/version drift; local recovery chain `dff07a9 → 507e12e → 581ed5c → e690528 → 78935b8 → 58556f6` сохраняет strict validator parity, делает максимум один Gemini fallback и допускает persistence только после done-only completeness barrier. Focused `23/23`; relevant Worker `171/170` с единственным known beta-hash failure; full `370/364` с теми же шестью baseline failures.
 
 ### Not verified
 
@@ -488,6 +513,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - причина и дальнейшая судьба unpublished 24-нoded production Aggregator draft;
 - ручная бизнес-проверка всех 27 полей клиентского результата.
 - post-fix runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; executions `14350–14352` являются pre-fix diagnostic evidence, а не GREEN canary;
+- post-fix runtime verification bounded Extractor fallback: execution `14359` остаётся `0/16` safely attachable по primary evidence, а local GREEN `58556f6` ещё не доказывает успешный Gemini fallback, exact batch convergence или отсутствие partial persistence в n8n runtime;
 - reproducible sanitized full-payload replay для semantic binding execution `14359`: checked-in regression намеренно сокращён до `6` controls и `4` meaningful tables, хотя отдельно хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен воспроизводимый sanitized full-payload replay либо точное переименование fixture/replay contract, исключающее впечатление полного replay;
 - published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
@@ -498,7 +524,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 На snapshot date exports имеют разные роли:
 
 - `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` — неизменяемый 60-node test/calibration snapshot;
-- Document Worker canonical path — clean inactive 62-node offline candidate с `DW-18`, без instance identity и test state;
+- Document Worker canonical path — clean inactive 71-node offline candidate с `DW-18` и bounded Extractor recovery, без instance identity и test state;
 - test Aggregator published active `91c17313-…` содержит execution-derived `AG-10`; unpublished test draft `f11906df-…` добавляет ровно три `AG-11` parameter changes без connection drift;
 - test Targeted Recheck published active `13b3c124-…` содержит `TR-10/TR-13` containment и audited technical `requires_review` fallback для execution `14292`;
 - 24-нoded production Aggregator draft не опубликован и соответствует очищенному core graph без disabled legacy/test nodes;
@@ -514,6 +540,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
 → canonical runtime hardening + offline deterministic contract (61/61 GREEN)
 → execution 14359 semantic binding: structural local owner + bounded fail-closed audit (69/69 GREEN)
+→ execution 14359 Extractor envelope: 0/16 safely attachable primary; bounded one-fallback local contract (23/23 GREEN)
 → sanitized full-payload replay или точное переименование сокращённого replay contract
 → read back and update isolated Worker candidate `csnDg78NzN1nIjUT`
 → Worker/Aggregator runtime canary на national_regime и participation_guarantee

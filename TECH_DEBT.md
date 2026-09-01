@@ -124,6 +124,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
 |`DW-17`|Evidence Repair требует от модели дословно реконструировать canonical quote; observed executions `14234` и `14238` подтвердили повторяемый exact-grounding failure. Нужен reference-only repair без ослабления fail-closed проверки.|Document Worker / evidence grounding|
 |`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
+|`DW-19`|⚠ Local GREEN, runtime canary pending. Execution `14359` дал `0/16` safely attachable primary Extractor responses из-за model contract noncompliance при неизменном exact prompt/version contract. Canonical Worker допускает только семь typed model failures к максимум одному Gemini 3.7 Flash low fallback; primary/fallback используют shared strict validator, explicit source envelope и done-only batch barrier. Production не изменён.|Document Worker / Extractor reliability|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
@@ -140,14 +141,14 @@ Naming, comments, cleanup, future hardening.
 Document Worker packaging checkpoint 2026-08-29:
 
 - immutable 60-node beta snapshot сохранён по пути `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`, SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`;
-- canonical JSON является clean 51-node offline production candidate и защищён beta→canonical regression;
+- canonical JSON после DW-18 и bounded Extractor recovery является clean 71-node offline production candidate и защищён selective beta→canonical regression;
 - packaging gate закрыт локально, но live production Worker не изменён;
 - promotion/wiring и runtime canary candidate остаются открытыми verification gates.
 
 Extractor model-selection checkpoint 2026-08-29:
 
 - текущий provisional baseline test/canonical candidate: `z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`;
-- Gemini 3.7 Flash low оставлен fallback-кандидатом;
+- Gemini 3.7 Flash low выбран bounded local fallback; runtime canary этого contour не выполнен;
 - model search на текущих 16 pinned units остановлен после сравнительного отчёта `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`;
 - full Worker runtime canary с выбранной связкой Extractor + Validator не выполнен и остаётся gate;
 - A/B подтвердил, что exact evidence validation не защищает от неверного `field_key`; universal semantic boundary `evaluation_criteria` остаётся предметом runtime наблюдения, но новый redesign до canary не открывается.
@@ -179,6 +180,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |`OR-6`|TenderPlan HTTP без retry/backoff policy|Orchestrator|
 |`DW-2`|proxy auth хранится в node config|Document Worker|
 |`DW-11`|visual content не анализируется|Document Worker|
+|`DW-20`|Nonblocking audit debt: `extractor.provider` в validated unit остаётся legacy literal `deepseek`, хотя primary/fallback aliases — GLM/Gemini. До отдельной versioned migration authoritative являются `extractor.attempt_audit.primary_model`, `fallback_model` и `final_source`; legacy field нельзя использовать как evidence или источник фактической модели.|Document Worker / audit metadata|
 |`AG-2 / TR-5`|дублируются Normalize FINAL + Save|Aggregator / Recheck|
 |`AG-3`|TenderMeta mappings захардкожены отдельно|Aggregator|
 |`AG-4`|unknown run может тихо завершить Aggregator|Aggregator|
@@ -1188,6 +1190,27 @@ semantic owners = 83/290 controls
 Это read-only replay, а не post-fix production canary. Production n8n, PostgreSQL, credentials, prompts и model settings не изменялись. Пока global semantic status остаётся `unknown`, `national_regime` и `participation_guarantee` должны materialize не выше `requires_review`.
 
 Неблокирующий follow-up debt для promotion: checked-in semantic-binding replay намеренно сокращён до шести controls и четырёх meaningful tables, хотя fixture отдельно фиксирует observed source cardinalities (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен reproducible sanitized full-payload replay либо точное переименование fixture/replay contract, чтобы сокращённый harness нельзя было принять за полный execution replay.
+
+### Stage 2 Extractor envelope and bounded fallback checkpoint 2026-09-01
+
+Exact read-only diagnosis execution `14359` показал `0/16` safely recoverable responses для deterministic envelope attachment. Все responses нарушали обязательный exact `field_catalog_version`; missing `schema_version`/`analysis_unit_id` сами по себе были бы attachable только при exact root allow-list, unique explicit source identity и полностью валидных facts/evidence. Exact request/system prompt и workflow version совпали с canonical/known-good contract, поэтому наблюдаемая причина — model noncompliance, а не prompt/version drift.
+
+```text
+dff07a9  RED: exact 16-response envelope diagnosis
+507e12e  GREEN: safe deterministic attachment only
+581ed5c  RED: bounded primary/fallback recovery contract
+e690528  RED: explicit source carry; no error-output pairing recovery
+78935b8  RED: exact hard-stop, IF, shared-validator parity and graph barrier
+58556f6  GREEN: one Gemini fallback + bounded audit + done-only convergence
+```
+
+Primary and fallback HTTP nodes hard-stop transport errors, do not retry internally and expose no error output. A regular-success wrapper creates an explicit source/attempt/provider-response envelope before classification. The primary classifier returns only `accepted` or `fallback_required` for the exact seven-code allow-list; unknown/internal/source/envelope defects hard-stop. Fallback uses the original prompts/response contract and Gemini 3.7 Flash low once, then passes the same byte-identical strict validator body; invalid fallback hard-stops the document. Accepted primary items never call fallback.
+
+Loop `batchSize=1` returns only successful primary/fallback evidence tails once. Output 0 reaches a separate barrier that validates expected cardinality, unique IDs, deterministic source order and bounded attempt audit before the pre-existing collector, Validator dispatch or fact persistence. No Merge or error-output source reconstruction is used. Fallback `recovery_context` is an exact bounded current-input contract, is validated outside the provider semantic payload and removed when final `attempt_audit` is materialized.
+
+Verification: focused `23/23`; relevant Worker `171 total / 170 pass / 1` accepted immutable-beta-hash failure; full `370 total / 364 pass / 6` exact accepted failures. No production n8n/PostgreSQL writes, credential changes or paid AI calls occurred. Runtime canary remains required; Stage 2 is not runtime complete.
+
+Nonblocking `DW-20`: validated units still expose legacy `extractor.provider = deepseek`. This value predates the GLM/Gemini attempt architecture and is not authoritative. Actual configured aliases and final source are recorded in bounded `extractor.attempt_audit`; renaming/versioning the legacy field is deferred to avoid unrelated downstream audit drift.
 
 ### Связанное, но отдельное ограничение
 
