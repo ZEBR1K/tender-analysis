@@ -1271,6 +1271,53 @@ test('document-level mapping warnings are stored once and segments carry bounded
   assert.ok(issueReferences.every((issueId) => issueId === documentWarnings[0].issue_id));
 });
 
+test('structural mapping issue references remain fail-closed through evidence and Validator dispatch', async () => {
+  const workflow = loadWorkflow();
+  const missing = semanticBindingFixture.source_option_states[3];
+  const overrides = new Map([[missing.control_name, { source_row_ref: null }]]);
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    bindingFixtureOptionStates(overrides),
+  );
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const semanticBlock = semantic.json.semantic_blocks.find(
+    ({ docx_option_state_mapping_issue_ids: issueIds = [] }) => issueIds.length > 0,
+  );
+  assert.ok(semanticBlock);
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'structural-issue-unit',
+    primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const segment = expanded.json.ai_segments[0];
+  assert.equal(segment.docx_option_state_mapping_issue_ids.length, 1);
+
+  const source = buildOptionSource(segment, 'structural-issue-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', missing.exact_label, segment.semantic_block_id),
+    ], 'structural-issue-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const fact = dispatch.json.units_for_ai[0].verified_facts[0];
+  assert.equal(fact.status, 'requires_review');
+  assert.equal(fact.option_state_applicability, 'review_only');
+  assert.deepEqual(
+    fact.evidence.map(({ semantic_block_id: blockId, quote }) => ({ blockId, quote })),
+    [{ blockId: segment.semantic_block_id, quote: missing.exact_label }],
+  );
+  assert.ok(fact.evidence.every((entry) => !('issue_id' in entry)));
+  assert.deepEqual(
+    fact.option_state_audit_warnings.map(({ issue_id: issueId }) => issueId),
+    segment.docx_option_state_mapping_issue_ids,
+  );
+});
+
 test('AI segments expose deterministic option markers without replacing canonical semantic text', async () => {
   const { workflow, semanticItem } = await buildOptionStateSemanticFixture();
   const semanticBlocks = semanticItem.json.semantic_blocks;
