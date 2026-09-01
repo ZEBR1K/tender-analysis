@@ -1305,7 +1305,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const item = $input.first();\nconst extension = String(item.json?.document?.file_extension ?? '').toLowerCase();\n\nif (extension !== 'docx') {\n  return item;\n}\n\nconst original = item.binary?.data;\nif (!original) {\n  throw new Error('DOCX binary data is missing before archive preparation');\n}\n\nconst originalName = String(original.fileName ?? item.json?.document?.file_name ?? 'document.docx');\nconst archiveName = /\\.docx$/iu.test(originalName)\n  ? originalName.replace(/\\.docx$/iu, '.zip')\n  : originalName + '.zip';\n\nreturn {\n  json: item.json,\n  binary: {\n    ...item.binary,\n    docx_archive: {\n      ...original,\n      fileName: archiveName,\n      fileExtension: 'zip',\n      mimeType: 'application/zip',\n    },\n  },\n};"
+        "jsCode": "const item = $input.item;\nconst extension = String(item.json?.document?.file_extension ?? '').toLowerCase();\n\nif (extension !== 'docx') {\n  return item;\n}\n\nconst original = item.binary?.data;\nif (!original) {\n  throw new Error('DOCX binary data is missing before archive preparation');\n}\n\nconst originalName = String(original.fileName ?? item.json?.document?.file_name ?? 'document.docx');\nconst archiveName = /\\.docx$/iu.test(originalName)\n  ? originalName.replace(/\\.docx$/iu, '.zip')\n  : originalName + '.zip';\n\nreturn {\n  json: item.json,\n  binary: {\n    ...item.binary,\n    docx_archive: {\n      ...original,\n      fileName: archiveName,\n      fileExtension: 'zip',\n      mimeType: 'application/zip',\n    },\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
