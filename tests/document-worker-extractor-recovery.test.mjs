@@ -266,6 +266,28 @@ async function runPrepareFallback(decisionJson) {
   return JSON.parse(JSON.stringify(result));
 }
 
+async function runFallbackAudit(unitJson) {
+  const node = findNode(NODES.fallbackAudit);
+  const inputItem = { json: structuredClone(unitJson) };
+  const context = vm.createContext({
+    console,
+    structuredClone,
+    $json: inputItem.json,
+    $input: {
+      all: () => [inputItem],
+      first: () => inputItem,
+      item: inputItem,
+    },
+    $: () => {
+      throw new Error('fallback audit must consume only current-input recovery_context');
+    },
+  });
+  const result = await new vm.Script(
+    `(async () => { ${node.parameters.jsCode}\n })()`,
+  ).runInContext(context);
+  return JSON.parse(JSON.stringify(result));
+}
+
 async function runResponseWrapper(nodeName, response, source, linkedSourceNode) {
   const node = findNode(nodeName);
   assert.equal(node.parameters.mode, 'runOnceForEachItem');
@@ -385,7 +407,19 @@ function buildModelContractDefectCorpus(unitId) {
   ];
 }
 
-function buildAttemptEnvelope(source, response, attempt = 'primary') {
+function buildRecoveryContext(source, failureCode = 'invalid_json') {
+  return {
+    version: 'ai_extractor_recovery_context_v1',
+    analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+    primary_model: fixture.models.primary_alias,
+    fallback_model: fixture.models.fallback_alias,
+    primary_failure_class: 'contract',
+    primary_failure_code: failureCode,
+    next_attempt: 2,
+  };
+}
+
+function buildAttemptEnvelope(source, response, attempt = 'primary', recoveryContext = null) {
   const modelAlias = attempt === 'primary'
     ? fixture.models.primary_alias
     : fixture.models.fallback_alias;
@@ -398,6 +432,9 @@ function buildAttemptEnvelope(source, response, attempt = 'primary') {
       transport_status: 'succeeded',
       source: structuredClone(source),
       provider_response: structuredClone(response),
+      ...(attempt === 'fallback'
+        ? { recovery_context: structuredClone(recoveryContext ?? buildRecoveryContext(source)) }
+        : {}),
       failure_class: null,
       failure_code: null,
     },
@@ -433,9 +470,10 @@ async function runStrictClassifier(nodeName, attemptEnvelope) {
       throw new Error('linked-item lookup is forbidden in Extractor classification');
     },
   });
-  return new vm.Script(
+  const result = await new vm.Script(
     `(async () => { ${node.parameters.jsCode}\n })()`,
   ).runInContext(context);
+  return JSON.parse(JSON.stringify(result));
 }
 
 function extractSharedValidationBody(nodeName) {
@@ -802,7 +840,14 @@ test('RED: unknown decisions/codes and malformed explicit envelopes hard-stop be
   delete fallbackMissingSource.attempt_transport.source;
   const fallbackWrongAttempt = buildAttemptEnvelope(source, validResponse, 'fallback');
   fallbackWrongAttempt.attempt_transport.attempt = 'primary';
-  for (const malformed of [{}, fallbackMissingSource, fallbackWrongAttempt]) {
+  const fallbackUnboundedContext = buildAttemptEnvelope(source, validResponse, 'fallback');
+  fallbackUnboundedContext.attempt_transport.recovery_context.provider_content = 'forbidden';
+  for (const malformed of [
+    {},
+    fallbackMissingSource,
+    fallbackWrongAttempt,
+    fallbackUnboundedContext,
+  ]) {
     await assert.rejects(runStrictClassifier(NODES.fallbackValidator, malformed));
   }
   assert.deepEqual(outputsFrom(NODES.prepareFallback), [{ node: NODES.fallbackHttp, index: 0 }]);
@@ -938,15 +983,16 @@ test('RED: fallback request is the approved alias on the same provider and audit
     analysis_unit_id: id,
     facts: [strictFact],
   });
+  const fallbackRecovery = buildRecoveryContext(source, 'invalid_evidence_contract');
   const wrappedFallback = await runResponseWrapper(
     NODES.fallbackWrapper,
     fallbackResponse,
-    { source, ai_request: source.ai_request },
+    { source, ai_request: source.ai_request, extractor_recovery: fallbackRecovery },
     NODES.prepareFallback,
   );
   assert.deepEqual(
     wrappedFallback.json,
-    buildAttemptEnvelope(source, fallbackResponse, 'fallback'),
+    buildAttemptEnvelope(source, fallbackResponse, 'fallback', fallbackRecovery),
   );
   const strictFallback = await runStrictClassifier(
     NODES.fallbackValidator,
@@ -978,4 +1024,35 @@ test('RED: fallback request is the approved alias on the same provider and audit
     runRecoveryBarrier([excessiveAttempts], [id]),
     /attempt_count|attempt count/i,
   );
+});
+
+test('RED: fallback audit consumes bounded current-input recovery_context and removes it after materialization', async () => {
+  const node = findNode(NODES.fallbackAudit);
+  assert.doesNotMatch(node.parameters.jsCode, /\$\(/);
+  assert.match(node.parameters.jsCode, /recovery_context/);
+
+  const id = 'sanitized_current_input_audit';
+  const unit = buildFinalUnit(id, 'fallback', {
+    failure_class: 'contract',
+    failure_code: 'invalid_evidence_contract',
+  });
+  delete unit.extractor.attempt_audit;
+  unit.extractor.recovery_context = {
+    version: 'ai_extractor_recovery_context_v1',
+    analysis_unit_id: id,
+    primary_model: fixture.models.primary_alias,
+    fallback_model: fixture.models.fallback_alias,
+    primary_failure_class: 'contract',
+    primary_failure_code: 'invalid_evidence_contract',
+    next_attempt: 2,
+  };
+  const before = structuredClone(semanticProjection(unit));
+  const output = await runFallbackAudit(unit);
+  assert.deepEqual(semanticProjection(output.json), before);
+  assertBoundedAudit(output.json.extractor.attempt_audit, 'fallback');
+  assert.equal('recovery_context' in output.json.extractor, false);
+
+  const unbounded = structuredClone(unit);
+  unbounded.extractor.recovery_context.provider_content = 'forbidden';
+  await assert.rejects(runFallbackAudit(unbounded), /allow-list|recovery_context/i);
 });

@@ -169,7 +169,28 @@ function parseXmlLikeN8n(xml) {
 async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = {} } = {}) {
   const node = findNode(workflow, nodeName);
   assert.equal(node.type, 'n8n-nodes-base.code');
-  const items = structuredClone(inputItems);
+  const items = nodeName === nodeNames.validateEvidence
+    ? inputItems.map((item) => {
+        const raw = sourceJsonByNode['Подготовить запрос для AI'];
+        const source = Array.isArray(raw) ? raw[0] : raw;
+        assert.ok(source, 'Primary Extractor validator fixture requires explicit source.');
+        return {
+          json: {
+            attempt_transport: {
+              version: 'ai_extractor_attempt_transport_v1',
+              attempt: 'primary',
+              analysis_unit_id: source.analysis_unit_meta?.analysis_unit_id ?? null,
+              model_alias: 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low',
+              transport_status: 'succeeded',
+              source: structuredClone(source),
+              provider_response: structuredClone(item.json),
+              failure_class: null,
+              failure_code: null,
+            },
+          },
+        };
+      })
+    : structuredClone(inputItems);
   const executionContext = {
     helpers: {
       async getBinaryDataBuffer(itemIndex, binaryPropertyName) {
@@ -210,7 +231,10 @@ async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = 
   const result = await new vm.Script(
     `(async function () { ${node.parameters.jsCode}\n }).call(__executionContext)`,
   ).runInContext(context);
-  return JSON.parse(JSON.stringify(Array.isArray(result) ? result : [result]));
+  const outputs = JSON.parse(JSON.stringify(Array.isArray(result) ? result : [result]));
+  return nodeName === nodeNames.validateEvidence
+    ? outputs.map((item) => ({ json: item.json.validated_unit ?? item.json }))
+    : outputs;
 }
 
 function textParagraph(text) {

@@ -59,6 +59,17 @@ async function runRequestPreparation(inputJson) {
 }
 
 function buildAttemptEnvelope(apiResponse, source, attempt = 'primary') {
+  const recoveryContext = attempt === 'fallback'
+    ? {
+        version: 'ai_extractor_recovery_context_v1',
+        analysis_unit_id: source?.analysis_unit_meta?.analysis_unit_id ?? null,
+        primary_model: recoveryFixture.models.primary_alias,
+        fallback_model: recoveryFixture.models.fallback_alias,
+        primary_failure_class: 'contract',
+        primary_failure_code: 'invalid_json',
+        next_attempt: 2,
+      }
+    : null;
   return {
     attempt_transport: {
       version: 'ai_extractor_attempt_transport_v1',
@@ -70,6 +81,7 @@ function buildAttemptEnvelope(apiResponse, source, attempt = 'primary') {
       transport_status: 'succeeded',
       source: structuredClone(source),
       provider_response: structuredClone(apiResponse),
+      ...(recoveryContext ? { recovery_context: recoveryContext } : {}),
       failure_class: null,
       failure_code: null,
     },

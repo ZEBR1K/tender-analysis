@@ -160,7 +160,27 @@ async function runCodeNodeItemsWithSources(
   sourceJsonsByNode,
 ) {
   const node = findNode(workflow, nodeName);
-  const inputItems = inputJsons.map((inputJson) => ({
+  const effectiveInputJsons = nodeName === 'Проверить и привязать evidence'
+    ? inputJsons.map((providerResponse, index) => {
+        const sources = sourceJsonsByNode['Подготовить запрос для AI'];
+        const source = sources?.[index] ?? sources?.[0];
+        assert.ok(source, 'Primary Extractor validator fixture requires explicit source.');
+        return {
+          attempt_transport: {
+            version: 'ai_extractor_attempt_transport_v1',
+            attempt: 'primary',
+            analysis_unit_id: source.analysis_unit_meta?.analysis_unit_id ?? null,
+            model_alias: 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low',
+            transport_status: 'succeeded',
+            source: structuredClone(source),
+            provider_response: structuredClone(providerResponse),
+            failure_class: null,
+            failure_code: null,
+          },
+        };
+      })
+    : inputJsons;
+  const inputItems = effectiveInputJsons.map((inputJson) => ({
     json: structuredClone(inputJson),
   }));
   const sourceItemsByNode = Object.fromEntries(
@@ -195,7 +215,12 @@ async function runCodeNodeItemsWithSources(
     `(async () => { ${node.parameters.jsCode}\n })()`,
   ).runInContext(context);
   const resultItems = Array.isArray(result) ? result : [result];
-  return resultItems.map((item) => JSON.parse(JSON.stringify(item.json)));
+  return resultItems.map((item) => {
+    const output = JSON.parse(JSON.stringify(item.json));
+    return nodeName === 'Проверить и привязать evidence' && output.validated_unit
+      ? output.validated_unit
+      : output;
+  });
 }
 
 async function runCodeNodeItems(workflow, nodeName, inputJsons, sourceJsons) {
@@ -1858,23 +1883,31 @@ test('repair topology cannot bypass validation attempt 2 or the completeness bar
 
   assert.deepEqual(
     connectedTargets(workflow, 'Подготовить запрос для AI'),
+    ['Обработать evidence units по одной'],
+  );
+  assert.deepEqual(
+    connectedTargets(workflow, 'Обработать evidence units по одной', 1),
     ['AI Extractor v1.0'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'AI Extractor v1.0'),
+    ['Связать primary Extractor response с source'],
+  );
+  assert.deepEqual(
+    connectedTargets(workflow, 'Связать primary Extractor response с source'),
     ['Проверить и привязать evidence'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Проверить и привязать evidence'),
-    ['Обработать evidence units по одной'],
+    ['Primary Extractor accepted?'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Обработать evidence units по одной', 0),
-    ['Собрать units после evidence validation'],
+    ['Проверить полноту Extractor recovery'],
   );
   assert.deepEqual(
-    connectedTargets(workflow, 'Обработать evidence units по одной', 1),
-    ['Evidence validation passed?'],
+    connectedTargets(workflow, 'Проверить полноту Extractor recovery'),
+    ['Собрать units после evidence validation'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Evidence validation passed?', 1),
@@ -1936,6 +1969,10 @@ test('repair topology cannot bypass validation attempt 2 or the completeness bar
 
 test('per-item validators use linked items, never a fixed positional item 0', () => {
   const workflow = loadWorkflow();
+  const primaryWrapper = findNode(
+    workflow,
+    'Связать primary Extractor response с source',
+  ).parameters.jsCode;
   const attemptOne = findNode(
     workflow,
     'Проверить и привязать evidence',
@@ -1961,7 +1998,9 @@ test('per-item validators use linked items, never a fixed positional item 0', ()
     'Проверить ответ AI Validator',
   ).parameters.jsCode;
 
-  assert.match(attemptOne, /\$\('Подготовить запрос для AI'\)\.item\.json/);
+  assert.match(primaryWrapper, /\$\('Подготовить запрос для AI'\)\.item\.json/);
+  assert.match(attemptOne, /attempt_transport/);
+  assert.doesNotMatch(attemptOne, /\$\([^)]*\)\.(?:item|itemMatching)\b/);
   assert.match(attemptTwo, /\$\('Подготовить Evidence Repair'\)\.item\.json/);
   assert.match(
     validatePartition,
@@ -2110,7 +2149,7 @@ test('attempt 1 reports all evidence violations in one analysis unit', async () 
   assert.equal(result.deterministically_rejected_facts.length, 1);
 });
 
-test('non-evidence Extractor violations remain hard errors', async () => {
+test('non-evidence model contract violations become one typed fallback decision', async () => {
   const workflow = loadWorkflow();
   const segments = [
     {
@@ -2128,14 +2167,21 @@ test('non-evidence Extractor violations remain hard errors', async () => {
     ),
   ]);
 
-  await assert.rejects(
-    runCodeNode(
-      workflow,
-      'Проверить и привязать evidence',
-      response,
-      buildSource(segments),
-    ),
-    /field_key/,
+  const result = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    response,
+    buildSource(segments),
+  );
+  assert.deepEqual(
+    result.extractor_recovery_decision,
+    {
+      version: 'ai_extractor_primary_decision_v1',
+      analysis_unit_id: 'fixture-unit',
+      decision: 'fallback_required',
+      primary_failure_class: 'contract',
+      primary_failure_code: 'invalid_fact_contract',
+    },
   );
 });
 
@@ -3412,7 +3458,7 @@ test('immutable beta Worker snapshot retains its reviewed packaging hash', () =>
   );
 });
 
-test('production import candidate preserves beta packaging outside reviewed DW-18 nodes', () => {
+test('production import candidate preserves beta packaging outside reviewed DW-18 and Extractor recovery nodes', () => {
   const workflow = loadWorkflow();
   const betaWorkflow = loadBetaWorkflow();
   const expectedRemovedNodes = [
@@ -3427,6 +3473,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'статистика аномальных блоков',
   ].sort();
   const expectedDw18Nodes = [
+    'AI Extractor fallback v1.0',
     'Вернуть DOCX binary для Docling',
     'Извлечь DOCX OOXML',
     'Подготовить DOCX archive alias',
@@ -3438,6 +3485,14 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Собрать DOCX parts для parser',
     'DOCX option-state extraction?',
     'OOXML часть XML?',
+    'Primary Extractor accepted?',
+    'Зафиксировать fallback Extractor attempt',
+    'Зафиксировать primary Extractor attempt',
+    'Подготовить fallback Extractor',
+    'Проверить fallback и привязать evidence',
+    'Проверить полноту Extractor recovery',
+    'Связать fallback Extractor response с source',
+    'Связать primary Extractor response с source',
   ].sort();
   const expectedChangedSharedNodes = new Set([
     'связать результат Docling и метаданные',
@@ -3454,11 +3509,13 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Сформировать units without AI Validator',
     'Свести AI и units without AI',
     'Собрать факты документа1',
+    'Обработать evidence units по одной',
   ]);
+  const expectedChangedRuntimeNodes = new Set(['AI Extractor v1.0']);
   const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));
   const candidateNodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
   assert.equal(betaNodesByName.size, 60);
-  assert.equal(candidateNodesByName.size, 62);
+  assert.equal(candidateNodesByName.size, 71);
   assert.deepEqual(
     [...betaNodesByName.keys()]
       .filter((name) => !candidateNodesByName.has(name))
@@ -3487,11 +3544,13 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     assert.deepEqual(candidateNode.credentials ?? null, betaNode.credentials ?? null, `${name}: credentials drift`);
     assert.equal(candidateNode.type, betaNode.type, `${name}: type drift`);
     assert.equal(candidateNode.typeVersion, betaNode.typeVersion, `${name}: typeVersion drift`);
-    assert.deepEqual(
-      nodeRuntimeSettings(candidateNode),
-      nodeRuntimeSettings(betaNode),
-      `${name}: node settings drift`,
-    );
+    if (!expectedChangedRuntimeNodes.has(name)) {
+      assert.deepEqual(
+        nodeRuntimeSettings(candidateNode),
+        nodeRuntimeSettings(betaNode),
+        `${name}: node settings drift`,
+      );
+    }
   }
 
   const betaEdges = workflowConnectionEdges(betaWorkflow);
@@ -3499,6 +3558,11 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
   assert.deepEqual(
     betaEdges.filter((edge) => !candidateEdges.includes(edge)),
     [
+      'AI Extractor v1.0|main|0|Проверить и привязать evidence|main|0',
+      'Обработать evidence units по одной|main|0|Собрать units после evidence validation|main|0',
+      'Обработать evidence units по одной|main|1|Evidence validation passed?|main|0',
+      'Подготовить запрос для AI|main|0|AI Extractor v1.0|main|0',
+      'Проверить и привязать evidence|main|0|Обработать evidence units по одной|main|0',
       'Связать метаданные и файл|main|0|определить тип файла|main|0',
       'When clicking ‘Execute workflow’|main|0|Сохранить analysis unit|main|0',
     ].sort(),
@@ -3509,6 +3573,8 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
       (nodeName) => edge.startsWith(`${nodeName}|`) || edge.includes(`|${nodeName}|`),
     )),
     [
+      'Обработать evidence units по одной|main|1|AI Extractor v1.0|main|0',
+      'Подготовить запрос для AI|main|0|Обработать evidence units по одной|main|0',
       'When Executed by Another Workflow|main|0|Проверить вход Worker|main|0',
       'Развернуть части для AI v1.2|main|0|Сохранить analysis unit|main|0',
     ].sort(),
