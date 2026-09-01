@@ -1,10 +1,10 @@
-export const CANARY_EXPECTED_ID_SOURCE = '[CANARY] Bypass analysis-unit persistence';
+export const CANARY_EXPECTED_ID_SOURCE = 'Подготовить запрос для AI';
 
-export function selectCanaryExpectedItems({ bypassItems }) {
-  if (!Array.isArray(bypassItems)) {
-    throw new Error('[Canary barrier source] Bypass items must be an array.');
+export function selectCanaryExpectedItems({ postMaterializationItems }) {
+  if (!Array.isArray(postMaterializationItems)) {
+    throw new Error('[Canary barrier source] Post-materialization items must be an array.');
   }
-  return bypassItems;
+  return postMaterializationItems;
 }
 
 export function deriveExpectedAnalysisUnitIds(items) {
