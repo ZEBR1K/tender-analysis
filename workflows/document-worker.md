@@ -134,10 +134,10 @@ When Executed by Another Workflow
       → Развернуть части для AI v1.2
       → Сохранить analysis unit
       → Подготовить запрос для AI
+      → AI Extractor v1.0 (primary GLM, multi-item batch 16 / interval 1000 ms)
+      → explicit primary attempt envelope
+      → shared strict Extractor validator
       → Обработать evidence units по одной (batchSize=1)
-         → AI Extractor v1.0 (primary GLM)
-         → explicit primary attempt envelope
-         → shared strict Extractor validator
             ├─ accepted → primary attempt audit
             └─ typed fallback_required → AI Extractor fallback v1.0 (Gemini, max 1)
                → explicit fallback attempt envelope
@@ -347,7 +347,7 @@ Promotion follow-up: checked-in semantic replay сокращён до `6` contro
 
 Execution `14359` дал `16/16` transport-success responses, но `0/16` были безопасно attachable: каждый model payload нарушал exact `field_catalog_version`; missing `schema_version`/`analysis_unit_id` не разрешает attachment без exact catalog/root, unique explicit source identity и полного strict facts/evidence validation. Exact request/system prompt и workflow version совпали с canonical/known-good contract, поэтому это model noncompliance, а не prompt/version drift.
 
-Analysis units сохраняются до AI как и раньше. Затем существующий `Loop Over Items` с `batchSize=1` запускает primary GLM. HTTP transport errors hard-stop, `retryOnFail=false`, error outputs отсутствуют. Regular-success wrapper немедленно формирует explicit `ai_extractor_attempt_transport_v1` с source, attempt и provider response; strict classifier не восстанавливает source через error-output item linking.
+Analysis units сохраняются до AI как и раньше. Primary GLM запускается до `Loop Over Items` как multi-item node run с `batchSize=16`, `batchInterval=1000` и timeout `180000`; HTTP transport errors hard-stop, `retryOnFail=false`, error outputs отсутствуют. Regular-success wrapper немедленно формирует explicit `ai_extractor_attempt_transport_v1` с source, attempt и provider response; он разрешает source через paired-item lineage, а strict classifier не восстанавливает source через error-output item linking. Локальный harness доказывает wrapper mapping на непозиционной перестановке 16 `pairedItem`; фактическая propagation linked items через batched HTTP node остаётся обязательной runtime-проверкой. Только уже проверенные primary decisions поступают в `Loop Over Items` с `batchSize=1`.
 
 Primary classifier использует shared `ai_extractor_strict_validator_v3` и выдаёт только:
 
@@ -380,9 +380,9 @@ attempt_count (1..2)
 final_source (primary|fallback)
 ```
 
-Audit не является evidence. После каждого successful evidence tail ровно один item возвращается в Loop; Loop output 0 — единственный input completeness barrier. Barrier проверяет исходную cardinality, unique IDs, deterministic order и audit до существующего collector, AI Validator dispatch и persistence. Partial batch не проходит дальше; Merge отсутствует.
+Audit не является evidence. После каждого successful evidence tail ровно один item возвращается в Loop; Loop output 0 — единственный input completeness barrier. Barrier проверяет исходную cardinality, unique IDs, deterministic order и audit до существующего collector, AI Validator dispatch и persistence. Partial batch не проходит дальше; Merge отсутствует. `extractor_requests` остаётся совместимым unit-level счётчиком primary запросов, `extractor_fallback_requests` отдельно считает fallback, а `total_ai_requests_before_ai_validator` суммирует primary + fallback + evidence repair + fact partition. Primary transport не сериализован Loop; сериализованы только per-unit convergence и bounded fallback/evidence retry routes.
 
-TDD chain: `dff07a9` → `507e12e` → `581ed5c` → `e690528` → `78935b8` → `58556f6`. Focused `23/23`; relevant Worker `171/170` с единственным accepted immutable-beta-hash failure; full `370/364` с exact six accepted failures. Production n8n/DB/credentials не изменялись, paid AI не запускался. Post-fix runtime canary pending; Stage 2 нельзя считать runtime complete.
+TDD chain исходного recovery contour: `dff07a9` → `507e12e` → `581ed5c` → `e690528` → `78935b8` → `58556f6`. Локальный batch-first latency checkpoint добавляет regression coverage для topology, HTTP batching, paired lineage, bounded fallback, completion barrier, hard-stop и request metrics; production JSON, prompts, models, credentials и semantic guards вне этой границы не меняются. Production n8n/DB/credentials не изменялись, paid AI не запускался. Post-fix runtime canary pending; Stage 2 нельзя считать runtime complete.
 
 Неблокирующий audit debt: pre-existing `extractor.provider` остаётся legacy `deepseek` даже для GLM/Gemini. Authoritative actual aliases и выбранный source находятся в `extractor.attempt_audit.primary_model`, `fallback_model`, `final_source`. Legacy field не исправлялся в этом checkpoint, чтобы не расширять downstream audit contract.
 

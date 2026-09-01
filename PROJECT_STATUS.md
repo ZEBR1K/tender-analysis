@@ -100,8 +100,8 @@ Canonical local Worker теперь имеет bounded recovery contour:
 
 ```text
 persisted analysis unit
+→ primary GLM multi-item batch → explicit attempt envelope → shared strict validator v3
 → Loop Over Items, batchSize=1
-→ primary GLM response → explicit attempt envelope → shared strict validator v3
    ├─ accepted → primary attempt audit
    └─ exact allow-listed model contract failure → максимум один Gemini 3.7 Flash low fallback
       → explicit fallback envelope → тот же strict validator → fallback attempt audit
@@ -115,6 +115,29 @@ Primary/fallback transport и internal errors hard-stop; accepted primary items 
 Implementation chain: RED `dff07a9`, safe-attachment GREEN `507e12e`, recovery RED `581ed5c`, explicit-source RED `e690528`, fail-closed/parity RED `78935b8`, local GREEN `58556f6`. Focused recovery/envelope suite: `23/23`. Relevant Worker suite: `171 total / 170 pass / 1` accepted immutable-beta-hash failure. Full suite: `370 total / 364 pass / 6` exact accepted failures, без нового failure signature.
 
 Это не runtime GREEN. Canonical candidate не promoted; production n8n, PostgreSQL и credentials не изменялись, paid AI не запускался. Post-fix canary должен доказать fallback cardinality/order, максимум две попытки, strict acceptance и отсутствие partial persistence на реальном execution path.
+
+### Primary Extractor batch-first latency recovery — local GREEN, runtime gate pending
+
+Runtime evidence локализует latency regression без изменения semantic contract: execution `14359` выполнил primary Extractor одним node run для `16` items примерно за `32` секунды; после переноса Loop перед Extractor execution `14362` выполнил `12` последовательных primary node runs за `423` секунды. Canonical local Worker возвращает primary transport до Loop:
+
+```text
+Подготовить запрос для AI
+→ AI Extractor v1.0 (multi-item; batchSize=16, batchInterval=1000, timeout=180000)
+→ Связать primary Extractor response с source
+→ Проверить и привязать evidence
+→ Loop Over Items, batchSize=1
+→ Primary Extractor accepted?
+→ primary audit либо максимум один Gemini fallback
+→ bounded evidence repair / fact partition
+→ Loop done-only recovery barrier
+→ existing collector / Validator / persistence
+```
+
+Primary transport по-прежнему `retryOnFail=false`, без error output или partial-persistence bypass. Regression tests статически фиксируют graph и симулируют wrapper mapping на непозиционной перестановке 16 distinct `pairedItem`, а также проверяют cardinality/order, fallback только invalid subset, максимум две попытки, недостижимость primary HTTP из loop body и недостижимость collector/Validator/persistence до done. Они не доказывают, что установленный n8n HTTP node фактически выдаёт правильные linked items в multi-item run: это отдельная часть pending runtime gate. Audit сохраняет совместимый `extractor_requests`, добавляет `extractor_fallback_requests`; total до AI Validator = primary + fallback + evidence repair + fact partition. Models, prompts, shared strict validator, fallback allow-list, evidence semantics, DOCX/ActiveX, Validator, PostgreSQL и 27-field contract не менялись.
+
+Это только local/offline GREEN. n8n MCP, isolated draft и runtime runs в этом checkpoint не выполнялись; execution `14359/14362/14363` остаются diagnostic evidence, а не post-change runtime GREEN. Runtime gate требует отдельного review/разрешения владельца.
+
+Локальная verification на Node `v26.5.1`: focused recovery `18/18`, evidence repair `79/79`; DOCX option-state `70 total / 69 pass / 1` unchanged baseline fixture-byte failure; все Worker tests `210 / 208 / 2`; полный suite после добавления трёх regression tests `378 / 369 / 9` против pre-change `375 / 366 / 9`, с теми же девятью signatures и без нового failure. Managed sandbox не воспроизводит исторический exact-six runner: пять CLI/runtime assertions получают пустой child-process output из-за подтверждённого `spawnSync ... EPERM`, ещё один pre-change failure — byte-size mismatch source-derived DOCX fixture. Поэтому исторические шесть accepted failures, перечисленные ниже в `Verified`, остаются authoritative repository baseline, но literal `6` на этом runner не подтверждён; runtime GREEN не заявляется.
 
 ### Extractor recovery runtime diagnostic 14360 — blocked before AI
 

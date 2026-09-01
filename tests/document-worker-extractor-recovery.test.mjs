@@ -323,6 +323,41 @@ async function runResponseWrapper(nodeName, response, source, linkedSourceNode) 
   return JSON.parse(JSON.stringify(result));
 }
 
+async function runPrimaryBatchWrappers(responses, sources, pairedSourceIndexes) {
+  assert.equal(responses.length, sources.length);
+  assert.equal(pairedSourceIndexes.length, responses.length);
+  return Promise.all(responses.map(async (response, index) => {
+    const inputItem = {
+      json: structuredClone(response),
+      pairedItem: { item: pairedSourceIndexes[index] },
+    };
+    const sourceItems = sources.map((source) => ({ json: structuredClone(source) }));
+    const node = findNode(NODES.primaryWrapper);
+    const context = vm.createContext({
+      console,
+      structuredClone,
+      $json: inputItem.json,
+      $input: {
+        all: () => [inputItem],
+        first: () => inputItem,
+        item: inputItem,
+      },
+      $: (nodeNameLookup) => {
+        assert.equal(nodeNameLookup, NODES.prepare);
+        const pairedIndex = inputItem.pairedItem.item;
+        return {
+          item: sourceItems[pairedIndex],
+          itemMatching: (requestedIndex) => sourceItems[requestedIndex],
+        };
+      },
+    });
+    const result = await new vm.Script(
+      `(async () => { ${node.parameters.jsCode}\n })()`,
+    ).runInContext(context);
+    return JSON.parse(JSON.stringify(result));
+  }));
+}
+
 function buildStrictSource(unitId) {
   const fact = buildFact(unitId);
   return {
@@ -604,6 +639,13 @@ test('RED: primary/fallback HTTP and recovery internals have exact hard-stop set
     NODES.fallbackAudit,
     NODES.recoveryBarrier,
   ]) assertExactHardStop(internalNode);
+
+  const primaryHttp = findNode(NODES.primaryHttp);
+  assert.deepEqual(primaryHttp.parameters.options?.batching, {
+    batchSize: 16,
+    batchInterval: 1000,
+  });
+  assert.equal(primaryHttp.parameters.options?.timeout, 180000);
 });
 
 test('RED: Primary Extractor accepted IF has one strict accepted-only condition', () => {
@@ -634,7 +676,7 @@ test('RED: Primary Extractor accepted IF has one strict accepted-only condition'
   assert.deepEqual(outputsFrom(NODES.primaryDecision, 1), [{ node: NODES.prepareFallback, index: 0 }]);
 });
 
-test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-done persistence path', () => {
+test('RED: batch-first primary graph has exact Loop feedback, completion barrier, and no pre-done persistence path', () => {
   const loop = findNode(NODES.loop);
   findNode(NODES.primaryHttp);
   findNode(NODES.primaryValidator);
@@ -649,14 +691,14 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
   assert.equal(loop.typeVersion, 3);
   assert.equal(loop.parameters.batchSize ?? 1, 1);
   assert.equal(loop.parameters.options?.reset ?? false, false);
-  assert.deepEqual(outputsFrom(NODES.prepare), [{ node: NODES.loop, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.loop, 1), [{ node: NODES.primaryHttp, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.prepare), [{ node: NODES.primaryHttp, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.loop, 1), [{ node: NODES.primaryDecision, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.loop, 0), [{ node: NODES.recoveryBarrier, index: 0 }]);
 
   assert.deepEqual(outputsFrom(NODES.primaryHttp, 0), [{ node: NODES.primaryWrapper, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), []);
   assert.deepEqual(outputsFrom(NODES.primaryWrapper), [{ node: NODES.primaryValidator, index: 0 }]);
-  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.primaryDecision, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.loop, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryValidator, 1), []);
   assert.deepEqual(outputsFrom(NODES.primaryDecision, 0), [{ node: NODES.primaryAudit, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryDecision, 1), [{ node: NODES.prepareFallback, index: 0 }]);
@@ -674,7 +716,7 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
   assert.deepEqual(outputsFrom(NODES.recoveryBarrier), [{ node: NODES.evidenceCollector, index: 0 }]);
 
   const expectedLoopInbound = [
-    { source: NODES.prepare, outputIndex: 0, inputIndex: 0 },
+    { source: NODES.primaryValidator, outputIndex: 0, inputIndex: 0 },
     { source: NODES.evidenceDecision, outputIndex: 0, inputIndex: 0 },
     { source: NODES.evidenceRepairDecision, outputIndex: 0, inputIndex: 0 },
     { source: NODES.factPartitionDecision, outputIndex: 0, inputIndex: 0 },
@@ -690,7 +732,7 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
   ]) {
     assert.deepEqual(outputsFrom(tail, 0), [{ node: NODES.loop, index: 0 }]);
   }
-  assert.equal(outputsFrom(NODES.primaryValidator).some(({ node }) => node === NODES.loop), false);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.loop, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.retryUnavailableStop), []);
   assert.deepEqual(outputsFrom(NODES.evidenceFailedStop), []);
 
@@ -712,12 +754,48 @@ test('RED: explicit-carry graph has exact Loop feedback, no Merge, and no pre-do
     NODES.validatorDispatch,
     NODES.saveFacts,
   ]) assert.equal(beforeDoneReachable.has(forbidden), false, `pre-done path reaches ${forbidden}`);
+  assert.equal(
+    beforeDoneReachable.has(NODES.primaryHttp),
+    false,
+    'Primary HTTP must be unreachable from the serialized Loop body',
+  );
   assert.deepEqual(
     [...beforeDoneReachable]
       .map((name) => findNode(name))
       .filter(({ type }) => type === 'n8n-nodes-base.merge')
       .map(({ name }) => name),
     [],
+  );
+});
+
+test('RED: 16 primary responses retain exact paired source identity, order, and cardinality', async () => {
+  const ids = fixture.primary_decisions.map(({ analysis_unit_id }) => analysis_unit_id);
+  const sources = ids.map((unitId) => buildStrictSource(unitId));
+  const pairedSourceIndexes = [5, 0, 15, 2, 11, 7, 1, 14, 4, 9, 3, 13, 6, 12, 8, 10];
+  const expectedLinkedIds = pairedSourceIndexes.map((sourceIndex) => ids[sourceIndex]);
+  assert.notDeepEqual(pairedSourceIndexes, Array.from({ length: 16 }, (_, index) => index));
+  const responses = expectedLinkedIds.map((unitId, index) => ({
+    ...buildProviderResponse(buildStrictProviderPayload(unitId)),
+    id: `sanitized-response-${index + 1}`,
+  }));
+  const wrapped = await runPrimaryBatchWrappers(
+    responses,
+    sources,
+    pairedSourceIndexes,
+  );
+
+  assert.equal(wrapped.length, 16);
+  assert.deepEqual(
+    wrapped.map(({ json }) => json.attempt_transport.analysis_unit_id),
+    expectedLinkedIds,
+  );
+  assert.deepEqual(
+    wrapped.map(({ json }) => json.attempt_transport.source.analysis_unit_meta.analysis_unit_id),
+    expectedLinkedIds,
+  );
+  assert.deepEqual(
+    wrapped.map(({ json }) => json.attempt_transport.provider_response.id),
+    responses.map(({ id }) => id),
   );
 });
 
@@ -750,6 +828,26 @@ test('RED: exact execution 14359 matrix requires exactly one fallback for each o
 
 test('RED: a mixed batch falls back only for the invalid subset and retains source order', async () => {
   const ids = ['sanitized_mixed_1', 'sanitized_mixed_2', 'sanitized_mixed_3', 'sanitized_mixed_4'];
+  const primaryResponses = ids.map((unitId) => buildProviderResponse(buildStrictProviderPayload(unitId)));
+  primaryResponses[1] = buildProviderTextResponse('{');
+  primaryResponses[3] = buildProviderResponse({
+    ...buildStrictProviderPayload(ids[3]),
+    field_catalog_version: 'unexpected_catalog',
+  });
+  const decisions = await Promise.all(ids.map((unitId, index) => runStrictClassifier(
+    NODES.primaryValidator,
+    buildAttemptEnvelope(buildStrictSource(unitId), primaryResponses[index]),
+  )));
+  assert.deepEqual(
+    decisions.map(({ json }) => json.extractor_recovery_decision.decision),
+    ['accepted', 'fallback_required', 'accepted', 'fallback_required'],
+  );
+  assert.deepEqual(
+    decisions.flatMap(({ json }, index) => (
+      json.extractor_recovery_decision.decision === 'fallback_required' ? [ids[index]] : []
+    )),
+    [ids[1], ids[3]],
+  );
   const units = [
     buildFinalUnit(ids[0], 'primary'),
     buildFinalUnit(ids[1], 'fallback', { failure_class: 'contract', failure_code: 'invalid_json' }),
@@ -767,6 +865,38 @@ test('RED: a mixed batch falls back only for the invalid subset and retains sour
     output.map(({ json }) => json.extractor.attempt_audit.attempt_count),
     [1, 2, 1, 2],
   );
+});
+
+test('RED: one unit can enter at most one fallback and the barrier rejects a third attempt', async () => {
+  assert.deepEqual(inboundTo(NODES.prepareFallback), [
+    { source: NODES.primaryDecision, outputIndex: 1, inputIndex: 0 },
+  ]);
+  const unitId = 'sanitized_unbounded_fallback';
+  const unbounded = buildFinalUnit(unitId, 'fallback', {
+    failure_class: 'contract',
+    failure_code: 'invalid_json',
+  });
+  unbounded.extractor.attempt_audit.attempt_count = 3;
+  await assert.rejects(
+    runRecoveryBarrier([unbounded], [unitId]),
+    /attempt_count|attempt audit/i,
+  );
+});
+
+test('RED: primary transport failure hard-stops before Loop done and cannot partially persist', () => {
+  assertExactHardStop(NODES.primaryHttp);
+  assert.deepEqual(outputsFrom(NODES.primaryHttp, 1), []);
+  assert.deepEqual(inboundTo(NODES.recoveryBarrier), [
+    { source: NODES.loop, outputIndex: 0, inputIndex: 0 },
+  ]);
+  const errorReachable = reachableNodes(outputsFrom(NODES.primaryHttp, 1));
+  for (const forbidden of [
+    NODES.loop,
+    NODES.recoveryBarrier,
+    NODES.evidenceCollector,
+    NODES.validatorDispatch,
+    NODES.saveFacts,
+  ]) assert.equal(errorReachable.has(forbidden), false);
 });
 
 test('RED: temporary canary injector mutates exactly the first validated wrapper and canonical validation forces one fallback', async () => {
@@ -1083,7 +1213,8 @@ test('RED: safe deterministic envelope attachment remains primary and cannot ent
     output.json.validated_unit.extractor.envelope_attachment.repair_reasons,
     ['missing_schema_version'],
   );
-  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.primaryDecision, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.primaryValidator), [{ node: NODES.loop, index: 0 }]);
+  assert.deepEqual(outputsFrom(NODES.loop, 1), [{ node: NODES.primaryDecision, index: 0 }]);
   assert.deepEqual(outputsFrom(NODES.primaryDecision, 0), [{ node: NODES.primaryAudit, index: 0 }]);
   assert.equal(outputsFrom(NODES.primaryAudit).some(({ node }) => node === NODES.prepareFallback), false);
 });

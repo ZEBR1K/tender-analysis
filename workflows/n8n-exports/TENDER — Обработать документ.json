@@ -564,6 +564,10 @@
         "specifyBody": "json",
         "jsonBody": "={{\n{\n  model: 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low',\n\n  messages: [\n    {\n      role: 'system',\n      content: $json.ai_request.system_prompt\n    },\n    {\n      role: 'user',\n      content: $json.ai_request.user_prompt\n    }\n  ],\n\n\n  response_format: {\n    type: 'json_object'\n  },\n\n  max_tokens: 16384,\n\n  stream: false\n}\n}}",
         "options": {
+          "batching": {
+            "batchSize": 16,
+            "batchInterval": 1000
+          },
           "response": {
             "response": {
               "responseFormat": "json"
@@ -957,7 +961,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst items = $input.all();\nconst savedUnits = $('Сохранить analysis unit').all();\nif (savedUnits.length === 0) throw new Error('[Evidence completeness barrier] Нет сохранённых units.');\nconst expected = Number(savedUnits[0].json.analysis_batch?.units_total ?? savedUnits.length);\nif (savedUnits.length !== expected) {\n  throw new Error('[Evidence completeness barrier] Saved units count mismatch: ' + savedUnits.length + '/' + expected);\n}\nif (items.length !== expected) {\n  throw new Error('[Evidence completeness barrier] Validated units count mismatch: ' + items.length + '/' + expected);\n}\nconst ids = new Set();\nlet evidenceRepairRequests = 0;\nlet factPartitionRequests = 0;\nlet evidenceCount = 0;\nlet quoteChars = 0;\nlet deterministicallyRejectedFactsCount = 0;\nfor (const item of items) {\n  const value = item.json;\n  const unitId = value.analysis_unit_meta?.analysis_unit_id;\n  if (!unitId || ids.has(unitId)) throw new Error('[Evidence completeness barrier] Missing or duplicate analysis_unit_id.');\n  ids.add(unitId);\n  if (value.validation_passed !== true || value.evidence_validation?.passed !== true) {\n    throw new Error('[Evidence completeness barrier] Unit did not pass evidence validation: ' + unitId);\n  }\n  if (!Array.isArray(value.violations) || value.violations.length !== 0) {\n    throw new Error('[Evidence completeness barrier] Unit contains unresolved violations: ' + unitId);\n  }\n  if (!Array.isArray(value.verified_facts)) {\n    throw new Error('[Evidence completeness barrier] verified_facts is not an array: ' + unitId);\n  }\n  if (value.deterministically_rejected_facts === undefined) {\n    value.deterministically_rejected_facts = [];\n  }\n  if (!Array.isArray(value.deterministically_rejected_facts)) {\n    throw new Error('[Evidence completeness barrier] deterministically_rejected_facts is not an array: ' + unitId);\n  }\n  if (value.resolved_violations === undefined) {\n    value.resolved_violations = [];\n  }\n  if (!Array.isArray(value.resolved_violations)) {\n    throw new Error('[Evidence completeness barrier] resolved_violations is not an array: ' + unitId);\n  }\n  evidenceRepairRequests += Number(value.extractor?.repair?.requests_count ?? 0);\n  factPartitionRequests += Number(value.extractor?.partition?.requests_count ?? 0);\n  evidenceCount += Number(value.evidence_validation?.resource_metrics?.evidence_count ?? 0);\n  quoteChars += Number(value.evidence_validation?.resource_metrics?.total_quote_chars ?? 0);\n  deterministicallyRejectedFactsCount += value.deterministically_rejected_facts.length;\n}\nconst totalRetryRequests = evidenceRepairRequests + factPartitionRequests;\nconst batchMetrics = {\n  units_total: expected,\n  extractor_requests: expected,\n  evidence_repair_requests: evidenceRepairRequests,\n  fact_partition_requests: factPartitionRequests,\n  total_retry_requests: totalRetryRequests,\n  repair_requests: totalRetryRequests,\n  total_ai_requests_before_ai_validator: expected + totalRetryRequests,\n  evidence_count: evidenceCount,\n  total_quote_chars: quoteChars,\n  deterministically_rejected_facts_count: deterministicallyRejectedFactsCount,\n  loop_batch_size: 1,\n  extractor_flow: 'normal multi-item flow before convergence loop',\n  latency_note: 'Only convergence and one bounded retry per invalid unit are serialized by Loop Over Items batch=1.',\n};\nreturn items.map((item, index) => ({\n  json: {\n    ...item.json,\n    evidence_batch_metrics: batchMetrics,\n    extractor: {\n      ...(item.json.extractor ?? {}),\n      evidence_batch_metrics: batchMetrics,\n    },\n  },\n  pairedItem: { item: index },\n}));\n"
+        "jsCode": "\nconst items = $input.all();\nconst savedUnits = $('Сохранить analysis unit').all();\nif (savedUnits.length === 0) throw new Error('[Evidence completeness barrier] Нет сохранённых units.');\nconst expected = Number(savedUnits[0].json.analysis_batch?.units_total ?? savedUnits.length);\nif (savedUnits.length !== expected) {\n  throw new Error('[Evidence completeness barrier] Saved units count mismatch: ' + savedUnits.length + '/' + expected);\n}\nif (items.length !== expected) {\n  throw new Error('[Evidence completeness barrier] Validated units count mismatch: ' + items.length + '/' + expected);\n}\nconst ids = new Set();\nlet extractorFallbackRequests = 0;\nlet evidenceRepairRequests = 0;\nlet factPartitionRequests = 0;\nlet evidenceCount = 0;\nlet quoteChars = 0;\nlet deterministicallyRejectedFactsCount = 0;\nfor (const item of items) {\n  const value = item.json;\n  const unitId = value.analysis_unit_meta?.analysis_unit_id;\n  if (!unitId || ids.has(unitId)) throw new Error('[Evidence completeness barrier] Missing or duplicate analysis_unit_id.');\n  ids.add(unitId);\n  if (value.validation_passed !== true || value.evidence_validation?.passed !== true) {\n    throw new Error('[Evidence completeness barrier] Unit did not pass evidence validation: ' + unitId);\n  }\n  if (!Array.isArray(value.violations) || value.violations.length !== 0) {\n    throw new Error('[Evidence completeness barrier] Unit contains unresolved violations: ' + unitId);\n  }\n  if (!Array.isArray(value.verified_facts)) {\n    throw new Error('[Evidence completeness barrier] verified_facts is not an array: ' + unitId);\n  }\n  if (value.deterministically_rejected_facts === undefined) {\n    value.deterministically_rejected_facts = [];\n  }\n  if (!Array.isArray(value.deterministically_rejected_facts)) {\n    throw new Error('[Evidence completeness barrier] deterministically_rejected_facts is not an array: ' + unitId);\n  }\n  if (value.resolved_violations === undefined) {\n    value.resolved_violations = [];\n  }\n  if (!Array.isArray(value.resolved_violations)) {\n    throw new Error('[Evidence completeness barrier] resolved_violations is not an array: ' + unitId);\n  }\n  extractorFallbackRequests += Number(value.extractor?.attempt_audit?.final_source === 'fallback');\n  evidenceRepairRequests += Number(value.extractor?.repair?.requests_count ?? 0);\n  factPartitionRequests += Number(value.extractor?.partition?.requests_count ?? 0);\n  evidenceCount += Number(value.evidence_validation?.resource_metrics?.evidence_count ?? 0);\n  quoteChars += Number(value.evidence_validation?.resource_metrics?.total_quote_chars ?? 0);\n  deterministicallyRejectedFactsCount += value.deterministically_rejected_facts.length;\n}\nconst totalRetryRequests = evidenceRepairRequests + factPartitionRequests;\nconst batchMetrics = {\n  units_total: expected,\n  extractor_requests: expected,\n  extractor_fallback_requests: extractorFallbackRequests,\n  evidence_repair_requests: evidenceRepairRequests,\n  fact_partition_requests: factPartitionRequests,\n  total_retry_requests: totalRetryRequests,\n  repair_requests: totalRetryRequests,\n  total_ai_requests_before_ai_validator: expected + extractorFallbackRequests + totalRetryRequests,\n  evidence_count: evidenceCount,\n  total_quote_chars: quoteChars,\n  deterministically_rejected_facts_count: deterministicallyRejectedFactsCount,\n  loop_batch_size: 1,\n  extractor_flow: 'batch-first primary before per-unit convergence loop',\n  latency_note: 'Primary Extractor runs as a multi-item batch before Loop Over Items; only per-unit convergence and bounded fallback/evidence retries are serialized by batch=1.',\n};\nreturn items.map((item, index) => ({\n  json: {\n    ...item.json,\n    evidence_batch_metrics: batchMetrics,\n    extractor: {\n      ...(item.json.extractor ?? {}),\n      evidence_batch_metrics: batchMetrics,\n    },\n  },\n  pairedItem: { item: index },\n}));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1907,7 +1911,7 @@
       "main": [
         [
           {
-            "node": "Обработать evidence units по одной",
+            "node": "AI Extractor v1.0",
             "type": "main",
             "index": 0
           }
@@ -1984,7 +1988,7 @@
       "main": [
         [
           {
-            "node": "Primary Extractor accepted?",
+            "node": "Обработать evidence units по одной",
             "type": "main",
             "index": 0
           }
@@ -2024,7 +2028,7 @@
         ],
         [
           {
-            "node": "AI Extractor v1.0",
+            "node": "Primary Extractor accepted?",
             "type": "main",
             "index": 0
           }

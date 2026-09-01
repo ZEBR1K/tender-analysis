@@ -1883,11 +1883,11 @@ test('repair topology cannot bypass validation attempt 2 or the completeness bar
 
   assert.deepEqual(
     connectedTargets(workflow, 'Подготовить запрос для AI'),
-    ['Обработать evidence units по одной'],
+    ['AI Extractor v1.0'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Обработать evidence units по одной', 1),
-    ['AI Extractor v1.0'],
+    ['Primary Extractor accepted?'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'AI Extractor v1.0'),
@@ -1899,7 +1899,7 @@ test('repair topology cannot bypass validation attempt 2 or the completeness bar
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Проверить и привязать evidence'),
-    ['Primary Extractor accepted?'],
+    ['Обработать evidence units по одной'],
   );
   assert.deepEqual(
     connectedTargets(workflow, 'Обработать evidence units по одной', 0),
@@ -3495,6 +3495,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Связать primary Extractor response с source',
   ].sort();
   const expectedChangedSharedNodes = new Set([
+    'AI Extractor v1.0',
     'связать результат Docling и метаданные',
     'Нормализовать документ Docling',
     'Собрать смысловые разделы v1.4',
@@ -3510,6 +3511,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Свести AI и units without AI',
     'Собрать факты документа1',
     'Обработать evidence units по одной',
+    'Собрать units после evidence validation',
   ]);
   const expectedChangedRuntimeNodes = new Set(['AI Extractor v1.0']);
   const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));
@@ -3561,8 +3563,6 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
       'AI Extractor v1.0|main|0|Проверить и привязать evidence|main|0',
       'Обработать evidence units по одной|main|0|Собрать units после evidence validation|main|0',
       'Обработать evidence units по одной|main|1|Evidence validation passed?|main|0',
-      'Подготовить запрос для AI|main|0|AI Extractor v1.0|main|0',
-      'Проверить и привязать evidence|main|0|Обработать evidence units по одной|main|0',
       'Связать метаданные и файл|main|0|определить тип файла|main|0',
       'When clicking ‘Execute workflow’|main|0|Сохранить analysis unit|main|0',
     ].sort(),
@@ -3573,8 +3573,6 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
       (nodeName) => edge.startsWith(`${nodeName}|`) || edge.includes(`|${nodeName}|`),
     )),
     [
-      'Обработать evidence units по одной|main|1|AI Extractor v1.0|main|0',
-      'Подготовить запрос для AI|main|0|Обработать evidence units по одной|main|0',
       'When Executed by Another Workflow|main|0|Проверить вход Worker|main|0',
       'Развернуть части для AI v1.2|main|0|Сохранить analysis unit|main|0',
     ].sort(),
@@ -3696,7 +3694,12 @@ test('completeness barrier rejects a missing unit and reports request metrics', 
     violations: [],
     verified_facts: [],
     deterministically_rejected_facts: [],
-    extractor: { repair: { requests_count: index } },
+    extractor: {
+      repair: { requests_count: index },
+      attempt_audit: {
+        final_source: index === 0 ? 'primary' : 'fallback',
+      },
+    },
     evidence_validation: {
       passed: true,
       resource_metrics: { evidence_count: 2, total_quote_chars: 30 },
@@ -3713,17 +3716,18 @@ test('completeness barrier rejects a missing unit and reports request metrics', 
   assert.deepEqual(results[0].evidence_batch_metrics, {
     units_total: 2,
     extractor_requests: 2,
+    extractor_fallback_requests: 1,
     evidence_repair_requests: 1,
     fact_partition_requests: 0,
     total_retry_requests: 1,
     repair_requests: 1,
-    total_ai_requests_before_ai_validator: 3,
+    total_ai_requests_before_ai_validator: 4,
     evidence_count: 4,
     total_quote_chars: 60,
     deterministically_rejected_facts_count: 0,
     loop_batch_size: 1,
-    extractor_flow: 'normal multi-item flow before convergence loop',
-    latency_note: 'Only convergence and one bounded retry per invalid unit are serialized by Loop Over Items batch=1.',
+    extractor_flow: 'batch-first primary before per-unit convergence loop',
+    latency_note: 'Primary Extractor runs as a multi-item batch before Loop Over Items; only per-unit convergence and bounded fallback/evidence retries are serialized by batch=1.',
   });
   assert.deepEqual(
     results[0].extractor.evidence_batch_metrics,
