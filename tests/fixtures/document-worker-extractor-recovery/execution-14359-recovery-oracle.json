@@ -1,0 +1,38 @@
+{
+  "fixture_version": "execution_14359_extractor_recovery_oracle_v1",
+  "sanitization": {
+    "contains_model_reasoning": false,
+    "contains_provider_content": false,
+    "contains_client_document_text": false,
+    "contains_full_execution_payload": false
+  },
+  "source_execution": {
+    "execution_id": "14359",
+    "response_count": 16,
+    "safely_attachable_response_count": 0,
+    "fallback_required_response_count": 16,
+    "first_rejecting_node": "Проверить и привязать evidence"
+  },
+  "models": {
+    "primary_alias": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low",
+    "fallback_alias": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low"
+  },
+  "primary_decisions": [
+    { "ordinal": 1, "analysis_unit_id": "sanitized_au_0001", "top_level_keys": ["facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 2, "analysis_unit_id": "sanitized_au_0002", "top_level_keys": ["facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 3, "analysis_unit_id": "sanitized_au_0003", "top_level_keys": ["facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 4, "analysis_unit_id": "sanitized_au_0004", "top_level_keys": ["facts"], "fact_count": 5, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 5, "analysis_unit_id": "sanitized_au_0005", "top_level_keys": ["facts"], "fact_count": 4, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 6, "analysis_unit_id": "sanitized_au_0006", "top_level_keys": ["facts"], "fact_count": 3, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 7, "analysis_unit_id": "sanitized_au_0007", "top_level_keys": ["analysis_unit_id", "facts"], "fact_count": 7, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 8, "analysis_unit_id": "sanitized_au_0008", "top_level_keys": ["facts", "schema_version"], "fact_count": 3, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 9, "analysis_unit_id": "sanitized_au_0009", "top_level_keys": ["facts"], "fact_count": 1, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 10, "analysis_unit_id": "sanitized_au_0010", "top_level_keys": ["analysis_unit_id", "facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 11, "analysis_unit_id": "sanitized_au_0011", "top_level_keys": ["facts"], "fact_count": 6, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 12, "analysis_unit_id": "sanitized_au_0012", "top_level_keys": ["facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 13, "analysis_unit_id": "sanitized_au_0013", "top_level_keys": ["analysis_unit_id", "facts"], "fact_count": 0, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 14, "analysis_unit_id": "sanitized_au_0014", "top_level_keys": ["facts"], "fact_count": 2, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 15, "analysis_unit_id": "sanitized_au_0015", "top_level_keys": ["facts"], "fact_count": 42, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" },
+    { "ordinal": 16, "analysis_unit_id": "sanitized_au_0016", "top_level_keys": ["analysis_unit_id", "facts"], "fact_count": 1, "decision": "fallback_required", "failure_class": "contract", "failure_code": "invalid_field_catalog_version" }
+  ]
+}
