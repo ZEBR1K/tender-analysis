@@ -5344,3 +5344,15 @@ Targeted Recheck prompt aligns evidence coordinates with both trusted sources
 Production n8n, PostgreSQL и credentials не изменялись; paid AI и push не выполнялись. Runtime canary остаётся pending, поэтому Stage 2 не является runtime complete и execution `14359` не объявляется исправленным в production.
 
 Неблокирующий audit debt: pre-existing `extractor.provider = deepseek` остаётся legacy полем, несмотря на GLM primary и Gemini fallback. Authoritative actual aliases и `primary|fallback` source записаны в bounded `extractor.attempt_audit`; отдельная versioned migration legacy field отложена.
+
+---
+
+## 2026-09-01 — Document Worker recovery canary 14360 blocked before AI
+
+Для isolated test Worker `pDTFwbq6B19qNAVI` approved draft snapshot `a9e13672-…` был временно дополнен manual MCP trigger и bounded summary terminal. Перед запуском graph reachability показал `57` reachable nodes, zero reachable PostgreSQL nodes и отсутствие пути к collector, Validator dispatch, facts/completion persistence и Aggregator. Верхняя граница платных вызовов была `<=48`: `16` primary GLM, до `16` Gemini fallback и до `16` mutually exclusive Evidence Repair/Lossless Fact Partition.
+
+Единственный manual execution `14360` завершился до parser и AI. Trigger, чтение сохранённого PIN claim snapshot, claim guard и file download прошли; первый incorrect node — `Связать метаданные и файл`. Pre-existing `$('Захватить документ в обработку').item.json` потребовал paired-item ancestry от pinned claim-ноды, которая не исполнялась как ancestor временного trigger path. Runtime signature: `workflow-data-proxy getPairedItem`; это дефект canary harness item linking, не semantic результат recovery implementation.
+
+По exact runData ни один PostgreSQL или AI node не исполнялся: paid calls `0`, DB writes `0`. Live workflow не патчился после failure, второй execution не запускался. Временный draft восстановлен из `a9e13672-…` в version `3016111f-…`; nodes, connections и node groups совпадают exact, итог `71` nodes / `68` connection sources, PIN data/credentials неизменны, `[CANARY]` nodes отсутствуют. Published version `a7d04a95-…` не менялась.
+
+Canary verdict — `BLOCKED_BEFORE_AI`. Stage 2 runtime gate остаётся pending: primary/fallback decisions, strict validator outcomes, attempt audit, source order/cardinality и done-only barrier в этом run не проверены. Перед новым paid run нужен отдельный reviewed/TDD contour, который явно переносит source context и не использует `.item` к pinned-but-unexecuted node. Sanitized evidence сохранён в `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14360_2026-09-01.md`; клиентский текст, source URL, document/run UUID, provider content/CoT и secrets не сохранялись.

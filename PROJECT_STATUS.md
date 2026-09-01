@@ -116,6 +116,14 @@ Implementation chain: RED `dff07a9`, safe-attachment GREEN `507e12e`, recovery R
 
 Это не runtime GREEN. Canonical candidate не promoted; production n8n, PostgreSQL и credentials не изменялись, paid AI не запускался. Post-fix canary должен доказать fallback cardinality/order, максимум две попытки, strict acceptance и отсутствие partial persistence на реальном execution path.
 
+### Extractor recovery runtime diagnostic 14360 — blocked before AI
+
+В isolated test Worker `pDTFwbq6B19qNAVI` был выполнен ровно один manual draft run на сохранённых PIN data, без publish. Временный canary contour статически имел zero reachability к PostgreSQL, Validator, persistence и Aggregator; его верхняя граница была `16` primary + до `16` fallback + до `16` mutually exclusive evidence-repair/partition calls (`<=48`). Фактически execution `14360` остановился до parser и AI, поэтому paid calls = `0`, PostgreSQL node runs = `0`.
+
+Первый incorrect node — `Связать метаданные и файл`. Его pre-existing expression `$('Захватить документ в обработку').item.json` запросил paired-item ancestry для pinned, но не исполнявшейся в этом временном пути claim-ноды. n8n завершил node в `workflow-data-proxy getPairedItem`; это canary-harness linking defect, а не verdict по GLM/Gemini recovery contract. Live-патч и повторный run не выполнялись.
+
+Временный graph восстановлен из approved snapshot `a9e13672-…` в draft `3016111f-…`: exact version comparison подтверждает равенство nodes/connections/nodeGroups, `71` nodes / `68` connection sources, отсутствие `[CANARY]` nodes, прежний pin-data SHA-256 и credentials. Published version `a7d04a95-…` не менялась. Runtime gate остаётся открытым: execution не дал ни primary decisions, ни fallback calls, ни barrier output. Sanitized audit: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14360_2026-09-01.md`.
+
 Текущий `[PROD CANDIDATE]` Worker является отдельным live test contour и не равен ни `[3 TEST]`, ни canonical repository export. Перед исправлением `DW-17` или `DW-18` нужно сначала получить exact active/draft diff `c5977af5-… → 778dfb50-…` и определить назначение draft-only 52-й ноды; молчаливо редактировать draft как эквивалент execution `14234` нельзя.
 
 ### Runtime evidence
@@ -514,6 +522,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - ручная бизнес-проверка всех 27 полей клиентского результата.
 - post-fix runtime extraction/preservation DOCX ActiveX state в isolated Worker candidate; executions `14350–14352` являются pre-fix diagnostic evidence, а не GREEN canary;
 - post-fix runtime verification bounded Extractor fallback: execution `14359` остаётся `0/16` safely attachable по primary evidence, а local GREEN `58556f6` ещё не доказывает успешный Gemini fallback, exact batch convergence или отсутствие partial persistence в n8n runtime;
+- isolated execution `14360` не закрыл этот gate: canary harness остановился до AI на missing paired-item ancestry в `Связать метаданные и файл`; следующий run допустим только после отдельного reviewed source-carry design, который не зависит от `.item` к pinned-but-unexecuted claim node;
 - reproducible sanitized full-payload replay для semantic binding execution `14359`: checked-in regression намеренно сокращён до `6` controls и `4` meaningful tables, хотя отдельно хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Перед promotion нужен воспроизводимый sanitized full-payload replay либо точное переименование fixture/replay contract, исключающее впечатление полного replay;
 - published/runtime verification Aggregator fail-closed applicability boundary; `AG-11` пока находится только в test draft и offline GREEN;
 - grounded внешний источник для суммы `participation_cost = 24 900`; в текущем source bundle это значение не подтверждено;
