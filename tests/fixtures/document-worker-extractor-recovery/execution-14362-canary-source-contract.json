@@ -1,0 +1,58 @@
+{
+  "contract_version": "document_worker_canary_barrier_source_v1",
+  "source_execution": {
+    "execution_id": "14362",
+    "observed_units": 12,
+    "bypass_shape": "analysis_unit_without_analysis_unit_meta",
+    "post_materialization_shape": "analysis_unit_meta_with_analysis_unit_id"
+  },
+  "expected_source_node": "Подготовить запрос для AI",
+  "expected_analysis_unit_ids": [
+    "sanitized_au_0001",
+    "sanitized_au_0002",
+    "sanitized_au_0003",
+    "sanitized_au_0004",
+    "sanitized_au_0005",
+    "sanitized_au_0006",
+    "sanitized_au_0007",
+    "sanitized_au_0008",
+    "sanitized_au_0009",
+    "sanitized_au_0010",
+    "sanitized_au_0011",
+    "sanitized_au_0012"
+  ],
+  "bypass_items": [
+    { "json": { "analysis_unit": { "ordinal": 1 } } },
+    { "json": { "analysis_unit": { "ordinal": 2 } } },
+    { "json": { "analysis_unit": { "ordinal": 3 } } },
+    { "json": { "analysis_unit": { "ordinal": 4 } } },
+    { "json": { "analysis_unit": { "ordinal": 5 } } },
+    { "json": { "analysis_unit": { "ordinal": 6 } } },
+    { "json": { "analysis_unit": { "ordinal": 7 } } },
+    { "json": { "analysis_unit": { "ordinal": 8 } } },
+    { "json": { "analysis_unit": { "ordinal": 9 } } },
+    { "json": { "analysis_unit": { "ordinal": 10 } } },
+    { "json": { "analysis_unit": { "ordinal": 11 } } },
+    { "json": { "analysis_unit": { "ordinal": 12 } } }
+  ],
+  "post_materialization_items": [
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0001" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0002" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0003" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0004" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0005" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0006" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0007" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0008" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0009" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0010" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0011" } } },
+    { "json": { "analysis_unit_meta": { "analysis_unit_id": "sanitized_au_0012" } } }
+  ],
+  "sanitization": {
+    "contains_client_document_text": false,
+    "contains_provider_content": false,
+    "contains_credentials": false,
+    "contains_document_or_run_uuid": false
+  }
+}
