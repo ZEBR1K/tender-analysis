@@ -1,0 +1,68 @@
+{
+  "contract_version": "docx_option_state_semantic_binding_fixture_v1",
+  "source_execution": 14359,
+  "sanitization": {
+    "full_document_included": false,
+    "credentials_or_secrets_included": false,
+    "personal_data_included": false,
+    "notes": "Minimal execution-derived table/row geometry and option labels required to reproduce global-label contamination."
+  },
+  "source_option_states": [
+    {
+      "control_name": "national_option_1",
+      "state": "unselected",
+      "exact_label": "Запрет закупок [пункты ТЗ];",
+      "source_row_ref": "word/document.xml#table[3]/row[1]"
+    },
+    {
+      "control_name": "national_option_2",
+      "state": "unselected",
+      "exact_label": "Ограничение закупок [пункты ТЗ];",
+      "source_row_ref": "word/document.xml#table[3]/row[2]"
+    },
+    {
+      "control_name": "national_option_3",
+      "state": "unselected",
+      "exact_label": "Преимущество российским товарам [пункты ТЗ];",
+      "source_row_ref": "word/document.xml#table[3]/row[3]"
+    },
+    {
+      "control_name": "national_option_4",
+      "state": "selected",
+      "exact_label": "Не применимо.",
+      "source_row_ref": "word/document.xml#table[3]/row[4]"
+    },
+    {
+      "control_name": "guarantee_option_1",
+      "state": "selected",
+      "exact_label": "Не предусмотрены;",
+      "source_row_ref": "word/document.xml#table[28]/row[1]"
+    },
+    {
+      "control_name": "guarantee_option_2",
+      "state": "unselected",
+      "exact_label": "Предусмотрены. Обеспечение заявки должно соответствовать требованиям:",
+      "source_row_ref": "word/document.xml#table[28]/row[2]"
+    }
+  ],
+  "normalized_tables": {
+    "national_regime": {
+      "docling_table_ref": "#/tables/2",
+      "semantic_block_id": "sb_0019"
+    },
+    "participation_guarantee": {
+      "docling_table_ref": "#/tables/25",
+      "semantic_block_id": "sb_0154"
+    },
+    "duplicate_national_label": {
+      "docling_table_ref": "#/tables/52",
+      "row": 6,
+      "label": "Не применимо."
+    },
+    "duplicate_guarantee_label": {
+      "docling_table_ref": "#/tables/31",
+      "row": 1,
+      "label": "Не предусмотрены;"
+    }
+  }
+}

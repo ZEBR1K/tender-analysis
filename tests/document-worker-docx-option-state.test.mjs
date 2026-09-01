@@ -23,6 +23,12 @@ const ooxmlRoot = path.join(fixtureRoot, 'ooxml');
 const manifest = JSON.parse(
   fs.readFileSync(path.join(fixtureRoot, 'manifest.json'), 'utf8'),
 );
+const semanticBindingFixture = JSON.parse(
+  fs.readFileSync(
+    path.join(fixtureRoot, 'execution-14359-semantic-binding.json'),
+    'utf8',
+  ),
+);
 
 const nodeNames = Object.freeze({
   prepareArchive: 'Подготовить DOCX archive alias',
@@ -503,6 +509,114 @@ function optionStateDoclingDocument() {
   };
 }
 
+function bindingFixtureOptionStates(overrides = new Map()) {
+  return semanticBindingFixture.source_option_states.map((state) => ({
+    contract_version: 'docx_option_state_v1',
+    document_part: 'word/document.xml',
+    control_type: 'option_button',
+    raw_value: state.state === 'selected' ? '1' : '0',
+    group_context: null,
+    control_rel_target: null,
+    binary_rel_target: null,
+    warnings: [],
+    ...state,
+    ...(overrides.get(state.control_name) ?? {}),
+  }));
+}
+
+function doclingTableFromLabels(tableIndex, labelsByRow = new Map()) {
+  const tableCells = [];
+  for (const [rowIndex, label] of [...labelsByRow.entries()].sort((a, b) => a[0] - b[0])) {
+    tableCells.push({
+      start_row_offset_idx: rowIndex,
+      end_row_offset_idx: rowIndex + 1,
+      start_col_offset_idx: 0,
+      end_col_offset_idx: 1,
+      text: '',
+    });
+    tableCells.push({
+      start_row_offset_idx: rowIndex,
+      end_row_offset_idx: rowIndex + 1,
+      start_col_offset_idx: 1,
+      end_col_offset_idx: 2,
+      text: label,
+    });
+  }
+  return {
+    self_ref: `#/tables/${tableIndex}`,
+    label: 'table',
+    prov: [],
+    data: {
+      num_rows: labelsByRow.size,
+      num_cols: 2,
+      table_cells: tableCells,
+    },
+  };
+}
+
+function execution14359SemanticDocument({ cloneGuaranteeStructure = false } = {}) {
+  const tableCount = 154;
+  const tables = Array.from({ length: tableCount }, (_, tableIndex) =>
+    doclingTableFromLabels(tableIndex, new Map([[0, `sanitized filler ${tableIndex}`]])));
+  const states = semanticBindingFixture.source_option_states;
+  const nationalLabels = new Map(states.slice(0, 4).map((state, index) => [index, state.exact_label]));
+  const guaranteeLabels = new Map(states.slice(4).map((state, index) => [index, state.exact_label]));
+  tables[2] = doclingTableFromLabels(2, nationalLabels);
+  tables[25] = doclingTableFromLabels(25, guaranteeLabels);
+  tables[52] = doclingTableFromLabels(52, new Map([[5, states[3].exact_label]]));
+  tables[31] = doclingTableFromLabels(31, new Map([[0, states[4].exact_label]]));
+  if (cloneGuaranteeStructure) tables[63] = doclingTableFromLabels(63, guaranteeLabels);
+
+  const tableOrder = Array.from({ length: tableCount }, (_, index) => index)
+    .filter((index) => index !== 2 && index !== 25);
+  tableOrder.splice(18, 0, 2);
+  tableOrder.splice(153, 0, 25);
+  assert.equal(tableOrder[18], 2);
+  assert.equal(tableOrder[153], 25);
+
+  return {
+    schema_name: 'DoclingDocument',
+    version: 'execution-14359-sanitized',
+    name: 'sanitized.docx',
+    origin: {
+      filename: 'sanitized.docx',
+      mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      binary_hash: 'sanitized',
+    },
+    body: { children: tableOrder.map((index) => ({ $ref: `#/tables/${index}` })) },
+    furniture: { children: [] },
+    texts: [],
+    tables,
+    pictures: [],
+    groups: [],
+    key_value_items: [],
+    form_items: [],
+    pages: {},
+  };
+}
+
+async function normalizeBindingFixture(document, optionStates = bindingFixtureOptionStates()) {
+  const [normalized] = await runCodeNode(
+    loadWorkflow(),
+    nodeNames.normalizeDocling,
+    [{ json: document }],
+    {
+      sourceJsonByNode: {
+        'связать результат Docling и метаданные': {
+          document: { file_name: 'sanitized.docx', file_extension: 'docx' },
+          docx_option_state_status: 'resolved',
+          docx_option_states: optionStates,
+          docx_option_state_audit: {
+            contract_version: 'docx_option_state_audit_v1',
+            warnings: [],
+          },
+        },
+      },
+    },
+  );
+  return normalized;
+}
+
 async function buildOptionStateSemanticFixture() {
   const workflow = loadWorkflow();
   const sourceContext = {
@@ -638,6 +752,22 @@ test('fixture is a reviewed minimal derivative with exact source ActiveX parts',
       assert.equal(data.subarray(0, 8).toString('hex'), 'd0cf11e0a1b11ae1', part.path);
     }
   }
+});
+
+test('execution 14359 semantic-binding fixture is sanitized and preserves only required geometry', () => {
+  assert.equal(
+    semanticBindingFixture.contract_version,
+    'docx_option_state_semantic_binding_fixture_v1',
+  );
+  assert.equal(semanticBindingFixture.source_execution, 14359);
+  assert.equal(semanticBindingFixture.sanitization.full_document_included, false);
+  assert.equal(semanticBindingFixture.sanitization.credentials_or_secrets_included, false);
+  assert.equal(semanticBindingFixture.sanitization.personal_data_included, false);
+  assert.equal(semanticBindingFixture.source_option_states.length, 6);
+  assert.deepEqual(
+    semanticBindingFixture.source_option_states.map(({ state }) => state),
+    ['unselected', 'unselected', 'unselected', 'selected', 'selected', 'unselected'],
+  );
 });
 
 test('structured parser input is loaded from the checked-in source-derived XML fixture', () => {
@@ -1001,73 +1131,144 @@ test('normalization maps exact option labels to owning source blocks and semanti
   }
 });
 
-test('ambiguous normalized ownership does not attach an option state to either source block', async () => {
+test('execution 14359 binds duplicate labels only through their unique source table and row structure', async () => {
   const workflow = loadWorkflow();
-  const document = optionStateDoclingDocument();
-  const ambiguous = manifest.expected_controls[0];
-  document.tables[1].data.table_cells.push({
-    start_row_offset_idx: 2,
-    end_row_offset_idx: 3,
-    start_col_offset_idx: 1,
-    end_col_offset_idx: 2,
-    text: ambiguous.exact_label,
-  });
-  const sourceContext = {
-    document: { file_name: 'fixture.docx', file_extension: 'docx' },
-    docx_option_state_status: 'resolved',
-    docx_option_states: sourceOptionStates(),
-    docx_option_state_audit: { contract_version: 'docx_option_state_audit_v1', warnings: [] },
-  };
-  const [normalized] = await runCodeNode(
-    workflow,
-    nodeNames.normalizeDocling,
-    [{ json: document }],
-    { sourceJsonByNode: { 'связать результат Docling и метаданные': sourceContext } },
+  const normalized = await normalizeBindingFixture(execution14359SemanticDocument());
+  assert.equal(normalized.json.docx_option_state_audit.semantic_mapping_warnings.length, 0);
+
+  const nationalBlock = normalized.json.blocks.find(
+    ({ block_id: blockId }) =>
+      blockId === semanticBindingFixture.normalized_tables.national_regime.docling_table_ref,
   );
-  assert.ok(normalized.json.docx_option_state_audit.semantic_mapping_warnings.some(
-    ({ code, control_name: controlName }) =>
-      code === 'ambiguous_semantic_option_label' && controlName === ambiguous.control_name,
-  ));
+  const guaranteeBlock = normalized.json.blocks.find(
+    ({ block_id: blockId }) =>
+      blockId === semanticBindingFixture.normalized_tables.participation_guarantee.docling_table_ref,
+  );
+  assert.deepEqual(
+    nationalBlock.docx_option_states.map(({ control_name: name }) => name),
+    ['national_option_1', 'national_option_2', 'national_option_3', 'national_option_4'],
+  );
+  assert.deepEqual(
+    guaranteeBlock.docx_option_states.map(({ control_name: name }) => name),
+    ['guarantee_option_1', 'guarantee_option_2'],
+  );
   assert.equal(
-    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_name: controlName }) => controlName === ambiguous.control_name),
-    false,
+    normalized.json.blocks.find(({ block_id: blockId }) => blockId === '#/tables/52')
+      .docx_option_states?.length ?? 0,
+    0,
+  );
+  assert.equal(
+    normalized.json.blocks.find(({ block_id: blockId }) => blockId === '#/tables/31')
+      .docx_option_states?.length ?? 0,
+    0,
   );
 
   const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
   const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
-  semantic.json.analysis_units = [{
-    analysis_unit_id: 'ambiguous-option-unit',
-    primary_semantic_block_ids: semantic.json.semantic_blocks.map(
-      ({ semantic_block_id: semanticBlockId }) => semanticBlockId,
-    ),
-    overlap_semantic_block_ids: [],
-  }];
-  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
-  const ambiguousSegment = expanded.json.ai_segments.find(
-    ({ canonical_text: text }) => text.includes(ambiguous.exact_label),
+  const nationalSemantic = semantic.json.semantic_blocks.find(
+    ({ semantic_block_id: id }) =>
+      id === semanticBindingFixture.normalized_tables.national_regime.semantic_block_id,
   );
-  assert.ok(ambiguousSegment);
-  assert.ok(ambiguousSegment.docx_option_state_mapping_warnings.some(
-    ({ code, exact_label: exactLabel }) =>
-      code === 'ambiguous_semantic_option_label' && exactLabel === ambiguous.exact_label,
-  ));
+  const guaranteeSemantic = semantic.json.semantic_blocks.find(
+    ({ semantic_block_id: id }) =>
+      id === semanticBindingFixture.normalized_tables.participation_guarantee.semantic_block_id,
+  );
+  assert.deepEqual(
+    nationalSemantic.docx_option_states.map(({ state }) => state),
+    ['unselected', 'unselected', 'unselected', 'selected'],
+  );
+  assert.deepEqual(
+    guaranteeSemantic.docx_option_states.map(({ state }) => state),
+    ['selected', 'unselected'],
+  );
+});
 
-  const source = buildOptionSource(ambiguousSegment, 'ambiguous-option-unit');
-  const [evidenceResult] = await runCodeNode(
-    workflow,
-    nodeNames.validateEvidence,
-    [{ json: buildExtractorResponse([
-      buildOptionFact('national_regime', ambiguous.exact_label, ambiguousSegment.semantic_block_id),
-    ], 'ambiguous-option-unit') }],
-    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+test('missing source row coordinate fails closed without label-only attachment', async () => {
+  const overrides = new Map([['national_option_4', { source_row_ref: null }]]);
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    bindingFixtureOptionStates(overrides),
   );
-  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
-  assert.equal(dispatch.json.units_for_ai[0].verified_facts[0].status, 'requires_review');
+  const warning = normalized.json.docx_option_state_audit.semantic_mapping_warnings.find(
+    ({ code, control_name: controlName }) =>
+      code === 'missing_structural_option_coordinate' && controlName === 'national_option_4',
+  );
+  assert.ok(warning);
+  assert.match(warning.issue_id, /^docx_option_mapping_issue_\d{4}$/u);
   assert.equal(
-    dispatch.json.units_for_ai[0].verified_facts[0].option_state_applicability,
-    'review_only',
+    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
+      .some(({ control_name: name }) => name === 'national_option_4'),
+    false,
   );
+});
+
+test('conflicting source row coordinate fails closed instead of searching the label globally', async () => {
+  const overrides = new Map([[
+    'national_option_4',
+    { source_row_ref: 'word/document.xml#table[3]/row[1]' },
+  ]]);
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    bindingFixtureOptionStates(overrides),
+  );
+  assert.ok(normalized.json.docx_option_state_audit.semantic_mapping_warnings.some(
+    ({ code }) => code === 'conflicting_structural_option_coordinates',
+  ));
+  assert.equal(
+    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
+      .some(({ control_name: name }) => name.startsWith('national_option_')),
+    false,
+  );
+});
+
+test('multiple structural table matches fail closed for the whole source-table group', async () => {
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument({ cloneGuaranteeStructure: true }),
+  );
+  assert.ok(normalized.json.docx_option_state_audit.semantic_mapping_warnings.some(
+    ({ code, source_table_ref: sourceTableRef, matches_count: matchesCount }) =>
+      code === 'ambiguous_structural_semantic_owner' &&
+      sourceTableRef === 'word/document.xml#table[28]' &&
+      matchesCount === 2,
+  ));
+  assert.equal(
+    normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
+      .some(({ control_name: name }) => name.startsWith('guarantee_option_')),
+    false,
+  );
+});
+
+test('document-level mapping warnings are stored once and segments carry bounded issue references', async () => {
+  const workflow = loadWorkflow();
+  const overrides = new Map([['national_option_4', { source_row_ref: null }]]);
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    bindingFixtureOptionStates(overrides),
+  );
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const ids = semantic.json.semantic_blocks.map(({ semantic_block_id: id }) => id);
+  semantic.json.analysis_units = [0, 1, 2].map((index) => ({
+    analysis_unit_id: `bounded-warning-unit-${index + 1}`,
+    primary_semantic_block_ids: ids.slice(index * 50, index === 2 ? ids.length : (index + 1) * 50),
+    overlap_semantic_block_ids: [],
+  }));
+  const expanded = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const documentWarnings = expanded.flatMap(
+    ({ json }) => json.analysis_unit?.docx_option_state_audit?.semantic_mapping_warnings ?? [],
+  );
+  assert.equal(documentWarnings.length, 1);
+  assert.equal(new Set(documentWarnings.map(({ issue_id: issueId }) => issueId)).size, 1);
+  assert.equal(
+    expanded.flatMap(({ json }) => json.ai_segments)
+      .flatMap(({ docx_option_state_mapping_warnings: warnings = [] }) => warnings)
+      .length,
+    0,
+  );
+  const issueReferences = expanded.flatMap(({ json }) => json.ai_segments)
+    .flatMap(({ docx_option_state_mapping_issue_ids: issueIds = [] }) => issueIds);
+  assert.ok(issueReferences.length >= 1);
+  assert.ok(issueReferences.every((issueId) => issueId === documentWarnings[0].issue_id));
 });
 
 test('AI segments expose deterministic option markers without replacing canonical semantic text', async () => {
