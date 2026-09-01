@@ -5356,3 +5356,15 @@ Production n8n, PostgreSQL и credentials не изменялись; paid AI и 
 По exact runData ни один PostgreSQL или AI node не исполнялся: paid calls `0`, DB writes `0`. Live workflow не патчился после failure, второй execution не запускался. Временный draft восстановлен из `a9e13672-…` в version `3016111f-…`; nodes, connections и node groups совпадают exact, итог `71` nodes / `68` connection sources, PIN data/credentials неизменны, `[CANARY]` nodes отсутствуют. Published version `a7d04a95-…` не менялась.
 
 Canary verdict — `BLOCKED_BEFORE_AI`. Stage 2 runtime gate остаётся pending: primary/fallback decisions, strict validator outcomes, attempt audit, source order/cardinality и done-only barrier в этом run не проверены. Перед новым paid run нужен отдельный reviewed/TDD contour, который явно переносит source context и не использует `.item` к pinned-but-unexecuted node. Sanitized evidence сохранён в `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14360_2026-09-01.md`; клиентский текст, source URL, document/run UUID, provider content/CoT и secrets не сохранялись.
+
+---
+
+## 2026-09-01 — Corrected pinned-claim canary 14361 blocked before parser/AI
+
+После diagnosis `14360` выполнен один согласованный corrected manual run. Временный Webhook был подключён прямо к pinned PostgreSQL-type node `Захватить документ в обработку`, затем сохранялись прежние bypass `Сохранить analysis unit`, barrier expected-ID adjustment и barrier-only bounded terminal. Pre-run graph: `57` reachable nodes, единственный reachable PostgreSQL node — pinned claim, zero path к collector/Validator/persistence/Aggregator, paid-call cap `<=48`.
+
+Execution `14361` подтвердил official manual pin semantics и corrected pairing: claim был executed ancestor, execution `pinData` содержал сохранённый claim, а его output JSON exact совпал с pin. Claim не записал canary execution ID; `Связать метаданные и файл` успешно завершился. Никакие другие PostgreSQL nodes не исполнялись.
+
+Первый incorrect node — `Подготовить DOCX archive alias`. Его current contract противоречив: `mode = runOnceForEachItem`, но line 1 — `const item = $input.first();`; runtime hard-stop: `.first()` доступен только в `runOnceForAllItems`. Ошибка возникла до parser и всех AI nodes. Paid calls `0`, DB writes `0`; live-патча и второго execution не было.
+
+Temporary draft `c5fef07d-…` восстановлен из source `3016111f-…` в `b8a06968-…`. Read-back: nodes/connections/nodeGroups exact equal, `71` nodes / `68` connection sources, no `[CANARY]` nodes, PIN SHA-256/credentials unchanged, published `a7d04a95-…` unchanged. Runtime recovery gate остаётся pending; следующий шаг — отдельный execution-derived TDD fix Code-node mode/input API mismatch, затем новый reviewed canary. Sanitized evidence: `evaluations/DOCUMENT_WORKER_EXTRACTOR_RECOVERY_CANARY_14361_2026-09-01.md`.
