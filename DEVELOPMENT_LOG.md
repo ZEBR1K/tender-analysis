@@ -5554,10 +5554,14 @@ Continuation GREEN after I-1/I-2/I-3/M-1 fixes:
 node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
 99/99 PASS
 
-All Document Worker tests:
+Authoritative exact non-isolated Document Worker comparison:
 node --test --test-isolation=none tests/document-worker-*.test.mjs
-233 total / 231 pass / 2 unchanged baseline failures
-(document-worker-docx-option-state, document-worker-validator-runtime-contract)
+base ea6248a: 213 total / 212 pass / 1 fail
+candidate: 233 total / 232 pass / 1 fail
+delta: +20 passing tests / no new Worker failure
+(document-worker-docx-option-state: ActiveX fixture 286 != 287)
+
+`document-worker-validator-runtime-contract` относится только к отдельному file-isolated full-suite baseline на runner, где child-process output может быть пустым из-за `spawnSync ... EPERM`; он не включён в authoritative non-isolated Worker totals.
 
 Full file-isolated suite:
 node --test tests/*.test.mjs

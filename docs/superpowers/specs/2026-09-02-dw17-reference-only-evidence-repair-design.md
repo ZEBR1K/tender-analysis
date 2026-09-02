@@ -1,6 +1,6 @@
 # DW-17 Reference-Only Evidence Repair Design
 
-**Status:** owner-approved implementation design  
+**Status:** owner-approved implementation design
 **Scope:** canonical local Document Worker only; no live n8n/DB access
 
 ## Problem and boundary
