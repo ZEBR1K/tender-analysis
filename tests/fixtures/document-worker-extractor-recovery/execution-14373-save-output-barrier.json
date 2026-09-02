@@ -1,0 +1,49 @@
+{
+  "fixture_version": "document_worker_extractor_recovery_barrier_execution_14373_v1",
+  "fixture_kind": "sanitized_execution_derived_barrier_contract",
+  "replay_scope": "save_output_shape_and_recovery_barrier_contract_only",
+  "source_execution": {
+    "execution_id": "14373",
+    "failed_node": "Проверить полноту Extractor recovery",
+    "observed_error": "[Extractor recovery barrier] Expected item 0 missing analysis_unit_id. [line 3]",
+    "observed_units": 12
+  },
+  "sanitization": {
+    "contains_client_document_text": false,
+    "contains_provider_request_or_response": false,
+    "contains_credentials_or_secrets": false,
+    "preserves_observed_output_shape": true
+  },
+  "models": {
+    "primary": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low",
+    "fallback": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low"
+  },
+  "save_analysis_unit_output": [
+    { "json": { "analysis_unit_id": "doc_3_au_0001", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0002", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0003", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0004", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0005", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0006", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0007", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0008", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0009", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0010", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0011", "analysis_batch": { "units_total": 12 } } },
+    { "json": { "analysis_unit_id": "doc_3_au_0012", "analysis_batch": { "units_total": 12 } } }
+  ],
+  "recovered_output": [
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0001" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0001", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0002" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0002", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0003" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0003", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0004" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0004", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0005" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0005", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0006" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0006", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0007" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0007", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0008" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0008", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0009" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0009", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0010" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0010", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0011" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0011", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } },
+    { "analysis_unit_meta": { "analysis_unit_id": "doc_3_au_0012" }, "analysis_batch": { "units_total": 12 }, "extractor": { "attempt_audit": { "version": "ai_extractor_attempt_audit_v1", "analysis_unit_id": "doc_3_au_0012", "primary_model": "z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low", "fallback_model": "google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low", "primary_failure_class": null, "primary_failure_code": null, "attempt_count": 1, "final_source": "primary" } } }
+  ]
+}

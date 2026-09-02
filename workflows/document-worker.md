@@ -392,6 +392,29 @@ TDD chain исходного recovery contour: `dff07a9` → `507e12e` → `581e
 
 ---
 
+## 9C. Extractor recovery barrier — execution 14373 local repair
+
+Execution `14373` прошёл `DW-17` Evidence Repair для всех `12` analysis units и остановился в `Проверить полноту Extractor recovery` с первым incorrect state:
+
+```text
+[Extractor recovery barrier] Expected item 0 missing analysis_unit_id.
+```
+
+`Сохранить analysis unit` фактически возвращает persisted identity как top-level `item.json.analysis_unit_id`; прежний barrier ошибочно ожидал `item.json.analysis_unit_meta.analysis_unit_id`. Recovered units сохраняют прежний downstream контракт `analysis_unit_meta.analysis_unit_id`, exact source order и bounded `ai_extractor_attempt_audit_v1`.
+
+Canonical local repair меняет только expected-ID access в barrier:
+
+```text
+item.json.analysis_unit_meta.analysis_unit_id
+→ item.json.analysis_unit_id
+```
+
+Все fail-closed проверки output cardinality, duplicate/unknown identity, order, `analysis_batch.units_total` и bounded audit сохранены. Sanitized execution-derived fixture покрывает `doc_3_au_0001…doc_3_au_0012`; focused Extractor recovery/envelope/evidence-repair suites проходят `132/132`. File-isolated Document Worker suite: `10 files / 8 pass / 2` unchanged baseline failures; full repository suite: `23 files / 19 pass / 4` exact baseline failures против base `22 / 18 / 4`.
+
+Это local-only GREEN. Canonical candidate не импортирован и не выполнялся; runtime recheck полного `DW-17 → recovery barrier → Validator → persistence` остаётся pending. Production n8n/PostgreSQL/credentials не читались и не изменялись.
+
+---
+
 ## 10. Universal Docling Normalizer
 
 `Нормализовать документ Docling` принимает `DoclingDocument` и превращает provider-specific структуру в наш универсальный document representation.

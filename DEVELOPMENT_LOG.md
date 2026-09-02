@@ -5575,3 +5575,40 @@ document-worker-validator-runtime-contract)
 Добавлен только sanitized synthetic structural-class fixture `14371` (`runtime_replay=false`): execution ID context, `doc_3_au_0003`, `sb_0019`, `quote_not_found`, empty `exact_match_candidate_ids`; client text и отсутствующие runtime payload/claims не сохранялись. Offline `rg`, `git log -S` и fixture history не нашли safe sanitized fixtures executions `14234`/`14238`; их exact replay gate остаётся pending и никаких payload не изобретено.
 
 Нода `AI Evidence Repair v1` сохранила имя, model, HTTP parameters, credential, timeout и topology. Один Repair call, missing-primary/overlap behavior, downstream shape, terminal exhaustion, Validator, persistence и DB contract не менялись. Live n8n/DB не читались и не изменялись. `DW-17` остаётся открытым до safe `14234`/`14238` replay fixtures, отдельной promotion и full-path runtime canary.
+
+---
+
+## 2026-09-02 — Execution 14373 Extractor recovery barrier local repair
+
+Authoritative forensic evidence зафиксировало первый incorrect state после успешного `DW-17` repair всех `12` units: `Проверить полноту Extractor recovery` завершился с `[Extractor recovery barrier] Expected item 0 missing analysis_unit_id. [line 3]`. Upstream `Сохранить analysis unit` возвращает persisted identity как top-level `item.json.analysis_unit_id`; nested `analysis_unit_meta` в sanitized Save output отсутствует. Recovered outputs сохраняют те же `doc_3_au_0001…doc_3_au_0012`, source order и bounded attempt audit.
+
+TDD RED был получен до workflow edit:
+
+```text
+node tests/document-worker-extractor-recovery-barrier-14373.test.mjs
+exit 1
+Error: [Extractor recovery barrier] Expected item 0 missing analysis_unit_id.
+```
+
+Canonical local change ограничен одной строкой одной Code Node: expected identity теперь читается из `item?.json?.analysis_unit_id`. Downstream recovered identity остаётся `analysis_unit_meta.analysis_unit_id`; guards missing/duplicate identity, cardinality, order, `units_total` и bounded audit не менялись.
+
+Verification:
+
+```text
+node tests/document-worker-extractor-recovery-barrier-14373.test.mjs
+3/3 PASS
+
+node --test --test-isolation=none tests/document-worker-extractor-recovery-barrier-14373.test.mjs tests/document-worker-extractor-recovery.test.mjs tests/document-worker-extractor-envelope.test.mjs tests/document-worker-evidence-repair.test.mjs
+132/132 PASS
+
+node --test tests/document-worker*.test.mjs
+10 files / 8 pass / 2 unchanged baseline failures
+
+node --test tests/*.test.mjs
+23 files / 19 pass / 4 unchanged baseline failures
+base: 22 files / 18 pass / 4 fail
+```
+
+Structural comparison с base `ffe6e954bf914b15d3ab994b33a65c5d795555ca` подтвердил `71 → 71` nodes и ровно одну изменённую ноду; connections, settings, pinData, positions, typeVersions и credentials равны. Evidence Repair prepare/HTTP, deterministic evidence validator, AI Validator и primary/fallback Extractor HTTP hashes неизменны.
+
+Это local-only GREEN. Network/live n8n/API/DB/Docker/credentials не использовались; runtime recheck `DW-17 → barrier → Validator → persistence` и promotion остаются pending.

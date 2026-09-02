@@ -231,7 +231,7 @@ function buildSavedUnits(unitIds) {
   return unitIds.map((unitId) => ({
     json: {
       analysis_batch: { units_total: unitIds.length },
-      analysis_unit_meta: { analysis_unit_id: unitId },
+      analysis_unit_id: unitId,
     },
   }));
 }

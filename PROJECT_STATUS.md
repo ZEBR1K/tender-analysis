@@ -532,6 +532,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - exact evidence grounding не заменено fuzzy/OCR matching;
 - lossless fact partition и item linking покрыты offline tests;
 - `DW-17` reference-only Evidence Repair v2 локально проходит focused `99/99`: identity-safe refs (включая одинаковый text в разных blocks), byte-identical catalog rebuild/parity, separate structural units, deterministic source-only materialization, lossless grounded-evidence merge, synchronized diagnostics, incremental catalog/source/request bounds, ref/collision rejection, table canonicalization и terminal exhaustion; Primary/Validator/persistence/graph не менялись. Safe sanitized fixtures `14234`/`14238` в repo/history отсутствуют, их exact replay, promotion и runtime canary остаются pending; `14371` покрыт только synthetic non-replay structure;
+- execution `14373` локализовал отдельный post-repair barrier defect: persisted Save output имеет top-level `analysis_unit_id`, тогда как `Проверить полноту Extractor recovery` ожидал nested `analysis_unit_meta.analysis_unit_id`. Canonical local repair меняет только этот access; sanitized `12/12` regression и все cardinality/order/identity/audit negative guards GREEN. Focused combined suite `132/132`; full file-isolated suite сохраняет baseline parity `23 files / 19 pass / 4 fail` против base `22 / 18 / 4`;
 - Validator field profiles покрывают ровно 27 canonical keys;
 - fact-local material literal guard не использует соседние facts или общий context как evidence;
 - Aggregator candidate SQL по-прежнему исключает `rejected` и включает `confirmed`/`requires_review`;
@@ -568,6 +569,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 
 - promotion/wiring clean Document Worker candidate в test/production contour;
 - promotion и full-path runtime canary canonical local `DW-17` Evidence Repair v2; local focused GREEN не является live/runtime GREEN;
+- import/runtime recheck execution-14373 barrier repair через downstream Validator и persistence; текущий canonical fix проверен только локально;
 - full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
 - production promotion `application_documents` boundary;

@@ -1040,6 +1040,12 @@ Canonical local Document Worker реализует `tender_evidence_repair_promp
 
 Focused offline regression: `99/99 PASS`. Offline `rg` и `git log -S` не нашли safe sanitized fixtures executions `14234`/`14238`; exact replay gate остаётся недоступным/pending, содержимое не выдумывалось. Fixture `14371` — synthetic structural class с `runtime_replay=false`, а не runtime replay. Primary Extractor, AI Validator, persistence, terminal failure policy, HTTP model/credentials и graph topology не менялись. Это не production/runtime GREEN: live workflow не изменён, replay fixtures, promotion и full-path runtime canary остаются обязательными gates, поэтому `DW-17` не закрыт.
 
+### Execution 14373 recovery barrier follow-up — local GREEN
+
+Execution `14373` подтвердил, что все `12` persisted units `doc_3_au_0001…doc_3_au_0012` и recovered outputs с exact order/audit дошли до `Проверить полноту Extractor recovery`, но barrier ошибочно читал nested expected identity. Authoritative `Сохранить analysis unit` output содержит top-level `item.json.analysis_unit_id`. Canonical local repair заменяет только этот expected-path; output identity/cardinality/order/audit guards не ослаблены.
+
+Execution-derived TDD fixture воспроизводит observed `12` top-level Save IDs при отсутствии nested identity. RED до workflow edit: exact `Expected item 0 missing analysis_unit_id`; GREEN: focused case `3/3`, combined Extractor recovery/envelope/evidence-repair `132/132`. File-isolated full suite сохраняет baseline parity: base `22 files / 18 pass / 4 fail`, candidate `23 / 19 / 4`, без нового failure signature. Promotion и runtime recheck через Validator/persistence остаются pending; debt не закрыт.
+
 ### Regression gate
 
 Debt закрывается только после выполнения всех условий:
