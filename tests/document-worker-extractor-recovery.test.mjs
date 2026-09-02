@@ -48,6 +48,17 @@ const batchingFixturePath = path.join(
   'document-worker-extractor-recovery',
   'execution-14365-http-batching-shape.json',
 );
+const runtime14367FixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-extractor-recovery',
+  'execution-14367-batch-first-canary.json',
+);
+const runtime14367ReportPath = path.join(
+  repositoryRoot,
+  'evaluations',
+  'DOCUMENT_WORKER_BATCH_FIRST_CANARY_14367_2026-09-02.md',
+);
 const fallbackInjectorFixturePath = path.join(
   testDirectory,
   'fixtures',
@@ -727,6 +738,164 @@ test('RED: execution 14365 requires nested batching for every affected Extractor
     assert.equal(Object.hasOwn(node.parameters.options.batching, 'batchSize'), false);
     assert.equal(Object.hasOwn(node.parameters.options.batching, 'batchInterval'), false);
   }
+});
+
+test('RED: execution 14367 has sanitized batch-first runtime acceptance evidence', () => {
+  assert.ok(
+    fs.existsSync(runtime14367FixturePath),
+    'RED: sanitized execution 14367 batch-first fixture is missing',
+  );
+  assert.ok(
+    fs.existsSync(runtime14367ReportPath),
+    'RED: sanitized execution 14367 review report is missing',
+  );
+
+  const runtimeFixture = JSON.parse(fs.readFileSync(runtime14367FixturePath, 'utf8'));
+  assert.equal(
+    runtimeFixture.fixture_schema_version,
+    'execution_14367_dw19_batch_first_canary_v1',
+  );
+  assert.deepEqual(runtimeFixture.provenance, {
+    source: 'read_only_n8n_mcp_full_workflow_and_execution_run_data',
+    workflow_id: 'YqIfikaeWbrdwfL7',
+    workflow_name: '[DW-19 DISPOSABLE CANARY 2026-09-02] TENDER — Обработать документ',
+    draft_version_id: '39247d00-0842-4e0e-823a-6727439b6f7f',
+    execution_id: '14367',
+    execution_mode: 'manual',
+    execution_status: 'success',
+    started_at: '2026-09-02T08:47:02.113Z',
+    stopped_at: '2026-09-02T08:47:10.583Z',
+  });
+  assert.deepEqual(runtimeFixture.sanitization, {
+    contains_provider_request_or_response: false,
+    contains_model_reasoning: false,
+    contains_client_document_text: false,
+    contains_full_execution_payload: false,
+    contains_credentials_or_secrets: false,
+  });
+
+  assert.deepEqual(runtimeFixture.workflow_snapshot, {
+    active: false,
+    active_version_id: null,
+    node_count: 76,
+    connection_source_count: 72,
+    edge_count: 87,
+    credential_reference_count: 13,
+    unique_credential_ids: 3,
+    pin_data_keys: 0,
+    reachable_node_count: 31,
+  });
+  assert.deepEqual(runtimeFixture.hashes, {
+    algorithm: 'sha256_recursively_key_sorted_json_utf8',
+    live_draft_content: 'de1b83f8425f8558f098b94b23b587dc1e4f58c482f788c9cc00210985f53e5f',
+    live_nodes: 'edc4513f8a38895e61b525c977b90d17c1c304df8a5a257b0f6ea992c8b9e4d5',
+    live_connections: '31d3b3eaff114c97af0a89a5ccf82a325423dde877ec8e24f895c7379dea63ea',
+    live_credential_references: '74cc2775451ea7eed886d56ba83dcf83256ad7841721236b959745cc487d4898',
+    live_canary_contour: '32d3c35aec66addcd5aa8ebc5c308c5ca5d165c03efebde6aa987205e59faf7f',
+    execution_run_data: '03aa065edb95c1a7dc34e0fe491810f0f6f2687c2bc847e6f949b622c7e72fee',
+    sanitized_acceptance_projection: 'cdb456af643bdd6a29438bc1ae6721ad59ca80731031b44c747cfb687adac642',
+    local_canonical_export_file: '288cff68a4369a9b6c2b4bf3f3ebad02e5bb63cdbd82c5cd92995afef38dfd79',
+  });
+
+  const expectedIds = Array.from(
+    { length: 12 },
+    (_, index) => `sanitized_au_${String(index + 1).padStart(4, '0')}`,
+  );
+  const expectedIndices = Array.from({ length: 12 }, (_, index) => index);
+  assert.deepEqual(runtimeFixture.ordered_unit_ids, expectedIds);
+  assert.deepEqual(runtimeFixture.paired_item_contract, {
+    stages: ['prepare', 'primary_http', 'primary_wrapper', 'primary_decision', 'recovery_barrier'],
+    indices_at_every_stage: expectedIndices,
+  });
+  assert.equal(runtimeFixture.decision_matrix.length, 12);
+  for (const [index, decision] of runtimeFixture.decision_matrix.entries()) {
+    const isFallback = index === 6;
+    assert.deepEqual(decision, {
+      analysis_unit_id: expectedIds[index],
+      decision: isFallback ? 'fallback_required' : 'accepted',
+      primary_failure_class: isFallback ? 'contract' : null,
+      primary_failure_code: isFallback ? 'invalid_field_catalog_version' : null,
+      final_source: isFallback ? 'fallback' : 'primary',
+      attempt_count: isFallback ? 2 : 1,
+    });
+  }
+
+  assert.deepEqual(runtimeFixture.run_contract, {
+    primary_node_runs: 1,
+    primary_outputs: 12,
+    primary_execution_time_ms: 4339,
+    loop_item_runs: 12,
+    loop_done_runs: 1,
+    loop_done_outputs: 12,
+    fallback_node_runs: 1,
+    fallback_outputs: 1,
+    evidence_repair_node_runs: 0,
+    fact_partition_node_runs: 0,
+    recovery_barrier_runs: 1,
+    recovery_barrier_outputs: 12,
+    acceptance_summary_runs: 1,
+    acceptance_summary_outputs: 1,
+  });
+  assert.deepEqual(runtimeFixture.acceptance_summary, {
+    accepted: true,
+    units: 12,
+    fallback_count: 1,
+    fallback_target: 'sanitized_au_0007',
+    fallback_failure_code: 'invalid_field_catalog_version',
+    paid_calls_observed: 13,
+    paid_calls_cap: 25,
+    barrier_exact: true,
+  });
+  assert.deepEqual(runtimeFixture.metrics_scope, {
+    primary_requests: 12,
+    fallback_requests: 1,
+    evidence_repair_requests: 0,
+    fact_partition_requests: 0,
+    paid_calls_observed: 13,
+    persistence_facing_metrics_materialized: false,
+    reason: 'collector_is_deliberately_unreachable_in_disposable_canary',
+  });
+
+  const primaryHttp = findNode(NODES.primaryHttp);
+  assert.deepEqual(runtimeFixture.primary_http_contract, {
+    node_type: primaryHttp.type,
+    node_type_version: primaryHttp.typeVersion,
+    batching: primaryHttp.parameters.options.batching,
+    timeout: primaryHttp.parameters.options.timeout,
+    retry_on_fail: primaryHttp.retryOnFail ?? false,
+    on_error: primaryHttp.onError ?? 'default_stop',
+  });
+  assert.deepEqual(runtimeFixture.forbidden_zero_run_nodes, [
+    'Захватить документ в обработку',
+    'Сохранить analysis unit',
+    NODES.evidenceCollector,
+    NODES.validatorDispatch,
+    'Есть units для AI Validator?',
+    'Развернуть units для AI Validator',
+    'AI Validator v1',
+    'Проверить ответ AI Validator',
+    'Сформировать units without AI Validator',
+    NODES.saveFacts,
+    'Завершить обработку документа',
+    'Проверить готовность к агрегации',
+    "Call 'TENDER — Агрегация закупки'",
+    'скачать документы RU PROXY',
+    'Загрузка файла в Docling',
+    'Docling Проверить статус задачи',
+    'Docling получить результат задачи',
+    'связать результат Docling и метаданные',
+    'Скачать текст документа Docling',
+    'Нормализовать документ Docling',
+    'Вернуть DOCX binary для Docling',
+  ]);
+
+  const report = fs.readFileSync(runtime14367ReportPath, 'utf8');
+  assert.match(report, /execution `14367`/i);
+  assert.match(report, /runtime batch-first gate[^\n]*GREEN/i);
+  assert.match(report, /disposable[^\n]*not[^\n]*production candidate/i);
+  assert.match(report, /persistence-facing[^\n]*not materialized/i);
+  assert.match(report, /sanitized projection[^\n]*cannot independently authenticate[^\n]*provenance/i);
+  assert.match(report, /separate reviewed packaging\/import/i);
 });
 
 test('RED: Primary Extractor accepted IF has one strict accepted-only condition', () => {

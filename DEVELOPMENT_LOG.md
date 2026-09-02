@@ -5476,3 +5476,45 @@ node --test --test-isolation=none tests/*.test.mjs
 Full suite grew by exactly two passing regressions from the immediately preceding `378 / 369 / 9`; no failure signature was added. The managed runner still adds sandbox `spawnSync ... EPERM` symptoms to the repository's authoritative exact-six baseline, so literal six was not reproduced here.
 
 No n8n draft update or execution was performed for this local fix. Production/published n8n, PostgreSQL and credentials were not changed. Execution `14365` is not runtime GREEN, and a second isolated canary is blocked until separate owner review and explicit authorization.
+
+---
+
+## 2026-09-02 — Execution 14367 bounded batch-first runtime gate GREEN
+
+Read-only evidence capture used exactly two n8n MCP reads: full workflow details for disposable clone `YqIfikaeWbrdwfL7` and full runData for execution `14367`. No workflow update, execution, publish, activation, deletion, PostgreSQL or credential operation was performed during this evidence task.
+
+Read-back identified `[DW-19 DISPOSABLE CANARY 2026-09-02] TENDER — Обработать документ`, draft `39247d00-0842-4e0e-823a-6727439b6f7f`: inactive, unpublished (`activeVersionId=null`), `76` nodes / `72` connection sources / `87` edges, `13` credential references, no pin data. Static reachability from the isolated canary trigger was `31` nodes with zero path to PostgreSQL, `Собрать units после evidence validation`, AI Validator, persistence, Aggregator, download/Docling or delivery. Hashes of the sanitized read-only projections are recorded in `tests/fixtures/document-worker-extractor-recovery/execution-14367-batch-first-canary.json`; provider payloads, client document content, model reasoning, credentials and full runData are not stored.
+
+Execution `14367` status was `success` (`08:47:02.113Z–08:47:10.583Z`). Installed HTTP Request `4.4` read nested `options.batching.batch={batchSize:16,batchInterval:1000}` and timeout `180000`. Primary Extractor ran once, emitted `12` outputs in `4339 ms`, and retained exact ordered IDs `sanitized_au_0001…sanitized_au_0012` plus `pairedItem=0…11` through prepare, HTTP, wrapper, decision and recovery barrier. Loop ran `12` item iterations plus done. Only unit `0007` was deterministically injected as `fallback_required / contract / invalid_field_catalog_version`; fallback HTTP ran once. Final audits were `primary / attempt_count=1` for eleven units and `fallback / attempt_count=2` for unit `0007`. Evidence Repair and Lossless Fact Partition ran zero times. Barrier returned exact `12/12` in source order; summary returned `accepted=true`, `barrier_exact=true`, one fallback, `paid_calls_observed=13`, cap `25`.
+
+Observed paid calls independently reconcile as `12 primary + 1 fallback + 0 evidence repair + 0 fact partition = 13`. Forbidden downstream run count was zero for every reviewed PostgreSQL, collector, AI Validator, persistence, Aggregator, download/Docling and delivery node. Persistence-facing `extractor_requests`, `extractor_fallback_requests` and `total_ai_requests_before_ai_validator` were not materialized because the collector was deliberately unreachable; this gate proves counts through the terminal summary and per-unit attempt audits, not full-path metrics runtime behavior.
+
+Strict TDD evidence:
+
+```text
+RED:
+node --test --test-isolation=none tests/document-worker-extractor-recovery.test.mjs
+21 total / 20 pass / 1 intended fail
+RED: sanitized execution 14367 batch-first fixture is missing
+
+GREEN:
+node --test --test-isolation=none tests/document-worker-extractor-recovery.test.mjs
+21/21 PASS
+
+node --test --test-isolation=none tests/document-worker-extractor-envelope.test.mjs
+9/9 PASS
+
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+79/79 PASS
+
+node --test --test-isolation=none tests/document-worker-docx-option-state.test.mjs
+70 total / 69 pass / 1 unchanged fixture-byte baseline
+
+node --test --test-isolation=none tests/document-worker-*.test.mjs
+213 total / 211 pass / 2 unchanged failures
+
+node --test --test-isolation=none tests/*.test.mjs
+381 total / 372 pass / 9 unchanged managed-runner signatures
+```
+
+The full suite grew by exactly one passing sanitized runtime-evidence regression from the immediately preceding `380 / 371 / 9`; no failure signature was added. Canonical workflow JSON and its behavior were not changed in this evidence commit. The bounded batch-first runtime gate is GREEN, but the executed five-node canary contour is disposable and not a production candidate. Canonical commit `2ffe1de` has not been imported as a clean workflow candidate. The next gate is a separate reviewed packaging/import into a new inactive, unpublished candidate with exact read-back; any full-path Validator/persistence test requires separate authorization.
