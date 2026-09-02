@@ -5426,3 +5426,53 @@ Temporary draft `b96333fa-…` прошёл read-back safety gate: `75` nodes / 
 Выполнен ровно один manual execution `14363`. Corrected `$input.item`, DOCX OOXML/Docling path и Normalizer прошли; подготовлено `12` ordered unique units. Normalizer снова дал semantic `unknown`, `33` warning groups и expected target ActiveX bindings. Один primary GLM call и primary wrapper завершились. Первый incorrect node — temporary `[CANARY] Inject one invalid primary envelope`: installed Code sandbox hard-stop `structuredClone is not defined [line 46]`. Strict classifier, fallback, evidence retry/partition, Loop done, barrier и summary не запускались. No patch/retry/second run.
 
 Pinned claim output exact совпал с execution pin; все non-pinned PostgreSQL nodes имели run count `0`, DB writes `0`. Restore создал draft `a62a7f29-…`, exact equal corrected rollback `50f43b3d/0800032b`: `71/68`, no CANARY nodes, `$input.item`, pin SHA, credential refs и published version unchanged. Runtime fallback gate остаётся pending; Stage 4 не начинался. Sanitized audit: `evaluations/DOCUMENT_WORKER_EXACTLY_ONE_FALLBACK_CANARY_14363_2026-09-01.md`.
+
+---
+
+## 2026-09-02 — Execution 14365 HTTP batching shape local GREEN
+
+Isolated runtime execution `14365` остановился в `AI Extractor v1.0` с exact error `Cannot read properties of undefined (reading 'batchInterval')`. Root-cause comparison выявил parameter-shape drift: canonical commit `66d5a8f` задавал flat `options.batching.{batchSize,batchInterval}`, но live HTTP Request `4.4` type definition установленного n8n описывает nested `options.batching.batch.{batchSize,batchInterval}` с default batching shape `{ batch: {} }`. Repository JSON/documentation/test противоречили platform source of truth; для node parameter shape authoritative являются installed type definition и observed runtime.
+
+Execution runData содержит один failed run `AI Extractor v1.0`; parameter error произошла до provider request, поэтому paid AI calls = `0`. Forbidden node runs = `0` для exact reviewed set: `AI Extractor fallback v1.0`, `AI Evidence Repair v1`, `AI Lossless Fact Partition v1`, `Собрать units после evidence validation`, `AI Validator v1`, все PostgreSQL nodes (`Захватить документ в обработку`, `Сохранить analysis unit`, `Сохранить факты документа`, `Завершить обработку документа`, `Проверить готовность к агрегации`) и `Call 'TENDER — Агрегация закупки'`. Эти zero-run данные подтверждают только отсутствие downstream side effects/paid calls в failed execution, не runtime GREEN целевой архитектуры.
+
+Strict TDD:
+
+```text
+RED command:
+node tests/document-worker-extractor-recovery.test.mjs
+
+18 pass / 1 intended fail
+AI Extractor v1.0: installed HTTP Request v4.4 requires options.batching.batch
+actual   { batching: { batchSize: 16, batchInterval: 1000 }, timeout: 180000 }
+expected { batching: { batch: { batchSize: 16, batchInterval: 1000 } }, timeout: 180000 }
+```
+
+RED test inventory-scans all canonical HTTP Extractor nodes, treats every node with `options.batching` as affected, loads a dedicated sanitized `execution_14365_http_batching_shape_v1` fixture and rejects both flat keys. Execution `14359` recovery oracle remains provenance-pure and unchanged in meaning. Immutable beta has no batching option and was not changed.
+
+Minimal GREEN changed only `AI Extractor v1.0.parameters.options.batching`: an intermediate `batch` object was added. Values `16/1000`, timeout `180000`, HTTP body/model/provider/credentials, `retryOnFail=false`, default hard-stop behavior without an explicit `onError`, fallback HTTP, pairedItem wrapper, connections, Loop `batchSize=1`, recovery barrier, prompts, strict validator, evidence semantics, DOCX/ActiveX, Validator, PostgreSQL and the 27-field contract are unchanged.
+
+Verification on Node `v26.5.1` with `--test-isolation=none`:
+
+```text
+node --test --test-isolation=none tests/document-worker-extractor-recovery.test.mjs
+20/20 PASS
+
+node --test --test-isolation=none tests/document-worker-extractor-envelope.test.mjs
+9/9 PASS
+
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+79/79 PASS
+
+node --test --test-isolation=none tests/document-worker-docx-option-state.test.mjs
+70 total / 69 pass / 1 unchanged fixture-byte baseline
+
+node --test --test-isolation=none tests/document-worker-*.test.mjs
+212 total / 210 pass / 2 unchanged failures
+
+node --test --test-isolation=none tests/*.test.mjs
+380 total / 371 pass / 9 unchanged managed-runner signatures
+```
+
+Full suite grew by exactly two passing regressions from the immediately preceding `378 / 369 / 9`; no failure signature was added. The managed runner still adds sandbox `spawnSync ... EPERM` symptoms to the repository's authoritative exact-six baseline, so literal six was not reproduced here.
+
+No n8n draft update or execution was performed for this local fix. Production/published n8n, PostgreSQL and credentials were not changed. Execution `14365` is not runtime GREEN, and a second isolated canary is blocked until separate owner review and explicit authorization.

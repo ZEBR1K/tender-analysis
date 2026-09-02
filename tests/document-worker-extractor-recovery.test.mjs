@@ -42,6 +42,12 @@ const envelopeFixturePath = path.join(
   'document-worker-extractor-envelope',
   'execution-14359-response-matrix.json',
 );
+const batchingFixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-extractor-recovery',
+  'execution-14365-http-batching-shape.json',
+);
 const fallbackInjectorFixturePath = path.join(
   testDirectory,
   'fixtures',
@@ -52,6 +58,7 @@ const fallbackInjectorFixturePath = path.join(
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(recoveryFixturePath, 'utf8'));
 const envelopeFixture = JSON.parse(fs.readFileSync(envelopeFixturePath, 'utf8'));
+const batchingFixture = JSON.parse(fs.readFileSync(batchingFixturePath, 'utf8'));
 const fallbackInjectorFixture = JSON.parse(
   fs.readFileSync(fallbackInjectorFixturePath, 'utf8'),
 );
@@ -639,13 +646,87 @@ test('RED: primary/fallback HTTP and recovery internals have exact hard-stop set
     NODES.fallbackAudit,
     NODES.recoveryBarrier,
   ]) assertExactHardStop(internalNode);
+});
 
-  const primaryHttp = findNode(NODES.primaryHttp);
-  assert.deepEqual(primaryHttp.parameters.options?.batching, {
-    batchSize: 16,
-    batchInterval: 1000,
+test('execution 14365 batching fixture is sanitized and records the pre-provider hard-stop', () => {
+  assert.equal(batchingFixture.fixture_schema_version, 'execution_14365_http_batching_shape_v1');
+  assert.deepEqual(batchingFixture.provenance, {
+    source_kind: 'isolated_test_execution_run_data_and_installed_node_type_definition',
+    execution_id: '14365',
+    failed_node: NODES.primaryHttp,
+    runtime_error: "Cannot read properties of undefined (reading 'batchInterval')",
+    node_type: 'n8n-nodes-base.httpRequest',
+    node_type_version: 4.4,
   });
-  assert.equal(primaryHttp.parameters.options?.timeout, 180000);
+  assert.deepEqual(batchingFixture.sanitization, {
+    contains_provider_request_or_response: false,
+    contains_model_reasoning: false,
+    contains_client_document_text: false,
+    contains_full_execution_payload: false,
+    contains_credentials_or_secrets: false,
+  });
+  assert.deepEqual(batchingFixture.runtime_outcome, {
+    paid_ai_calls: 0,
+    forbidden_node_run_count: 0,
+    forbidden_node_names: [
+      NODES.fallbackHttp,
+      'AI Evidence Repair v1',
+      'AI Lossless Fact Partition v1',
+      NODES.evidenceCollector,
+      'AI Validator v1',
+      'Захватить документ в обработку',
+      'Сохранить analysis unit',
+      NODES.saveFacts,
+      'Завершить обработку документа',
+      'Проверить готовность к агрегации',
+      "Call 'TENDER — Агрегация закупки'",
+    ],
+  });
+  for (const nodeName of batchingFixture.runtime_outcome.forbidden_node_names) {
+    assert.ok(workflow.nodes.some(({ name }) => name === nodeName), `Unknown forbidden node: ${nodeName}`);
+  }
+});
+
+test('RED: execution 14365 requires nested batching for every affected Extractor HTTP node', () => {
+  assert.deepEqual(batchingFixture.batching_contract, {
+    affected_node_names: [NODES.primaryHttp],
+    required_options: {
+      batching: {
+        batch: {
+          batchSize: 16,
+          batchInterval: 1000,
+        },
+      },
+      timeout: 180000,
+    },
+    flat_batching_keys_forbidden: true,
+  });
+
+  const extractorHttpNodes = workflow.nodes.filter(
+    (node) => node.type === 'n8n-nodes-base.httpRequest' && /^AI Extractor/.test(node.name),
+  );
+  const affectedNodes = extractorHttpNodes.filter(
+    (node) => Object.hasOwn(node.parameters.options ?? {}, 'batching'),
+  );
+  assert.deepEqual(
+    affectedNodes.map(({ name }) => name),
+    batchingFixture.batching_contract.affected_node_names,
+  );
+
+  for (const node of affectedNodes) {
+    assert.equal(node.type, batchingFixture.provenance.node_type);
+    assert.equal(node.typeVersion, batchingFixture.provenance.node_type_version);
+    assert.deepEqual(
+      {
+        batching: node.parameters.options.batching,
+        timeout: node.parameters.options.timeout,
+      },
+      batchingFixture.batching_contract.required_options,
+      `${node.name}: installed HTTP Request v4.4 requires options.batching.batch`,
+    );
+    assert.equal(Object.hasOwn(node.parameters.options.batching, 'batchSize'), false);
+    assert.equal(Object.hasOwn(node.parameters.options.batching, 'batchInterval'), false);
+  }
 });
 
 test('RED: Primary Extractor accepted IF has one strict accepted-only condition', () => {

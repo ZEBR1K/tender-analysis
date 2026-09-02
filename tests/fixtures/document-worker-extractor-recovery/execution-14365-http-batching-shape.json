@@ -1,0 +1,48 @@
+{
+  "fixture_schema_version": "execution_14365_http_batching_shape_v1",
+  "provenance": {
+    "source_kind": "isolated_test_execution_run_data_and_installed_node_type_definition",
+    "execution_id": "14365",
+    "failed_node": "AI Extractor v1.0",
+    "runtime_error": "Cannot read properties of undefined (reading 'batchInterval')",
+    "node_type": "n8n-nodes-base.httpRequest",
+    "node_type_version": 4.4
+  },
+  "sanitization": {
+    "contains_provider_request_or_response": false,
+    "contains_model_reasoning": false,
+    "contains_client_document_text": false,
+    "contains_full_execution_payload": false,
+    "contains_credentials_or_secrets": false
+  },
+  "runtime_outcome": {
+    "paid_ai_calls": 0,
+    "forbidden_node_run_count": 0,
+    "forbidden_node_names": [
+      "AI Extractor fallback v1.0",
+      "AI Evidence Repair v1",
+      "AI Lossless Fact Partition v1",
+      "Собрать units после evidence validation",
+      "AI Validator v1",
+      "Захватить документ в обработку",
+      "Сохранить analysis unit",
+      "Сохранить факты документа",
+      "Завершить обработку документа",
+      "Проверить готовность к агрегации",
+      "Call 'TENDER — Агрегация закупки'"
+    ]
+  },
+  "batching_contract": {
+    "affected_node_names": ["AI Extractor v1.0"],
+    "required_options": {
+      "batching": {
+        "batch": {
+          "batchSize": 16,
+          "batchInterval": 1000
+        }
+      },
+      "timeout": 180000
+    },
+    "flat_batching_keys_forbidden": true
+  }
+}

@@ -565,8 +565,10 @@
         "jsonBody": "={{\n{\n  model: 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low',\n\n  messages: [\n    {\n      role: 'system',\n      content: $json.ai_request.system_prompt\n    },\n    {\n      role: 'user',\n      content: $json.ai_request.user_prompt\n    }\n  ],\n\n\n  response_format: {\n    type: 'json_object'\n  },\n\n  max_tokens: 16384,\n\n  stream: false\n}\n}}",
         "options": {
           "batching": {
-            "batchSize": 16,
-            "batchInterval": 1000
+            "batch": {
+              "batchSize": 16,
+              "batchInterval": 1000
+            }
           },
           "response": {
             "response": {
