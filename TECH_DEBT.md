@@ -122,7 +122,7 @@ Naming, comments, cleanup, future hardening.
 |TR-3|✅ Closed|Исправлены зависимости дочернего workflow от parent workflow nodes. Targeted Recheck workflow теперь получает необходимые данные через входной JSON и успешно выполняется отдельно.|
 |`DW-14 / EW-3`|handled evidence error может тихо закончить ветку и не вызвать Error Workflow|Document Worker / Error Workflow|
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
-|`DW-17`|Evidence Repair требует от модели дословно реконструировать canonical quote; observed executions `14234` и `14238` подтвердили повторяемый exact-grounding failure. Нужен reference-only repair без ослабления fail-closed проверки.|Document Worker / evidence grounding|
+|`DW-17`|⚠ Local GREEN / promotion+runtime pending. Canonical local Worker заменяет model-written quote на bounded allow-listed `ai_evidence_repair_v2` refs, deterministic materialization и lossless merge; exact grounding не ослаблен. Live production не изменён.|Document Worker / evidence grounding|
 |`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-19`|⚠ Bounded runtime batch-first GREEN; clean-candidate packaging pending. Execution `14359` дал `0/16` safely attachable primary responses; `14362` выявил latency regression (`12` sequential runs / `423` s против одного `16`-item run / ~`32` s); `14365` подтвердил nested-batching configuration blocker. Disposable isolated execution `14367` прошёл: primary `1` run / `12` outputs / `4339 ms`, exact linked IDs/order `12/12`, Loop `12 + done`, один allow-listed fallback только для injected unit `0007`, barrier `12/12`, paid calls `13 <= 25`, forbidden downstream runs `0`. Это не production candidate и не full-path metrics/Validator/persistence GREEN: canonical `2ffe1de` ещё не импортирован как clean inactive candidate; packaging/read-back — следующий отдельный gate. Production не изменён.|Document Worker / Extractor reliability and latency|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
@@ -979,6 +979,7 @@ no FINAL / no guaranteed alert
 
 ```text
 P0 / Critical / observed
+⚠ mitigated in canonical local candidate; debt remains open pending promotion/runtime canary
 ```
 
 ### Runtime evidence
@@ -1033,12 +1034,18 @@ Reference-only repair:
 
 Модель не должна перепечатывать или исправлять текст источника.
 
+### Local mitigation — 2026-09-02
+
+Canonical local Document Worker реализует `tender_evidence_repair_prompt_v2 / ai_evidence_repair_v2`. Prepare node строит stable identity-safe `er2:<semantic_block_id>:<ordinal>` catalog из exact canonical source: одинаковый text в разных blocks разрешён, каждая structural line/sentence остаётся отдельным candidate, split применяется только к oversized unit. Byte-identical builder в attempt 2 rebuild-ит source catalog и exact-сравнивает order/content/contexts/contracts до materialization. Hard limits `256 candidates / 250000 catalog+context chars / 100000 canonical-source chars / 1500 chars per quote / 360000 serialized request chars` проверяются инкрементально; overflow и source/provenance/ref collisions fail closed без truncation. Attempt 2 принимает только allow-listed refs, сохраняет exact-grounded original evidence, исключает attempt-1 invalid evidence, materializes quote только из rebuilt catalog, повторно вызывает неизменный strict validator и синхронизирует metrics после `repair_dropped_grounded_evidence` invariant.
+
+Focused offline regression: `99/99 PASS`. Offline `rg` и `git log -S` не нашли safe sanitized fixtures executions `14234`/`14238`; exact replay gate остаётся недоступным/pending, содержимое не выдумывалось. Fixture `14371` — synthetic structural class с `runtime_replay=false`, а не runtime replay. Primary Extractor, AI Validator, persistence, terminal failure policy, HTTP model/credentials и graph topology не менялись. Это не production/runtime GREEN: live workflow не изменён, replay fixtures, promotion и full-path runtime canary остаются обязательными gates, поэтому `DW-17` не закрыт.
+
 ### Regression gate
 
 Debt закрывается только после выполнения всех условий:
 
 ```text
-fixtures из executions 14234 и 14238
+safe sanitized fixtures и exact replay executions 14234 и 14238 (currently unavailable/pending)
 unknown refs rejected
 no fuzzy matching
 materialized quote = exact canonical quote

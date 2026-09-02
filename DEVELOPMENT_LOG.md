@@ -5518,3 +5518,56 @@ node --test --test-isolation=none tests/*.test.mjs
 ```
 
 The full suite grew by exactly one passing sanitized runtime-evidence regression from the immediately preceding `380 / 371 / 9`; no failure signature was added. Canonical workflow JSON and its behavior were not changed in this evidence commit. The bounded batch-first runtime gate is GREEN, but the executed five-node canary contour is disposable and not a production candidate. Canonical commit `2ffe1de` has not been imported as a clean workflow candidate. The next gate is a separate reviewed packaging/import into a new inactive, unpublished candidate with exact read-back; any full-path Validator/persistence test requires separate authorization.
+
+---
+
+## 2026-09-02 — DW-17 reference-only Evidence Repair local GREEN
+
+Canonical local Document Worker переведён с `ai_evidence_repair_v1`, где модель перепечатывала `{semantic_block_id, quote}`, на reference-only `tender_evidence_repair_prompt_v2 / ai_evidence_repair_v2`. Primary Extractor полностью сохранён.
+
+`Подготовить Evidence Repair` теперь строит deterministic source-derived catalog со stable identity-safe refs `er2:<semantic_block_id>:<fragment_ordinal>` и той же whitespace/table-coordinate canonicalization. Независимые structural lines/sentences не пакуются; offset-based split применяется только к oversized unit. Одинаковый canonical text в разных blocks остаётся двумя refs с независимыми identity/scope/provenance. Hard bounds `256 candidates / 250000 catalog+context chars / 100000 canonical-source chars / 1500 chars per quote / 360000 serialized request chars` проверяются инкрементально и fail closed без truncation.
+
+Repair response содержит только `fact_index`, allow-listed `violation_codes` и `selected_evidence_refs`. `Object.freeze` не считается trust boundary: `Проверить evidence — попытка 2` использует byte-identical builder, rebuild-ит catalog из source и exact-сравнивает order, refs, identity/metadata, quote, contexts и contract counts/bounds до materialization. Затем нода exact-validates refs/current unit, materializes `{semantic_block_id, quote}` только из rebuilt catalog/source, byte-preserves already exact-grounded original evidence, не переносит attempt-1 invalid evidence и deterministic exact-dedupes retained+selected items. После неизменного `validateFacts(repairedFacts, source, 2)` invariant `repair_dropped_grounded_evidence` resync-ит `violations_by_code`, unresolved/resolved metrics и outward audit counts.
+
+Strict TDD evidence:
+
+```text
+RED before workflow edit:
+node --test tests/document-worker-evidence-repair.test.mjs
+exit 1: 1 file / 0 pass / 1 fail (process isolation hides subtests)
+
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+86 total / 66 pass / 20 intended v2-contract failures
+
+GREEN after two Code-node changes and final boundary regressions:
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+87/87 PASS
+
+Owner-review continuation RED before follow-up workflow edits:
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+98 total / 86 pass / 12 fail
+(adjacent-unit packing; missing shared rebuild; five catalog tamper acceptances;
+metrics drift; duplicate-text global collision; non-incremental candidate/source bounds;
+missing serialized-request budget)
+
+Continuation GREEN after I-1/I-2/I-3/M-1 fixes:
+node --test --test-isolation=none tests/document-worker-evidence-repair.test.mjs
+99/99 PASS
+
+All Document Worker tests:
+node --test --test-isolation=none tests/document-worker-*.test.mjs
+233 total / 231 pass / 2 unchanged baseline failures
+(document-worker-docx-option-state, document-worker-validator-runtime-contract)
+
+Full file-isolated suite:
+node --test tests/*.test.mjs
+22 files / 18 pass / 4 unchanged baseline failures
+(aggregator-application-documents-runtime-eval,
+aggregator-procurement-subject-execution-14104,
+document-worker-docx-option-state,
+document-worker-validator-runtime-contract)
+```
+
+Добавлен только sanitized synthetic structural-class fixture `14371` (`runtime_replay=false`): execution ID context, `doc_3_au_0003`, `sb_0019`, `quote_not_found`, empty `exact_match_candidate_ids`; client text и отсутствующие runtime payload/claims не сохранялись. Offline `rg`, `git log -S` и fixture history не нашли safe sanitized fixtures executions `14234`/`14238`; их exact replay gate остаётся pending и никаких payload не изобретено.
+
+Нода `AI Evidence Repair v1` сохранила имя, model, HTTP parameters, credential, timeout и topology. Один Repair call, missing-primary/overlap behavior, downstream shape, terminal exhaustion, Validator, persistence и DB contract не менялись. Live n8n/DB не читались и не изменялись. `DW-17` остаётся открытым до safe `14234`/`14238` replay fixtures, отдельной promotion и full-path runtime canary.

@@ -531,6 +531,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - execution-derived Document Worker regressions `14006–14017`, `14059`, `14061`, `14075`, `14103`, `14104`;
 - exact evidence grounding не заменено fuzzy/OCR matching;
 - lossless fact partition и item linking покрыты offline tests;
+- `DW-17` reference-only Evidence Repair v2 локально проходит focused `99/99`: identity-safe refs (включая одинаковый text в разных blocks), byte-identical catalog rebuild/parity, separate structural units, deterministic source-only materialization, lossless grounded-evidence merge, synchronized diagnostics, incremental catalog/source/request bounds, ref/collision rejection, table canonicalization и terminal exhaustion; Primary/Validator/persistence/graph не менялись. Safe sanitized fixtures `14234`/`14238` в repo/history отсутствуют, их exact replay, promotion и runtime canary остаются pending; `14371` покрыт только synthetic non-replay structure;
 - Validator field profiles покрывают ровно 27 canonical keys;
 - fact-local material literal guard не использует соседние facts или общий context как evidence;
 - Aggregator candidate SQL по-прежнему исключает `rejected` и включает `confirmed`/`requires_review`;
@@ -566,6 +567,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 ### Not verified
 
 - promotion/wiring clean Document Worker candidate в test/production contour;
+- promotion и full-path runtime canary canonical local `DW-17` Evidence Repair v2; local focused GREEN не является live/runtime GREEN;
 - full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
 - production promotion Aggregator AG-8 boundary;
 - production promotion `application_documents` boundary;

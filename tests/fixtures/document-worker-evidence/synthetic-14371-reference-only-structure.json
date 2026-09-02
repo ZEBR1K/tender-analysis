@@ -1,0 +1,12 @@
+{
+  "schema_version": "document_worker_evidence_reference_only_structural_class_v1",
+  "fixture_kind": "synthetic_structural_class",
+  "runtime_replay": false,
+  "execution_id": 14371,
+  "analysis_unit_id": "doc_3_au_0003",
+  "semantic_block_id": "sb_0019",
+  "violation": {
+    "code": "quote_not_found",
+    "exact_match_candidate_ids": []
+  }
+}

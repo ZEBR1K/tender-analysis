@@ -63,6 +63,12 @@ const execution14075FixturePath = path.join(
   'document-worker-evidence',
   'execution-14075-doc-11-au-0002.json',
 );
+const synthetic14371ReferenceOnlyFixturePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-evidence',
+  'synthetic-14371-reference-only-structure.json',
+);
 
 function loadWorkflow() {
   return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
@@ -321,7 +327,7 @@ function buildRepairResponse(repairs, overrides = {}) {
         finish_reason: 'stop',
         message: {
           content: JSON.stringify({
-            schema_version: 'ai_evidence_repair_v1',
+            schema_version: 'ai_evidence_repair_v2',
             field_catalog_version: 'tender_fields_v1',
             analysis_unit_id: 'fixture-unit',
             repairs,
@@ -332,6 +338,89 @@ function buildRepairResponse(repairs, overrides = {}) {
     ],
     usage: {},
   };
+}
+
+function catalogRef(prepared, semanticBlockId, canonicalQuote = null) {
+  const candidates = prepared.repair_request.evidence_catalog.filter(
+    (candidate) => candidate.semantic_block_id === semanticBlockId &&
+      (canonicalQuote === null || candidate.canonical_quote === canonicalQuote),
+  );
+  assert.equal(
+    candidates.length,
+    1,
+    `Expected exactly one catalog candidate for ${semanticBlockId}`,
+  );
+  return candidates[0].evidence_ref;
+}
+
+function firstCatalogRef(prepared, semanticBlockId) {
+  const candidate = prepared.repair_request.evidence_catalog.find(
+    (entry) => entry.semantic_block_id === semanticBlockId,
+  );
+  assert.ok(candidate, `Catalog candidate not found for ${semanticBlockId}`);
+  return candidate.evidence_ref;
+}
+
+function buildReferenceRepair(prepared, factIndex, semanticBlockIds, violationCodes = []) {
+  return {
+    fact_index: factIndex,
+    violation_codes: violationCodes,
+    selected_evidence_refs: semanticBlockIds.map(
+      (semanticBlockId) => firstCatalogRef(prepared, semanticBlockId),
+    ),
+  };
+}
+
+function recalculatePreparedCatalogContract(prepared) {
+  const catalog = prepared.repair_request.evidence_catalog;
+  prepared.repair_request.evidence_catalog_contract.candidates_count = catalog.length;
+  prepared.repair_request.evidence_catalog_contract.total_chars = catalog.reduce(
+    (sum, candidate) => sum + candidate.canonical_quote.length +
+      (candidate.context_before?.length ?? 0) +
+      (candidate.context_after?.length ?? 0),
+    0,
+  );
+  return prepared;
+}
+
+function workflowWithAttemptTwoMutation(workflow, search, replacement) {
+  const mutated = structuredClone(workflow);
+  const node = findNode(mutated, 'Проверить evidence — попытка 2');
+  assert.ok(node.parameters.jsCode.includes(search), 'Attempt-2 mutation anchor missing.');
+  node.parameters.jsCode = node.parameters.jsCode.replace(search, replacement);
+  return mutated;
+}
+
+async function buildCatalogParityFixture(workflow, unitId = 'catalog-parity-unit') {
+  const source = buildSource([
+    {
+      semantic_block_id: 'sb_parity_a', scope: 'primary', type: 'text', role: 'body',
+      text: 'Первое самостоятельное предложение. Второе противоположное предложение.',
+    },
+    {
+      semantic_block_id: 'sb_parity_b', scope: 'overlap', type: 'text', role: 'heading',
+      text: 'Отдельный overlap fragment.',
+    },
+    {
+      semantic_block_id: 'sb_parity_c', scope: 'primary', type: 'table', role: 'body',
+      text: '[C1] Отдельный table fragment.',
+    },
+  ], unitId);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_parity_a', quote: 'Отсутствующая цитата',
+    }])], unitId),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const response = buildRepairResponse([{
+    fact_index: 0,
+    violation_codes: [],
+    selected_evidence_refs: ['er2:sb_parity_a:0001'],
+  }], { analysis_unit_id: unitId });
+  return { source, first, prepared, response };
 }
 
 function buildPartitionResponse(partitions, analysisUnitId = 'fixture-unit') {
@@ -701,7 +790,7 @@ async function buildExecution14061PostOverlapUnits(workflow) {
   return units;
 }
 
-async function convergeUnits(workflow, units, repairMode = 'valid') {
+async function convergeUnits(workflow, units) {
   const converged = [];
   const repairUnitIds = [];
   const failed = [];
@@ -720,17 +809,15 @@ async function convergeUnits(workflow, units, repairMode = 'valid') {
 
     repairUnitIds.push(unit.unitId);
     const prepared = await prepareEvidenceRepair(workflow, first);
-    const evidence = [{
-      semantic_block_id: unit.source.ai_segments[0].semantic_block_id,
-      quote: repairMode === 'valid'
-        ? unit.exactQuote
-        : `Всё ещё невалидная цитата для ${unit.unitId}`,
-    }];
+    const selectedEvidenceRefs = [firstCatalogRef(
+      prepared,
+      unit.source.ai_segments[0].semantic_block_id,
+    )];
     const second = await runCodeNode(
       workflow,
       'Проверить evidence — попытка 2',
       buildRepairResponse(
-        [{ fact_index: 0, violation_codes: [], evidence }],
+        [{ fact_index: 0, violation_codes: [], selected_evidence_refs: selectedEvidenceRefs }],
         { analysis_unit_id: unit.unitId },
       ),
       prepared,
@@ -841,14 +928,12 @@ test('14008 wrong block ID passes attempt 2 only after exact ID repair', async (
   );
   assert.ok(wrongId);
   const prepared = await prepareEvidenceRepair(workflow, first);
-  const evidence = structuredClone(fixture.facts[0].evidence);
-  evidence[wrongId.evidence_index].semantic_block_id =
-    wrongId.details.exact_match_candidate_ids[0];
+  const repairedBlockId = wrongId.details.exact_match_candidate_ids[0];
   const second = await runCodeNode(
     workflow,
     'Проверить evidence — попытка 2',
     buildRepairResponse(
-      [{ fact_index: 0, violation_codes: [], evidence }],
+      [buildReferenceRepair(prepared, 0, [repairedBlockId])],
       { analysis_unit_id: fixture.analysis_unit_id },
     ),
     prepared,
@@ -856,7 +941,7 @@ test('14008 wrong block ID passes attempt 2 only after exact ID repair', async (
   assert.equal(second.validation_passed, true);
 });
 
-test('14009 ellipsis quote remains invalid until replaced by an exact substring', async () => {
+test('14009 ellipsis quote is repaired only through allow-listed source refs', async () => {
   const workflow = loadWorkflow();
   const fixture = loadProductionCase(14009);
   const first = await runCodeNode(
@@ -867,35 +952,14 @@ test('14009 ellipsis quote remains invalid until replaced by an exact substring'
   );
   assert.ok(first.violations.some(({ code }) => code === 'quote_not_found'));
   const prepared = await prepareEvidenceRepair(workflow, first);
-  const unchanged = await runCodeNode(
-    workflow,
-    'Проверить evidence — попытка 2',
-    buildRepairResponse(
-      [{
-        fact_index: 0,
-        violation_codes: [],
-        evidence: structuredClone(fixture.facts[0].evidence),
-      }],
-      { analysis_unit_id: fixture.analysis_unit_id },
-    ),
-    prepared,
-  );
-  assert.equal(unchanged.validation_passed, false);
-
-  const exactEvidence = structuredClone(fixture.facts[0].evidence);
-  for (const violation of first.violations.filter(
-    ({ code }) => code === 'quote_not_found',
-  )) {
-    const badId = exactEvidence[violation.evidence_index].semantic_block_id;
-    exactEvidence[violation.evidence_index].quote = fixture.source.ai_segments.find(
-      ({ semantic_block_id }) => semantic_block_id === badId,
-    ).text;
-  }
+  const repairedBlockIds = [...new Set(first.violations
+    .filter(({ evidence_index }) => Number.isInteger(evidence_index))
+    .map(({ evidence_index }) => fixture.facts[0].evidence[evidence_index].semantic_block_id))];
   const exact = await runCodeNode(
     workflow,
     'Проверить evidence — попытка 2',
     buildRepairResponse(
-      [{ fact_index: 0, violation_codes: [], evidence: exactEvidence }],
+      [buildReferenceRepair(prepared, 0, repairedBlockIds)],
       { analysis_unit_id: fixture.analysis_unit_id },
     ),
     prepared,
@@ -962,12 +1026,12 @@ test('Extractor prompt targets remain below the deterministic hard evidence limi
   assert.match(prepareCode, /не более 20 evidence/i);
   assert.match(prepareCode, /не должна превышать 1200 символов/i);
   assert.match(prepareCode, /не должна превышать 4500 символов/i);
-  assert.match(prepareRepairCode, /Не более 20 evidence/i);
-  assert.match(prepareRepairCode, /quote до 1200 символов/i);
-  assert.match(prepareRepairCode, /сумма quote до 4500 символов/i);
+  assert.match(prepareRepairCode, /maxCandidates:\s*256/);
+  assert.match(prepareRepairCode, /maxTotalChars:\s*250000/);
+  assert.match(prepareRepairCode, /maxQuoteLength:\s*1500/);
   assert.match(prepareRepairCode, /maxItems:\s*25/);
-  assert.match(prepareRepairCode, /maxLength:\s*1500/);
-  assert.match(prepareRepairCode, /не более 5000 символов/i);
+  assert.match(prepareRepairCode, /selected_evidence_refs/);
+  assert.doesNotMatch(prepareRepairCode, /required:\s*\['semantic_block_id', 'quote'\]/);
 });
 
 test('execution 14061 fixtures reproduce pure overlap_only while retaining every other verified fact', async () => {
@@ -1112,10 +1176,7 @@ test('attempt 2 converts newly exact-grounded overlap-only evidence into determi
     buildRepairResponse([{
       fact_index: 0,
       violation_codes: [],
-      evidence: [{
-        semantic_block_id: 'sb_overlap_attempt_2',
-        quote: exactQuote,
-      }],
+      selected_evidence_refs: [firstCatalogRef(prepared, 'sb_overlap_attempt_2')],
     }], { analysis_unit_id: unitId }),
     prepared,
   );
@@ -1129,6 +1190,7 @@ test('attempt 2 converts newly exact-grounded overlap-only evidence into determi
       .validation_attempt,
     2,
   );
+  assert.match(prepared.repair_request.system_prompt, /overlap-only.*deterministic/i);
 });
 
 test('multiple exact-grounded overlap-only facts are all retained as deterministic rejections', async () => {
@@ -1272,10 +1334,7 @@ test('a pure overlap fact and a repairable fact in one unit converge without los
       violation_codes: prepared.violations
         .filter(({ fact_index }) => fact_index === 1)
         .map(({ code }) => code),
-      evidence: [{
-        semantic_block_id: primarySegment.semantic_block_id,
-        quote: primarySegment.text,
-      }],
+      selected_evidence_refs: [firstCatalogRef(prepared, primarySegment.semantic_block_id)],
     }], { analysis_unit_id: unitId }),
     prepared,
   );
@@ -2533,7 +2592,706 @@ test('lossless partition item linking rejects crossed analysis units', async () 
   assert.equal(correctD.validation_passed, true);
 });
 
-test('Evidence Repair schema exposes evidence only and prohibits withdrawal', async () => {
+test('14371 fixture is a synthetic structural class, not an execution replay', () => {
+  const fixture = JSON.parse(
+    fs.readFileSync(synthetic14371ReferenceOnlyFixturePath, 'utf8'),
+  );
+  assert.deepEqual(fixture, {
+    schema_version: 'document_worker_evidence_reference_only_structural_class_v1',
+    fixture_kind: 'synthetic_structural_class',
+    runtime_replay: false,
+    execution_id: 14371,
+    analysis_unit_id: 'doc_3_au_0003',
+    semantic_block_id: 'sb_0019',
+    violation: {
+      code: 'quote_not_found',
+      exact_match_candidate_ids: [],
+    },
+  });
+  assert.deepEqual(
+    Object.keys(fixture).sort(),
+    [
+      'analysis_unit_id', 'execution_id', 'fixture_kind', 'runtime_replay',
+      'schema_version', 'semantic_block_id', 'violation',
+    ],
+  );
+});
+
+test('Evidence Repair v2 builds stable canonical refs from block IDs and ordinals', async () => {
+  const workflow = loadWorkflow();
+  const source = buildSource([
+    {
+      semantic_block_id: 'sb_stable_a', scope: 'primary', type: 'text', role: 'body',
+      text: 'Первый канонический фрагмент.',
+    },
+    {
+      semantic_block_id: 'sb_stable_b', scope: 'overlap', type: 'text', role: 'heading',
+      text: 'Второй канонический фрагмент.',
+    },
+  ]);
+  const invalid = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_stable_a',
+      quote: 'Невалидная цитата',
+    }])]),
+    source,
+  );
+  const first = await prepareEvidenceRepair(workflow, invalid);
+  const second = await prepareEvidenceRepair(workflow, invalid);
+
+  assert.deepEqual(first.repair_request.evidence_catalog, second.repair_request.evidence_catalog);
+  assert.deepEqual(
+    first.repair_request.evidence_catalog.map(({ evidence_ref }) => evidence_ref),
+    ['er2:sb_stable_a:0001', 'er2:sb_stable_b:0001'],
+  );
+  assert.deepEqual(Object.keys(first.repair_request.evidence_catalog[0]).sort(), [
+    'canonical_quote', 'context_after', 'context_before', 'evidence_ref',
+    'role', 'scope', 'semantic_block_id', 'type',
+  ]);
+  assert.deepEqual(
+    first.repair_request.evidence_catalog_contract,
+    second.repair_request.evidence_catalog_contract,
+  );
+});
+
+test('independent adjacent sentences remain two evidence refs and are never packed', async () => {
+  const workflow = loadWorkflow();
+  const { prepared } = await buildCatalogParityFixture(workflow, 'sentence-boundary-unit');
+  const sentenceCandidates = prepared.repair_request.evidence_catalog.filter(
+    ({ semantic_block_id }) => semantic_block_id === 'sb_parity_a',
+  );
+  assert.deepEqual(
+    sentenceCandidates.map(({ evidence_ref, canonical_quote }) => ({ evidence_ref, canonical_quote })),
+    [
+      {
+        evidence_ref: 'er2:sb_parity_a:0001',
+        canonical_quote: 'Первое самостоятельное предложение.',
+      },
+      {
+        evidence_ref: 'er2:sb_parity_a:0002',
+        canonical_quote: 'Второе противоположное предложение.',
+      },
+    ],
+  );
+  assert.equal(sentenceCandidates[0].context_before, null);
+  assert.equal(sentenceCandidates[0].context_after, sentenceCandidates[1].canonical_quote);
+  assert.equal(sentenceCandidates[1].context_before, sentenceCandidates[0].canonical_quote);
+  assert.equal(sentenceCandidates[1].context_after, null);
+});
+
+test('Prepare and attempt 2 contain byte-identical deterministic catalog builders', () => {
+  const workflow = loadWorkflow();
+  const start = '/* EVIDENCE_REPAIR_CATALOG_BUILDER_SHARED_START */';
+  const end = '/* EVIDENCE_REPAIR_CATALOG_BUILDER_SHARED_END */';
+  const extract = (nodeName) => {
+    const code = findNode(workflow, nodeName).parameters.jsCode;
+    const startIndex = code.indexOf(start);
+    const endIndex = code.indexOf(end);
+    assert.ok(startIndex >= 0 && endIndex > startIndex, `${nodeName}: shared catalog markers missing`);
+    return code.slice(startIndex, endIndex + end.length);
+  };
+  assert.equal(
+    extract('Подготовить Evidence Repair'),
+    extract('Проверить evidence — попытка 2'),
+  );
+});
+
+test('attempt 2 rebuild rejects a grounded quote tamper even with recalculated totals', async () => {
+  const workflow = loadWorkflow();
+  const { prepared, response } = await buildCatalogParityFixture(workflow, 'catalog-quote-tamper');
+  const tampered = structuredClone(prepared);
+  const candidate = tampered.repair_request.evidence_catalog.find(
+    ({ evidence_ref }) => evidence_ref === 'er2:sb_parity_a:0001',
+  );
+  candidate.canonical_quote = 'самостоятельное предложение.';
+  recalculatePreparedCatalogContract(tampered);
+  await assert.rejects(
+    runCodeNode(workflow, 'Проверить evidence — попытка 2', response, tampered),
+    /catalog parity|immutable catalog/i,
+  );
+});
+
+test('attempt 2 rebuild rejects omitted candidates and blocks', async () => {
+  const workflow = loadWorkflow();
+  const { prepared, response } = await buildCatalogParityFixture(workflow, 'catalog-omit-tamper');
+  const tampered = structuredClone(prepared);
+  tampered.repair_request.evidence_catalog = tampered.repair_request.evidence_catalog.filter(
+    ({ semantic_block_id }) => semantic_block_id !== 'sb_parity_b',
+  );
+  recalculatePreparedCatalogContract(tampered);
+  await assert.rejects(
+    runCodeNode(workflow, 'Проверить evidence — попытка 2', response, tampered),
+    /catalog parity|immutable catalog/i,
+  );
+});
+
+test('attempt 2 rebuild rejects candidate reordering', async () => {
+  const workflow = loadWorkflow();
+  const { prepared, response } = await buildCatalogParityFixture(workflow, 'catalog-order-tamper');
+  const tampered = structuredClone(prepared);
+  const left = tampered.repair_request.evidence_catalog.findIndex(
+    ({ semantic_block_id }) => semantic_block_id === 'sb_parity_b',
+  );
+  const right = tampered.repair_request.evidence_catalog.findIndex(
+    ({ semantic_block_id }) => semantic_block_id === 'sb_parity_c',
+  );
+  [tampered.repair_request.evidence_catalog[left], tampered.repair_request.evidence_catalog[right]] =
+    [tampered.repair_request.evidence_catalog[right], tampered.repair_request.evidence_catalog[left]];
+  await assert.rejects(
+    runCodeNode(workflow, 'Проверить evidence — попытка 2', response, tampered),
+    /catalog parity|immutable catalog/i,
+  );
+});
+
+test('attempt 2 rebuild rejects source-grounded context tampering', async () => {
+  const workflow = loadWorkflow();
+  const { prepared, response } = await buildCatalogParityFixture(workflow, 'catalog-context-tamper');
+  const tampered = structuredClone(prepared);
+  const candidate = tampered.repair_request.evidence_catalog.find(
+    ({ evidence_ref }) => evidence_ref === 'er2:sb_parity_a:0001',
+  );
+  candidate.context_after = 'противоположное предложение.';
+  recalculatePreparedCatalogContract(tampered);
+  await assert.rejects(
+    runCodeNode(workflow, 'Проверить evidence — попытка 2', response, tampered),
+    /catalog parity|immutable catalog/i,
+  );
+});
+
+test('attempt 2 rebuild rejects an alternate exact fragment boundary', async () => {
+  const workflow = loadWorkflow();
+  const unitId = 'catalog-fragment-boundary-tamper';
+  const longHead = 'A'.repeat(1500);
+  const longTail = 'B'.repeat(100);
+  const source = buildSource([{
+    semantic_block_id: 'sb_long_boundary', scope: 'primary', type: 'text', role: 'body',
+    text: `${longHead} ${longTail}`,
+  }], unitId);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_long_boundary', quote: 'missing',
+    }])], unitId),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const tampered = structuredClone(prepared);
+  const candidates = tampered.repair_request.evidence_catalog;
+  candidates[0].canonical_quote = 'A'.repeat(1499);
+  candidates[0].context_after = longTail;
+  candidates[1].context_before = 'A'.repeat(1499);
+  recalculatePreparedCatalogContract(tampered);
+  const response = buildRepairResponse([{
+    fact_index: 0,
+    violation_codes: [],
+    selected_evidence_refs: ['er2:sb_long_boundary:0001'],
+  }], { analysis_unit_id: unitId });
+  await assert.rejects(
+    runCodeNode(workflow, 'Проверить evidence — попытка 2', response, tampered),
+    /catalog parity|immutable catalog/i,
+  );
+});
+
+test('Evidence Repair v2 materializes single and multiple refs with exact downstream shape', async () => {
+  const workflow = loadWorkflow();
+  const source = buildSource([
+    {
+      semantic_block_id: 'sb_retained', scope: 'primary', type: 'text', role: 'body',
+      text: 'Уже точная исходная цитата.',
+    },
+    {
+      semantic_block_id: 'sb_repaired', scope: 'primary', type: 'text', role: 'body',
+      text: 'Первая материализованная цитата.',
+    },
+    {
+      semantic_block_id: 'sb_additional', scope: 'overlap', type: 'text', role: 'heading',
+      text: 'Вторая материализованная цитата.',
+    },
+  ]);
+  const invalidQuote = 'Эта строка отсутствует в источнике';
+  const invalid = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([
+      { semantic_block_id: 'sb_retained', quote: 'Уже точная исходная цитата.' },
+      { semantic_block_id: 'sb_repaired', quote: invalidQuote },
+    ])]),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, invalid);
+  const repaired = await runCodeNode(
+    workflow,
+    'Проверить evidence — попытка 2',
+    buildRepairResponse([buildReferenceRepair(
+      prepared,
+      0,
+      ['sb_repaired', 'sb_additional'],
+      ['quote_not_found'],
+    )]),
+    prepared,
+  );
+
+  assert.equal(repaired.validation_passed, true, JSON.stringify(repaired.violations));
+  assert.deepEqual(
+    repaired.verified_facts[0].evidence.map(({ semantic_block_id, quote }) => ({
+      semantic_block_id,
+      quote,
+    })),
+    [
+      { semantic_block_id: 'sb_retained', quote: 'Уже точная исходная цитата.' },
+      { semantic_block_id: 'sb_repaired', quote: 'Первая материализованная цитата.' },
+      { semantic_block_id: 'sb_additional', quote: 'Вторая материализованная цитата.' },
+    ],
+  );
+  assert.ok(repaired.verified_facts[0].evidence.every((evidence) => (
+    Object.hasOwn(evidence, 'scope') &&
+    Object.hasOwn(evidence, 'type') &&
+    Object.hasOwn(evidence, 'role') &&
+    Object.hasOwn(evidence, 'source_block_ids') &&
+    Object.hasOwn(evidence, 'page_from') &&
+    Object.hasOwn(evidence, 'page_to') &&
+    Object.hasOwn(evidence, 'sheet_name') &&
+    Object.hasOwn(evidence, 'sources')
+  )));
+  assert.doesNotMatch(JSON.stringify(repaired.verified_facts), new RegExp(invalidQuote));
+  assert.doesNotMatch(JSON.stringify(repaired.evidence_context), new RegExp(invalidQuote));
+});
+
+test('repair_dropped_grounded_evidence synchronizes diagnostics metrics and audit counts', async () => {
+  const workflow = loadWorkflow();
+  const unitId = 'repair-dropped-metrics-unit';
+  const source = buildSource([
+    {
+      semantic_block_id: 'sb_metrics_retained', scope: 'primary', type: 'text', role: 'body',
+      text: 'Grounded evidence that must be retained.',
+    },
+    {
+      semantic_block_id: 'sb_metrics_selected', scope: 'primary', type: 'text', role: 'body',
+      text: 'Grounded selected replacement.',
+    },
+  ], unitId);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([
+      { semantic_block_id: 'sb_metrics_retained', quote: 'Grounded evidence that must be retained.' },
+      { semantic_block_id: 'sb_metrics_selected', quote: 'missing quote' },
+    ])], unitId),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const search = "if (isExactGroundedEvidence(segment, evidence.quote)) {\n      addExact({ semantic_block_id: evidence.semantic_block_id, quote: evidence.quote });\n    }";
+  const replacement = "if (false && isExactGroundedEvidence(segment, evidence.quote)) {\n      addExact({ semantic_block_id: evidence.semantic_block_id, quote: evidence.quote });\n    }";
+  const harnessWorkflow = workflowWithAttemptTwoMutation(workflow, search, replacement);
+  const result = await runCodeNode(
+    harnessWorkflow,
+    'Проверить evidence — попытка 2',
+    buildRepairResponse([buildReferenceRepair(
+      prepared,
+      0,
+      ['sb_metrics_selected'],
+      ['quote_not_found'],
+    )], { analysis_unit_id: unitId }),
+    prepared,
+  );
+  assert.equal(result.validation_passed, false);
+  assert.deepEqual(
+    result.violations.map(({ code }) => code),
+    ['repair_dropped_grounded_evidence'],
+  );
+  const metrics = result.extractor.evidence_diagnostics.resource_metrics;
+  assert.equal(metrics.violations_by_code.repair_dropped_grounded_evidence, 1);
+  assert.equal(metrics.unresolved_violations_count, result.violations.length);
+  assert.equal(
+    result.extractor.evidence_diagnostics.violations.length,
+    result.evidence_validation.violations_count,
+  );
+  assert.deepEqual(
+    result.evidence_validation.resource_metrics,
+    metrics,
+  );
+});
+
+test('Evidence Repair v2 rejects unknown, foreign, and duplicate refs exactly', async () => {
+  const workflow = loadWorkflow();
+  const makePrepared = async (unitId, blockId) => {
+    const source = buildSource([{
+      semantic_block_id: blockId,
+      scope: 'primary',
+      type: 'text',
+      role: 'body',
+      text: `Canonical ${unitId}`,
+    }], unitId);
+    const invalid = await runCodeNode(
+      workflow,
+      'Проверить и привязать evidence',
+      buildExtractorResponse([buildFact([{
+        semantic_block_id: blockId,
+        quote: 'Missing quote',
+      }])], unitId),
+      source,
+    );
+    return prepareEvidenceRepair(workflow, invalid);
+  };
+  const preparedA = await makePrepared('unit-ref-a', 'sb_ref_a');
+  const preparedB = await makePrepared('unit-ref-b', 'sb_ref_b');
+  const validRef = firstCatalogRef(preparedA, 'sb_ref_a');
+  const foreignRef = firstCatalogRef(preparedB, 'sb_ref_b');
+
+  for (const refs of [['er2:sb_unknown:0001'], [foreignRef], [validRef, validRef]]) {
+    await assert.rejects(
+      runCodeNode(
+        workflow,
+        'Проверить evidence — попытка 2',
+        buildRepairResponse([{
+          fact_index: 0,
+          violation_codes: [],
+          selected_evidence_refs: refs,
+        }], { analysis_unit_id: 'unit-ref-a' }),
+        preparedA,
+      ),
+      /evidence_ref|duplicate|allow-list|unknown|foreign/i,
+    );
+  }
+});
+
+test('Evidence Repair v2 source duplicate IDs and catalog ref collisions fail closed', async () => {
+  const workflow = loadWorkflow();
+  const segments = [
+    { semantic_block_id: 'sb_duplicate', scope: 'primary', type: 'text', role: 'body', text: 'A' },
+    { semantic_block_id: 'sb_duplicate', scope: 'overlap', type: 'text', role: 'body', text: 'B' },
+  ];
+  const source = buildSource(segments, 'collision-unit');
+  const invalid = {
+      validation_passed: false,
+      violations: [{
+        code: 'quote_not_found', fact_index: 0, evidence_index: 0,
+        details: { exact_match_candidate_ids: [] },
+      }],
+      repair_context: {
+        original_extractor_response: {
+          schema_version: 'ai_extractor_v1',
+          field_catalog_version: 'tender_fields_v1',
+          analysis_unit_id: 'collision-unit',
+          facts: [buildFact([{ semantic_block_id: segments[0].semantic_block_id, quote: 'missing' }])],
+        },
+        source,
+        field_catalog: [],
+      },
+      evidence_validation: {
+        resource_contract: {
+          max_evidence_per_fact: 25,
+          max_quote_length: 1500,
+          max_total_quote_chars_per_fact: 5000,
+        },
+      },
+      retry_decision: {
+        route: 'evidence_repair',
+        invalid_fact_indexes: [0],
+        evidence_repair_fact_indexes: [0],
+      },
+  };
+  await assert.rejects(
+    runCodeNode(workflow, 'Подготовить Evidence Repair', invalid, invalid),
+    /duplicate|collision/i,
+  );
+
+  const validSource = buildSource([
+    { semantic_block_id: 'sb_catalog_a', scope: 'primary', type: 'text', role: 'body', text: 'Catalog A' },
+    { semantic_block_id: 'sb_catalog_b', scope: 'overlap', type: 'text', role: 'body', text: 'Catalog B' },
+  ], 'catalog-collision-unit');
+  const invalidUnit = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_catalog_a', quote: 'missing',
+    }])], 'catalog-collision-unit'),
+    validSource,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, invalidUnit);
+  const tampered = structuredClone(prepared);
+  tampered.repair_request.evidence_catalog[1].evidence_ref =
+    tampered.repair_request.evidence_catalog[0].evidence_ref;
+  await assert.rejects(
+    runCodeNode(
+      workflow,
+      'Проверить evidence — попытка 2',
+      buildRepairResponse([buildReferenceRepair(prepared, 0, ['sb_catalog_a'])], {
+        analysis_unit_id: 'catalog-collision-unit',
+      }),
+      tampered,
+    ),
+    /duplicate evidence_ref|collision/i,
+  );
+});
+
+test('identical canonical text in distinct blocks produces distinct identity-safe refs', async () => {
+  const workflow = loadWorkflow();
+  const unitId = 'duplicate-phrase-distinct-blocks';
+  const phrase = 'Одинаковая допустимая фраза.';
+  const source = buildSource([
+    { semantic_block_id: 'sb_same_primary', scope: 'primary', type: 'text', role: 'body', text: phrase },
+    { semantic_block_id: 'sb_same_overlap', scope: 'overlap', type: 'table', role: 'heading', text: `[C1] ${phrase}` },
+  ], unitId);
+  source.provenance.index.sb_same_primary.source_block_ids = ['#/texts/1'];
+  source.provenance.index.sb_same_overlap.source_block_ids = ['#/tables/1'];
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_same_primary', quote: 'Неточная цитата',
+    }])], unitId),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  assert.deepEqual(
+    prepared.repair_request.evidence_catalog.map((candidate) => ({
+      evidence_ref: candidate.evidence_ref,
+      semantic_block_id: candidate.semantic_block_id,
+      scope: candidate.scope,
+      type: candidate.type,
+      role: candidate.role,
+      canonical_quote: candidate.canonical_quote,
+    })),
+    [
+      {
+        evidence_ref: 'er2:sb_same_primary:0001', semantic_block_id: 'sb_same_primary',
+        scope: 'primary', type: 'text', role: 'body', canonical_quote: phrase,
+      },
+      {
+        evidence_ref: 'er2:sb_same_overlap:0001', semantic_block_id: 'sb_same_overlap',
+        scope: 'overlap', type: 'table', role: 'heading', canonical_quote: phrase,
+      },
+    ],
+  );
+  const repaired = await runCodeNode(
+    workflow,
+    'Проверить evidence — попытка 2',
+    buildRepairResponse([{
+      fact_index: 0,
+      violation_codes: ['quote_not_found', 'missing_primary_evidence'],
+      selected_evidence_refs: [
+        'er2:sb_same_primary:0001',
+        'er2:sb_same_overlap:0001',
+      ],
+    }], { analysis_unit_id: unitId }),
+    prepared,
+  );
+  assert.equal(repaired.validation_passed, true, JSON.stringify(repaired.violations));
+  assert.deepEqual(
+    repaired.verified_facts[0].evidence.map((evidence) => ({
+      semantic_block_id: evidence.semantic_block_id,
+      scope: evidence.scope,
+      type: evidence.type,
+      role: evidence.role,
+      source_block_ids: evidence.source_block_ids,
+    })),
+    [
+      {
+        semantic_block_id: 'sb_same_primary', scope: 'primary', type: 'text', role: 'body',
+        source_block_ids: ['#/texts/1'],
+      },
+      {
+        semantic_block_id: 'sb_same_overlap', scope: 'overlap', type: 'table', role: 'heading',
+        source_block_ids: ['#/tables/1'],
+      },
+    ],
+  );
+});
+
+test('Evidence Repair v2 catalog has explicit hard bounds and never truncates overflow', async () => {
+  const workflow = loadWorkflow();
+  const segments = [{
+    semantic_block_id: 'sb_bound_incremental',
+    scope: 'primary',
+    type: 'text',
+    role: 'body',
+    text: Array.from({ length: 300 }, (_, index) => (
+      `Unique bounded candidate ${index + 1}.`
+    )).join('\n'),
+  }];
+  const source = buildSource(segments, 'catalog-overflow-unit');
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: segments[0].semantic_block_id,
+      quote: 'Not in the source',
+    }])], 'catalog-overflow-unit'),
+    source,
+  );
+
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /candidate count overflow.*candidate_index=257/i,
+  );
+
+  const charOverflowSegments = Array.from({ length: 251 }, (_, index) => ({
+    semantic_block_id: `sb_chars_${String(index + 1).padStart(4, '0')}`,
+    scope: index === 0 ? 'primary' : 'overlap',
+    type: 'text',
+    role: 'body',
+    text: `${String(index + 1).padStart(4, '0')}-${'X'.repeat(995)}`,
+  }));
+  const charOverflowSource = buildSource(charOverflowSegments, 'catalog-char-overflow-unit');
+  const charOverflowFirst = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: charOverflowSegments[0].semantic_block_id,
+      quote: 'Not in this source either',
+    }])], 'catalog-char-overflow-unit'),
+    charOverflowSource,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, charOverflowFirst),
+    /canonical source.*overflow|catalog total character overflow/i,
+  );
+});
+
+test('catalog preflight bounds an oversized single canonical block before request construction', async () => {
+  const workflow = loadWorkflow();
+  const unitId = 'oversized-canonical-source-unit';
+  const source = buildSource([{
+    semantic_block_id: 'sb_oversized_source',
+    scope: 'primary',
+    type: 'text',
+    role: 'body',
+    text: 'Z'.repeat(100001),
+  }], unitId);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_oversized_source', quote: 'missing',
+    }])], unitId),
+    source,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /canonical source preflight overflow/i,
+  );
+});
+
+test('Evidence Repair enforces the actual serialized HTTP request budget without truncation', async () => {
+  const workflow = loadWorkflow();
+  const source = buildSource([{
+    semantic_block_id: 'sb_request_budget', scope: 'primary', type: 'text', role: 'body',
+    text: 'Короткий source candidate.',
+  }], 'request-budget-unit');
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_request_budget', quote: 'missing',
+    }])], 'request-budget-unit'),
+    source,
+  );
+  first.repair_context.field_catalog = [{
+    field_key: 'application_documents',
+    instructions: 'Y'.repeat(400000),
+  }];
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /serialized request budget overflow/i,
+  );
+
+  first.repair_context.field_catalog = [];
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const requestProjection = JSON.stringify({
+    model: 'google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low',
+    messages: [
+      { role: 'system', content: prepared.repair_request.system_prompt },
+      { role: 'user', content: prepared.repair_request.user_prompt },
+    ],
+    response_format: { type: 'json_object' },
+    max_tokens: 8192,
+    stream: false,
+  });
+  assert.equal(
+    prepared.repair_request.evidence_catalog_contract.serialized_request_chars,
+    requestProjection.length,
+  );
+  assert.equal(
+    prepared.repair_request.evidence_catalog_contract.max_serialized_request_chars,
+    360000,
+  );
+  const prepareCode = findNode(workflow, 'Подготовить Evidence Repair').parameters.jsCode;
+  assert.doesNotMatch(prepareCode, /remaining\s*=\s*remaining\.slice/);
+  assert.match(prepareCode, /sourceOffset/);
+});
+
+test('Evidence Repair v2 rejects source provenance and scope mismatch before provider input', async () => {
+  const workflow = loadWorkflow();
+  const source = buildSource([{
+    semantic_block_id: 'sb_provenance_scope',
+    scope: 'primary',
+    type: 'text',
+    role: 'body',
+    text: 'Canonical source',
+  }], 'provenance-scope-unit');
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_provenance_scope',
+      quote: 'Missing source text',
+    }])], 'provenance-scope-unit'),
+    source,
+  );
+  const classified = await classifyRetry(workflow, first);
+  classified.repair_context.source.provenance.index.sb_provenance_scope.scope = 'overlap';
+  await assert.rejects(
+    runCodeNode(
+      workflow,
+      'Подготовить Evidence Repair',
+      classified,
+      classified,
+    ),
+    /provenance\/scope mismatch/i,
+  );
+});
+
+test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte-stable', () => {
+  const workflow = loadWorkflow();
+  const parameterHashes = Object.fromEntries([
+    'Подготовить запрос для AI',
+    'AI Extractor v1.0',
+    'Связать primary Extractor response с source',
+    'Проверить и привязать evidence',
+  ].map((name) => [
+    name,
+    crypto.createHash('sha256')
+      .update(JSON.stringify(findNode(workflow, name).parameters))
+      .digest('hex'),
+  ]));
+  assert.deepEqual(parameterHashes, {
+    'Подготовить запрос для AI': 'd7fadf8133a06e3faca1fcbe564c18fbe2715aa8277d6b9138bbecda36248cc2',
+    'AI Extractor v1.0': 'f08f1c27ffb0969694b923718964515b58edfca69fd46edfc6a3b054a3ef6059',
+    'Связать primary Extractor response с source': 'e42b9b2c4d0e2dc00bd2387702c53b39732c529456c9fbb1839c770775271176',
+    'Проверить и привязать evidence': '22195356bcece450952479fcb473fa5e37ac121b101464aae7d313e3284be34d',
+  });
+  assert.equal(
+    crypto.createHash('sha256')
+      .update(JSON.stringify(findNode(workflow, 'AI Evidence Repair v1')))
+      .digest('hex'),
+    'b2eb9ea0dfe99de44b3d113cc9f1663b0ed0fa2f8394e1369a221d82160479f3',
+  );
+});
+
+test('DW-17 preserves base Validator preparation parameters byte-for-byte', () => {
+  const workflow = loadWorkflow();
+  const parameters = findNode(workflow, 'Развернуть units для AI Validator').parameters;
+  assert.equal(
+    crypto.createHash('sha256').update(JSON.stringify(parameters)).digest('hex'),
+    'cd95632a02b7beb442ea5f342c09f6e23671626926d44d0e1cfcf281810fb0ed',
+  );
+});
+
+test('Evidence Repair v2 schema exposes selected refs only and prohibits model-authored evidence', async () => {
   const workflow = loadWorkflow();
   const source = buildSource([
     {
@@ -2553,17 +3311,34 @@ test('Evidence Repair schema exposes evidence only and prohibits withdrawal', as
     source,
   );
   const prepared = await prepareEvidenceRepair(workflow, invalid);
-  const serializedSchema = JSON.stringify(prepared.repair_request.response_schema);
-
-  assert.doesNotMatch(serializedSchema, /value_text|field_key|status|confidence/);
-  assert.doesNotMatch(serializedSchema, /withdraw/i);
-  assert.match(prepared.repair_request.system_prompt, /только evidence/i);
+  const repairItemSchema = prepared.repair_request.response_schema
+    .properties.repairs.items;
+  assert.deepEqual(
+    repairItemSchema.required,
+    ['fact_index', 'violation_codes', 'selected_evidence_refs'],
+  );
+  assert.deepEqual(
+    Object.keys(repairItemSchema.properties).sort(),
+    ['fact_index', 'selected_evidence_refs', 'violation_codes'],
+  );
+  assert.equal(repairItemSchema.properties.evidence, undefined);
+  assert.equal(repairItemSchema.properties.semantic_block_id, undefined);
+  assert.equal(repairItemSchema.properties.quote, undefined);
+  assert.equal(prepared.repair_request.prompt_version, 'tender_evidence_repair_prompt_v2');
+  assert.equal(prepared.repair_request.schema_version, 'ai_evidence_repair_v2');
+  assert.match(prepared.repair_request.system_prompt, /selected_evidence_refs/);
+  assert.match(prepared.repair_request.system_prompt, /не.*quote/i);
   assert.match(prepared.repair_request.system_prompt, /"repairs"/);
   assert.match(prepared.repair_request.system_prompt, /не возвращай repaired_facts/i);
   const userPayload = JSON.parse(prepared.repair_request.user_prompt);
   assert.ok(userPayload.response_schema);
   assert.ok(userPayload.required_output_shape);
   assert.ok(Array.isArray(userPayload.required_output_shape.repairs));
+  assert.ok(Array.isArray(userPayload.evidence_catalog));
+  assert.deepEqual(
+    Object.keys(userPayload.required_output_shape.repairs[0]).sort(),
+    ['fact_index', 'selected_evidence_refs', 'violation_codes'],
+  );
   assert.equal(userPayload.required_output_shape.repaired_facts, undefined);
 });
 
@@ -2641,7 +3416,7 @@ test('attempt 2 can replace wrong evidence while preserving the original fact va
       {
         fact_index: 0,
         violation_codes: [],
-        evidence: [{ semantic_block_id: 'sb_0002', quote: 'Нужная точная цитата' }],
+        selected_evidence_refs: [firstCatalogRef(prepared, 'sb_0002')],
       },
     ]),
     prepared,
@@ -2654,7 +3429,7 @@ test('attempt 2 can replace wrong evidence while preserving the original fact va
   assert.equal(repaired.extractor.evidence_diagnostics.attempt, 2);
 });
 
-test('attempt 2 leaves an ungrounded repair invalid for the explicit error branch', async () => {
+test('attempt 2 rejects a non-allow-listed evidence ref before materialization', async () => {
   const workflow = loadWorkflow();
   const source = buildSource([
     {
@@ -2674,22 +3449,19 @@ test('attempt 2 leaves an ungrounded repair invalid for the explicit error branc
     source,
   );
   const prepared = await prepareEvidenceRepair(workflow, invalid);
-  const repaired = await runCodeNode(
-    workflow,
-    'Проверить evidence — попытка 2',
-    buildRepairResponse([
-      {
+  await assert.rejects(
+    runCodeNode(
+      workflow,
+      'Проверить evidence — попытка 2',
+      buildRepairResponse([{
         fact_index: 0,
         violation_codes: ['quote_not_found'],
-        evidence: [{ semantic_block_id: 'sb_0001', quote: 'Всё ещё отсутствует' }],
-      },
-    ]),
-    prepared,
+        selected_evidence_refs: ['er2:sb_foreign:0001'],
+      }]),
+      prepared,
+    ),
+    /unknown|allow-list|evidence_ref/i,
   );
-
-  assert.equal(repaired.validation_passed, false);
-  assert.deepEqual(repaired.verified_facts, []);
-  assert.ok(repaired.violations.some(({ code }) => code === 'quote_not_found'));
 });
 
 test('attempt 2 rejects incomplete repair output as a hard contract error', async () => {
@@ -2753,7 +3525,7 @@ test('attempt 2 enforces violation_codes application-side', async () => {
         {
           fact_index: 0,
           violation_codes: ['invented_violation'],
-          evidence: [{ semantic_block_id: 'sb_0001', quote: 'Точная цитата' }],
+          selected_evidence_refs: [firstCatalogRef(prepared, 'sb_0001')],
         },
       ]),
       prepared,
@@ -2839,10 +3611,10 @@ test('analysis_unit_id rejects crossed B/D source links end-to-end', async () =>
     [{
       fact_index: 0,
       violation_codes: [],
-      evidence: [{
-        semantic_block_id: unitB.source.ai_segments[0].semantic_block_id,
-        quote: unitB.exactQuote,
-      }],
+      selected_evidence_refs: [firstCatalogRef(
+        preparedB,
+        unitB.source.ai_segments[0].semantic_block_id,
+      )],
     }],
     { analysis_unit_id: 'unitB' },
   );
@@ -2880,19 +3652,44 @@ test('convergence: all-invalid batch gets at most one repair per unit', async ()
   ));
 });
 
-test('convergence: invalid attempt 2 reaches explicit Worker error and cannot reach AI Validator', async () => {
+test('valid refs that exceed attempt-2 quote budget reach explicit Worker terminal exhaustion', async () => {
   const workflow = loadWorkflow();
-  const unit = buildConvergenceUnit('unitA', false);
-  const result = await convergeUnits(workflow, [unit], 'invalid');
-  assert.deepEqual(result.repairUnitIds, ['unitA']);
-  assert.equal(result.converged.length, 0);
-  assert.equal(result.failed.length, 1);
+  const unitId = 'terminal-exhaustion-unit';
+  const segments = Array.from({ length: 4 }, (_, index) => ({
+    semantic_block_id: `sb_terminal_${index + 1}`,
+    scope: 'primary',
+    type: 'text',
+    role: 'body',
+    text: `${index + 1}`.repeat(1400),
+  }));
+  const source = buildSource(segments, unitId);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([buildFact([{
+      semantic_block_id: 'sb_terminal_1', quote: 'not-grounded',
+    }])], unitId),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const failed = await runCodeNode(
+    workflow,
+    'Проверить evidence — попытка 2',
+    buildRepairResponse([buildReferenceRepair(
+      prepared,
+      0,
+      segments.map(({ semantic_block_id }) => semantic_block_id),
+    )], { analysis_unit_id: unitId }),
+    prepared,
+  );
+  assert.equal(failed.validation_passed, false);
+  assert.ok(failed.violations.some(({ code }) => code === 'evidence_total_quote_chars_exceeded'));
   await assert.rejects(
     runCodeNode(
       workflow,
       'Завершить unit: evidence validation failed',
-      result.failed[0],
-      result.failed[0],
+      failed,
+      failed,
     ),
     /Evidence validation exhausted.*attempts=2/,
   );
@@ -3012,7 +3809,7 @@ test('coordinate-only quote with unknown ID produces no exact table candidates',
   assert.deepEqual(violation.details.exact_match_candidate_ids, []);
 });
 
-test('attempt 2 rejects coordinate-only table evidence without hard-crashing', async () => {
+test('attempt 2 materializes canonical table evidence without generated coordinates', async () => {
   const workflow = loadWorkflow();
   const segment = {
     semantic_block_id: 'sb_coordinate_only_attempt_2',
@@ -3038,14 +3835,13 @@ test('attempt 2 rejects coordinate-only table evidence without hard-crashing', a
     buildRepairResponse([{
       fact_index: 0,
       violation_codes: first.violations.map(({ code }) => code),
-      evidence: [{ semantic_block_id: segment.semantic_block_id, quote: '[C1]' }],
+      selected_evidence_refs: [firstCatalogRef(prepared, segment.semantic_block_id)],
     }]),
     prepared,
   );
 
-  assert.equal(second.validation_passed, false);
-  assert.ok(second.violations.some(({ code }) => code === 'quote_not_found'));
-  assert.ok(second.violations.some(({ code }) => code === 'missing_primary_evidence'));
+  assert.equal(second.validation_passed, true, JSON.stringify(second.violations));
+  assert.equal(second.verified_facts[0].evidence[0].quote, 'Реальный текст ячейки');
 });
 
 test('classifier never routes coordinate-only resource evidence to fact_partition', async () => {
@@ -3305,10 +4101,7 @@ test('attempt 2 applies the same exact table-coordinate grounding contract', asy
     buildRepairResponse([{
       fact_index: 0,
       violation_codes: ['quote_not_found', 'missing_primary_evidence'],
-      evidence: [{
-        semantic_block_id: segment.semantic_block_id,
-        quote: 'Формула значение',
-      }],
+      selected_evidence_refs: [firstCatalogRef(prepared, segment.semantic_block_id)],
     }]),
     prepared,
   );
@@ -3402,23 +4195,25 @@ test('execution 14075 preserves exact quote_not_found for РАЗРЕЩЕНИЙ v
   );
 
   const prepared = await prepareEvidenceRepair(workflow, attempt1);
+  const exactRepairCandidate = prepared.repair_request.evidence_catalog.find(
+    (candidate) => candidate.semantic_block_id ===
+      (fixture.semantic_block_id ?? fixture.source.ai_segments[0].semantic_block_id) &&
+      candidate.canonical_quote.includes('РАЗРЕЩЕНИЙ'),
+  );
+  assert.ok(exactRepairCandidate, 'Expected a structurally isolated exact РАЗРЕЩЕНИЙ candidate');
   const attempt2 = await runCodeNode(
     workflow,
     'Проверить evidence — попытка 2',
-    fixture.repair_response,
+    buildRepairResponse([{
+      fact_index: fixture.problem_fact_index,
+      violation_codes: ['quote_not_found'],
+      selected_evidence_refs: [exactRepairCandidate.evidence_ref],
+    }], { analysis_unit_id: fixture.analysis_unit_id }),
     prepared,
   );
-  assert.equal(attempt2.validation_passed, false);
-  assert.deepEqual(
-    attempt2.violations.map(({ code, fact_index, evidence_index, details }) => ({
-      code,
-      fact_index,
-      evidence_index,
-      semantic_block_id: details.semantic_block_id,
-    })),
-    fixture.expected.attempt_2.violations,
-  );
-  assert.equal(attempt2.verified_facts.length, 0);
+  assert.equal(attempt2.validation_passed, true, JSON.stringify(attempt2.violations));
+  assert.doesNotMatch(JSON.stringify(attempt2.verified_facts), /РАЗРЕШЕНИЙ/);
+  assert.match(JSON.stringify(attempt2.verified_facts), /РАЗРЕЩЕНИЙ/);
 });
 
 test('completeness barrier references the canonical upstream persistence node by exact name', () => {
@@ -3501,6 +4296,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Собрать смысловые разделы v1.4',
     'подготовить части для анализа v1.3',
     'Развернуть части для AI v1.2',
+    'Подготовить Evidence Repair',
     'Проверить и привязать evidence',
     'Проверить evidence — попытка 2',
     'Классифицировать bounded retry',
