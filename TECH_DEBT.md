@@ -148,7 +148,7 @@ Document Worker packaging checkpoint 2026-08-29:
 Extractor model-selection checkpoint 2026-08-29:
 
 - текущий provisional baseline test/canonical candidate: `z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`;
-- Gemini 3.7 Flash low выбран bounded local fallback; runtime canary этого contour не выполнен;
+- Gemini 3.7 Flash low выбран bounded local fallback; isolated bounded contour подтверждён execution `14367` (ровно один fallback для `sanitized_au_0007`), но full-path Validator/persistence не входил в canary;
 - model search на текущих 16 pinned units остановлен после сравнительного отчёта `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`;
 - full Worker runtime canary с выбранной связкой Extractor + Validator не выполнен и остаётся gate;
 - A/B подтвердил, что exact evidence validation не защищает от неверного `field_key`; universal semantic boundary `evaluation_criteria` остаётся предметом runtime наблюдения, но новый redesign до canary не открывается.
