@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-09-03
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw17-semantic-audit-14374-14376`
+**Branch at snapshot:** `codex/tr14389-targeted-recheck-prompt`
 
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
@@ -43,8 +43,8 @@ Production PostgreSQL и published production workflows в текущем лок
 | `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | legacy calibration/runtime workflow, 60 nodes, current unpublished version `55664cef-…`; последние executions `14147–14158`, в клиентском 12-document run не участвовал |
 | `[PROD CANDIDATE] TENDER — Обработать документ` | `csnDg78NzN1nIjUT` | yes | фактический Worker клиентского 12-document run; published active version `c5977af5-…` с 51-node execution graph, current unpublished draft `778dfb50-…` содержит 52 nodes; executions `14234/14238` воспроизводят `DW-17` |
 | `[DW-17 MANUAL REVIEW — INACTIVE] TENDER — Обработать документ` | `8dEt6A8IwTybFuIq` | no | inactive/unpublished 71-node audit contour; current observed draft `62041fec-…`; executions `14374/14376` technical GREEN through readiness, semantic gate FAIL; Aggregator disabled |
-| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published containment candidate `91c17313-…`; fresh canary и consecutive series `3/3` GREEN |
-| `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | technical fallback candidate `13b3c124-…`; fresh canary и consecutive series `3/3` GREEN |
+| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published `91c17313-…`; current draft `f11906df-…` отличается от active; execution `14398` подтвердил test wiring, но Round 1 fail-closed на `9/10 candidate_decisions` |
+| `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | published active `13b3c124-…`; current unpublished draft `cf0f67f6-…` содержит только stitched-quote prompt hardening; execution `14398` до Targeted Recheck не дошёл |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
 
@@ -81,6 +81,18 @@ Live drift на этом checkpoint:
 Полный sanitized report: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`.
 
 DW-21 implementation находится только на стороне пользователя и отсутствует в текущей Git branch. Owner-supplied выводы `14386/14387` приняты без повторного аудита: Docling прошёл, ActiveX `national_regime` с selected `Не применимо` был grounded, но overall mapping остался partial/unknown (`51 exact / 189 missing_owner / 50 conflicting`); attempts завершались `429` на Evidence Repair/fallback. Добавленный пользователем Wait не входит в этот branch.
+
+### Forensic checkpoint — executions 14397 / 14398
+
+- Lineage: `14396 manual ancestor → 14397 document-processing execution (DJtWSqTcUmQo0xWv) → document completed/readiness=true → 14398 test Aggregator ftvmrEHoMbPOAqZG → Проверить ответ Semantic Aggregator → ERROR`.
+- Wiring теперь правильно ведёт в test Aggregator, не production.
+- Downstream evidence: `1/1` completed document, `28` units, `65` persisted facts, readiness `all_documents_completed`. Полный internal `14397` runData недоступен (`404/502`), поэтому внутренние Docling/Extractor/fallback/Repair/Validator counts не independently verified.
+- `14398`: atomic claim `ready_for_aggregation → aggregating`; `65` facts; `27` fields; `10` with candidates / `17` without; `10` AI responses.
+- Первый incorrect node item — index `2`, `evaluation_criteria` (`field_index=12`). Модель `google/gemini-3.7-flash` вернула valid JSON и `9 candidate_decisions` при ожидаемых `10`. Exact error: `[Semantic Aggregator Validator] Ожидалось 10 candidate_decisions, получено 9 [line 144]`. Отсутствует ровно один allowed fact ID; duplicate/unknown IDs нет. `finish_reason=stop`, `completion_tokens=1029`, workflow `max_tokens=16384`: model omission при normal stop, не truncation/`429`/JSON parse.
+- Validator корректно сработал fail-closed и не должен быть ослаблен.
+- Targeted Recheck не вызван; новый unpublished prompt draft `cf0f67f6-…` не exercised. FINAL/Finalizer/27/27/report отсутствуют. Latest state `aggregating` inferred from runData, без DB `SELECT`; тот же run нельзя перезапускать без reset/retry policy.
+- **Current blocker:** Round 1 Semantic Aggregator может нарушить one-decision-per-candidate contract при valid JSON/stop, останавливая pipeline до Targeted Recheck/FINAL.
+- **One next step:** sanitized execution-derived regression для omission `evaluation_criteria` `10→9` и минимальный bounded contract repair/retry либо explicit technical fallback; сохранить exact ID-set/cardinality fail-closed, не создавать fabricated verdict; runtime не запускать до local RED/GREEN и review.
 
 ## 3. Document Worker test candidate
 
