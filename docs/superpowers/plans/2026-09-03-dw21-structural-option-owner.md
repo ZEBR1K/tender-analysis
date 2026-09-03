@@ -8,6 +8,8 @@
 
 **Tech Stack:** n8n workflow JSON, JavaScript Code nodes, OOXML/MS-OFORMS structures, Node.js built-in test runner.
 
+**Recovery baseline:** this branch starts at `a5c6050`. The authoritative local full Node suite is `404 total / 397 pass / 7 fail`; the seventh failure is the documented source-derived DOCX fixture-byte mismatch. Do not report the older literal-six set as this branch's exact local baseline.
+
 ---
 
 ### Task 1: Commit the bounded design and recovery evidence
@@ -37,6 +39,7 @@
 - Test: `tests/document-worker-docx-option-owner.test.mjs`
 
 - [ ] Extend direct OOXML traversal to emit stable source table/row/control-cell/label-cell refs and bounded table ancestry. Derive a question owner only from an unambiguous direct structural owner (direct preceding sibling paragraph/row or enclosing ancestor cell), never from global/nearest-text search.
+- [ ] Treat a preceding paragraph/row as an owner only when the OOXML tree records it as a typed direct sibling relation and there is exactly one candidate. Distance/proximity scoring is forbidden.
 - [ ] Form mutually-exclusive groups only from explicit ActiveX group identity scoped to the structural owner/table; unsupported checkbox grouping remains `unknown` unless the structural source proves one exact group.
 - [ ] Emit `mapping_status`/audit reasons for missing, conflicting, or multiple source owners. Do not use control names, ActiveX part numbers, labels, tender IDs, or execution IDs as production rules.
 - [ ] Run the focused test and retain REDs that belong to downstream semantic binding.
@@ -45,23 +48,27 @@
 
 **Files:**
 - Modify: `workflows/n8n-exports/TENDER — Обработать документ.json` (`Нормализовать документ Docling`)
+- Modify: `workflows/n8n-exports/TENDER — Обработать документ.json` (`Развернуть части для AI v1.2`)
 - Test: `tests/document-worker-docx-option-owner.test.mjs`
 
 - [ ] Resolve a source option group to exactly one normalized table using all group rows, their exact labels, cell coordinates, and one common relative row offset.
 - [ ] Resolve the question owner through the source-derived owner relation and the same local Docling/semantic hierarchy; duplicate text in another table/group must not participate.
 - [ ] Add bounded `docx_option_state_v1` fields for exact option text, group/question identity, source refs, owner block ID, and `mapping_status`; preserve canonical block text and quotes byte-for-byte.
+- [ ] Make the AI-visible segment contract carry proven state, exact option text, question/group identity, source refs, owner semantic block ID, and mapping status. Unknown ownership must not be presented to AI as selected/applicable; canonical segment text and evidence quote remain byte-identical.
 - [ ] On zero/multiple/conflicting matches, attach bounded issue IDs, keep full document audit once, and set the affected option/group to review-only.
 - [ ] Run the focused test until structural ownership cases pass.
 
 ### Task 5: Preserve proof through Validator dispatch and checker
 
 **Files:**
-- Modify: `workflows/n8n-exports/TENDER — Обработать документ.json` (`Подготовить dispatch AI Validator`, `Проверить ответ AI Validator`)
+- Modify: `workflows/n8n-exports/TENDER — Обработать документ.json` (`Проверить и привязать evidence`, `Проверить fallback и привязать evidence`, `Проверить evidence — попытка 2`, `Проверить Lossless Fact Partition`, `Подготовить dispatch AI Validator`, `Проверить ответ AI Validator`)
 - Test: `tests/document-worker-docx-option-owner.test.mjs`
 
 - [ ] Replace field allow-list behavior with fact-local structural applicability for every field: evidence touching an option group must use only selected options with one mapped owner/group; unselected evidence is deterministically rejected; mixed mutually-exclusive evidence is review-only.
 - [ ] Keep a final universal DW-21 cap: unknown/conflicting/multiple owner or group mapping forces `requires_review`, `accepted_for_normalization=false`, and preserves exact candidate/evidence/provenance plus original AI verdict/reason in audit.
 - [ ] Carry `docx_option_state_fact_audit_v1` losslessly with state, exact option token/text, group/question identity, source table/row/cell refs, owner semantic block ID, `mapping_status`, and issue IDs. AI must not create or alter this proof.
+- [ ] Audit every mirror evidence path in the actual graph: primary strict checker, fallback strict checker, Evidence Repair attempt 2 rebuild/materialization, Lossless Fact Partition, collector, and dispatch. Preserve byte-identical shared validator bodies where the current contract requires parity.
+- [ ] Run the same fixture through primary plus at least one synthetic fallback/repair route before the Validator cap; additive ownership must survive each route unchanged and review-only must still block AI promotion.
 - [ ] Confirm a uniquely mapped selected option remains eligible for the normal Validator and a neutral fact is unchanged.
 
 ### Task 6: Verify and document only observed behavior
