@@ -25,6 +25,15 @@ async function runCode(name, inputItems, sources = {}) {
   const code = node(graph, name).parameters.jsCode;
   const items = structuredClone(inputItems);
   const first = items[0] ?? { json: {} };
+  const executionContext = {
+    helpers: {
+      async getBinaryDataBuffer(itemIndex, binaryPropertyName) {
+        const descriptor = items[itemIndex]?.binary?.[binaryPropertyName];
+        assert.ok(descriptor?.data, `Unknown binary property ${itemIndex}:${binaryPropertyName}`);
+        return Buffer.from(descriptor.data, 'base64');
+      },
+    },
+  };
   const context = vm.createContext({
     Buffer,
     structuredClone,
@@ -36,11 +45,95 @@ async function runCode(name, inputItems, sources = {}) {
       if (!Object.hasOwn(sources, sourceName)) throw new Error(`Unknown source node: ${sourceName}`);
       const values = Array.isArray(sources[sourceName]) ? sources[sourceName] : [sources[sourceName]];
       const sourceItems = values.map((json) => ({ json: structuredClone(json) }));
-      return { all: () => sourceItems, first: () => sourceItems[0], item: sourceItems[0] };
+      return { all: () => sourceItems, first: () => sourceItems[0], itemMatching: (index) => sourceItems[index] ?? sourceItems[0], item: sourceItems[0] };
     },
+    __executionContext: executionContext,
   });
-  const result = await new vm.Script(`(async () => { ${code}\n })()`).runInContext(context);
+  const result = await new vm.Script(`(async function () { ${code}\n }).call(__executionContext)`).runInContext(context);
   return JSON.parse(JSON.stringify(Array.isArray(result) ? result : [result]));
+}
+
+function textParagraph(text) {
+  return { 'w:r': [{ 'w:t': [text] }] };
+}
+
+function parserInputItems() {
+  const projection = fixture.input.parser_input_projection;
+  const group = projection.outer_group_table;
+  const emptyTables = Array.from({ length: projection.preceding_table_count }, () => ({ 'w:tr': [] }));
+  const optionTable = {
+    'w:tr': group.rows.map((row) => ({
+      'w:tc': [
+        { 'w:p': [{ 'w:r': [{ 'w:object': [{ 'w:control': [{ $: { 'r:id': row.document_rel_id, 'w:name': row.control_name } }] }] }] }] },
+        { 'w:p': [] },
+        { 'w:p': [textParagraph(row.label)] },
+      ],
+    })),
+  };
+  const outerTable = {
+    'w:tr': [
+      { 'w:tc': [{ 'w:p': [] }] },
+      { 'w:tc': [{ 'w:p': [] }] },
+      { 'w:tc': [{ 'w:p': [] }] },
+      {
+        'w:tc': [
+          { 'w:p': [] },
+          { 'w:p': [textParagraph(group.question_text)], 'w:tbl': [optionTable] },
+        ],
+      },
+    ],
+  };
+  const document = {
+    json: {
+      docx_part_path: projection.document_part,
+      docx_part_kind: 'structured_xml',
+      'w:document': [{ 'w:body': [{ 'w:tbl': [...emptyTables, outerTable] }] }],
+    },
+  };
+  const documentRels = {
+    json: {
+      docx_part_path: 'word/_rels/document.xml.rels',
+      docx_part_kind: 'structured_xml',
+      Relationships: [{
+        Relationship: group.rows.map((row) => ({ $: {
+          Id: row.document_rel_id,
+          Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/control',
+          Target: row.active_x_part.replace(/^word\//u, ''),
+        } })),
+      }],
+    },
+  };
+  const stateShape = {
+    selected: { number: '8', source: 'activeX8' },
+    unselected: { number: '5', source: 'activeX5' },
+  };
+  const fixtureRoot = path.join(root, 'tests', 'fixtures', 'document-worker-docx-option-state', 'ooxml', 'word', 'activeX');
+  const controlItems = group.rows.flatMap((row) => {
+    const shape = stateShape[row.state_source];
+    const baseName = path.posix.basename(row.active_x_part, '.xml');
+    const binaryPart = `word/activeX/${baseName}.bin`;
+    return [
+      {
+        json: {
+          docx_part_path: row.active_x_part,
+          docx_part_kind: 'structured_xml',
+          'ax:ocx': [{ $: { 'ax:classid': '{8BD21D40-EC42-11CE-9E0D-00AA006002F3}', 'ax:persistence': 'persistStorage', 'r:id': 'rIdBinary' } }],
+        },
+      },
+      {
+        json: {
+          docx_part_path: `word/activeX/_rels/${baseName}.xml.rels`,
+          docx_part_kind: 'structured_xml',
+          Relationships: [{ Relationship: [{ $: { Id: 'rIdBinary', Type: 'http://schemas.microsoft.com/office/2006/relationships/activeXControlBinary', Target: `${baseName}.bin` } }] }],
+        },
+      },
+      {
+        json: { docx_part_path: binaryPart, docx_part_kind: 'binary' },
+        binary: { data: { data: fs.readFileSync(path.join(fixtureRoot, `${shape.source}.bin`)).toString('base64') } },
+      },
+    ];
+  });
+  return [document, documentRels, ...controlItems];
 }
 
 function doclingDocument({ cloneAlphaTable = false } = {}) {
@@ -131,6 +224,62 @@ function groundedUnit(segment, evidenceLabels, { fieldKey = 'advance_contract_gu
   };
 }
 
+function validatorSourceWithOptionFacts() {
+  const evidence = [{ semantic_block_id: 'sb_0466', scope: 'primary', quote: 'OPTION_ALPHA_SELECTED' }];
+  const mapped = {
+    ...fixture.input.option_states[0],
+    mapping_status: 'mapped',
+    option_group_id: 'word/document.xml#table[62]#group[1-3]',
+    question_owner: { source_block_id: '#/texts/513', semantic_block_id: 'sb_0465' },
+  };
+  const missingOwner = { ...mapped, mapping_status: 'missing_owner', question_owner: null };
+  return {
+    tender: { tender_id: 'sanitized' },
+    document: { document_id: 'sanitized-document' },
+    analysis_batch: { unit_index: 1, units_total: 1 },
+    analysis_unit_meta: { analysis_unit_id: 'doc_3_au_0012' },
+    evidence_validation: { version: 'evidence_validator_v1', passed: true },
+    extractor: { prompt_version: 'sanitized' },
+    validator_prompt_context: {
+      prompt_version: 'ai_validator_prompt_v1_2',
+      field_profiles_version: 'validator_field_profiles_v1',
+      field_keys: ['advance_contract_guarantee', 'participation_guarantee'],
+      field_profiles_text: 'SANITIZED_FIELD_PROFILES',
+    },
+    validator_field_keys: ['advance_contract_guarantee', 'participation_guarantee'],
+    verified_facts: [
+      {
+        fact_index: 0, field_key: 'advance_contract_guarantee', value_text: 'OPTION_ALPHA_SELECTED', status: 'requires_review', confidence: 0.99,
+        review_reason_code: 'source_quality_issue', review_note: 'Structural owner is unresolved.', evidence,
+        option_state_applicability: 'review_only', option_state_evidence: [missingOwner],
+        option_state_audit: { contract_version: 'docx_option_state_fact_audit_v1', mapping_status: 'missing_owner' },
+      },
+      {
+        fact_index: 1, field_key: 'participation_guarantee', value_text: 'OPTION_ALPHA_SELECTED', status: 'found', confidence: 0.99,
+        review_reason_code: null, review_note: null, evidence,
+        option_state_applicability: 'applicable', option_state_evidence: [mapped],
+        option_state_audit: { contract_version: 'docx_option_state_fact_audit_v1', mapping_status: 'mapped' },
+      },
+    ],
+    deterministically_rejected_facts: [],
+    evidence_context: { sb_0466: { canonical_text: 'OPTION_ALPHA_SELECTED' } },
+  };
+}
+
+function confirmedValidatorResponse() {
+  return {
+    id: 'sanitized-response', model: 'sanitized-model', provider: 'sanitized-provider',
+    choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({
+      schema_version: 'ai_validator_v1', analysis_unit_id: 'doc_3_au_0012',
+      validations: [
+        { fact_index: 0, field_key: 'advance_contract_guarantee', verdict: 'confirmed', confidence: 0.99, reason_code: null, reason_note: null },
+        { fact_index: 1, field_key: 'participation_guarantee', verdict: 'confirmed', confidence: 0.99, reason_code: null, reason_note: null },
+      ],
+    }) } }],
+    usage: {},
+  };
+}
+
 test('fixture is execution-derived, neutral, and preserves equality/collision topology', () => {
   const raw = fs.readFileSync(fixturePath, 'utf8');
   assert.equal(fixture.source_execution, 14374);
@@ -143,6 +292,23 @@ test('fixture is execution-derived, neutral, and preserves equality/collision to
   const shared = fixture.input.option_states.filter(({ exact_label: label }) => label === 'OPTION_SHARED');
   assert.equal(shared.length, 2);
   assert.notEqual(shared[0].source_row_ref.split('/row')[0], shared[1].source_row_ref.split('/row')[0]);
+});
+
+test('RED: real ActiveX parser derives exact cells and one typed structural question-owner candidate', async () => {
+  const [parsed] = await runCode('Разобрать состояния DOCX ActiveX', parserInputItems());
+  assert.equal(parsed.json.docx_option_state_status, 'resolved');
+  assert.deepEqual(parsed.json.docx_option_states.map(({ state }) => state), ['selected', 'unselected', 'unselected']);
+  const expected = fixture.oracle.target_group;
+  for (const option of parsed.json.docx_option_states) {
+    assert.equal(option.source_table_ref, expected.source_table_ref);
+    assert.match(option.source_row_ref, /^word\/document\.xml#table\[62\]\/row\[[123]\]$/u);
+    assert.match(option.source_control_cell_ref, /\/cell\[1\]$/u);
+    assert.match(option.source_label_cell_ref, /\/cell\[3\]$/u);
+    assert.equal(option.structural_group_candidate?.relation, 'direct_enclosing_cell_child');
+    assert.equal(option.structural_group_candidate?.question_source_ref, fixture.input.nested_table_case.question_ref);
+    assert.equal(option.structural_group_candidate?.question_text, 'QUESTION_ALPHA');
+    assert.equal(option.structural_group_candidate?.candidate_count, 1);
+  }
 });
 
 test('RED: current Normalizer preserves exact states but lacks unique question/group/semantic ownership', async () => {
@@ -183,6 +349,22 @@ test('RED: AI-visible segment carries proven owner/group/state while canonical t
   assert.ok(segment.text.includes('QUESTION_ALPHA'));
   assert.ok(segment.docx_option_states.every(({ mapping_status: status }) => status === 'mapped'));
   assert.ok(segment.docx_option_states.every(({ question_owner: owner }) => owner.semantic_block_id === 'sb_0001'));
+});
+
+test('RED: AI-visible text never presents unresolved selected state as applicable', async () => {
+  const semantic = await semanticReplay(await normalize());
+  const target = semantic.json.semantic_blocks.find(({ semantic_block_id: id }) => id === 'sb_0002');
+  target.docx_option_states = target.docx_option_states.map((option) => ({
+    ...option,
+    mapping_status: 'multiple_owners',
+    question_owner: null,
+  }));
+  semantic.json.analysis_units = [{ analysis_unit_id: 'doc_3_au_0012', primary_semantic_block_ids: ['sb_0001', 'sb_0002'], overlap_semantic_block_ids: [] }];
+  const expanded = await runCode('Развернуть части для AI v1.2', [semantic]);
+  const segment = expanded[0].json.ai_segments.find(({ semantic_block_id: id }) => id === 'sb_0002');
+  assert.doesNotMatch(segment.text, /\[OPTION_STATE selected\]/u);
+  assert.doesNotMatch(segment.text, /applicable/iu);
+  assert.match(segment.text, /OPTION_STATE unknown|OPTION_MAPPING review_only/u);
 });
 
 test('RED: mutually exclusive selected and unselected evidence cannot jointly support confirmed', async () => {
@@ -243,6 +425,27 @@ test('RED: selected option with one mapped owner remains eligible for normal Val
   assert.equal(fact.status, 'found');
   assert.equal(fact.option_state_applicability, 'applicable');
   assert.equal(fact.option_state_evidence[0].question_owner.semantic_block_id, 'sb_0465');
+});
+
+test('RED: post-AI checker caps missing owner, preserves AI verdict/audit/evidence, and keeps mapped selected confirmed', async () => {
+  const source = validatorSourceWithOptionFacts();
+  const [checked] = await runCode(
+    'Проверить ответ AI Validator',
+    [{ json: confirmedValidatorResponse() }],
+    { 'Развернуть units для AI Validator': source },
+  );
+  const unresolved = checked.json.validated_facts.find(({ fact_index: index }) => index === 0);
+  const mapped = checked.json.validated_facts.find(({ fact_index: index }) => index === 1);
+  assert.equal(unresolved.ai_validation.verdict, 'requires_review');
+  assert.equal(unresolved.processing_status, 'requires_review');
+  assert.equal(unresolved.accepted_for_normalization, false);
+  assert.equal(unresolved.validator_meta.option_state_guard.original_ai_verdict, 'confirmed');
+  assert.deepEqual(unresolved.option_state_audit, source.verified_facts[0].option_state_audit);
+  assert.deepEqual(unresolved.evidence, source.verified_facts[0].evidence);
+  assert.equal(mapped.ai_validation.verdict, 'confirmed');
+  assert.equal(mapped.processing_status, 'confirmed');
+  assert.equal(mapped.accepted_for_normalization, true);
+  assert.deepEqual(mapped.option_state_audit, source.verified_facts[1].option_state_audit);
 });
 
 test('neutral non-option fact is unchanged', async () => {

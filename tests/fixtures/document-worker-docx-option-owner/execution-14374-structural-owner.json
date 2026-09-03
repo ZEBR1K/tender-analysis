@@ -23,6 +23,21 @@
     "semantic_applicability": "fail"
   },
   "input": {
+    "parser_input_projection": {
+      "document_part": "word/document.xml",
+      "preceding_table_count": 60,
+      "outer_group_table": {
+        "question_text": "QUESTION_ALPHA",
+        "question_cell": 2,
+        "inner_table_cell": 2,
+        "rows": [
+          { "document_rel_id": "rIdNeutral266", "control_name": "CONTROL_ALPHA_SELECTED", "control_col": 1, "label_col": 3, "label": "OPTION_ALPHA_SELECTED", "active_x_part": "word/activeX/activeX266.xml", "state_source": "selected" },
+          { "document_rel_id": "rIdNeutral267", "control_name": "CONTROL_ALPHA_SHARED", "control_col": 1, "label_col": 3, "label": "OPTION_SHARED", "active_x_part": "word/activeX/activeX267.xml", "state_source": "unselected" },
+          { "document_rel_id": "rIdNeutral268", "control_name": "CONTROL_ALPHA_OTHER", "control_col": 1, "label_col": 3, "label": "OPTION_ALPHA_OTHER", "active_x_part": "word/activeX/activeX268.xml", "state_source": "unselected" }
+        ]
+      },
+      "notes": "The test materializes this execution-derived neutral topology as n8n XML-node JSON. State bytes come from already-reviewed generic MS-OFORMS selected/unselected fixture shapes and are aliased in memory only."
+    },
     "body_sequence": [
       { "kind": "question", "self_ref": "#/texts/513", "text": "QUESTION_ALPHA", "typed_relation": "direct_preceding_sibling" },
       { "kind": "option_table", "self_ref": "#/tables/58", "source_table_ref": "word/document.xml#table[62]" },
