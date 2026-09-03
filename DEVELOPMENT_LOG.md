@@ -5624,3 +5624,36 @@ Both runs closed the technical runtime path through readiness: `12/12` Extractor
 Semantic comparison failed despite exact-grounding PASS. Counts changed `46 → 42` facts and `179 → 171` evidence; verdict totals changed `20/13/13 → 20/13/9`. `analog_allowed` disappeared, the `application_documents` fact/verdict qualification distribution changed without a root cause established by the aggregate audit, and `delivery_term` changed from `requires_review` to `rejected`. The critical case `doc_3_au_0012#0 / advance_contract_guarantee` retained exact evidence; read-only semantic inspection linked its source context to unresolved DOCX option ownership/mutually exclusive alternatives, and it still became confirmed. Sensitive linkage payloads were not retained, so the next local RED must preserve a sanitized structural fixture.
 
 DOCX metrics were stable at `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings`, split as `29` missing semantic owner and `4` conflicting coordinates; semantic option state remained `unknown`. The new P0 `DW-21` records the narrow next gate: execution-derived local RED plus a deterministic `requires_review` cap for affected option-derived facts, preserving exact grounding, candidates, provenance and audit. Full sanitized tables and field distributions are in `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+---
+
+## 2026-09-03 — DW-21 structural DOCX option ownership local GREEN
+
+The first incorrect boundary was reproduced in current canonical `Нормализовать документ Docling`: the parser retained correct selected/unselected state, but the normalized result did not prove a unique enclosing question/group and semantic owner. Exact grounding therefore passed while applicability could still fail open. An execution-derived sanitized fixture was built outside raw payload handling and checked in only as neutral tokens plus relationship identity, nested table/row/cell ancestry, relative geometry and duplicate-label collision topology. It contains neither client text nor a full DOCX.
+
+TDD/implementation commits:
+
+```text
+ebf42f7 / 4eb2086  bounded plan and review gaps
+0303834 / 1b99ace  structural, parser and post-AI RED
+293da55             exact parser structural refs
+751b9bd             option group → question/source/semantic owner binding and AI projection
+80bd138 / 0031770  universal dispatch cap and persisted audit
+2c00d0e / 6bf4976  partial grounded quote bypass RED/GREEN
+```
+
+`Разобрать состояния DOCX ActiveX` now emits additive source table/row/control-cell/label-cell refs, ancestry and only a unique typed `direct_enclosing_cell_child` owner candidate. `Нормализовать документ Docling` groups by source table and relative row geometry, maps the exact question to one source/semantic block, and emits `option_group_id`, question/semantic owner, mutual-exclusion observation, mapping status and audit. `Собрать смысловые разделы v1.4` retains only unique owner binding. `Развернуть части для AI v1.2` keeps canonical text unchanged and shows state/group/owner only for mapped proof; unresolved ownership is visible only as review-only.
+
+`Подготовить dispatch AI Validator` no longer has a field allow-list. It classifies each fact only from its grounded evidence quote and structurally attached option rows. Exact normalized line/cell equality and shorter continuous label fragments at Unicode lexical boundaries are supported; `value_text` and arbitrary substring matching are forbidden. One mapped selected row stays Validator-eligible, one mapped unselected row becomes an audited deterministic rejection, and multiple states/groups/owners or any missing/conflicting mapping become `requires_review` with `accepted_for_normalization=false`. Primary, fallback, Evidence Repair attempt 2 and partition paths preserve the proof. `Проверить ответ AI Validator` retains `original_ai_verdict`, evidence and option audit while preventing review-only promotion; `Собрать факты документа1` persists the audit under `validator_meta.option_state`. No DB schema, 27-field semantics, prompts, models or credentials changed.
+
+Local verification on Node with `--test-isolation=none`:
+
+```text
+focused DW-21: 19/19 PASS
+legacy DOCX option-state: 70 total / 69 pass / 1 known fixture-byte mismatch
+Document Worker: 255 total / 252 pass / 3 known failures
+full repository: 423 total / 416 pass / 7 known failures
+new failure signatures: 0
+```
+
+The seven full-suite signatures remain the exact local recovery baseline: procurement-subject current-scope RED; two execution-14104 A/B artifact/harness gates; source-derived DOCX ActiveX fixture-byte mismatch; immutable beta Worker hash; Validator prompt CRLF/LF equality; Targeted Recheck evidence-coordinate prompt. Cross-run `analog_allowed`, `application_documents` and `delivery_term` drift was not changed. Production n8n, PostgreSQL, credentials, publish/activation and runtime executions were not touched. A bounded isolated runtime canary remains pending a separate review checkpoint.
