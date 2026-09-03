@@ -91,8 +91,8 @@ DW-21 implementation находится только на стороне пол�
 - Первый incorrect node item — index `2`, `evaluation_criteria` (`field_index=12`). Модель `google/gemini-3.7-flash` вернула valid JSON и `9 candidate_decisions` при ожидаемых `10`. Exact error: `[Semantic Aggregator Validator] Ожидалось 10 candidate_decisions, получено 9 [line 144]`. Отсутствует ровно один allowed fact ID; duplicate/unknown IDs нет. `finish_reason=stop`, `completion_tokens=1029`, workflow `max_tokens=16384`: model omission при normal stop, не truncation/`429`/JSON parse.
 - Validator корректно сработал fail-closed и не должен быть ослаблен.
 - Targeted Recheck не вызван; новый unpublished prompt draft `cf0f67f6-…` не exercised. FINAL/Finalizer/27/27/report отсутствуют. Latest state `aggregating` inferred from runData, без DB `SELECT`; тот же run нельзя перезапускать без reset/retry policy.
-- **Current blocker:** Round 1 Semantic Aggregator может нарушить one-decision-per-candidate contract при valid JSON/stop, останавливая pipeline до Targeted Recheck/FINAL.
-- **One next step:** sanitized execution-derived regression для omission `evaluation_criteria` `10→9` и минимальный bounded contract repair/retry либо explicit technical fallback; сохранить exact ID-set/cardinality fail-closed, не создавать fabricated verdict; runtime не запускать до local RED/GREEN и review.
+- **Current blocker:** execution-14398 omission локально mitigated bounded recovery contour, но production/runtime остаются неизменёнными и непроверенными.
+- **One next step:** owner-operated packaging/promotion review и отдельно авторизованный runtime canary; не запускать runtime из этого локального task.
 
 ## 3. Document Worker test candidate
 
@@ -123,6 +123,14 @@ Technical runtime gate is **GREEN through readiness only**. Semantic gate is **F
 This is not production-ready. Exact details and sanitized repaired-unit tables: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
 
 **One next step:** add an execution-derived local RED and the smallest deterministic review cap for facts whose evidence depends on unresolved DOCX option ownership/mutually exclusive alternatives, beginning with `doc_3_au_0012#0`; preserve evidence/audit and neutral non-option behavior. Do not enable Aggregator or start another runtime before that gate is reviewed locally.
+
+### Aggregator candidate-decision omission recovery — local only — 2026-09-03
+
+Execution `14398` established a typed Round 1 transport-contract failure: `evaluation_criteria` returned valid JSON with `finish_reason=stop`, but only `9/10` unique allowed `candidate_decisions`. The original deterministic validator remains unchanged and fail-closed.
+
+The local canonical and beta exports now contain a bounded field-local contour: only an otherwise structurally consistent exact-one allowed-ID omission receives one repair call with the missing ID and full allow-list. The complete retry response passes a byte-identical strict checker. A second invalid response produces an audited technical `requires_review` with no accepted model decisions and continues through the existing FINAL normalizer/persistence path. Malformed JSON, unknown/duplicate IDs and role/list inconsistencies remain ineligible for retry and reach the original hard-fail checker.
+
+This is offline implementation/test evidence only. Production n8n, live workflows, PostgreSQL, credentials, models and existing semantic prompts were not changed; runtime GREEN is not claimed. The next safe step is owner-operated packaging/promotion review followed by a separately authorized runtime canary.
 
 В `[3 TEST]` реализованы:
 

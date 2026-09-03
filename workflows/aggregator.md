@@ -36,6 +36,14 @@ Workflow не извлекает новые facts из документов.
 
 Atomic claim фактически исполняется перед загрузкой фактов: execution `13856` подтвердил `aggregation_claimed=true`. После независимых FINAL UPSERT Aggregator вызывает `TENDER — Финализация анализа`, который выполняет DB-backed 27/27 barrier и atomic completion claim. Downstream Report Generation V2 — отдельный read-only workflow, создающий HTML artifact; подробный контракт находится в `workflows/report-generation.md`.
 
+### Bounded recovery для exact-one `candidate_decisions` omission
+
+После первого `Semantic Aggregator` добавлен локальный typed classifier. Retry разрешён только когда API envelope, JSON, field/status/confidence, known unique IDs, roles, role lists и status consistency валидны, а единственный дефект — отсутствие ровно одного allowed `fact_id`. Все остальные invalid paths передаются в неизменённую ноду `Проверить ответ Semantic Aggregator` и остаются hard-fail.
+
+Eligible item выполняет ровно один `Retry Semantic Aggregator`. Repair context содержит exact missing ID, полный allow-list и исходные candidates; роль отсутствующего candidate не назначается детерминированно. Полный новый ответ проходит `Проверить retry Semantic Aggregator`, чей `jsCode` byte-identical исходному strict checker. В graph нет loop/back-edge.
+
+Error output второго checker формирует terminal technical `requires_review` (`resolution_method=semantic_aggregator_technical_fallback`) с пустыми `candidate_decisions`/evidence refs и audit обоих ответов и validation error. Затем используются существующие `Нормализовать FINAL поле1 → Сохранить FINAL результат поля в БД1`. Это local/offline candidate; runtime verification отсутствует.
+
 ### Downstream finalization
 
 ```text

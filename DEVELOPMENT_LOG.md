@@ -5057,6 +5057,12 @@ deterministic selected/unselected extraction
 
 Existing `DW-17` OCR/reference-only repair остаётся отдельным blocker clean 12/12 run. Текущий предварительный отчёт допустим только с явным клиентским disclaimer; final/client-ready verdict остаётся `REJECT` до `DW-18 / AG-11`, `DW-17`, fresh 12/12 и ручной проверки 27/27.
 
+## 2026-09-03 — Aggregator execution 14398 bounded omission recovery (local)
+
+Sanitized execution-derived fixture фиксирует `evaluation_criteria` с `10` allowed synthetic fact IDs и valid JSON/stop, содержащим `9` решений без unknown/duplicate IDs. TDD RED: focused test `8 total / 1 pass / 7 fail` из-за отсутствующих recovery nodes.
+
+В canonical и beta Aggregator exports добавлен field-local exact-one omission classifier, один repair call с exact missing-ID context, byte-identical clone исходного strict checker и audited terminal technical `requires_review` после повторной invalid попытки. Original checker, models, credentials, DB SQL, field semantics и existing semantic prompts не менялись. Malformed/unknown/duplicate/role inconsistency остаются hard-fail; fallback не принимает model decisions и проходит существующий Normalize/Save FINAL graph. Это offline checkpoint, не runtime GREEN и не production promotion.
+
 Live read-only refresh уточнил фактический Worker contour:
 
 ```text

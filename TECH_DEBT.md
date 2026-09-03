@@ -1402,6 +1402,8 @@ P0
 
 ## D2 — `AG-1 / TR-6`
 
+**Aggregator status 2026-09-03:** locally mitigated for the execution-14398 exact-one candidate-decision omission class; production/runtime remains unverified. `TR-6` and other transient response classes remain open.
+
 Одинаковый паттерн на разных AI-этапах:
 
 ```text
@@ -1432,6 +1434,8 @@ max attempts
 backoff
 final hard error
 ```
+
+Для Aggregator exact-one omission implemented contour intentionally differs at exhaustion: after one field-local retry, repeated invalid output becomes an audited technical `requires_review` with zero accepted model decisions and continues through the existing FINAL persistence path. The unchanged strict validator still rejects malformed/unknown/duplicate/role-inconsistent responses. This prevents one model omission from leaving the 27/27 barrier permanently incomplete without fabricating a candidate role.
 
 ### Никогда не делать
 

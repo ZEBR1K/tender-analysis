@@ -800,6 +800,130 @@
       ],
       "id": "265ec8cd-f01c-4c85-91af-85e60cda8972",
       "name": "Подготовить вызов Finalizer1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const aiResponse = $json;\nconst source = $('Подготовить запрос Semantic Aggregator').item.json;\n\nlet retryEligible = false;\nlet missingFactIds = [];\n\ntry {\n  const choice = aiResponse?.choices?.[0];\n  if (!choice || choice.finish_reason !== 'stop') throw new Error('invalid envelope');\n  const content = choice?.message?.content;\n  if (typeof content !== 'string' || !content.trim()) throw new Error('empty content');\n  const result = JSON.parse(content);\n\n  const allowedStatuses = new Set(['resolved', 'requires_recheck']);\n  const allowedRoles = new Set([\n    'primary', 'duplicate', 'supporting', 'complement', 'conflict', 'not_applicable',\n  ]);\n  const allowedRecheckCodes = new Set([\n    'conflicting_candidates', 'insufficient_evidence', 'ambiguous_scope',\n    'no_reliable_candidate', 'other',\n  ]);\n  const allowedFactIds = Array.isArray(source.allowed_fact_ids) ? source.allowed_fact_ids : [];\n  const allowedFactIdSet = new Set(allowedFactIds);\n\n  if (result?.field_key !== source.field_key) throw new Error('field mismatch');\n  if (!allowedStatuses.has(result?.status)) throw new Error('invalid status');\n  if (\n    typeof result?.confidence !== 'number' || !Number.isFinite(result.confidence) ||\n    result.confidence < 0 || result.confidence > 1\n  ) throw new Error('invalid confidence');\n  if (!Array.isArray(result?.candidate_decisions)) throw new Error('invalid decisions');\n  if (result.candidate_decisions.length !== allowedFactIds.length - 1) {\n    throw new Error('not exact-one omission');\n  }\n\n  const decisionByFactId = new Map();\n  for (const decision of result.candidate_decisions) {\n    if (typeof decision?.fact_id !== 'string' || !decision.fact_id) throw new Error('missing fact id');\n    if (!allowedFactIdSet.has(decision.fact_id)) throw new Error('unknown fact id');\n    if (decisionByFactId.has(decision.fact_id)) throw new Error('duplicate fact id');\n    if (!allowedRoles.has(decision.role)) throw new Error('invalid role');\n    if (typeof decision.reason !== 'string' || !decision.reason.trim()) throw new Error('missing reason');\n    decisionByFactId.set(decision.fact_id, decision);\n  }\n\n  missingFactIds = allowedFactIds.filter((factId) => !decisionByFactId.has(factId));\n  if (missingFactIds.length !== 1) throw new Error('not exact-one missing id');\n\n  if (!Array.isArray(result.supporting_fact_ids) || !Array.isArray(result.conflict_fact_ids)) {\n    throw new Error('invalid role lists');\n  }\n  const supportingSet = new Set();\n  for (const factId of result.supporting_fact_ids) {\n    if (!decisionByFactId.has(factId) || supportingSet.has(factId)) throw new Error('invalid supporting id');\n    supportingSet.add(factId);\n    const role = decisionByFactId.get(factId).role;\n    if (role === 'conflict' || role === 'not_applicable') throw new Error('supporting role mismatch');\n  }\n  const conflictSet = new Set();\n  for (const factId of result.conflict_fact_ids) {\n    if (!decisionByFactId.has(factId) || conflictSet.has(factId)) throw new Error('invalid conflict id');\n    conflictSet.add(factId);\n  }\n  for (const decision of result.candidate_decisions) {\n    const listedAsConflict = conflictSet.has(decision.fact_id);\n    if ((decision.role === 'conflict') !== listedAsConflict) throw new Error('conflict role mismatch');\n  }\n\n  const primaryCount = result.candidate_decisions.filter(({ role }) => role === 'primary').length;\n  if (result.status === 'resolved') {\n    if (typeof result.final_value_text !== 'string' || !result.final_value_text.trim()) throw new Error('missing value');\n    if (result.needs_recheck !== false || result.recheck_reason_code !== null) throw new Error('resolved mismatch');\n    if (primaryCount !== 1 || conflictSet.size > 0) throw new Error('resolved roles mismatch');\n  }\n  if (result.status === 'requires_recheck') {\n    if (result.needs_recheck !== true) throw new Error('recheck flag mismatch');\n    if (!allowedRecheckCodes.has(result.recheck_reason_code)) throw new Error('invalid recheck code');\n    if (typeof result.recheck_note !== 'string' || !result.recheck_note.trim()) throw new Error('missing recheck note');\n    if (primaryCount > 1) throw new Error('too many primary decisions');\n  }\n\n  retryEligible = true;\n} catch {\n  retryEligible = false;\n  missingFactIds = [];\n}\n\nreturn {\n  json: {\n    ...aiResponse,\n    semantic_aggregator_retry_required: retryEligible,\n    semantic_aggregator_retry_attempt: retryEligible ? 1 : 0,\n    missing_fact_ids: missingFactIds,\n    original_ai_response: aiResponse,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -768
+      ],
+      "id": "14398000-0001-4000-8000-000000000001",
+      "name": "Классифицировать omission Semantic Aggregator"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "14398000-0102-4000-8000-000000000002",
+              "leftValue": "={{ $json.semantic_aggregator_retry_required === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2016,
+        -768
+      ],
+      "id": "14398000-0002-4000-8000-000000000002",
+      "name": "Нужен retry Semantic Aggregator?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $json;\nconst source = $('Подготовить запрос Semantic Aggregator').item.json;\n\nif (input.semantic_aggregator_retry_required !== true || input.semantic_aggregator_retry_attempt !== 1) {\n  throw new Error('[Подготовить retry Semantic Aggregator] Retry contract не подтверждён');\n}\nif (!Array.isArray(input.missing_fact_ids) || input.missing_fact_ids.length !== 1) {\n  throw new Error('[Подготовить retry Semantic Aggregator] Ожидался ровно один missing fact_id');\n}\n\nconst missingFactId = input.missing_fact_ids[0];\nconst allowedFactIds = Array.isArray(source.allowed_fact_ids) ? source.allowed_fact_ids : [];\nif (!allowedFactIds.includes(missingFactId)) {\n  throw new Error('[Подготовить retry Semantic Aggregator] missing fact_id отсутствует в allow-list');\n}\n\nconst repairInstruction = [\n  'Предыдущий ответ нарушил технический контракт: отсутствует решение ровно для fact_id=' + missingFactId + '.',\n  'Верни полный новый JSON для всех candidate facts, используя каждый allowed fact_id ровно один раз.',\n  'Allowed fact_id: ' + JSON.stringify(allowedFactIds) + '.',\n  'Не назначай роль отсутствующему candidate автоматически: заново оцени каждый candidate по исходным правилам.',\n  'Не добавляй неизвестные fact_id и не меняй field_key.',\n].join('\\n');\n\nreturn {\n  json: {\n    ...source,\n    system_prompt: source.system_prompt,\n    user_prompt: source.user_prompt + '\\n\\nТЕХНИЧЕСКОЕ ИСПРАВЛЕНИЕ ОТВЕТА:\\n' + repairInstruction,\n    repair_instruction: repairInstruction,\n    semantic_aggregator_retry_attempt: 2,\n    missing_fact_ids: [missingFactId],\n    allowed_fact_ids: allowedFactIds,\n    aggregation_input: source.aggregation_input,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -992
+      ],
+      "id": "14398000-0003-4000-8000-000000000003",
+      "name": "Подготовить retry Semantic Aggregator"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://polza.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  model: 'deepseek/deepseek-v4-pro-0813@reasoning_effort=low',\n\n  messages: [\n    {\n      role: 'system',\n      content: $json.system_prompt\n    },\n    {\n      role: 'user',\n      content: $json.user_prompt\n    }\n  ],\n\n\n  response_format: {\n    type: 'json_object'\n  },\n\n  max_tokens: 8192,\n\n  stream: false\n}\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2240,
+        -992
+      ],
+      "id": "14398000-0004-4000-8000-000000000004",
+      "name": "Retry Semantic Aggregator",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "XaaCIUSKLJgqt16X",
+          "name": "Polza AI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const aiResponse = $json;\n\nconst source =\n  $('Подготовить запрос Semantic Aggregator').item.json;\n\n\n// ============================================================\n// 1. Проверяем технический ответ API\n// ============================================================\n\nconst choice =\n  aiResponse?.choices?.[0];\n\nif (!choice) {\n  throw new Error(\n    '[Semantic Aggregator Validator] В ответе отсутствует choices[0]'\n  );\n}\n\nif (choice.finish_reason !== 'stop') {\n  throw new Error(\n    `[Semantic Aggregator Validator] Некорректный finish_reason: ${choice.finish_reason}`\n  );\n}\n\nconst content =\n  choice?.message?.content;\n\nif (\n  typeof content !== 'string' ||\n  !content.trim()\n) {\n  throw new Error(\n    '[Semantic Aggregator Validator] message.content пуст'\n  );\n}\n\n\n// ============================================================\n// 2. Парсим JSON модели\n// ============================================================\n\nlet result;\n\ntry {\n  result = JSON.parse(content);\n} catch (error) {\n  throw new Error(\n    `[Semantic Aggregator Validator] Модель вернула невалидный JSON: ${error.message}`\n  );\n}\n\n\n// ============================================================\n// 3. Разрешённые значения\n// ============================================================\n\nconst ALLOWED_STATUSES =\n  new Set([\n    'resolved',\n    'requires_recheck',\n  ]);\n\nconst ALLOWED_ROLES =\n  new Set([\n    'primary',\n    'duplicate',\n    'supporting',\n    'complement',\n    'conflict',\n    'not_applicable',\n  ]);\n\nconst ALLOWED_RECHECK_CODES =\n  new Set([\n    'conflicting_candidates',\n    'insufficient_evidence',\n    'ambiguous_scope',\n    'no_reliable_candidate',\n    'other',\n  ]);\n\n\n// ============================================================\n// 4. Проверяем field_key\n// ============================================================\n\nif (result.field_key !== source.field_key) {\n  throw new Error(\n    `[Semantic Aggregator Validator] field_key изменён: ожидался ${source.field_key}, получен ${result.field_key}`\n  );\n}\n\n\n// ============================================================\n// 5. Проверяем status\n// ============================================================\n\nif (!ALLOWED_STATUSES.has(result.status)) {\n  throw new Error(\n    `[Semantic Aggregator Validator] Недопустимый status: ${result.status}`\n  );\n}\n\n\n// ============================================================\n// 6. Проверяем confidence\n// ============================================================\n\nif (\n  typeof result.confidence !== 'number' ||\n  !Number.isFinite(result.confidence) ||\n  result.confidence < 0 ||\n  result.confidence > 1\n) {\n  throw new Error(\n    `[Semantic Aggregator Validator] Некорректный confidence: ${result.confidence}`\n  );\n}\n\n\n// ============================================================\n// 7. Проверяем candidate_decisions\n// ============================================================\n\nif (!Array.isArray(result.candidate_decisions)) {\n  throw new Error(\n    '[Semantic Aggregator Validator] candidate_decisions должен быть массивом'\n  );\n}\n\nconst allowedFactIds =\n  Array.isArray(source.allowed_fact_ids)\n    ? source.allowed_fact_ids\n    : [];\n\nconst allowedFactIdSet =\n  new Set(allowedFactIds);\n\nif (\n  result.candidate_decisions.length !==\n  allowedFactIds.length\n) {\n  throw new Error(\n    `[Semantic Aggregator Validator] Ожидалось ${allowedFactIds.length} candidate_decisions, получено ${result.candidate_decisions.length}`\n  );\n}\n\nconst usedFactIds =\n  new Set();\n\nconst decisionByFactId =\n  new Map();\n\nfor (const decision of result.candidate_decisions) {\n\n  if (\n    typeof decision?.fact_id !== 'string' ||\n    !decision.fact_id\n  ) {\n    throw new Error(\n      '[Semantic Aggregator Validator] candidate_decision без fact_id'\n    );\n  }\n\n  if (!allowedFactIdSet.has(decision.fact_id)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Модель придумала неизвестный fact_id: ${decision.fact_id}`\n    );\n  }\n\n  if (usedFactIds.has(decision.fact_id)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] fact_id повторяется: ${decision.fact_id}`\n    );\n  }\n\n  usedFactIds.add(\n    decision.fact_id\n  );\n\n  if (!ALLOWED_ROLES.has(decision.role)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Недопустимая role=${decision.role} для fact_id=${decision.fact_id}`\n    );\n  }\n\n  if (\n    typeof decision.reason !== 'string' ||\n    !decision.reason.trim()\n  ) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Нет reason для fact_id=${decision.fact_id}`\n    );\n  }\n\n  decisionByFactId.set(\n    decision.fact_id,\n    decision\n  );\n}\n\n\n// ============================================================\n// 8. Убеждаемся, что ни один входной fact не потерян\n// ============================================================\n\nfor (const factId of allowedFactIds) {\n  if (!usedFactIds.has(factId)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] В ответе потерян fact_id=${factId}`\n    );\n  }\n}\n\n\n// ============================================================\n// 9. Проверяем supporting_fact_ids\n// ============================================================\n\nif (!Array.isArray(result.supporting_fact_ids)) {\n  throw new Error(\n    '[Semantic Aggregator Validator] supporting_fact_ids должен быть массивом'\n  );\n}\n\nconst supportingSet =\n  new Set();\n\nfor (const factId of result.supporting_fact_ids) {\n\n  if (!allowedFactIdSet.has(factId)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Неизвестный supporting fact_id=${factId}`\n    );\n  }\n\n  if (supportingSet.has(factId)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Дубликат supporting fact_id=${factId}`\n    );\n  }\n\n  supportingSet.add(factId);\n\n  const role =\n    decisionByFactId.get(factId)?.role;\n\n  if (\n    role === 'conflict' ||\n    role === 'not_applicable'\n  ) {\n    throw new Error(\n      `[Semantic Aggregator Validator] fact_id=${factId} имеет role=${role}, но указан как supporting`\n    );\n  }\n}\n\n\n// ============================================================\n// 10. Проверяем conflict_fact_ids\n// ============================================================\n\nif (!Array.isArray(result.conflict_fact_ids)) {\n  throw new Error(\n    '[Semantic Aggregator Validator] conflict_fact_ids должен быть массивом'\n  );\n}\n\nconst conflictSet =\n  new Set();\n\nfor (const factId of result.conflict_fact_ids) {\n\n  if (!allowedFactIdSet.has(factId)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Неизвестный conflict fact_id=${factId}`\n    );\n  }\n\n  if (conflictSet.has(factId)) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Дубликат conflict fact_id=${factId}`\n    );\n  }\n\n  conflictSet.add(factId);\n}\n\n\n// Все role=conflict обязаны находиться в conflict_fact_ids\nfor (const decision of result.candidate_decisions) {\n\n  const listedAsConflict =\n    conflictSet.has(decision.fact_id);\n\n  if (\n    decision.role === 'conflict' &&\n    !listedAsConflict\n  ) {\n    throw new Error(\n      `[Semantic Aggregator Validator] fact_id=${decision.fact_id} имеет role=conflict, но отсутствует в conflict_fact_ids`\n    );\n  }\n\n  if (\n    decision.role !== 'conflict' &&\n    listedAsConflict\n  ) {\n    throw new Error(\n      `[Semantic Aggregator Validator] fact_id=${decision.fact_id} указан в conflict_fact_ids, но role=${decision.role}`\n    );\n  }\n}\n\n\nfunction normalizeApplicabilityText(value) {\n  return String(value ?? '').normalize('NFKC').replace(/\\s+/g, ' ').trim();\n}\n\nfunction evidenceRefMatchesCandidate(ref, candidate, { allowLabelContainment = false } = {}) {\n  if (!ref || typeof ref.semantic_block_id !== 'string' || ref.semantic_block_id.length === 0) return false;\n  const candidateEvidence = Array.isArray(candidate?.evidence) ? candidate.evidence : [];\n  return candidateEvidence.some((evidence) => {\n    if (evidence?.semantic_block_id !== ref.semantic_block_id) return false;\n    const candidateQuote = normalizeApplicabilityText(evidence?.quote);\n    const refText = normalizeApplicabilityText(ref?.quote ?? ref?.exact_label);\n    if (!candidateQuote || !refText) return false;\n    if (allowLabelContainment) {\n      return candidateQuote.includes(refText);\n    }\n    return candidateQuote === refText;\n  });\n}\n\nfunction assessNationalRegimeApplicability(source, result) {\n  if (source?.field_catalog_version !== 'tender_fields_v1' || source?.field_key !== 'national_regime' || result?.field_key !== 'national_regime') {\n    return { required: false, proven: false, proof_kind: null, primary_fact_id: null };\n  }\n  const primaryDecision = result.candidate_decisions.find((decision) => decision?.role === 'primary') ?? null;\n  const candidates = Array.isArray(source?.aggregation_input?.candidates) ? source.aggregation_input.candidates : [];\n  const primaryCandidate = primaryDecision\n    ? candidates.find((candidate) => candidate?.fact_id === primaryDecision.fact_id) ?? null\n    : null;\n  if (!primaryCandidate || primaryCandidate.validator_verdict !== 'confirmed') {\n    return { required: true, proven: false, proof_kind: null, primary_fact_id: primaryDecision?.fact_id ?? null };\n  }\n\n  const normalizedPrimaryValue = normalizeApplicabilityText(primaryCandidate.value_text);\n  const finalValueBoundToPrimary =\n    normalizedPrimaryValue.length > 0 &&\n    normalizeApplicabilityText(result.final_value_text) === normalizedPrimaryValue;\n\n  const optionState = primaryCandidate.option_state;\n  const optionEvidence = Array.isArray(optionState?.evidence) ? optionState.evidence : [];\n  const optionWarnings = Array.isArray(optionState?.warnings) ? optionState.warnings : [];\n  const selectedOptionProven =\n    optionState?.contract_version === 'docx_option_state_fact_audit_v1' &&\n    optionState?.applicability === 'applicable' &&\n    optionWarnings.length === 0 &&\n    finalValueBoundToPrimary &&\n    optionEvidence.length > 0 &&\n    optionEvidence.every((entry) =>\n      entry?.state === 'selected' &&\n      evidenceRefMatchesCandidate(entry, primaryCandidate, { allowLabelContainment: true })\n    );\n  if (selectedOptionProven) {\n    return { required: true, proven: true, proof_kind: 'selected_option_state', primary_fact_id: primaryCandidate.fact_id };\n  }\n\n  const explicitProof = primaryCandidate.applicability_proof;\n  const explicitEvidenceRefs = Array.isArray(explicitProof?.evidence_refs) ? explicitProof.evidence_refs : [];\n  const explicitCurrentProcurementProven =\n    explicitProof?.contract_version === 'current_procurement_applicability_v1' &&\n    explicitProof?.applicability === 'applicable' &&\n    explicitProof?.source === 'deterministic_source_contract' &&\n    finalValueBoundToPrimary &&\n    explicitEvidenceRefs.length > 0 &&\n    explicitEvidenceRefs.every((entry) => evidenceRefMatchesCandidate(entry, primaryCandidate));\n  if (explicitCurrentProcurementProven) {\n    return { required: true, proven: true, proof_kind: 'explicit_current_procurement', primary_fact_id: primaryCandidate.fact_id };\n  }\n\n  return { required: true, proven: false, proof_kind: null, primary_fact_id: primaryCandidate.fact_id };\n}\n\n\n// ============================================================\n// 11. Проверяем согласованность resolved / requires_recheck\n// ============================================================\n\nconst primaryCount =\n  result.candidate_decisions.filter(\n    decision =>\n      decision.role === 'primary'\n  ).length;\n\n\nif (result.status === 'resolved') {\n\n  if (\n    typeof result.final_value_text !== 'string' ||\n    !result.final_value_text.trim()\n  ) {\n    throw new Error(\n      '[Semantic Aggregator Validator] Для resolved требуется final_value_text'\n    );\n  }\n\n  if (result.needs_recheck !== false) {\n    throw new Error(\n      '[Semantic Aggregator Validator] Для resolved needs_recheck должен быть false'\n    );\n  }\n\n  if (result.recheck_reason_code !== null) {\n    throw new Error(\n      '[Semantic Aggregator Validator] Для resolved recheck_reason_code должен быть null'\n    );\n  }\n\n  if (primaryCount !== 1) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Для resolved ожидается ровно один primary, получено ${primaryCount}`\n    );\n  }\n\n  if (conflictSet.size > 0) {\n    throw new Error(\n      '[Semantic Aggregator Validator] resolved не может содержать unresolved conflict'\n    );\n  }\n}\n\n\nif (result.status === 'requires_recheck') {\n\n  if (result.needs_recheck !== true) {\n    throw new Error(\n      '[Semantic Aggregator Validator] Для requires_recheck needs_recheck должен быть true'\n    );\n  }\n\n  if (\n    !ALLOWED_RECHECK_CODES.has(\n      result.recheck_reason_code\n    )\n  ) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Некорректный recheck_reason_code: ${result.recheck_reason_code}`\n    );\n  }\n\n  if (\n    typeof result.recheck_note !== 'string' ||\n    !result.recheck_note.trim()\n  ) {\n    throw new Error(\n      '[Semantic Aggregator Validator] Для requires_recheck нужен recheck_note'\n    );\n  }\n\n  if (primaryCount > 1) {\n    throw new Error(\n      `[Semantic Aggregator Validator] Для requires_recheck не может быть больше одного primary, получено ${primaryCount}`\n    );\n  }\n}\n\n\nconst applicabilityAssessment =\n  assessNationalRegimeApplicability(source, result);\n\nconst containmentApplied =\n  result.status === 'resolved' &&\n  applicabilityAssessment.required &&\n  !applicabilityAssessment.proven;\n\nconst effectiveStatus =\n  containmentApplied\n    ? 'requires_recheck'\n    : result.status;\n\nconst effectiveNeedsRecheck =\n  containmentApplied\n    ? true\n    : result.needs_recheck;\n\nconst effectiveRecheckReasonCode =\n  containmentApplied\n    ? 'insufficient_evidence'\n    : result.recheck_reason_code;\n\nconst effectiveRecheckNote =\n  containmentApplied\n    ? 'Применимость национального режима к текущей закупке не доказана структурированным evidence; требуется Targeted Recheck.'\n    : result.recheck_note;\n\n// ============================================================\n// 12. Возвращаем проверенный результат + provenance\n// ============================================================\n\nreturn {\n  json: {\n    analysis_run_id:\n      source.analysis_run_id,\n\n    field_catalog_version:\n      source.field_catalog_version,\n\n    field_index:\n      source.field_index,\n\n    field_key:\n      source.field_key,\n\n    aggregation_status:\n      effectiveStatus,\n\n    final_value_text:\n      result.final_value_text ?? null,\n\n    confidence:\n      result.confidence,\n\n    candidate_decisions:\n      result.candidate_decisions,\n\n    supporting_fact_ids:\n      result.supporting_fact_ids,\n\n    conflict_fact_ids:\n      result.conflict_fact_ids,\n\n    needs_recheck:\n      effectiveNeedsRecheck,\n\n    recheck_reason_code:\n      effectiveRecheckReasonCode,\n\n    recheck_note:\n      effectiveRecheckNote,\n\n    aggregation_input:\n      source.aggregation_input,\n\n    semantic_aggregator_meta: {\n      response_id:\n        aiResponse.id ?? null,\n\n      model:\n        aiResponse.model ?? null,\n\n      finish_reason:\n        choice.finish_reason,\n\n      usage:\n        aiResponse.usage ?? null,\n\n      reported_result:\n        result,\n\n      reported_status:\n        result.status,\n\n      effective_status:\n        effectiveStatus,\n\n      containment_applied:\n        containmentApplied,\n\n      containment_policy:\n        containmentApplied\n          ? 'national_regime_round1_applicability_v1'\n          : null,\n\n      containment_reason:\n        containmentApplied\n          ? effectiveRecheckNote\n          : null,\n\n      applicability_proof_kind:\n        applicabilityAssessment.proof_kind,\n\n      applicability_assessment:\n        applicabilityAssessment,\n    },\n\n    aggregation_validated: true,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        -992
+      ],
+      "id": "14398000-0005-4000-8000-000000000005",
+      "name": "Проверить retry Semantic Aggregator",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const retryOutput = $json;\nconst source = $('Подготовить запрос Semantic Aggregator').item.json;\nconst classified = $('Классифицировать omission Semantic Aggregator').item.json;\n\nconst missingFactIds = Array.isArray(classified.missing_fact_ids)\n  ? classified.missing_fact_ids\n  : [];\nif (\n  classified.semantic_aggregator_retry_required !== true ||\n  classified.semantic_aggregator_retry_attempt !== 1 ||\n  missingFactIds.length !== 1\n) {\n  throw new Error('[Technical fallback Semantic Aggregator] Некорректный recovery audit contract');\n}\n\nconst retryValidationError = retryOutput?.error ?? {\n  message: 'Retry Semantic Aggregator не прошёл строгую deterministic validation',\n};\n\nreturn {\n  json: {\n    analysis_run_id: source.analysis_run_id,\n    field_catalog_version: source.field_catalog_version,\n    field_index: source.field_index,\n    field_key: source.field_key,\n    aggregation_status: 'requires_review',\n    final_value_text: null,\n    confidence: null,\n    candidate_decisions: [],\n    supporting_fact_ids: [],\n    conflict_fact_ids: [],\n    needs_recheck: false,\n    recheck_reason_code: null,\n    recheck_note: null,\n    review_reason_code: 'semantic_aggregator_model_validation_failed',\n    review_note: 'Повторный ответ Semantic Aggregator не прошёл строгую техническую проверку; требуется ручная проверка поля.',\n    resolution_method: 'semantic_aggregator_technical_fallback',\n    evidence: [],\n    aggregation_round: 1,\n    supporting_candidate_refs: [],\n    conflict_candidate_refs: [],\n    conflict_evidence: [],\n    aggregation_input: source.aggregation_input,\n    semantic_aggregator_meta: {\n      technical_fallback_required: true,\n      retry_attempts: 1,\n      missing_fact_ids: missingFactIds,\n      original_ai_response: classified.original_ai_response ?? null,\n      retry_ai_response: retryOutput,\n      retry_validation_error: retryValidationError,\n      accepted_model_decisions: false,\n    },\n    aggregation_validated: true,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        -864
+      ],
+      "id": "14398000-0006-4000-8000-000000000006",
+      "name": "Сформировать technical requires_review Semantic Aggregator"
     }
   ],
   "pinData": {
@@ -1058,7 +1182,7 @@
       "main": [
         [
           {
-            "node": "Проверить ответ Semantic Aggregator",
+            "node": "Классифицировать omission Semantic Aggregator",
             "type": "main",
             "index": 0
           }
@@ -1181,6 +1305,86 @@
         [
           {
             "node": "Подготовить вызов Finalizer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Классифицировать omission Semantic Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Нужен retry Semantic Aggregator?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нужен retry Semantic Aggregator?": {
+      "main": [
+        [
+          {
+            "node": "Подготовить retry Semantic Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Проверить ответ Semantic Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить retry Semantic Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Retry Semantic Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Semantic Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Проверить retry Semantic Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить retry Semantic Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Нужен Targeted Recheck?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать technical requires_review Semantic Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать technical requires_review Semantic Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать FINAL поле1",
             "type": "main",
             "index": 0
           }
