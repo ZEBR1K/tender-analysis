@@ -29,12 +29,12 @@
 | Workflow | ID | Active | Read-only snapshot 2026-08-28 |
 |---|---|---:|---|
 | `TENDER — Обработать документ` | `1Pw61ZY3HgBSvcUr` | yes | API вернул 37 nodes, version `f3d9fdb3-…`; test hardening ниже не promoted |
-| `TENDER — Агрегация закупки` | `iLt7wLLfueg8qffZ` | yes | published active: 38 nodes/version `c4bbee79-…`; current unpublished draft: 24 nodes/version `89b33d04-…` |
-| `TENDER - Targeted Recheck` | `9uDOU31DGo30fGXX` | yes | read-only refresh 2026-08-30: 64 nodes, version `4e0858c9-…`; local export отстаёт на одну disconnected test-ноду |
+| `TENDER — Агрегация закупки` | `iLt7wLLfueg8qffZ` | yes | owner-supplied read-only checkpoint 2026-09-03: active=draft, 24 nodes/version `89b33d04-…`; local canonical остаётся 38-node snapshot `1c9019de-…` |
+| `TENDER - Targeted Recheck` | `9uDOU31DGo30fGXX` | yes | owner-supplied read-only checkpoint 2026-09-03: active 64 nodes/version `4e0858c9-…`; live/local drift и node-count convention описаны ниже |
 | `TENDER — Финализация анализа` | `cSsh9yjpS7t5p0OO` | yes | 5 nodes; protected workflow, не менялся в текущем цикле |
 | `TENDER — Генерация отчета` | `ckPnP3hRhKu4Mf9u` | yes | 9 nodes; protected workflow, не менялся в текущем цикле |
 
-Production PostgreSQL и published production workflows в текущем цикле Codex не изменялись намеренно. Read-only API подтвердил, что новый 24-нoded Aggregator draft не опубликован: production executions продолжают использовать 38-нoded active version `c4bbee79-…`.
+Production PostgreSQL и published production workflows в текущем локальном цикле Codex не изменялись намеренно. Более раннее утверждение, что 24-node Aggregator оставался unpublished draft, устарело: owner-supplied read-back для цепочки `14389–14391` фиксирует его как active и `sameAsDraft=true`.
 
 ### MCP-enabled test workflows
 
@@ -49,6 +49,38 @@ Production PostgreSQL и published production workflows в текущем цик
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
 
 Repository также содержит inactive local-only export `[TEMP] TENDER — Ручная загрузка файлов` (`tmpManual16726ZO`, 8 nodes). Несмотря на имя, его текущая роль — сформировать calibration fixture, зарегистрировать test run/documents и вызвать test Worker; это не production manual-upload feature.
+
+### Forensic checkpoint — executions 14389 / 14390 / 14391
+
+Owner-supplied read-only evidence фиксирует terminal chain:
+
+```text
+14389 parent (manual, error)
+→ 14390 Aggregator (integrated, error)
+→ claim ready_for_aggregation → aggregating
+→ 14391 Targeted Recheck (integrated, error)
+→ Проверить #2 evidence Targeted Recheck
+```
+
+Aggregator загрузил `1` completed document, `84` facts и `28` units, построил `27` grouped fields (`10` with candidates / `17` without), выполнил `10/10` Round 1 AI calls и направил `9` полей в Targeted Recheck; `evaluation_criteria` был единственным Round 1 `resolved`.
+
+Targeted Recheck выполнил retrieval, prompt preparation и AI для `9/9` items (`9` calls; `170873 / 10448 / 181321` prompt/completion/total tokens). Первый failure — item `6/9`, `advance_contract_guarantee`, `doc_3_au_0024 / sb_0459`: AI создал structurally valid `requires_review/ambiguous_scope` candidate с `12` evidence, но `evidence[1]` stitched header и четыре несмежные table rows, пропуская промежуточные cells и labels `Строка R2…R5`. Exact deterministic error:
+
+```text
+[Targeted Recheck Evidence Validator] candidate[0].evidence[1]: quote отсутствует в semantic block после нормализации пробелов
+```
+
+Retrieval передал полный block корректно; первый неправильный state возник в `#2 AI Targeted Recheck v1`. Validator правильно отклонил quote и не меняется. Downstream Validator, Round 2, FINAL UPSERT и Finalization имели `0` runs; Targeted Recheck выполнил два DB read и `0` DB write. Цепочка создала `0` FINAL. Состояние run после claim считается `aggregating` по runData/inference, без отдельного DB query.
+
+Live drift на этом checkpoint:
+
+- Aggregator active graph уже `24` nodes/version `89b33d04-…`, тогда как local canonical — `38` nodes/version `1c9019de-…`;
+- Targeted Recheck live — `64` nodes/version `4e0858c9-…`, local version — `7f82ae43-…`; owner comparison считает `63` local core nodes и одну live-only disconnected test-validator node, тогда как прямой parse repository JSON даёт `64` nodes. Это расхождение node-count convention не скрывается;
+- main live validator удаляет `[C…]` table coordinates, local comparison использует whitespace-only normalization; noncontiguous omissions воспроизводят defect при обеих semantics.
+
+Полный sanitized report: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`.
+
+DW-21 implementation находится только на стороне пользователя и отсутствует в текущей Git branch. Owner-supplied выводы `14386/14387` приняты без повторного аудита: Docling прошёл, ActiveX `national_regime` с selected `Не применимо` был grounded, но overall mapping остался partial/unknown (`51 exact / 189 missing_owner / 50 conflicting`); attempts завершались `429` на Evidence Repair/fallback. Добавленный пользователем Wait не входит в этот branch.
 
 ## 3. Document Worker test candidate
 

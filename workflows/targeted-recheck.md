@@ -1562,6 +1562,39 @@ no FINAL
 
 ---
 
+### TR-15 — AI stitched noncontiguous table fragments into one quote
+
+**Severity:** Critical / evidence contract
+**Status:** Observed in execution `14391`; prompt-only local fix required
+
+Owner-supplied read-only chain `14389 → 14390 → 14391` впервые стал некорректным в `#2 AI Targeted Recheck v1`, а не в retrieval или deterministic validator. Для item `6/9`, field `advance_contract_guarantee`, unit `doc_3_au_0024`, block `sb_0459`, модель вернула один `requires_review/ambiguous_scope` candidate с `12` evidence. `evidence[1]` объединил header и четыре несмежные строки таблицы, пропустив промежуточные cells и labels `Строка R2…R5`; `evidence[2]` повторил тот же класс ошибки на другом table block.
+
+Validator корректно остановил execution на line `458`:
+
+```text
+[Targeted Recheck Evidence Validator] candidate[0].evidence[1]: quote отсутствует в semantic block после нормализации пробелов
+```
+
+Runtime cardinality до failure:
+
+```text
+retrieval = 9/9
+prompt preparation = 9/9
+AI calls = 9/9
+existing_candidates for failing item = 13
+allowed_semantic_blocks = 51
+candidate evidence = 12
+downstream Validator / Round 2 / FINAL / Finalization = 0
+Targeted Recheck DB reads = 2
+Targeted Recheck DB writes = 0
+```
+
+Prompt contract должен явно запрещать stitching нескольких строк или ячеек с пропуском любого промежуточного текста. Каждый `semantic_block` evidence quote обязан быть одной непрерывной дословной подстрокой. Если candidate нужны несколько раздельных fragments из одного block, они передаются отдельными evidence objects с одинаковыми `analysis_unit_id` и `semantic_block_id`.
+
+Evidence Validator, retrieval, models, schema, FIELD_CATALOG, DB и 27-field contract не меняются. Synthetic regression не хранит client text. Полный sanitized forensic report: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`.
+
+---
+
 ### TR-5 — дублирование Normalize + Save
 
 **Severity:** Medium  
@@ -1917,16 +1950,16 @@ TR-3
 закрыты.
 ```
 
-Следующий production gate:
+Следующий local correctness gate:
 
 ```text
-TR-10 local GREEN candidate
-→ promotion decision / live update отдельным шагом
-→ runtime canary application_documents
-→ только затем full client run
+TR-15 execution-derived RED
+→ prompt-only continuous-substring fix
+→ structural single-node/parameter-only proof
+→ focused + full regression parity
 ```
 
-После `TR-10` отдельно проверить `TR-11` terminal failure/alert semantics. Остальные hardening items не должны расширять текущий P0 scope:
+После local `TR-15` review production promotion/runtime остаются отдельным operator action. `TR-10` и `TR-11` не смешиваются с этой prompt-only правкой. Остальные hardening items не должны расширять текущий P0 scope:
 
 1. TR-6 — selective AI retry.
 2. TR-7 — убрать недетерминированный fallback existingCandidates[0].
@@ -1978,6 +2011,7 @@ TR-3
 Local canonical candidate содержит TR-10 containment, но production Targeted Recheck нельзя считать готовым для автоматического клиентского отчёта до закрытия:
 
 ```text
+TR-15 — stitched noncontiguous evidence quote prompt boundary
 TR-10 — LIVE promotion/runtime verification local containment
 TR-11 — terminal failure / alert semantics
 ```

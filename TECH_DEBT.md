@@ -125,7 +125,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-17`|⚠ Local GREEN / promotion+runtime pending. Canonical local Worker заменяет model-written quote на bounded allow-listed `ai_evidence_repair_v2` refs, deterministic materialization и lossless merge; exact grounding не ослаблен. Live production не изменён.|Document Worker / evidence grounding|
 |`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-19`|⚠ Bounded runtime batch-first GREEN; clean-candidate packaging pending. Execution `14359` дал `0/16` safely attachable primary responses; `14362` выявил latency regression (`12` sequential runs / `423` s против одного `16`-item run / ~`32` s); `14365` подтвердил nested-batching configuration blocker. Disposable isolated execution `14367` прошёл: primary `1` run / `12` outputs / `4339 ms`, exact linked IDs/order `12/12`, Loop `12 + done`, один allow-listed fallback только для injected unit `0007`, barrier `12/12`, paid calls `13 <= 25`, forbidden downstream runs `0`. Это не production candidate и не full-path metrics/Validator/persistence GREEN: canonical `2ffe1de` ещё не импортирован как clean inactive candidate; packaging/read-back — следующий отдельный gate. Production не изменён.|Document Worker / Extractor reliability and latency|
-|`DW-21`|⚠ P0 observed semantic applicability failure. Executions `14374/14376` passed exact grounding and Worker readiness, but unresolved DOCX option ownership/mutually exclusive alternatives still allowed unsafe confirmation, concretely `doc_3_au_0012#0 / advance_contract_guarantee`. Requires a deterministic `requires_review` cap with evidence/audit preservation and neutral controls.|Document Worker / DOCX semantic applicability|
+|`DW-21`|⚠ P0 observed semantic applicability failure. Executions `14374/14376` passed exact grounding and Worker readiness, but unresolved DOCX option ownership/mutually exclusive alternatives still allowed unsafe confirmation, concretely `doc_3_au_0012#0 / advance_contract_guarantee`. Owner reports a subsequent user-side implementation and `14386/14387` diagnostics, but that code is unavailable in this Git branch and is not re-audited here.|Document Worker / DOCX semantic applicability|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
@@ -137,6 +137,7 @@ Naming, comments, cleanup, future hardening.
 |`TR-10`|⚠ Mitigated / GREEN in local canonical candidate: `application_documents` Round 2 reported `resolved` детерминированно становится effective `requires_review/insufficient_evidence` с audit и без потери decisions/evidence. LIVE `4e0858c9-…` не изменён и остаётся vulnerable до promotion/runtime canary.|Targeted Recheck semantic safety|
 |`TR-13`|✅ Baseline canary GREEN: terminal containment для `participation_guarantee` и `required_official_certificates` прошёл exact 27/27 + semantic audit 27/27 в `14279/14280/14281/14285/14289`. Confirmation series не началась из-за отдельного technical failure `TR-14`.|Targeted Recheck terminal semantic containment|
 |`TR-14`|⚠ Offline GREEN / unpublished draft: execution `14292` зафиксировал четыре model contract/evidence failures из семи ответов. Typed local validation fallback сохраняет raw response/error/source/original candidates, не принимает unvalidated candidates и terminally materializes `requires_review` для `requires_recheck` или `no_initial_candidates`. Test draft `13b3c124-…`; active `c43b4ed3-…` unchanged. Publish/fresh confirmation pending.|Targeted Recheck technical validation containment|
+|`TR-15`|⚠ P0 observed prompt noncompliance. Execution `14391`, item `6/9`, field `advance_contract_guarantee`: structurally valid AI candidate stitched noncontiguous table rows/cells into one quote; deterministic validator correctly rejected it, leaving `0` FINAL writes and the claimed run inferred stuck in `aggregating`. Required fix is prompt-only; validator/retrieval/models/schema stay unchanged.|Targeted Recheck evidence quote generation|
 |`TR-12`|⚠ Mitigated / offline GREEN, test publish completed: execution `14256` подтвердил prompt/checker mismatch для existing-candidate evidence. Checker использует exact trusted union и допускает только unique `analysis_unit_id` coordinate repair при неизменных block ID/quote; 43/43 evidence и Validator handoff проверены. Test version `bca1746c-…` опубликована; runtime PIN-data canary остаётся pending.|Targeted Recheck evidence grounding|
 
 Document Worker packaging checkpoint 2026-08-29:
@@ -951,6 +952,33 @@ Baseline canary `14279/14280/14281/14285/14289` прошёл exact 27/27 и sema
 ### `TR-14` technical validation containment
 
 Execution `14292` первым остановился на exact evidence mismatch `results_date candidate[0].evidence[4]`; всего четыре из семи AI payload нарушили schema/contract/evidence validation. Typed checker fallback ловит только собственные deterministic model-response violations, сохраняет raw response/content, точную ошибку/stage, source metadata, original aggregation и existing candidates, не принимает AI candidates и оставляет `evidence_validated=false`. Dedicated route terminally материализует `requires_review` для ровно двух ожидаемых source states: `requires_recheck` и `no_initial_candidates`. Валидный `insufficient_evidence` остаётся на прежнем пути и может дать `not_found`; неизвестные programming errors и upstream invariants остаются hard-fail. Runtime GREEN не заявляется до publish и fresh confirmation.
+
+### `TR-15` — stitched noncontiguous table quote
+
+Execution chain `14389 → 14390 → 14391` остановился в `Проверить #2 evidence Targeted Recheck`. Для item `6/9`, `advance_contract_guarantee`, `doc_3_au_0024 / sb_0459`, AI вернул один structurally valid `requires_review/ambiguous_scope` candidate с `12` evidence. `candidate[0].evidence[1]` stitched table header и четыре несмежные rows, пропустив промежуточные cells и labels `Строка R2…R5`; `evidence[2]` повторял тот же класс дефекта на другом block.
+
+Exact deterministic rejection:
+
+```text
+[Targeted Recheck Evidence Validator] candidate[0].evidence[1]: quote отсутствует в semantic block после нормализации пробелов
+```
+
+Retrieval/full block корректен. Первый неправильный state создаёт `#2 AI Targeted Recheck v1`; Evidence Validator ведёт себя правильно и не должен ослабляться. В `14391` retrieval/prompt/AI прошли `9/9`, но downstream Validator, Round 2, FINAL UPSERT и Finalization имели `0` runs. Aggregator ранее успешно сделал atomic claim, поэтому run после ошибки inference-only остаётся `aggregating`; DB query не выполнялся.
+
+Minimal contract:
+
+```text
+one semantic_block evidence.quote
+→ exactly one continuous verbatim substring
+
+multiple noncontiguous fragments from the same block
+→ separate evidence objects
+→ same analysis_unit_id + semantic_block_id
+```
+
+Regression fixture должен быть synthetic/sanitized и воспроизводить table-stitching structure без client text. Structural gate обязан доказать, что workflow diff ограничен `parameters.jsCode` ноды `Подготовить запрос #2 AI Targeted Recheck`. Retrieval, models, schema, FIELD_CATALOG, DATA_MODEL, 27 fields, DB и validator не меняются.
+
+Detailed evidence: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`.
 
 \---
 

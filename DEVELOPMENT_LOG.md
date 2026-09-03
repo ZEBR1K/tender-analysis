@@ -5624,3 +5624,24 @@ Both runs closed the technical runtime path through readiness: `12/12` Extractor
 Semantic comparison failed despite exact-grounding PASS. Counts changed `46 → 42` facts and `179 → 171` evidence; verdict totals changed `20/13/13 → 20/13/9`. `analog_allowed` disappeared, the `application_documents` fact/verdict qualification distribution changed without a root cause established by the aggregate audit, and `delivery_term` changed from `requires_review` to `rejected`. The critical case `doc_3_au_0012#0 / advance_contract_guarantee` retained exact evidence; read-only semantic inspection linked its source context to unresolved DOCX option ownership/mutually exclusive alternatives, and it still became confirmed. Sensitive linkage payloads were not retained, so the next local RED must preserve a sanitized structural fixture.
 
 DOCX metrics were stable at `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings`, split as `29` missing semantic owner and `4` conflicting coordinates; semantic option state remained `unknown`. The new P0 `DW-21` records the narrow next gate: execution-derived local RED plus a deterministic `requires_review` cap for affected option-derived facts, preserving exact grounding, candidates, provenance and audit. Full sanitized tables and field distributions are in `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+---
+
+## 2026-09-03 — Forensic chain 14389 / 14390 / 14391 and TR-15 diagnosis
+
+Owner-supplied read-only evidence зафиксировало chain `14389` parent manual error → `14390` Aggregator integrated error → `14391` Targeted Recheck integrated error, без retries. Aggregator успешно claim-нул run `ready_for_aggregation → aggregating`, загрузил `1` completed document / `84` facts / `28` units, создал `27` grouped fields (`10` candidates / `17` no candidates), выполнил `10/10` Round 1 AI calls и направил `9` полей в Recheck. Только `evaluation_criteria` был Round 1 `resolved`; Aggregator FINAL/TenderMeta/Finalization не исполнялись.
+
+Targeted Recheck выполнил retrieval, prompt prep и AI `9/9`; token totals `170873 / 10448 / 181321`. На item `6/9`, `advance_contract_guarantee`, `doc_3_au_0024 / sb_0459`, structurally valid AI result (`1` requires-review candidate, `12` evidence) stitched header и четыре несмежные table rows с пропуском промежуточных cells и labels `Строка R2…R5`. First failure:
+
+```text
+Проверить #2 evidence Targeted Recheck, line 458
+[Targeted Recheck Evidence Validator] candidate[0].evidence[1]: quote отсутствует в semantic block после нормализации пробелов
+```
+
+Retrieval/full block был корректен; первый неправильный state — output `#2 AI Targeted Recheck v1`. Validator корректен и не меняется. Downstream Validator/Round 2/FINAL/Finalization: `0`; DB writes: `0`; создано `0` FINAL. После claim run считается оставшимся в `aggregating` только по runData inference, без DB query.
+
+Live drift owner checkpoint: Aggregator active=draft `24` nodes/version `89b33d04-…`, local canonical `38` nodes/version `1c9019de-…`; прежняя документация active-38/draft-24 устарела. Targeted Recheck live `64`/`4e0858c9-…`, local version `7f82ae43-…`; owner comparison сообщает local core `63` + live-only disconnected validator, но repository JSON напрямую содержит `64` nodes, поэтому это node-count convention discrepancy документировано явно. Live main validator удаляет `[C…]` coordinates, local comparison нормализует только whitespace; substantive omissions ломают containment в обоих случаях.
+
+DW-21 implementation остаётся user-side и отсутствует в current branch. Owner conclusions `14386/14387` приняты без re-audit: Docling PASS; `14386` primary `28/28`, third Evidence Repair `429`; `14387` primary `6/28`, fallback `22/28`, fourth fallback `429`; ActiveX `national_regime` selected `Не применимо` grounded (`290 = 38 selected / 88 unselected / 164 unknown`, `126` reliable), но semantic mapping partial/unknown (`51 exact / 189 missing_owner / 50 conflicting`). Пользовательский Wait и последующий DW-21 code не входят в эту ветку; Worker portion `14389` завершился до downstream failure chain.
+
+Новый `TR-15` ограничивает следующий fix только prompt ноды `Подготовить запрос #2 AI Targeted Recheck`: один evidence quote = одна continuous verbatim substring; разные fragments = отдельные evidence objects с теми же unit/block IDs. Sanitized report: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`. Client payload, run/fact UUID, provider response ID, credentials и URLs не сохранены. Live n8n/DB не изменялись.
