@@ -43,7 +43,7 @@ Production PostgreSQL и published production workflows в текущем лок
 | `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | legacy calibration/runtime workflow, 60 nodes, current unpublished version `55664cef-…`; последние executions `14147–14158`, в клиентском 12-document run не участвовал |
 | `[PROD CANDIDATE] TENDER — Обработать документ` | `csnDg78NzN1nIjUT` | yes | фактический Worker клиентского 12-document run; published active version `c5977af5-…` с 51-node execution graph, current unpublished draft `778dfb50-…` содержит 52 nodes; executions `14234/14238` воспроизводят `DW-17` |
 | `[DW-17 MANUAL REVIEW — INACTIVE] TENDER — Обработать документ` | `8dEt6A8IwTybFuIq` | no | inactive/unpublished 71-node audit contour; current observed draft `62041fec-…`; executions `14374/14376` technical GREEN through readiness, semantic gate FAIL; Aggregator disabled |
-| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published `91c17313-…`; current draft `f11906df-…` отличается от active; execution `14398` подтвердил test wiring, но Round 1 fail-closed на `9/10 candidate_decisions` |
+| `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published active `f11906df-…`; current unpublished draft `3654ec40-…` содержит 30 nodes и bounded recovery для exact-one omission; execution `14398` относится к прежнему active graph и завершился fail-closed на `9/10 candidate_decisions`; новый draft runtime не запускался |
 | `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | published active `13b3c124-…`; current unpublished draft `cf0f67f6-…` содержит только stitched-quote prompt hardening; execution `14398` до Targeted Recheck не дошёл |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
@@ -91,8 +91,8 @@ DW-21 implementation находится только на стороне пол�
 - Первый incorrect node item — index `2`, `evaluation_criteria` (`field_index=12`). Модель `google/gemini-3.7-flash` вернула valid JSON и `9 candidate_decisions` при ожидаемых `10`. Exact error: `[Semantic Aggregator Validator] Ожидалось 10 candidate_decisions, получено 9 [line 144]`. Отсутствует ровно один allowed fact ID; duplicate/unknown IDs нет. `finish_reason=stop`, `completion_tokens=1029`, workflow `max_tokens=16384`: model omission при normal stop, не truncation/`429`/JSON parse.
 - Validator корректно сработал fail-closed и не должен быть ослаблен.
 - Targeted Recheck не вызван; новый unpublished prompt draft `cf0f67f6-…` не exercised. FINAL/Finalizer/27/27/report отсутствуют. Latest state `aggregating` inferred from runData, без DB `SELECT`; тот же run нельзя перезапускать без reset/retry policy.
-- **Current blocker:** execution-14398 omission локально mitigated bounded recovery contour, но production/runtime остаются неизменёнными и непроверенными.
-- **One next step:** owner-operated packaging/promotion review и отдельно авторизованный runtime canary; не запускать runtime из этого локального task.
+- **Current blocker:** execution-14398 omission mitigated в local candidate и загружен только в unpublished test Aggregator draft `3654ec40-…`; published active version `f11906df-…` не изменена, новый draft runtime не проверен.
+- **One next step:** отдельно авторизованный bounded runtime canary на test draft; публикация остаётся отдельным решением после runtime evidence.
 
 ## 3. Document Worker test candidate
 
