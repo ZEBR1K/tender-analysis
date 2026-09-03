@@ -471,6 +471,35 @@ test('RED: unique grounded quote fragment of an unselected label cannot bypass t
   assert.equal(excludedUnit.deterministically_rejected_facts[0].option_state_applicability, 'excluded');
 });
 
+test('grounded quote fragment shared by multiple option rows fails closed', async () => {
+  const selected = mappedOption(fixture.input.option_states[0], {
+    exact_label: 'OPTION SHARED SELECTED',
+    state: 'selected',
+  });
+  const unselected = mappedOption(fixture.input.option_states[1], {
+    exact_label: 'OPTION SHARED OTHER',
+    state: 'unselected',
+  });
+  const segment = {
+    semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table',
+    canonical_text: `${selected.exact_label}\n${unselected.exact_label}`,
+    text: `${selected.exact_label}\n${unselected.exact_label}`,
+    docx_option_states: [selected, unselected],
+  };
+  const dispatch = await runCode(
+    'Подготовить dispatch AI Validator',
+    [groundedUnit(segment, ['OPTION SHARED'])],
+  );
+  const fact = dispatch[0].json.units_for_ai[0].verified_facts[0];
+  assert.equal(fact.status, 'requires_review');
+  assert.equal(fact.accepted_for_normalization, false);
+  assert.equal(fact.option_state_audit.mapping_status, 'multiple_option_states');
+  assert.deepEqual(
+    fact.option_state_evidence.map(({ exact_label: label }) => label),
+    ['OPTION SHARED SELECTED', 'OPTION SHARED OTHER'],
+  );
+});
+
 test('RED: unknown owner after repair path is review-only and keeps exact evidence', async () => {
   const option = { ...fixture.input.option_states[0], mapping_status: 'missing_owner', question_owner: null };
   const segment = { semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table', canonical_text: option.exact_label, text: option.exact_label, docx_option_states: [option], docx_option_state_mapping_issue_ids: ['docx_option_mapping_issue_0001'] };
