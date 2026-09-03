@@ -164,7 +164,16 @@ for (const workflowPath of workflowPaths) {
       nodeByName.get(retryHttpNodeName).credentials,
       nodeByName.get('Semantic Aggregator').credentials,
     );
-    assert.notEqual(nodeByName.get(retryHttpNodeName).retryOnFail, true);
+    assert.notEqual(
+      nodeByName.get('Semantic Aggregator').retryOnFail,
+      true,
+      'the initial Semantic Aggregator HTTP call must not use implicit n8n retries',
+    );
+    assert.notEqual(
+      nodeByName.get(retryHttpNodeName).retryOnFail,
+      true,
+      'the bounded repair HTTP call must not use implicit n8n retries',
+    );
   });
 }
 

@@ -425,8 +425,6 @@
       ],
       "id": "a4d1f19f-8f73-4d89-ba8c-262c91fb59d4",
       "name": "Semantic Aggregator",
-      "retryOnFail": true,
-      "waitBetweenTries": 5000,
       "credentials": {
         "httpHeaderAuth": {
           "id": "XaaCIUSKLJgqt16X",
