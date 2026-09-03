@@ -5612,3 +5612,15 @@ base: 22 files / 18 pass / 4 fail
 Structural comparison с base `ffe6e954bf914b15d3ab994b33a65c5d795555ca` подтвердил `71 → 71` nodes и ровно одну изменённую ноду; connections, settings, pinData, positions, typeVersions и credentials равны. Evidence Repair prepare/HTTP, deterministic evidence validator, AI Validator и primary/fallback Extractor HTTP hashes неизменны.
 
 Это local-only GREEN. Network/live n8n/API/DB/Docker/credentials не использовались; runtime recheck `DW-17 → barrier → Validator → persistence` и promotion остаются pending.
+
+---
+
+## 2026-09-03 — Read-only semantic audit executions 14374 / 14376
+
+Existing executions `14374` (`manual`, success) and `14376` (`integrated`, success) of inactive/unpublished test Worker `8dEt6A8IwTybFuIq` were reviewed read-only. No workflow/API/DB write, new execution, retry, publish, activation, credential operation or external delivery was performed.
+
+Both runs closed the technical runtime path through readiness: `12/12` Extractor recovery, `9/9` Validator dispatch, exact stored-unit/fact parity, document completion and `run.status=ready_for_aggregation`. Current observed draft was `62041fec-78c3-493a-9d2e-df648b51d1c9` with `71` nodes; Aggregator call remained disabled and created no child. n8n did not expose an immutable executed version ID, so this draft is recorded only as current observed state.
+
+Semantic comparison failed despite exact-grounding PASS. Counts changed `46 → 42` facts and `179 → 171` evidence; verdict totals changed `20/13/13 → 20/13/9`. `analog_allowed` disappeared, the `application_documents` fact/verdict qualification distribution changed without a root cause established by the aggregate audit, and `delivery_term` changed from `requires_review` to `rejected`. The critical case `doc_3_au_0012#0 / advance_contract_guarantee` retained exact evidence; read-only semantic inspection linked its source context to unresolved DOCX option ownership/mutually exclusive alternatives, and it still became confirmed. Sensitive linkage payloads were not retained, so the next local RED must preserve a sanitized structural fixture.
+
+DOCX metrics were stable at `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings`, split as `29` missing semantic owner and `4` conflicting coordinates; semantic option state remained `unknown`. The new P0 `DW-21` records the narrow next gate: execution-derived local RED plus a deterministic `requires_review` cap for affected option-derived facts, preserving exact grounding, candidates, provenance and audit. Full sanitized tables and field distributions are in `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.

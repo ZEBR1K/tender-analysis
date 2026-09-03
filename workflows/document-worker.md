@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-01
+**Последнее обновление:** 2026-09-03
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -412,6 +412,42 @@ item.json.analysis_unit_meta.analysis_unit_id
 Все fail-closed проверки output cardinality, duplicate/unknown identity, order, `analysis_batch.units_total` и bounded audit сохранены. Sanitized execution-derived fixture покрывает `doc_3_au_0001…doc_3_au_0012`; focused Extractor recovery/envelope/evidence-repair suites проходят `132/132`. File-isolated Document Worker suite: `10 files / 8 pass / 2` unchanged baseline failures; full repository suite: `23 files / 19 pass / 4` exact baseline failures против base `22 / 18 / 4`.
 
 Это local-only GREEN. Canonical candidate не импортирован и не выполнялся; runtime recheck полного `DW-17 → recovery barrier → Validator → persistence` остаётся pending. Production n8n/PostgreSQL/credentials не читались и не изменялись.
+
+---
+
+## 9D. Exact grounding versus semantic applicability — executions 14374 / 14376
+
+Read-only audit of the inactive/unpublished 71-node test workflow `8dEt6A8IwTybFuIq` observed current draft `62041fec-78c3-493a-9d2e-df648b51d1c9`; the Aggregator call was disabled. Existing executions `14374` and `14376` completed `12/12` Extractor recovery, `9/9` Validator dispatch, fact persistence, document completion and transition to `ready_for_aggregation`. No Aggregator child was created. This is bounded runtime evidence through readiness for the observed executions; it does not close the canonical candidate promotion/runtime gate because an immutable executed version was not exposed, and it does not prove production promotion, Aggregator, 27/27 FINAL, report or delivery.
+
+The audit separates two different guarantees:
+
+```text
+exact grounding
+= materialized evidence is an exact canonical source fragment
+
+semantic applicability
+= that fragment supports this field/value under the resolved option owner,
+  selection state, scope, modality and mutually exclusive alternatives
+```
+
+Reference-only repair passed exact grounding in both runs. Semantic applicability failed for `doc_3_au_0012#0 / advance_contract_guarantee`: the evidence was exact, but option ownership remained unresolved and mutually exclusive alternatives could not establish which clause applied. The fact still received an unsafe confirmed verdict.
+
+Observed DOCX metrics were identical in both runs:
+
+```text
+647 normalized blocks
+528 semantic blocks
+290 controls
+126 structurally resolved
+33 semantic-mapping warnings
+  29 missing owner
+   4 conflicting coordinates
+semantic status = unknown
+```
+
+Cross-run instability was also material: `46 → 42` facts, `179 → 171` evidence, loss of `analog_allowed` in `14376`, a changed `application_documents` fact/verdict qualification distribution, and `delivery_term` changing from `requires_review` to `rejected`. The aggregate audit does not establish the cause of the `application_documents` change. Exact grounding must remain strict; it is necessary but insufficient for a final semantic verdict.
+
+Current unresolved gate is `DW-21`: add an execution-derived deterministic review cap for option-derived facts with unresolved owner or conflicting mutually exclusive coordinates. Preserve candidate/evidence/provenance and audit, route unsafe confirmation to `requires_review`, and prove neutral non-option/fully-resolved controls are unchanged. Detailed sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
 
 ---
 

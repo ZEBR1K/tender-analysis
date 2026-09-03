@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-09-01
+**Последнее обновление:** 2026-09-03
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -125,6 +125,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-17`|⚠ Local GREEN / promotion+runtime pending. Canonical local Worker заменяет model-written quote на bounded allow-listed `ai_evidence_repair_v2` refs, deterministic materialization и lossless merge; exact grounding не ослаблен. Live production не изменён.|Document Worker / evidence grounding|
 |`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-19`|⚠ Bounded runtime batch-first GREEN; clean-candidate packaging pending. Execution `14359` дал `0/16` safely attachable primary responses; `14362` выявил latency regression (`12` sequential runs / `423` s против одного `16`-item run / ~`32` s); `14365` подтвердил nested-batching configuration blocker. Disposable isolated execution `14367` прошёл: primary `1` run / `12` outputs / `4339 ms`, exact linked IDs/order `12/12`, Loop `12 + done`, один allow-listed fallback только для injected unit `0007`, barrier `12/12`, paid calls `13 <= 25`, forbidden downstream runs `0`. Это не production candidate и не full-path metrics/Validator/persistence GREEN: canonical `2ffe1de` ещё не импортирован как clean inactive candidate; packaging/read-back — следующий отдельный gate. Production не изменён.|Document Worker / Extractor reliability and latency|
+|`DW-21`|⚠ P0 observed semantic applicability failure. Executions `14374/14376` passed exact grounding and Worker readiness, but unresolved DOCX option ownership/mutually exclusive alternatives still allowed unsafe confirmation, concretely `doc_3_au_0012#0 / advance_contract_guarantee`. Requires a deterministic `requires_review` cap with evidence/audit preservation and neutral controls.|Document Worker / DOCX semantic applicability|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
@@ -1232,6 +1233,72 @@ Nonblocking `DW-20`: validated units still expose legacy `extractor.provider = d
 ### Связанное, но отдельное ограничение
 
 Сумма `24 900` для `participation_cost` отсутствует во всех предоставленных DOCX, text-readable PDF и OCR data execution `14234`; `tender_metadata` также пуст. В `Блок_1_Извещение.docx` выбранное `Плата не предусмотрена` относится к плате за предоставление документации, а не к тарифу ЭТП. Значение `24 900` нельзя добавлять без отдельного grounded внешнего источника.
+
+\---
+
+## C9 — `DW-21`
+
+### Статус
+
+```text
+P0 / Critical / observed semantic applicability failure
+```
+
+### Execution evidence
+
+Read-only audit executions `14374` and `14376` proved the technical Worker path through `12/12` recovery, `9/9` Validator dispatch, persistence parity, document completion and `ready_for_aggregation` for those observed runs. Because n8n did not expose their immutable executed version, this does not close the canonical candidate promotion/runtime gate. Reference-only Evidence Repair preserved exact grounding. Nevertheless, the two runs produced `46 → 42` facts and `179 → 171` evidence with semantic drift, including:
+
+```text
+doc_3_au_0012#0 / advance_contract_guarantee
+exact-grounded evidence
++ unresolved DOCX option owner / mutually exclusive alternatives
+→ unsafe confirmed verdict
+
+analog_allowed: 1 confirmed → absent
+application_documents: 16 facts (8/1/7) → 10 facts (7/2/1)
+delivery_term: requires_review → rejected
+```
+
+The DOCX boundary remained `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings`: `29 missing_structural_semantic_owner` and `4 conflicting_structural_option_coordinates`. `docx_option_state_semantic_status=unknown` is therefore authoritative for applicability even when every selected quote exists exactly in canonical source.
+
+Read-only semantic inspection linked `doc_3_au_0012#0` and its initial `sb_0466` context to this unresolved option boundary. Client text and raw coordinate payloads are deliberately absent from the handoff, so an execution-derived sanitized structural fixture is required before the diagnosis can become a byte-level reproducible regression.
+
+### Required minimal behavior
+
+Do not weaken exact grounding and do not reinterpret absence as a negative fact. Add a narrow deterministic review cap:
+
+```text
+fact relies on DOCX option evidence
++ semantic owner unresolved or coordinates conflict across mutually exclusive alternatives
+→ verdict cannot become confirmed
+→ preserve candidate, exact evidence, option-state diagnostics and Validator audit
+→ requires_review
+```
+
+The cap must not manufacture a selected option, delete rejected facts, change any `field_key`, or modify the 27-field contract. It is a semantic-applicability boundary after grounding, not a replacement for Evidence Repair.
+
+### Regression gates
+
+```text
+execution-derived RED reproduces doc_3_au_0012#0 / advance_contract_guarantee
+exact quote grounding remains PASS
+unknown owner and conflicting coordinates each cap confirmed → requires_review
+mutually exclusive alternatives cannot jointly support confirmed
+candidate/evidence/provenance/option-state audit remain lossless
+neutral non-option exact-grounded confirmed fact remains unchanged
+neutral resolved selected-option fact remains eligible for normal validation
+analog_allowed absence is detected as cross-run instability, not converted to a negative fact
+application_documents and delivery_term fixtures retain FIELD_CATALOG semantics
+focused local suite GREEN before any new execution or promotion
+```
+
+Detailed sanitized evidence: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+### Приоритет
+
+```text
+P0 before another full/client-ready run
+```
 
 \---
 

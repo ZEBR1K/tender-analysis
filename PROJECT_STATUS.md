@@ -1,8 +1,8 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-01
+**Snapshot date:** 2026-09-03
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw18-ag11-option-state`
+**Branch at snapshot:** `codex/dw17-semantic-audit-14374-14376`
 
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
@@ -42,6 +42,7 @@ Production PostgreSQL и published production workflows в текущем цик
 |---|---|---:|---|
 | `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | legacy calibration/runtime workflow, 60 nodes, current unpublished version `55664cef-…`; последние executions `14147–14158`, в клиентском 12-document run не участвовал |
 | `[PROD CANDIDATE] TENDER — Обработать документ` | `csnDg78NzN1nIjUT` | yes | фактический Worker клиентского 12-document run; published active version `c5977af5-…` с 51-node execution graph, current unpublished draft `778dfb50-…` содержит 52 nodes; executions `14234/14238` воспроизводят `DW-17` |
+| `[DW-17 MANUAL REVIEW — INACTIVE] TENDER — Обработать документ` | `8dEt6A8IwTybFuIq` | no | inactive/unpublished 71-node audit contour; current observed draft `62041fec-…`; executions `14374/14376` technical GREEN through readiness, semantic gate FAIL; Aggregator disabled |
 | `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published containment candidate `91c17313-…`; fresh canary и consecutive series `3/3` GREEN |
 | `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | technical fallback candidate `13b3c124-…`; fresh canary и consecutive series `3/3` GREEN |
 
@@ -50,6 +51,34 @@ MCP доступ включён только для тестового конт�
 Repository также содержит inactive local-only export `[TEMP] TENDER — Ручная загрузка файлов` (`tmpManual16726ZO`, 8 nodes). Несмотря на имя, его текущая роль — сформировать calibration fixture, зарегистрировать test run/documents и вызвать test Worker; это не production manual-upload feature.
 
 ## 3. Document Worker test candidate
+
+### Read-only runtime and semantic audit — executions 14374 / 14376
+
+Current observed test workflow state:
+
+```text
+workflow = 8dEt6A8IwTybFuIq
+name = [DW-17 MANUAL REVIEW — INACTIVE] TENDER — Обработать документ
+active = false
+activeVersionId = null (unpublished)
+nodes = 71
+current observed draft = 62041fec-78c3-493a-9d2e-df648b51d1c9
+Aggregator call = disabled
+```
+
+Existing executions `14374` and `14376` were audited read-only. Both succeeded through `12/12` Extractor recovery, `9/9` Validator dispatch, fact persistence parity, `document.status=completed` and `run.status=ready_for_aggregation`. The disabled Execute Workflow node produced no Aggregator child; 27/27 FINAL, Targeted Recheck, report and delivery were not exercised. n8n does not expose an immutable executed version ID for these executions, so the current draft ID is an observed state, not proof of their exact execution graph.
+
+Technical runtime gate is **GREEN through readiness only**. Semantic gate is **FAIL**:
+
+- `14374`: `46` facts / `179` evidence / `20 confirmed`, `13 requires_review`, `13 rejected`;
+- `14376`: `42` facts / `171` evidence / `20 confirmed`, `13 requires_review`, `9 rejected`;
+- exact grounding passed for all repaired evidence, but `doc_3_au_0012#0 / advance_contract_guarantee` relied on unresolved mutually exclusive DOCX options and was still confirmed;
+- DOCX metrics stayed `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings` (`29` missing owner + `4` conflicting coordinates), with semantic status `unknown`;
+- `analog_allowed` disappeared in `14376`, the `application_documents` fact/verdict qualification distribution changed, and `delivery_term` changed from `requires_review` to `rejected`; the aggregate audit does not assign a root cause for the `application_documents` change.
+
+This is not production-ready. Exact details and sanitized repaired-unit tables: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+**One next step:** add an execution-derived local RED and the smallest deterministic review cap for facts whose evidence depends on unresolved DOCX option ownership/mutually exclusive alternatives, beginning with `doc_3_au_0012#0`; preserve evidence/audit and neutral non-option behavior. Do not enable Aggregator or start another runtime before that gate is reviewed locally.
 
 В `[3 TEST]` реализованы:
 
@@ -533,6 +562,8 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - lossless fact partition и item linking покрыты offline tests;
 - `DW-17` reference-only Evidence Repair v2 локально проходит focused `99/99`: identity-safe refs (включая одинаковый text в разных blocks), byte-identical catalog rebuild/parity, separate structural units, deterministic source-only materialization, lossless grounded-evidence merge, synchronized diagnostics, incremental catalog/source/request bounds, ref/collision rejection, table canonicalization и terminal exhaustion; Primary/Validator/persistence/graph не менялись. Safe sanitized fixtures `14234`/`14238` в repo/history отсутствуют, их exact replay, promotion и runtime canary остаются pending; `14371` покрыт только synthetic non-replay structure;
 - execution `14373` локализовал отдельный post-repair barrier defect: persisted Save output имеет top-level `analysis_unit_id`, тогда как `Проверить полноту Extractor recovery` ожидал nested `analysis_unit_meta.analysis_unit_id`. Canonical local repair меняет только этот access; sanitized `12/12` regression и все cardinality/order/identity/audit negative guards GREEN. Focused combined suite `132/132`; full file-isolated suite сохраняет baseline parity `23 files / 19 pass / 4 fail` против base `22 / 18 / 4`;
+- executions `14374/14376` runtime GREEN through readiness: `12/12` recovery, `9/9` Validator dispatch, exact fact persistence parity, document completion and `ready_for_aggregation`; disabled Aggregator created no child execution;
+- reference-only repair exact grounding PASS, with sanitized repaired-unit audit recorded for both executions;
 - Validator field profiles покрывают ровно 27 canonical keys;
 - fact-local material literal guard не использует соседние facts или общий context как evidence;
 - Aggregator candidate SQL по-прежнему исключает `rejected` и включает `confirmed`/`requires_review`;
@@ -568,9 +599,10 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 ### Not verified
 
 - promotion/wiring clean Document Worker candidate в test/production contour;
-- promotion и full-path runtime canary canonical local `DW-17` Evidence Repair v2; local focused GREEN не является live/runtime GREEN;
-- import/runtime recheck execution-14373 barrier repair через downstream Validator и persistence; текущий canonical fix проверен только локально;
-- full runtime canary Document Worker candidate с зафиксированной связкой GLM Extractor + Gemini Validator;
+- immutable execution-version attribution for `14374/14376`; current draft `62041fec-…` is observed state, because n8n metadata did not return an exact executed version ID;
+- semantic applicability after exact grounding: `doc_3_au_0012#0 / advance_contract_guarantee` is unsafe while DOCX option owner remains unresolved; `DW-21` review-cap regression/fix pending;
+- stable extraction across repeated runs: `analog_allowed`, the `application_documents` fact/verdict qualification distribution and the `delivery_term` verdict differed between `14374` and `14376`; root cause for the `application_documents` change is not established;
+- full runtime canary beyond Document Worker readiness: Aggregator was disabled, so 27/27 FINAL/report/delivery remain unverified;
 - production promotion Aggregator AG-8 boundary;
 - production promotion `application_documents` boundary;
 - promotion и runtime canary local Targeted Recheck candidate в LIVE contour;
