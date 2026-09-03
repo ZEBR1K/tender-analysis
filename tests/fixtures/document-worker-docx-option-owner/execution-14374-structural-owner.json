@@ -1,0 +1,138 @@
+{
+  "contract_version": "dw21_execution_14374_structural_owner_fixture_v1",
+  "source_execution": 14374,
+  "sanitization": {
+    "full_payload_included": false,
+    "client_text_included": false,
+    "credentials_or_urls_included": false,
+    "notes": "Client strings were replaced in-memory by stable neutral tokens. Equality and collision topology are preserved."
+  },
+  "observed_boundary": {
+    "analysis_unit_id": "doc_3_au_0012",
+    "fact_index": 0,
+    "field_key": "advance_contract_guarantee",
+    "question_semantic_block_id": "sb_0465",
+    "option_semantic_block_id": "sb_0466",
+    "question_source_block_id": "#/texts/513",
+    "option_source_block_id": "#/tables/58",
+    "source_table_ref": "word/document.xml#table[62]",
+    "source_rows": [1, 2, 3],
+    "states": ["selected", "unselected", "unselected"],
+    "exact_grounding": "pass",
+    "reported_validator_verdict": "confirmed",
+    "semantic_applicability": "fail"
+  },
+  "input": {
+    "body_sequence": [
+      { "kind": "question", "self_ref": "#/texts/513", "text": "QUESTION_ALPHA", "typed_relation": "direct_preceding_sibling" },
+      { "kind": "option_table", "self_ref": "#/tables/58", "source_table_ref": "word/document.xml#table[62]" },
+      { "kind": "question", "self_ref": "#/texts/520", "text": "QUESTION_BETA", "typed_relation": "direct_preceding_sibling" },
+      { "kind": "option_table", "self_ref": "#/tables/59", "source_table_ref": "word/document.xml#table[63]" }
+    ],
+    "option_states": [
+      {
+        "contract_version": "docx_option_state_v1",
+        "control_type": "checkbox",
+        "state": "selected",
+        "raw_value": "1",
+        "exact_label": "OPTION_ALPHA_SELECTED",
+        "source_row_ref": "word/document.xml#table[62]/row[1]",
+        "control_rel_target": "word/activeX/activeX266.xml",
+        "binary_rel_target": "word/activeX/activeX266.bin",
+        "group_context": null,
+        "warnings": []
+      },
+      {
+        "contract_version": "docx_option_state_v1",
+        "control_type": "checkbox",
+        "state": "unselected",
+        "raw_value": "0",
+        "exact_label": "OPTION_SHARED",
+        "source_row_ref": "word/document.xml#table[62]/row[2]",
+        "control_rel_target": "word/activeX/activeX267.xml",
+        "binary_rel_target": "word/activeX/activeX267.bin",
+        "group_context": null,
+        "warnings": []
+      },
+      {
+        "contract_version": "docx_option_state_v1",
+        "control_type": "checkbox",
+        "state": "unselected",
+        "raw_value": "0",
+        "exact_label": "OPTION_ALPHA_OTHER",
+        "source_row_ref": "word/document.xml#table[62]/row[3]",
+        "control_rel_target": "word/activeX/activeX268.xml",
+        "binary_rel_target": "word/activeX/activeX268.bin",
+        "group_context": null,
+        "warnings": []
+      },
+      {
+        "contract_version": "docx_option_state_v1",
+        "control_type": "option_button",
+        "state": "selected",
+        "raw_value": "1",
+        "exact_label": "OPTION_SHARED",
+        "source_row_ref": "word/document.xml#table[63]/row[1]",
+        "control_rel_target": "word/activeX/activeX269.xml",
+        "binary_rel_target": "word/activeX/activeX269.bin",
+        "group_context": "GROUP_BETA",
+        "warnings": []
+      },
+      {
+        "contract_version": "docx_option_state_v1",
+        "control_type": "option_button",
+        "state": "unselected",
+        "raw_value": "0",
+        "exact_label": "OPTION_BETA_OTHER",
+        "source_row_ref": "word/document.xml#table[63]/row[2]",
+        "control_rel_target": "word/activeX/activeX270.xml",
+        "binary_rel_target": "word/activeX/activeX270.bin",
+        "group_context": "GROUP_BETA",
+        "warnings": []
+      }
+    ],
+    "tables": [
+      {
+        "self_ref": "#/tables/58",
+        "rows": [
+          { "row": 0, "control_col": 0, "label_col": 2, "label": "OPTION_ALPHA_SELECTED" },
+          { "row": 1, "control_col": 0, "label_col": 2, "label": "OPTION_SHARED" },
+          { "row": 2, "control_col": 0, "label_col": 2, "label": "OPTION_ALPHA_OTHER" }
+        ]
+      },
+      {
+        "self_ref": "#/tables/59",
+        "rows": [
+          { "row": 0, "control_col": 0, "label_col": 2, "label": "OPTION_SHARED" },
+          { "row": 1, "control_col": 0, "label_col": 2, "label": "OPTION_BETA_OTHER" }
+        ]
+      }
+    ],
+    "nested_table_case": {
+      "outer_table_ref": "word/document.xml#table[61]",
+      "outer_cell_ref": "word/document.xml#table[61]/row[4]/cell[2]",
+      "question_ref": "word/document.xml#table[61]/row[4]/cell[2]/paragraph[1]",
+      "inner_table_ref": "word/document.xml#table[62]",
+      "relation": "direct_enclosing_cell_child"
+    }
+  },
+  "oracle": {
+    "target_group": {
+      "mapping_status": "mapped",
+      "mutual_exclusion_status": "proven",
+      "source_table_ref": "word/document.xml#table[62]",
+      "question_source_ref": "#/texts/513",
+      "question_semantic_block_id": "sb_0001",
+      "option_semantic_block_id": "sb_0002",
+      "selected_label": "OPTION_ALPHA_SELECTED",
+      "unselected_labels": ["OPTION_SHARED", "OPTION_ALPHA_OTHER"]
+    },
+    "duplicate_label_group": {
+      "source_table_ref": "word/document.xml#table[63]",
+      "question_source_ref": "#/texts/520",
+      "question_semantic_block_id": "sb_0003",
+      "option_semantic_block_id": "sb_0004",
+      "selected_label": "OPTION_SHARED"
+    }
+  }
+}
