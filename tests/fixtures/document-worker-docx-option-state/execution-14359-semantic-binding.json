@@ -17,6 +17,8 @@
   "source_option_states": [
     {
       "control_name": "CommonSupplierCheckBox11",
+      "control_type": "checkbox",
+      "group_context": "SANITIZED_LOCAL_GROUP_ALPHA",
       "control_rel_target": "word/activeX/activeX5.xml",
       "state": "unselected",
       "exact_label": "запрет закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];",
@@ -24,6 +26,8 @@
     },
     {
       "control_name": "CommonSupplierCheckBox12",
+      "control_type": "checkbox",
+      "group_context": "SANITIZED_LOCAL_GROUP_ALPHA",
       "control_rel_target": "word/activeX/activeX6.xml",
       "state": "unselected",
       "exact_label": "ограничение закупок товаров (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), происходящих из иностранных государств, работ, услуг, соответственно выполняемых, оказываемых иностранными лицами, [указываются пункты ТЗ];",
@@ -31,6 +35,8 @@
     },
     {
       "control_name": "CommonSupplierCheckBox13",
+      "control_type": "checkbox",
+      "group_context": "SANITIZED_LOCAL_GROUP_ALPHA",
       "control_rel_target": "word/activeX/activeX7.xml",
       "state": "unselected",
       "exact_label": "преимущество в отношении товаров российского происхождения (в том числе поставляемых при выполнении закупаемых работ, оказании закупаемых услуг), работ, услуг, соответственно выполняемых, оказываемых российскими лицами, [указываются пункты ТЗ];",
@@ -38,6 +44,8 @@
     },
     {
       "control_name": "CommonSupplierCheckBox14",
+      "control_type": "checkbox",
+      "group_context": "SANITIZED_LOCAL_GROUP_ALPHA",
       "control_rel_target": "word/activeX/activeX8.xml",
       "state": "selected",
       "exact_label": "Не применимо.",
@@ -45,6 +53,8 @@
     },
     {
       "control_name": "OptionButton25221111131",
+      "control_type": "option_button",
+      "group_context": "SANITIZED_LOCAL_GROUP_BETA",
       "control_rel_target": "word/activeX/activeX55.xml",
       "state": "selected",
       "exact_label": "Не предусмотрены;",
@@ -52,6 +62,8 @@
     },
     {
       "control_name": "OptionButton252211111211",
+      "control_type": "option_button",
+      "group_context": "SANITIZED_LOCAL_GROUP_BETA",
       "control_rel_target": "word/activeX/activeX56.xml",
       "state": "unselected",
       "exact_label": "Предусмотрены. Обеспечение заявки должно соответствовать следующим требованиям:",

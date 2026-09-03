@@ -4,6 +4,92 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/tr14389-targeted-recheck-prompt`
 
+## ActiveX semantic checkpoint: parent 14409 / Worker 14410
+
+Read-only MCP evidence on 2026-09-03 established that execution `14409` is the
+manual parent (`workflowId=5rYqVLDj4bHnnUD8`) and is not MCP-visible. Its child
+execution `14410` is the actual Document Worker run for exact workflow
+`MUsCcwlpURJilj10`, `[TEST ACTIVE X] TENDER — Обработать документ`. The child
+metadata is `integrated / success`, has no retry lineage, and identifies `14409`
+as its parent. Therefore `14409` must not be described as belonging to the
+Worker; its own workflow name/version cannot be independently read back with
+the current MCP access.
+
+The Worker run decoded `290` controls: `38 selected`, `88 unselected`, `164
+unknown`, `0 conflict`. Normalization attached `83/290` unique controls to
+semantic owners and produced `33` warning groups (`29
+missing_structural_semantic_owner`, `4 conflicting_structural_option_coordinates`).
+The document-wide semantic status remained `unknown`.
+
+The two exact semantic oracles were grounded correctly:
+
+```text
+activeX5/6/7/8
+→ OOXML table[3] rows 1/2/3/4
+→ Docling #/tables/2
+→ unselected / unselected / unselected / selected
+→ selected label: Не применимо.
+
+activeX55/56
+→ OOXML table[28] rows 1/2
+→ Docling #/tables/25
+→ selected / unselected
+→ selected label: Не предусмотрены;
+```
+
+The Extractor request for the owning analysis units contained explicit
+`[OPTION_STATE selected]` / `[OPTION_STATE unselected]` markers plus structured
+option-state provenance. The model therefore did not see labels alone. It
+returned the semantically correct negative candidates, but the current
+document-wide unknown guard capped both to `requires_review`. Unselected
+alternatives were retained for audit and did not become applicable candidates.
+
+First incorrect state: `Нормализовать документ Docling` collapses unrelated
+unresolved ownership anywhere in the document into the global
+`docx_option_state_semantic_status=unknown`; downstream guarded facts cannot
+distinguish a locally exact, complete option group from an affected block.
+Exact grounding is verified for both oracles; global semantic completeness is
+not verified. Remaining blocker: introduce a deterministic block/group-local
+ownership and completeness verdict while preserving the document-wide audit.
+One next step: implement the accepted contract in
+`docs/superpowers/specs/2026-09-03-activex-local-semantic-ownership-design.md`
+through an execution-derived TDD slice.
+
+### Offline implementation checkpoint
+
+The accepted group-local v2 contract is implemented in the local canonical
+Worker export and independently reviewed. Stable identity remains canonical
+`document_part + control_rel_target`; changes to state, binary target, source
+coordinate, type, name, exact label, or group context are conflicting observed
+snapshots rather than new identities. Radio and checkbox groups have separate
+cardinality rules. Unknown/conflicting groups fail closed, while unrelated
+groups do not poison a resolved local group. Selected and unselected states,
+the full v2 group projection, original canonical text/evidence, and rejected
+audit facts survive semantic blocks, analysis units, compact provenance,
+Extractor evidence handling, Validator dispatch, and convergence. AI-only
+markers are not canonical evidence, and Validator cannot elevate review-only
+facts. The deterministic applicability guard remains limited to
+`national_regime` and `participation_guarantee`.
+
+Offline verification on 2026-09-03:
+
+- focused DOCX option-state suite: `81 tests / 80 pass / 1 fail`;
+- all Document Worker suites: `10 files / 247 tests / 245 pass / 2 fail`;
+- full repository suite: `25 files / 426 tests / 417 pass / 9 fail`;
+- base `bfaa93147ea5109f48375cd6ea410b4d9ec78f6c`: Document Worker
+  `236 / 234 / 2`, full suite `415 / 406 / 9`;
+- candidate adds `11` passing regressions and preserves the same baseline
+  failure files, counts, and signatures.
+
+The two independent post-correction reviews are `APPROVE`. This checkpoint is
+**offline only**: no n8n draft was updated, no runtime/canary was started, and
+neither execution `14409` nor child `14410` was repeated. Runtime GREEN is not
+verified. Remaining gate: an operator must first perform exact read-back of
+workflow `MUsCcwlpURJilj10` and prove exact name/version/active/published state
+and drift against this reviewed local candidate; only then may the separately
+authorized unpublished-draft update and a statically side-effect-free bounded
+canary be considered.
+
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
 - live n8n export как фактическое состояние workflow;

@@ -682,6 +682,7 @@ function buildOptionSource(segment, analysisUnitId = 'option-state-unit') {
           scope: segment.scope,
           source_block_ids: [],
           sources: [],
+          docx_option_state_semantic: segment.docx_option_state_semantic ?? null,
         },
       },
     },
@@ -1311,7 +1312,7 @@ test('one stable control identity with contradictory table coordinates fails clo
   );
 });
 
-test('document semantic unknown with no candidate block remains bounded and guards facts globally', async () => {
+test('document semantic unknown with no candidate block remains bounded without poisoning a resolved local group', async () => {
   const workflow = loadWorkflow();
   const selected = semanticBindingFixture.source_option_states[4];
   const optionStates = [
@@ -1377,13 +1378,378 @@ test('document semantic unknown with no candidate block remains bounded and guar
   );
   const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
   const fact = dispatch.json.units_for_ai[0].verified_facts[0];
-  assert.equal(fact.status, 'requires_review');
-  assert.equal(fact.option_state_applicability, 'review_only');
+  assert.equal(fact.status, 'found');
+  assert.equal(fact.option_state_applicability, 'applicable');
   assert.deepEqual(
     fact.evidence.map(({ semantic_block_id: blockId, quote }) => ({ blockId, quote })),
     [{ blockId: segment.semantic_block_id, quote: selected.exact_label }],
   );
   assert.ok(fact.evidence.every((entry) => !('issue_id' in entry)));
+});
+
+test('execution-derived local groups remain resolved despite an unrelated document-wide unknown owner', async () => {
+  const workflow = loadWorkflow();
+  const optionStates = [
+    ...bindingFixtureOptionStates(),
+    {
+      contract_version: 'docx_option_state_v1',
+      document_part: 'word/document.xml',
+      control_type: 'option_button',
+      control_name: 'sanitized_unrelated_control',
+      control_rel_target: 'word/activeX/sanitized-unrelated.xml',
+      binary_rel_target: 'word/activeX/sanitized-unrelated.bin',
+      raw_value: null,
+      state: 'unknown',
+      exact_label: 'Sanitized unrelated option',
+      source_row_ref: 'word/document.xml#table[99]/row[1]',
+      group_context: 'SANITIZED_UNRELATED_GROUP',
+      warnings: [{ code: 'sanitized_missing_owner', message: 'fixture' }],
+    },
+  ];
+  assert.equal(optionStates[4].group_context, optionStates[5].group_context);
+  assert.notEqual(optionStates[4].group_context.trim(), '');
+
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    optionStates,
+  );
+  assert.equal(normalized.json.docx_option_state_semantic_status, 'unknown');
+
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const expectedFacts = [
+    {
+      binding: semanticBindingFixture.oracle.bindings[0],
+      selected: optionStates[3],
+      fieldKey: 'national_regime',
+    },
+    {
+      binding: semanticBindingFixture.oracle.bindings[1],
+      selected: optionStates[4],
+      fieldKey: 'participation_guarantee',
+    },
+  ];
+
+  for (const [index, expected] of expectedFacts.entries()) {
+    const semanticBlock = semantic.json.semantic_blocks.find(
+      ({ source_block_ids: ids = [] }) => ids.includes(expected.binding.expected_docling_table_ref),
+    );
+    assert.ok(semanticBlock);
+    assert.equal(semanticBlock.docx_option_state_semantic.contract_version, 'docx_option_state_semantic_v2');
+    assert.equal(semanticBlock.docx_option_state_semantic.option_groups.length, 1);
+    assert.equal(semanticBlock.docx_option_state_semantic.option_groups[0].group_status, 'resolved');
+
+    semantic.json.analysis_units = [{
+      analysis_unit_id: `local-group-unit-${index}`,
+      primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+      overlap_semantic_block_ids: [],
+    }];
+    const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+    const segment = expanded.json.ai_segments[0];
+    assert.equal(segment.canonical_text.includes(expected.selected.exact_label), true);
+    assert.equal(segment.docx_option_state_semantic.option_groups[0].group_status, 'resolved');
+
+    const source = buildOptionSource(segment, `local-group-unit-${index}`);
+    const [evidenceResult] = await runCodeNode(
+      workflow,
+      nodeNames.validateEvidence,
+      [{ json: buildExtractorResponse([
+        buildOptionFact(expected.fieldKey, expected.selected.exact_label, segment.semantic_block_id),
+      ], `local-group-unit-${index}`) }],
+      { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+    );
+    assert.equal(evidenceResult.json.validation_passed, true, 'canonical quote grounding must already pass');
+    const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+    const fact = dispatch.json.units_for_ai[0].verified_facts[0];
+    assert.equal(fact.status, 'found');
+    assert.equal(fact.option_state_applicability, 'applicable');
+  }
+});
+
+for (const changedField of ['state', 'binary_rel_target', 'source_row_ref']) {
+  test(`repeated stable identity with changed ${changedField} conflicts group-locally`, async () => {
+    const target = bindingFixtureOptionStates()[4];
+    const changedValues = {
+      state: 'unselected',
+      binary_rel_target: 'word/activeX/sanitized-conflict.bin',
+      source_row_ref: 'word/document.xml#table[28]/row[2]',
+    };
+    const normalized = await normalizeBindingFixture(
+      execution14359SemanticDocument(),
+      [...bindingFixtureOptionStates(), { ...target, [changedField]: changedValues[changedField] }],
+    );
+    const owner = normalized.json.blocks.find(
+      ({ block_id: blockId }) => blockId === '#/tables/25',
+    );
+    const group = owner.docx_option_state_semantic.option_groups[0];
+    assert.equal(group.owner_status, 'conflict');
+    assert.equal(group.group_status, 'conflict');
+    assert.equal(group.applicability, 'review_only');
+  });
+}
+
+test('radio groups fail closed for two selected, zero selected, and caller all-cleared flag', async () => {
+  const base = bindingFixtureOptionStates();
+  for (const [name, states] of [
+    ['two-selected', ['selected', 'selected']],
+    ['zero-selected', ['unselected', 'unselected']],
+    ['caller-all-cleared', ['unselected', 'unselected']],
+  ]) {
+    const optionStates = base.map((state, index) => {
+      if (index < 4) return state;
+      return {
+        ...state,
+        state: states[index - 4],
+        raw_value: states[index - 4] === 'selected' ? '1' : '0',
+        ...(name === 'caller-all-cleared' ? { allow_all_cleared: true } : {}),
+      };
+    });
+    const normalized = await normalizeBindingFixture(execution14359SemanticDocument(), optionStates);
+    const group = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/25')
+      .docx_option_state_semantic.option_groups[0];
+    assert.equal(group.group_status, name === 'two-selected' ? 'conflict' : 'unknown');
+    assert.equal(group.applicability, 'review_only');
+  }
+});
+
+test('distinct GroupName values in one source table create separate local verdicts', async () => {
+  const states = bindingFixtureOptionStates();
+  states[5] = { ...states[5], group_context: 'SANITIZED_LOCAL_GROUP_GAMMA' };
+  const normalized = await normalizeBindingFixture(execution14359SemanticDocument(), states);
+  const groups = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/25')
+    .docx_option_state_semantic.option_groups;
+  assert.equal(groups.length, 2);
+  assert.deepEqual(groups.map(({ group_status: status }) => status), ['resolved', 'unknown']);
+});
+
+test('an unresolved sibling group issue in one block does not poison a resolved local group', async () => {
+  const workflow = loadWorkflow();
+  const states = sourceOptionStates().map((state, index) => ({
+    ...state,
+    group_context: index < 2
+      ? 'SANITIZED_LOCAL_GROUP_ALPHA'
+      : (index < 4 ? 'SANITIZED_LOCAL_GROUP_BETA' : 'SANITIZED_LOCAL_GROUP_GAMMA'),
+  }));
+  states[0] = { ...states[0], state: 'selected', raw_value: '1' };
+  states[3] = {
+    ...states[3],
+    source_row_ref: null,
+  };
+
+  const normalized = await normalizeBindingFixture(optionStateDoclingDocument(), states);
+  assert.equal(normalized.json.docx_option_state_semantic_status, 'unknown');
+  const owner = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/0');
+  assert.ok(owner.docx_option_state_mapping_issue_ids.length > 0);
+  const alpha = owner.docx_option_state_semantic.option_groups.find(
+    ({ group_id: groupId }) => groupId.includes('SANITIZED_LOCAL_GROUP_ALPHA'),
+  );
+  const beta = owner.docx_option_state_semantic.option_groups.find(
+    ({ group_id: groupId }) => groupId.includes('SANITIZED_LOCAL_GROUP_BETA'),
+  );
+  assert.equal(alpha.group_kind, 'checkbox_set');
+  assert.equal(alpha.group_status, 'resolved');
+  assert.deepEqual(alpha.issue_ids, []);
+  assert.equal(beta.group_status, 'unknown');
+  assert.deepEqual(beta.issue_ids, owner.docx_option_state_mapping_issue_ids);
+
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const semanticBlock = semantic.json.semantic_blocks.find(
+    ({ source_block_ids: ids = [] }) => ids.includes('#/tables/0'),
+  );
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'same-block-local-issue-unit',
+    primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const segment = expanded.json.ai_segments[0];
+  const source = buildOptionSource(segment, 'same-block-local-issue-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', states[0].exact_label, segment.semantic_block_id),
+    ], 'same-block-local-issue-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  assert.equal(dispatch.json.units_for_ai[0].verified_facts[0].option_state_applicability, 'applicable');
+});
+
+test('identity conflict projection does not attach through a duplicate label', async () => {
+  const states = bindingFixtureOptionStates();
+  const target = states[4];
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    [...states, { ...target, state: 'unselected', raw_value: '0' }],
+  );
+  const owner = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/25');
+  assert.equal(owner.docx_option_state_semantic.option_groups[0].group_status, 'conflict');
+  for (const duplicateRef of semanticBindingFixture.oracle.duplicate_only_table_refs) {
+    const duplicateBlock = normalized.json.blocks.find(({ block_id: id }) => id === duplicateRef);
+    assert.deepEqual(duplicateBlock.docx_option_state_semantic.option_groups, []);
+  }
+});
+
+test('v2 local group projection is preserved in compact provenance', async () => {
+  const workflow = loadWorkflow();
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    bindingFixtureOptionStates(),
+  );
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const semanticBlock = semantic.json.semantic_blocks.find(
+    ({ source_block_ids: ids = [] }) => ids.includes('#/tables/25'),
+  );
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'v2-provenance-unit',
+    primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  assert.deepEqual(
+    expanded.json.provenance.index[semanticBlock.semantic_block_id].docx_option_state_semantic,
+    semanticBlock.docx_option_state_semantic,
+  );
+
+  const segment = expanded.json.ai_segments[0];
+  const source = buildOptionSource(segment, 'v2-provenance-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('participation_guarantee', bindingFixtureOptionStates()[4].exact_label, segment.semantic_block_id),
+    ], 'v2-provenance-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  assert.deepEqual(
+    evidenceResult.json.evidence_context[semanticBlock.semantic_block_id]
+      .provenance.docx_option_state_semantic,
+    semanticBlock.docx_option_state_semantic,
+  );
+});
+
+test('resolved and unresolved groups in one semantic block are enforced independently', async () => {
+  const workflow = loadWorkflow();
+  const selected = bindingFixtureOptionStates()[4];
+  const unresolved = { ...bindingFixtureOptionStates()[5], state: 'unknown', raw_value: null };
+  const selectedIdentity = `${selected.document_part}\u0000${selected.control_rel_target}`;
+  const unresolvedIdentity = `${unresolved.document_part}\u0000${unresolved.control_rel_target}`;
+  const resolvedGroup = {
+    group_id: 'sanitized-resolved-group',
+    owner_status: 'resolved',
+    group_status: 'resolved',
+    applicability: 'applicable',
+    control_identity_keys: [selectedIdentity],
+    selected_control_identity_keys: [selectedIdentity],
+    issue_ids: [],
+  };
+  const unresolvedGroup = {
+    group_id: 'sanitized-unresolved-group',
+    owner_status: 'resolved',
+    group_status: 'unknown',
+    applicability: 'review_only',
+    control_identity_keys: [unresolvedIdentity],
+    selected_control_identity_keys: [],
+    issue_ids: ['sanitized-local-issue'],
+  };
+  const segment = {
+    semantic_block_id: 'sb_local_mixed_groups',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: `${selected.exact_label}\n${unresolved.exact_label}`,
+    text: `${selected.exact_label}\n${unresolved.exact_label}`,
+    docx_option_states: [
+      { ...selected, docx_option_group_semantic: resolvedGroup },
+      { ...unresolved, docx_option_group_semantic: unresolvedGroup },
+    ],
+    docx_option_state_semantic: {
+      contract_version: 'docx_option_state_semantic_v2',
+      docling_block_id: '#/tables/sanitized',
+      semantic_block_id: 'sb_local_mixed_groups',
+      option_groups: [
+        resolvedGroup,
+        unresolvedGroup,
+      ],
+    },
+  };
+  const source = buildOptionSource(segment, 'local-mixed-groups-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('participation_guarantee', selected.exact_label, segment.semantic_block_id),
+      buildOptionFact('participation_guarantee', unresolved.exact_label, segment.semantic_block_id),
+    ], 'local-mixed-groups-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  assert.equal(dispatch.json.units_for_ai[0].verified_facts[0].option_state_applicability, 'applicable');
+  assert.equal(dispatch.json.units_for_ai[0].verified_facts[1].option_state_applicability, 'review_only');
+
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(expanded.json, 'confirmed') }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
+  );
+  assert.equal(checked.json.validated_facts[0].processing_status, 'confirmed');
+  assert.equal(checked.json.validated_facts[1].processing_status, 'requires_review');
+});
+
+test('v2 applicability requires the exact option label in grounded evidence, not value_text alone', async () => {
+  const workflow = loadWorkflow();
+  const selected = bindingFixtureOptionStates()[4];
+  const identity = `${selected.document_part}\u0000${selected.control_rel_target}`;
+  const neutralQuote = 'Sanitized grounded context without the option label.';
+  const segment = {
+    semantic_block_id: 'sb_quote_only_option_match',
+    scope: 'primary',
+    type: 'table',
+    role: 'table',
+    canonical_text: `${neutralQuote}\n${selected.exact_label}`,
+    text: `${neutralQuote}\n${selected.exact_label}`,
+    docx_option_states: [selected],
+    docx_option_state_semantic: {
+      contract_version: 'docx_option_state_semantic_v2',
+      docling_block_id: '#/tables/sanitized',
+      semantic_block_id: 'sb_quote_only_option_match',
+      option_groups: [{
+        group_id: 'sanitized-quote-group',
+        group_kind: 'radio',
+        owner_status: 'resolved',
+        group_status: 'resolved',
+        applicability: 'applicable',
+        source_table_ref: 'word/document.xml#table[1]',
+        source_row_refs: [selected.source_row_ref],
+        control_identity_keys: [identity],
+        selected_control_identity_keys: [identity],
+        issue_ids: [],
+      }],
+    },
+  };
+  const source = buildOptionSource(segment, 'quote-only-option-unit');
+  const fact = buildOptionFact(
+    'participation_guarantee',
+    selected.exact_label,
+    segment.semantic_block_id,
+  );
+  fact.evidence[0].quote = neutralQuote;
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([fact], 'quote-only-option-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  assert.equal(evidenceResult.json.validation_passed, true);
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const guarded = dispatch.json.units_for_ai[0].verified_facts[0];
+  assert.equal(guarded.status, 'requires_review');
+  assert.equal(guarded.option_state_applicability, 'review_only');
 });
 
 test('document-level mapping warnings are stored once and segments carry bounded issue references', async () => {
