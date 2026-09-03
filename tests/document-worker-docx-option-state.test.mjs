@@ -1740,6 +1740,7 @@ test('selected grounded negative option remains an applicable candidate with opt
   const storedAudit = documentFacts.json.facts[0].validator_meta.option_state;
   assert.equal(storedAudit.applicability, 'applicable');
   assert.equal(storedAudit.evidence[0].state, 'selected');
+  assert.equal(storedAudit.audit.mapping_status, 'mapped');
 });
 
 test('mixed selected and unselected facts survive Validator mapping without reviving the excluded fact', async () => {
