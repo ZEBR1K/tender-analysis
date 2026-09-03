@@ -84,11 +84,22 @@ Offline verification on 2026-09-03:
 The two independent post-correction reviews are `APPROVE`. This checkpoint is
 **offline only**: no n8n draft was updated, no runtime/canary was started, and
 neither execution `14409` nor child `14410` was repeated. Runtime GREEN is not
-verified. Remaining gate: an operator must first perform exact read-back of
-workflow `MUsCcwlpURJilj10` and prove exact name/version/active/published state
-and drift against this reviewed local candidate; only then may the separately
-authorized unpublished-draft update and a statically side-effect-free bounded
-canary be considered.
+verified.
+
+Post-commit live preflight for workflow `MUsCcwlpURJilj10` confirmed
+`active=true`, `sameAsDraft=true`, and
+`versionId=activeVersionId=1ae15557-28e8-4604-b662-d65cfe057a9c`; the only
+execution remains child `14410`. The four target Code-node parameter objects are
+byte-equivalent to the local parent/base and differ from the reviewed candidate,
+so the intended code transition is exact. Automatic draft sync was nevertheless
+stopped before write: the available MCP `update_workflow` schema exposes no
+`versionId`/`expectedVersionId` compare-and-swap, while the live clone also has
+intentional drift in connections, node metadata, settings/`availableInMCP`, and
+credential-reference structure. No approval card was opened and
+`update_workflow` was not called. The next gate is a safe owner-operated import
+or another reviewed update path that preserves the live graph and provides an
+adequate concurrency boundary; only after read-back may a statically
+side-effect-free bounded canary be considered.
 
 Этот файл — короткий оперативный снимок. Он не заменяет:
 
