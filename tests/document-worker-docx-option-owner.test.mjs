@@ -452,6 +452,25 @@ test('RED: unselected sibling is excluded universally, including advance_contrac
   assert.equal(excludedUnit.deterministically_rejected_facts[0].deterministic_rejection.reason_code, 'unselected_option_not_applicable');
 });
 
+test('RED: unique grounded quote fragment of an unselected label cannot bypass the option guard', async () => {
+  const option = mappedOption(fixture.input.option_states[1], {
+    exact_label: 'OPTION ALPHA OTHER LONG SUFFIX',
+    state: 'unselected',
+  });
+  const segment = {
+    semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table',
+    canonical_text: option.exact_label, text: option.exact_label, docx_option_states: [option],
+  };
+  const dispatch = await runCode(
+    'Подготовить dispatch AI Validator',
+    [groundedUnit(segment, ['ALPHA OTHER'])],
+  );
+  const excludedUnit = dispatch[0].json.units_without_ai[0] ?? null;
+  assert.ok(excludedUnit, 'unique grounded label fragment must remain fact-local option evidence');
+  assert.equal(excludedUnit.verified_facts.length, 0);
+  assert.equal(excludedUnit.deterministically_rejected_facts[0].option_state_applicability, 'excluded');
+});
+
 test('RED: unknown owner after repair path is review-only and keeps exact evidence', async () => {
   const option = { ...fixture.input.option_states[0], mapping_status: 'missing_owner', question_owner: null };
   const segment = { semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table', canonical_text: option.exact_label, text: option.exact_label, docx_option_states: [option], docx_option_state_mapping_issue_ids: ['docx_option_mapping_issue_0001'] };
