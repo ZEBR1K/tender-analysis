@@ -476,6 +476,22 @@ function sourceOptionStates() {
   }));
 }
 
+function mappedOptionStateForTest(optionState, groupId = 'fixture-option-group') {
+  return {
+    ...optionState,
+    mapping_status: 'mapped',
+    option_group_id: groupId,
+    mutual_exclusion_status: 'proven',
+    question_owner: {
+      relation: 'direct_enclosing_cell_child',
+      source_ref: 'word/document.xml#table[1]/row[1]/cell[2]/paragraph[1]',
+      source_block_id: '#/texts/0',
+      semantic_block_id: 'sb_question_owner',
+      exact_text: 'SANITIZED_QUESTION_OWNER',
+    },
+  };
+}
+
 function doclingTable(expectedControls, tableIndex) {
   const tableCells = [];
   expectedControls.forEach((expected, rowIndex) => {
@@ -1244,8 +1260,9 @@ test('missing source row coordinate fails closed without label-only attachment',
   assert.match(warning.issue_id, /^docx_option_mapping_issue_\d{4}$/u);
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_name: name }) => name === target.control_name),
-    false,
+      .find(({ control_name: name }) => name === target.control_name)
+      ?.mapping_status,
+    'missing_owner',
   );
 });
 
@@ -1264,9 +1281,10 @@ test('conflicting source row coordinate fails closed instead of searching the la
   ));
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_rel_target: relTarget }) =>
-        semanticBindingFixture.oracle.bindings[0].control_rel_targets.includes(relTarget)),
-    false,
+      .filter(({ control_rel_target: relTarget }) =>
+        semanticBindingFixture.oracle.bindings[0].control_rel_targets.includes(relTarget))
+      .every(({ mapping_status: mappingStatus }) => mappingStatus === 'conflicting_coordinates'),
+    true,
   );
 });
 
@@ -1282,9 +1300,10 @@ test('multiple structural table matches fail closed for the whole source-table g
   ));
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_rel_target: relTarget }) =>
-        semanticBindingFixture.oracle.bindings[1].control_rel_targets.includes(relTarget)),
-    false,
+      .filter(({ control_rel_target: relTarget }) =>
+        semanticBindingFixture.oracle.bindings[1].control_rel_targets.includes(relTarget))
+      .every(({ mapping_status: mappingStatus }) => mappingStatus === 'multiple_owners'),
+    true,
   );
 });
 
@@ -1306,8 +1325,9 @@ test('one stable control identity with contradictory table coordinates fails clo
   ));
   assert.equal(
     normalized.json.blocks.flatMap((block) => block.docx_option_states ?? [])
-      .some(({ control_rel_target: relTarget }) => relTarget === target.control_rel_target),
-    false,
+      .filter(({ control_rel_target: relTarget }) => relTarget === target.control_rel_target)
+      .every(({ mapping_status: mappingStatus }) => mappingStatus === 'conflicting_coordinates'),
+    true,
   );
 });
 
@@ -1513,9 +1533,9 @@ for (const candidateCase of [
 ]) {
   test(`unselected ${candidateCase.fieldKey} option is deterministically excluded from applicable candidates`, async () => {
     const workflow = loadWorkflow();
-    const optionState = sourceOptionStates().find(
+    const optionState = mappedOptionStateForTest(sourceOptionStates().find(
       ({ control_name }) => control_name === candidateCase.expected.control_name,
-    );
+    ));
     const segment = {
       semantic_block_id: 'sb_option_state',
       scope: 'primary',
@@ -1615,7 +1635,7 @@ for (const state of ['unknown', 'indeterminate']) {
   });
 }
 
-test('global unknown DOCX option-state source keeps guarded facts review-only', async () => {
+test('global unknown DOCX option-state source does not blanket-cap a fact without exact option proof', async () => {
   const workflow = loadWorkflow();
   const expected = manifest.expected_controls[0];
   const segment = {
@@ -1640,9 +1660,8 @@ test('global unknown DOCX option-state source keeps guarded facts review-only', 
   );
   const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
   const guarded = dispatch.json.units_for_ai[0].verified_facts[0];
-  assert.equal(guarded.status, 'requires_review');
-  assert.equal(guarded.option_state_applicability, 'review_only');
-  assert.equal(guarded.option_state_audit_warnings[0].code, 'resource_gate');
+  assert.equal(guarded.status, 'found');
+  assert.equal(Object.hasOwn(guarded, 'option_state_applicability'), false);
 
   const [expanded] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
   const [checked] = await runCodeNode(
@@ -1651,14 +1670,14 @@ test('global unknown DOCX option-state source keeps guarded facts review-only', 
     [{ json: buildValidatorResponse(expanded.json, 'confirmed') }],
     { sourceJsonByNode: { 'Развернуть units для AI Validator': expanded.json } },
   );
-  assert.equal(checked.json.validated_facts[0].processing_status, 'requires_review');
-  assert.equal(checked.json.validated_facts[0].accepted_for_normalization, false);
+  assert.equal(checked.json.validated_facts[0].processing_status, 'confirmed');
+  assert.equal(checked.json.validated_facts[0].accepted_for_normalization, true);
 });
 
 test('selected grounded negative option remains an applicable candidate with option provenance', async () => {
   const workflow = loadWorkflow();
   const expected = manifest.expected_controls[3];
-  const optionState = sourceOptionStates()[3];
+  const optionState = mappedOptionStateForTest(sourceOptionStates()[3]);
   const segment = {
     semantic_block_id: 'sb_option_state',
     scope: 'primary',
@@ -1725,8 +1744,8 @@ test('selected grounded negative option remains an applicable candidate with opt
 
 test('mixed selected and unselected facts survive Validator mapping without reviving the excluded fact', async () => {
   const workflow = loadWorkflow();
-  const selected = sourceOptionStates()[3];
-  const unselected = sourceOptionStates()[0];
+  const selected = mappedOptionStateForTest(sourceOptionStates()[3]);
+  const unselected = mappedOptionStateForTest(sourceOptionStates()[0]);
   const segment = {
     semantic_block_id: 'sb_mixed_option_state',
     scope: 'primary',
@@ -1763,7 +1782,9 @@ test('mixed selected and unselected facts survive Validator mapping without revi
 
 test('convergence converts option-state rejection-only units without weakening AI units', async () => {
   const workflow = loadWorkflow();
-  const states = [sourceOptionStates()[3], sourceOptionStates()[0]];
+  const states = [sourceOptionStates()[3], sourceOptionStates()[0]].map(
+    (state) => mappedOptionStateForTest(state),
+  );
   const evidenceItems = [];
   for (let index = 0; index < states.length; index += 1) {
     const optionState = states[index];

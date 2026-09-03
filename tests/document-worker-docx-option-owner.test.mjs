@@ -239,14 +239,26 @@ function groundedUnit(segment, evidenceLabels, { fieldKey = 'advance_contract_gu
   };
 }
 
-function validatorSourceWithOptionFacts() {
-  const evidence = [{ semantic_block_id: 'sb_0466', scope: 'primary', quote: 'OPTION_ALPHA_SELECTED' }];
-  const mapped = {
-    ...fixture.input.option_states[0],
+function mappedOption(option, overrides = {}) {
+  return {
+    ...option,
     mapping_status: 'mapped',
     option_group_id: 'word/document.xml#table[62]#group[1-3]',
-    question_owner: { source_block_id: '#/texts/513', semantic_block_id: 'sb_0465' },
+    mutual_exclusion_status: 'proven',
+    question_owner: {
+      source_ref: 'word/document.xml#table[61]/row[4]/cell[2]/paragraph[1]',
+      source_block_id: '#/texts/513',
+      semantic_block_id: 'sb_0465',
+      exact_text: 'QUESTION_ALPHA',
+      relation: 'direct_enclosing_cell_child',
+    },
+    ...overrides,
   };
+}
+
+function validatorSourceWithOptionFacts() {
+  const evidence = [{ semantic_block_id: 'sb_0466', scope: 'primary', quote: 'OPTION_ALPHA_SELECTED' }];
+  const mapped = mappedOption(fixture.input.option_states[0]);
   const missingOwner = { ...mapped, mapping_status: 'missing_owner', question_owner: null };
   return {
     tender: { tender_id: 'sanitized' },
@@ -292,6 +304,38 @@ function confirmedValidatorResponse() {
       ],
     }) } }],
     usage: {},
+  };
+}
+
+function extractorResponse(analysisUnitId, fieldKey, quote) {
+  return {
+    id: 'sanitized-extractor-response', model: 'sanitized-extractor-model',
+    choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({
+      schema_version: 'ai_extractor_v1', field_catalog_version: 'tender_fields_v1', analysis_unit_id: analysisUnitId,
+      facts: [{ field_key: fieldKey, value_text: quote, status: 'found', confidence: 0.99, evidence: [{ semantic_block_id: 'sb_0466', quote }], review_reason_code: null, review_note: null }],
+    }) } }],
+    usage: {},
+  };
+}
+
+function extractorTransport(attempt, source, response) {
+  const primaryModel = 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low';
+  const fallbackModel = 'google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low';
+  return {
+    json: {
+      attempt_transport: {
+        version: 'ai_extractor_attempt_transport_v1', attempt,
+        analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+        model_alias: attempt === 'primary' ? primaryModel : fallbackModel,
+        transport_status: 'succeeded', source, provider_response: response,
+        failure_class: null, failure_code: null,
+        ...(attempt === 'fallback' ? { recovery_context: {
+          version: 'ai_extractor_recovery_context_v1', analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+          primary_model: primaryModel, fallback_model: fallbackModel,
+          primary_failure_class: 'contract', primary_failure_code: 'invalid_evidence_contract', next_attempt: 2,
+        } } : {}),
+      },
+    },
   };
 }
 
@@ -388,7 +432,7 @@ test('RED: mutually exclusive selected and unselected evidence cannot jointly su
     semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table',
     canonical_text: 'OPTION_ALPHA_SELECTED\nOPTION_SHARED\nOPTION_ALPHA_OTHER',
     text: 'OPTION_ALPHA_SELECTED\nOPTION_SHARED\nOPTION_ALPHA_OTHER',
-    docx_option_states: fixture.input.option_states.slice(0, 3),
+    docx_option_states: fixture.input.option_states.slice(0, 3).map((option) => mappedOption(option)),
   };
   const dispatch = await runCode('Подготовить dispatch AI Validator', [groundedUnit(segment, ['OPTION_ALPHA_SELECTED', 'OPTION_SHARED'])]);
   const fact = dispatch[0].json.units_for_ai[0].verified_facts[0];
@@ -399,7 +443,7 @@ test('RED: mutually exclusive selected and unselected evidence cannot jointly su
 });
 
 test('RED: unselected sibling is excluded universally, including advance_contract_guarantee', async () => {
-  const option = fixture.input.option_states[1];
+  const option = mappedOption(fixture.input.option_states[1]);
   const segment = { semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table', canonical_text: option.exact_label, text: option.exact_label, docx_option_states: [option] };
   const dispatch = await runCode('Подготовить dispatch AI Validator', [groundedUnit(segment, [option.exact_label])]);
   const excludedUnit = dispatch[0].json.units_without_ai[0] ?? null;
@@ -419,6 +463,43 @@ test('RED: unknown owner after repair path is review-only and keeps exact eviden
   assert.deepEqual(fact.evidence, unit.json.verified_facts[0].evidence);
 });
 
+test('primary and fallback evidence paths retain ownership proof losslessly through the final cap', async () => {
+  const cases = [
+    {
+      attempt: 'primary', nodeName: 'Проверить и привязать evidence',
+      option: mappedOption(fixture.input.option_states[1]),
+      expectedApplicability: 'excluded',
+    },
+    {
+      attempt: 'fallback', nodeName: 'Проверить fallback и привязать evidence',
+      option: mappedOption(fixture.input.option_states[0], { mapping_status: 'missing_owner', question_owner: null }),
+      expectedApplicability: 'review_only',
+    },
+  ];
+  for (const candidate of cases) {
+    const segment = {
+      semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table',
+      canonical_text: candidate.option.exact_label, text: candidate.option.exact_label,
+      docx_option_states: [candidate.option], docx_option_state_mapping_issue_ids: [],
+      docx_option_state_status: 'resolved', docx_option_state_semantic_status: candidate.option.mapping_status === 'mapped' ? 'mapped' : 'unknown',
+    };
+    const unitId = `sanitized-${candidate.attempt}`;
+    const source = sourceFromSegment(segment, unitId);
+    const response = extractorResponse(unitId, 'advance_contract_guarantee', candidate.option.exact_label);
+    const [checked] = await runCode(candidate.nodeName, [extractorTransport(candidate.attempt, source, response)]);
+    const unit = candidate.attempt === 'primary' ? checked.json.validated_unit : checked.json;
+    assert.deepEqual(unit.evidence_context.sb_0466.docx_option_states, [candidate.option]);
+    const [dispatch] = await runCode('Подготовить dispatch AI Validator', [{ json: unit }]);
+    if (candidate.expectedApplicability === 'excluded') {
+      assert.equal(dispatch.json.units_without_ai[0].deterministically_rejected_facts[0].option_state_applicability, 'excluded');
+    } else {
+      const fact = dispatch.json.units_for_ai[0].verified_facts[0];
+      assert.equal(fact.option_state_applicability, 'review_only');
+      assert.equal(fact.accepted_for_normalization, false);
+    }
+  }
+});
+
 test('RED: conflicting coordinates and multiple semantic owners fail closed', async () => {
   const conflicted = structuredClone(fixture.input.option_states.slice(0, 3));
   conflicted.push({ ...conflicted[0], source_row_ref: 'word/document.xml#table[62]/row[2]' });
@@ -434,7 +515,7 @@ test('RED: conflicting coordinates and multiple semantic owners fail closed', as
 });
 
 test('RED: selected option with one mapped owner remains eligible for normal Validator', async () => {
-  const option = { ...fixture.input.option_states[0], mapping_status: 'mapped', option_group_id: 'word/document.xml#table[62]#group[1-3]', question_owner: { source_block_id: '#/texts/513', semantic_block_id: 'sb_0465' } };
+  const option = mappedOption(fixture.input.option_states[0]);
   const segment = { semantic_block_id: 'sb_0466', scope: 'primary', type: 'table', role: 'table', canonical_text: option.exact_label, text: option.exact_label, docx_option_states: [option] };
   const dispatch = await runCode('Подготовить dispatch AI Validator', [groundedUnit(segment, [option.exact_label])]);
   const fact = dispatch[0].json.units_for_ai[0].verified_facts[0];
@@ -472,6 +553,35 @@ test('neutral non-option fact is unchanged', async () => {
   assert.equal('option_state_applicability' in fact, false);
 });
 
+test('embedded and overlapping labels do not create substring option-state matches', async () => {
+  const embedded = mappedOption(fixture.input.option_states[0], { exact_label: 'TOKEN', state: 'unselected' });
+  const embeddedSegment = {
+    semantic_block_id: 'sb_neutral', scope: 'primary', type: 'text', role: 'paragraph',
+    canonical_text: 'TOKENIZED', text: 'TOKENIZED', docx_option_states: [embedded],
+  };
+  const embeddedDispatch = await runCode(
+    'Подготовить dispatch AI Validator',
+    [groundedUnit(embeddedSegment, ['TOKENIZED'], { fieldKey: 'payment_terms' })],
+  );
+  const untouched = embeddedDispatch[0].json.units_for_ai[0].verified_facts[0];
+  assert.equal(untouched.status, 'found');
+  assert.equal(Object.hasOwn(untouched, 'option_state_applicability'), false);
+
+  const short = mappedOption(fixture.input.option_states[0], { exact_label: 'OPTION_ALPHA', state: 'selected' });
+  const long = mappedOption(fixture.input.option_states[1], { exact_label: 'OPTION_ALPHA_EXTENDED', state: 'unselected' });
+  const overlapSegment = {
+    semantic_block_id: 'sb_neutral', scope: 'primary', type: 'table', role: 'table',
+    canonical_text: 'OPTION_ALPHA_EXTENDED', text: 'OPTION_ALPHA_EXTENDED', docx_option_states: [short, long],
+  };
+  const overlapDispatch = await runCode(
+    'Подготовить dispatch AI Validator',
+    [groundedUnit(overlapSegment, ['OPTION_ALPHA_EXTENDED'], { fieldKey: 'payment_terms' })],
+  );
+  const excluded = overlapDispatch[0].json.units_without_ai[0].deterministically_rejected_facts[0];
+  assert.equal(excluded.option_state_applicability, 'excluded');
+  assert.deepEqual(excluded.option_state_evidence.map(({ exact_label: label }) => label), ['OPTION_ALPHA_EXTENDED']);
+});
+
 test('nested-table owner relation is retained as a typed structural oracle, never proximity', () => {
   const nested = fixture.input.nested_table_case;
   assert.equal(nested.relation, 'direct_enclosing_cell_child');
@@ -481,6 +591,7 @@ test('nested-table owner relation is retained as a typed structural oracle, neve
 
 test('canonical graph still contains the final dispatch and post-AI checker cap points', () => {
   const graph = workflow();
-  assert.match(node(graph, 'Подготовить dispatch AI Validator').parameters.jsCode, /OPTION_STATE_GUARDED_FIELDS/u);
+  assert.doesNotMatch(node(graph, 'Подготовить dispatch AI Validator').parameters.jsCode, /OPTION_STATE_GUARDED_FIELDS/u);
+  assert.match(node(graph, 'Подготовить dispatch AI Validator').parameters.jsCode, /docx_option_state_fact_audit_v1/u);
   assert.match(node(graph, 'Проверить ответ AI Validator').parameters.jsCode, /option_state_applicability/u);
 });
