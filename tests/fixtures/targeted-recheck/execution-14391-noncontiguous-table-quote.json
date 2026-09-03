@@ -1,0 +1,90 @@
+{
+  "schema_version": "targeted_recheck_noncontiguous_table_quote_regression_v1",
+  "fixture_kind": "execution_derived_synthetic_structural_class",
+  "runtime_replay": false,
+  "provenance": {
+    "parent_execution_id": "14389",
+    "aggregator_execution_id": "14390",
+    "targeted_recheck_execution_id": "14391",
+    "failing_item_ordinal": "6/9",
+    "field_index": 20,
+    "field_key": "advance_contract_guarantee",
+    "analysis_unit_id": "sanitized_doc_3_au_0024",
+    "semantic_block_id": "sanitized_sb_0459",
+    "sanitization": "All client text and runtime UUIDs are replaced; table topology, omitted-fragment class, cardinality, and deterministic error class are retained."
+  },
+  "observed_failure": {
+    "node": "Проверить #2 evidence Targeted Recheck",
+    "line": 458,
+    "candidate_index": 0,
+    "evidence_index": 1,
+    "recheck_attempt": 1,
+    "existing_candidates": 13,
+    "allowed_semantic_blocks": 51,
+    "candidate_count": 1,
+    "candidate_status": "requires_review",
+    "review_reason_code": "ambiguous_scope",
+    "evidence_count": 12,
+    "error_message": "[Targeted Recheck Evidence Validator] candidate[0].evidence[1]: quote отсутствует в semantic block после нормализации пробелов"
+  },
+  "synthetic_table": {
+    "source_text": "[C1] Условия обеспечения [C2] Применимость: выбрать один вариант\n[R2,C1] Строка R2 [R2,C2] Вариант A [R2,C3] промежуточное условие A\n[R3,C1] Строка R3 [R3,C2] Вариант B [R3,C3] промежуточное условие B\n[R4,C1] Строка R4 [R4,C2] Вариант C [R4,C3] промежуточное условие C\n[R5,C1] Строка R5 [R5,C2] Вариант D [R5,C3] промежуточное условие D",
+    "invalid_stitched_quote": "Условия обеспечения Вариант A Вариант B Вариант C Вариант D",
+    "omitted_intermediate_text": [
+      "Применимость: выбрать один вариант",
+      "Строка R2",
+      "промежуточное условие A",
+      "Строка R3",
+      "промежуточное условие B",
+      "Строка R4",
+      "промежуточное условие C",
+      "Строка R5",
+      "промежуточное условие D"
+    ],
+    "required_separate_evidence": [
+      {
+        "source_type": "semantic_block",
+        "analysis_unit_id": "sanitized_doc_3_au_0024",
+        "semantic_block_id": "sanitized_sb_0459",
+        "quote": "Условия обеспечения"
+      },
+      {
+        "source_type": "semantic_block",
+        "analysis_unit_id": "sanitized_doc_3_au_0024",
+        "semantic_block_id": "sanitized_sb_0459",
+        "quote": "Вариант A"
+      },
+      {
+        "source_type": "semantic_block",
+        "analysis_unit_id": "sanitized_doc_3_au_0024",
+        "semantic_block_id": "sanitized_sb_0459",
+        "quote": "Вариант B"
+      },
+      {
+        "source_type": "semantic_block",
+        "analysis_unit_id": "sanitized_doc_3_au_0024",
+        "semantic_block_id": "sanitized_sb_0459",
+        "quote": "Вариант C"
+      },
+      {
+        "source_type": "semantic_block",
+        "analysis_unit_id": "sanitized_doc_3_au_0024",
+        "semantic_block_id": "sanitized_sb_0459",
+        "quote": "Вариант D"
+      }
+    ]
+  },
+  "parent_workflow_baseline": {
+    "commit": "de7b9058ae0f7aa97c4efd50209b54caaa9cf474",
+    "workflow_path": "workflows/n8n-exports/TENDER - Targeted Recheck.json",
+    "target_node": "Подготовить запрос #2 AI Targeted Recheck",
+    "allowed_parameter_path": "nodes[name=Подготовить запрос #2 AI Targeted Recheck].parameters.jsCode",
+    "node_count": 64,
+    "workflow_with_target_jsCode_sentinel_sha256": "779bc67b89b0b3e9f51f5cb22cc03c89f005f5c17bcadcdfd863c8ade5973973",
+    "target_node_except_jsCode_sha256": "b3bfd2474d2c7768fa1f51599bb0d1d919d52fce22c00e502746562db4542e48",
+    "target_jsCode_sha256": "acb91d5136a0e063359bc36493dca6bcf60c04e490022a7728324cf5c8190ab3",
+    "connections_sha256": "b078cd5e190798559405ce5e2ed530dade0b9485a6fa9d92cdb924b99a83f574",
+    "settings_sha256": "e36b9fd3c1c6e9f9ba743be50901c37f3cb62d0ee4c8638232d4d8c5004cf447",
+    "other_nodes_sha256": "06740ce41c01efba59f7196f0d9cae3bdccf5b5ae300dd2f575fef716ce5a7c8"
+  }
+}

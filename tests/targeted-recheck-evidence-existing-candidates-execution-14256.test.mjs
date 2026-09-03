@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -464,13 +465,12 @@ test('Targeted Recheck prompt aligns evidence coordinates with both trusted sour
   assert.match(prepared.system_prompt, /never.*invent.*coordinates/is);
   assert.match(prepared.system_prompt, /does not.*prove.*completeness/is);
 
-  const prepareNode = workflow.nodes.find(({ name }) => name === prepareNodeName);
-  const promptMatch = prepareNode.parameters.jsCode.match(
-    /const systemPrompt = `([\s\S]*?)`\.trim\(\);/u,
-  );
-  assert.ok(promptMatch, 'Unable to extract the complete system prompt template.');
+  const historicalPromptArtifact = fs.readFileSync(promptArtifactPath, 'utf8');
   assert.equal(
-    fs.readFileSync(promptArtifactPath, 'utf8').trimEnd(),
-    promptMatch[1].trim(),
+    crypto.createHash('sha256').update(historicalPromptArtifact).digest('hex'),
+    'de088fa41055cb952ef0d1f35ab93d4486f0dc279b26b270d0b4bc5e0b445576',
+    'Historical v1.1 prompt artifact must remain byte-unchanged.',
   );
+  assert.match(historicalPromptArtifact, /11\. quote должен быть непрерывной дословной цитатой/u);
+  assert.doesNotMatch(historicalPromptArtifact, /Каждый semantic_block evidence\.quote/u);
 });
