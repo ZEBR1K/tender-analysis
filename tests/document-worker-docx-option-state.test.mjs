@@ -1472,7 +1472,7 @@ test('structural mapping issue references remain fail-closed through evidence an
   ));
 });
 
-test('AI segments expose deterministic option markers without replacing canonical semantic text', async () => {
+test('AI segments hide selected applicability when the exact question owner is unavailable', async () => {
   const { workflow, semanticItem } = await buildOptionStateSemanticFixture();
   const semanticBlocks = semanticItem.json.semantic_blocks;
   const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [{
@@ -1495,9 +1495,11 @@ test('AI segments expose deterministic option markers without replacing canonica
   );
   assert.equal(segment.canonical_text, semanticBlock.text);
   assert.ok(segment.text.includes(semanticBlock.text));
-  assert.ok(segment.text.includes(`[OPTION_STATE selected] ${selected.exact_label}`));
+  assert.ok(segment.text.includes(`[OPTION_MAPPING review_only] ${selected.exact_label}`));
+  assert.doesNotMatch(segment.text, /\[OPTION_STATE selected\]/u);
   assert.ok(segment.docx_option_states.some(
-    ({ control_name }) => control_name === selected.control_name,
+    ({ control_name, mapping_status: mappingStatus }) =>
+      control_name === selected.control_name && mappingStatus === 'missing_owner',
   ));
   assert.match(
     findNode(workflow, 'подготовить части для анализа v1.3').parameters.jsCode,

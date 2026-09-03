@@ -60,9 +60,19 @@ function textParagraph(text) {
 function parserInputItems() {
   const projection = fixture.input.parser_input_projection;
   const group = projection.outer_group_table;
+  const siblingGroup = projection.sibling_group;
   const emptyTables = Array.from({ length: projection.preceding_table_count }, () => ({ 'w:tr': [] }));
   const optionTable = {
     'w:tr': group.rows.map((row) => ({
+      'w:tc': [
+        { 'w:p': [{ 'w:r': [{ 'w:object': [{ 'w:control': [{ $: { 'r:id': row.document_rel_id, 'w:name': row.control_name } }] }] }] }] },
+        { 'w:p': [] },
+        { 'w:p': [textParagraph(row.label)] },
+      ],
+    })),
+  };
+  const siblingOptionTable = {
+    'w:tr': siblingGroup.rows.map((row) => ({
       'w:tc': [
         { 'w:p': [{ 'w:r': [{ 'w:object': [{ 'w:control': [{ $: { 'r:id': row.document_rel_id, 'w:name': row.control_name } }] }] }] }] },
         { 'w:p': [] },
@@ -79,6 +89,7 @@ function parserInputItems() {
         'w:tc': [
           { 'w:p': [] },
           { 'w:p': [textParagraph(group.question_text)], 'w:tbl': [optionTable] },
+          { 'w:p': [textParagraph(siblingGroup.question_text)], 'w:tbl': [siblingOptionTable] },
         ],
       },
     ],
@@ -95,7 +106,7 @@ function parserInputItems() {
       docx_part_path: 'word/_rels/document.xml.rels',
       docx_part_kind: 'structured_xml',
       Relationships: [{
-        Relationship: group.rows.map((row) => ({ $: {
+        Relationship: [...group.rows, ...siblingGroup.rows].map((row) => ({ $: {
           Id: row.document_rel_id,
           Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/control',
           Target: row.active_x_part.replace(/^word\//u, ''),
@@ -108,7 +119,7 @@ function parserInputItems() {
     unselected: { number: '5', source: 'activeX5' },
   };
   const fixtureRoot = path.join(root, 'tests', 'fixtures', 'document-worker-docx-option-state', 'ooxml', 'word', 'activeX');
-  const controlItems = group.rows.flatMap((row) => {
+  const controlItems = [...group.rows, ...siblingGroup.rows].flatMap((row) => {
     const shape = stateShape[row.state_source];
     const baseName = path.posix.basename(row.active_x_part, '.xml');
     const binaryPart = `word/activeX/${baseName}.bin`;
@@ -187,6 +198,10 @@ function sourceContext(optionStates = fixture.input.option_states) {
 }
 
 async function normalize(document = doclingDocument(), optionStates = fixture.input.option_states) {
+  if (optionStates === fixture.input.option_states) {
+    const [parsed] = await runCode('Разобрать состояния DOCX ActiveX', parserInputItems());
+    optionStates = parsed.json.docx_option_states;
+  }
   return (await runCode('Нормализовать документ Docling', [{ json: document }], {
     'связать результат Docling и метаданные': sourceContext(optionStates),
   }))[0];
@@ -297,9 +312,10 @@ test('fixture is execution-derived, neutral, and preserves equality/collision to
 test('RED: real ActiveX parser derives exact cells and one typed structural question-owner candidate', async () => {
   const [parsed] = await runCode('Разобрать состояния DOCX ActiveX', parserInputItems());
   assert.equal(parsed.json.docx_option_state_status, 'resolved');
-  assert.deepEqual(parsed.json.docx_option_states.map(({ state }) => state), ['selected', 'unselected', 'unselected']);
+  const targetOptions = parsed.json.docx_option_states.filter(({ source_table_ref: tableRef }) => tableRef === fixture.oracle.target_group.source_table_ref);
+  assert.deepEqual(targetOptions.map(({ state }) => state), ['selected', 'unselected', 'unselected']);
   const expected = fixture.oracle.target_group;
-  for (const option of parsed.json.docx_option_states) {
+  for (const option of targetOptions) {
     assert.equal(option.source_table_ref, expected.source_table_ref);
     assert.match(option.source_row_ref, /^word\/document\.xml#table\[62\]\/row\[[123]\]$/u);
     assert.match(option.source_control_cell_ref, /\/cell\[1\]$/u);
