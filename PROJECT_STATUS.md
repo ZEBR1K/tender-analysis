@@ -6,6 +6,54 @@
 
 ## ActiveX semantic checkpoint: parent 14409 / Worker 14410
 
+### Execution 14425 — ActiveX V2 / JSONB runtime GREEN
+
+Read-only forensic execution `14425` подтвердил исправленный изолированный
+Worker `U3u87zB2GNSbzU9e`, `[TEST ACTIVE X V2 JSONB SAFE] TENDER — Обработать
+документ`: `integrated / success`, parent execution `14424`, без retry lineage.
+Workflow оставался inactive и unpublished (`active=false`,
+`activeVersionId=null`), а вызов Aggregator был disabled. Execution API не
+возвращает execution `versionId`, но три изменённые Code nodes точно совпали с
+local commit `689859e72eb3d4053e8c12035cdb0015a425fe7f`; runtime output также
+подтвердил JSONB-safe V2 identities.
+
+Прямая persistence projection содержала `12` analysis units и `0` literal
+U+0000 во всех `analysis_unit`, `ai_segments`, `provenance`. `Сохранить analysis
+unit` успешно сохранила `12/12`, поэтому PostgreSQL JSONB blocker execution
+`14423` не воспроизвёлся. Extractor recovery завершился `12/12`: primary
+Extractor принял `11` units, один unit прошёл разрешённый fallback; Evidence
+Repair выполнил `4/4`, Lossless Fact Partition не потребовался. AI Validator
+обработал `9` units, ещё `3` units без verified facts прошли deterministic
+convergence без Validator HTTP.
+
+Обе целевые ActiveX-цепочки дошли до persisted confirmed facts:
+
+```text
+activeX5/6/7/8 → #/tables/2 → activeX8 selected → «Не применимо.»
+→ national_regime → exact grounded evidence → Validator confirmed
+→ processing_status=confirmed → persisted
+
+activeX55/56 → #/tables/25 → activeX55 selected → «Не предусмотрены;»
+→ participation_guarantee → exact grounded evidence → Validator confirmed
+→ processing_status=confirmed → persisted
+```
+
+Итог execution: `40` persisted facts (`24 confirmed`, `7 requires_review`, `9
+rejected`), document `b85f8a8d-ce79-4f37-bfe4-678b3218693a` завершён, run
+`d592b2c2-c4c2-46e7-884a-a413bfc5b9e0` переведён в
+`ready_for_aggregation`. Disabled Aggregator node дала только canvas
+pass-through; в точном execution window найден только `14425`, реальных
+Aggregator/Finalization/Report/Delivery child executions не было. Fresh DB
+`SELECT` отдельно не выполнялся, поэтому persisted state подтверждён outputs
+успешных PostgreSQL nodes на момент execution, а не независимым последующим
+read-back.
+
+ActiveX local semantic ownership и JSONB-safe identity gate закрыты runtime
+evidence. Повторный Worker execution для этого run не нужен. Следующий отдельный
+gate — read-only preflight точного test Aggregator/Targeted Recheck target и
+после отдельного разрешения запуск агрегации уже подготовленного
+`ready_for_aggregation` run; не смешивать его с ActiveX branch scope.
+
 ### Execution 14423 PostgreSQL NUL containment — local implementation
 
 Execution `14423` впервые завершился ошибкой в `Save analysis unit`: PostgreSQL
