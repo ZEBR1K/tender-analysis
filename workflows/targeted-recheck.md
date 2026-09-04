@@ -41,7 +41,7 @@ Workflow не анализирует тендер целиком. Он обра�
 Round 2 является последним semantic этапом.
 После Round 2 повторный Targeted Recheck не запускается.
 
-### Route-guard checkpoint — execution 14429
+### Route-guard checkpoint — executions 14429 / 14449
 
 Owner-started run `535461ec-8969-4e15-ad69-a87c3b9e4747` подтвердил новый P0
 route defect. Для `application_documents` Targeted Recheck вернул
@@ -67,8 +67,32 @@ terminally формирует `requires_review` через существующ�
 Finalizer contracts. Candidate evidence, existing/new candidate audit,
 Validator summary и явные `route_guard_policy` / `route_guard_reason`
 сохраняются. Перед `Собрать candidates для Round 2` действует тот же allow-list
-как defense in depth. Local export содержит `66` nodes; production/test n8n не
-изменялись, runtime GREEN после fix не заявляется.
+как defense in depth. Local export содержит `66` nodes. Production n8n не
+изменён; owner-imported inactive test workflow проверен отдельно.
+
+Owner-started manual execution `14449` подтвердил fix в отдельном inactive test
+workflow `SKzmu0VqYRtJ0Ai1` на пяти исходных field items execution `14429`. Для
+`application_documents` фактический runtime path был:
+
+```text
+Targeted Recheck AI: candidate_found, 1 candidate, 25 evidence
+→ exact evidence validator: evidence_validated=true
+→ AI Validator: requires_review / unsupported_inference / confidence 0.7
+→ post_validator_route=terminal_requires_review
+→ route reason=field_catalog_round_2_not_allowed
+→ отдельные normalize / UPSERT / Finalizer nodes
+```
+
+`Собрать candidates для Round 2` и `Semantic Aggregator1` имели `0` runs.
+`application_documents` получил FINAL `requires_review` с сохранёнными original
+aggregation, `11` existing candidates, targeted recheck result, Validator
+summary и evidence. Finalizer подтвердил валидный `27/27` barrier для уже
+завершённого analysis run. Exact runtime route-guard gate GREEN; повторный test
+canary этого gate не нужен.
+
+Execution `14449` не является fresh полным запуском от Orchestrator и не
+доказывает production promotion. Production workflow не изменён; independent
+fresh PostgreSQL `SELECT` после execution не выполнялся.
 
 ### Current verification boundary — 2026-08-30
 

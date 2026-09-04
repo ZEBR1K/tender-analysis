@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/application-documents-route-guard-14429`
 
-## Targeted Recheck route-guard checkpoint — execution 14429
+## Targeted Recheck route-guard checkpoint — executions 14429 / 14449
 
 Owner-started full run `535461ec-8969-4e15-ad69-a87c3b9e4747` завершил 27/27,
 но не является semantic GREEN: `application_documents` после validated Targeted
@@ -17,9 +17,25 @@ Local canonical Targeted Recheck теперь имеет exact four-key Round 2 
 отдельный terminal `requires_review` для остальных 23 полей и defense-in-depth в
 Round 2 collector. `application_documents` сохраняет validated candidate
 evidence и route-guard audit; существующий `direct_final` contract не изменён.
-Execution-derived regression по `14429` GREEN offline. Production/test n8n,
-PostgreSQL, credentials и executions не изменялись; следующий gate — отдельный
-owner-authorized import/read-back и runtime canary полного маршрута.
+Execution-derived regression по `14429` GREEN offline.
+
+Owner-started manual execution `14449` в отдельном inactive test workflow
+`SKzmu0VqYRtJ0Ai1` прошёл runtime contour на пяти исходных field items execution
+`14429`. Для `application_documents` реально выполнились Targeted Recheck AI,
+exact evidence validator (`evidence_validated=true`) и AI Validator. Validator
+вернул `requires_review` (`unsupported_inference`, confidence `0.7`), после чего
+route guard выставил `terminal_requires_review` с причиной
+`field_catalog_round_2_not_allowed`. `Собрать candidates для Round 2` и
+`Semantic Aggregator1` имели `0` runs. Отдельная terminal-ветка один раз
+нормализовала и сохранила FINAL `requires_review`; Finalizer подтвердил валидный
+барьер `27/27` для уже завершённого run. Таким образом, exact runtime
+route-guard gate для `application_documents` GREEN и повторного canary этого
+gate не требует.
+
+Это не production promotion и не fresh полный запуск от Orchestrator. Production
+Targeted Recheck не изменён; fresh независимый PostgreSQL `SELECT` после `14449`
+не выполнялся. Следующий отдельный gate — review и явно согласованный production
+promotion, после него fresh full run.
 
 ## ActiveX semantic checkpoint: parent 14409 / Worker 14410
 
