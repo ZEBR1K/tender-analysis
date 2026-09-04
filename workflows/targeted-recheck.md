@@ -1,7 +1,7 @@
 # TENDER - Targeted Recheck
 
 **Статус:** Active development / P0 terminal completeness audit
-**Последнее обновление:** 2026-08-30
+**Последнее обновление:** 2026-09-04
 **Тип:** sub-workflow n8n  
 **Родительский workflow:** `TENDER — Агрегация закупки`  
 **Финальный контракт поля:** `tender_field_final_v1`  
@@ -63,11 +63,15 @@ warranty_obligations_guarantee
 `direct_final` и его существующие preconditions не изменены. Для остальных 23
 полей non-direct validated result получает
 `post_validator_route=terminal_requires_review`, обходит общий Round 2 и
-terminally формирует `requires_review` через существующие normalize / UPSERT /
-Finalizer contracts. Candidate evidence, existing/new candidate audit,
+terminally формирует `requires_review` через выделенную цепочку
+`Нормализовать FINAL поле8 → Сохранить FINAL результат поля в БД8 →
+Подготовить вызов Finalizer8 → Call 'TENDER — Финализация анализа'8`.
+Candidate evidence, existing/new candidate audit,
 Validator summary и явные `route_guard_policy` / `route_guard_reason`
 сохраняются. Перед `Собрать candidates для Round 2` действует тот же allow-list
-как defense in depth. Local export содержит `66` nodes. Production n8n не
+как defense in depth. Audit `aggregation_round` равен `1` только для
+`aggregation_recheck`; для `no_initial_candidates` он `null`. Local export
+содержит `70` nodes. Production n8n не
 изменён; owner-imported inactive test workflow проверен отдельно.
 
 Owner-started manual execution `14449` подтвердил fix в отдельном inactive test
@@ -93,10 +97,16 @@ canary этого gate не нужен.
 Execution `14449` не является fresh полным запуском от Orchestrator и не
 доказывает production promotion. Production workflow не изменён; independent
 fresh PostgreSQL `SELECT` после execution не выполнялся.
+Локальный canonical синхронизирован с доказанной именованной topology
+выделенной `...8` цепочки, но exact tested parameter/ID/position parity не
+заявляется: read-only live source не был доступен для программного
+сравнения. Параметры новых нод копируют текущие canonical
+`Нормализовать FINAL поле5 / БД5 / Finalizer2` contracts; новые credential
+references не добавлены.
 
-### Current verification boundary — 2026-08-30
+### Historical verification boundary — 2026-08-30
 
-Read-only refresh authoritative live workflow:
+Исторический read-only refresh authoritative live workflow на указанную дату:
 
 ```text
 workflow id = 9uDOU31DGo30fGXX
@@ -267,6 +277,7 @@ Targeted Recheck должен завершаться одним из вариа�
 |---|---|
 | direct_final | resolved |
 | semantic_aggregator_round_2 | resolved / requires_review |
+| terminal_requires_review | requires_review без общего Semantic Aggregator Round 2 |
 | existing_candidate_preserved | requires_review |
 | no usable evidence | not_found |
 
@@ -627,18 +638,20 @@ FALSE                              TRUE
  |                   |          |         |       TRUE        FALSE
  |                   |          |         |        |            |
  |                   |          |         |        |            v
- |                   |          |         |        |      Собрать candidates
- |                   |          |         |        |      для Round 2
- |                   |          |         |        |            |
- |                   |          |         |        |            v
- |                   |          |         |        |      Semantic Aggregator
- |                   |          |         |        |      Round 2
- |                   |          |         |        |            |
- |                   |          |         |        |            v
- |                   |          |         |        |      FINAL Round 2
- |                   |          |         |        |
- v                   v          v         v        v
-not_found        requires_review / not_found / direct FINAL / Round 2 FINAL
+ |                   |          |         |        |      Round 2 разрешён
+ |                   |          |         |        |      для поля?
+ |                   |          |         |        |       /       \
+ |                   |          |         |        |    TRUE       FALSE
+ |                   |          |         |        |      |          |
+ |                   |          |         |        |      v          v
+ |                   |          |         |        |  Собрать     terminal
+ |                   |          |         |        |  candidates  requires_review
+ |                   |          |         |        |  → Round 2  → dedicated ...8
+ |                   |          |         |        |  → FINAL      chain
+ |                   |          |         |        |      |          |
+ v                   v          v         v        v          v
+not_found        requires_review / not_found / direct FINAL / Round 2 FINAL /
+                                                        terminal requires_review
         \            |             |          /
          \           |             |         /
           `----------+-------------+--------'
@@ -654,23 +667,27 @@ not_found        requires_review / not_found / direct FINAL / Round 2 FINAL
 
 ### Physical inventory
 
-Актуальный JSON содержит:
+Актуальный local canonical candidate JSON содержит:
 
 ```text
-50 nodes total
-47 enabled/reachable
-3 disabled legacy nodes
+70 nodes total
+70 enabled/reachable
+0 disabled or unreachable nodes
 ```
 
-Disabled legacy chain:
+Выделенная активная terminal-цепочка route guard:
 
 ```text
-Сформировать not_found после Targeted Recheck
+Сформировать requires_review — Round 2 запрещён
 → Нормализовать FINAL поле8
 → Сохранить FINAL результат поля в БД8
+→ Подготовить вызов Finalizer8
+→ Call 'TENDER — Финализация анализа'8
 ```
 
-Эта цепочка физически существует, но не описывается как активное production behavior.
+Это candidate graph, а не описание текущего production workflow. Исторические
+live/local snapshots с другими node counts выше явно помечены датой и как
+historical.
 
 ---
 
@@ -1032,6 +1049,8 @@ existing candidate отсутствует
 direct_final
 или
 round_2
+или
+terminal_requires_review
 ```
 
 `direct_final` разрешён только когда одновременно:
@@ -1041,7 +1060,10 @@ round_2
 3. пригодный candidate ровно один;
 4. его `validator_verdict === confirmed`.
 
-Все остальные usable cases отправляются в Round 2.
+Остальные usable cases разделяются по authoritative allow-list. Только
+`procurement_subject`, `nm_price_with_vat`, `delivery_term` и
+`warranty_obligations_guarantee` получают `round_2`. Остальные 23 поля получают
+`terminal_requires_review` с причиной `field_catalog_round_2_not_allowed`.
 
 ---
 
@@ -1076,7 +1098,19 @@ resolution_method = targeted_recheck_single_confirmed_candidate
 
 ---
 
-##### FALSE -> Round 2
+##### FALSE -> проверка allow-list Round 2
+
+#### `Round 2 разрешён для поля?`
+
+**TRUE:** только четыре разрешённых field key идут в общий Round 2.
+
+**FALSE:** validated non-direct result terminally материализуется как
+`requires_review` через выделенные `...8` normalizer / UPSERT / Finalizer nodes;
+общий Round 2 не выполняется.
+
+---
+
+##### TRUE allow-list -> Round 2
 
 #### `Собрать candidates для Round 2`
 
@@ -1132,15 +1166,22 @@ candidate_stats = ...
   - `resolved`;
   - `requires_review`.
 
-`FIELD_RULES` Round 2 содержит правила для всех 27 `field_key`.
-
-`TR-2` закрыт для MVP на уровне code coverage:
+Реализация сохраняет `FIELD_RULES` для всех 27 `field_key` как исторический
+compatibility/validation inventory. Наличие правила не разрешает полю вход в
+общий Round 2. Исполняемый маршрут допускает сюда только четыре field key из
+authoritative allow-list:
 
 ```text
-любой field_key из tender_fields_v1
-→ имеет Round 2 semantic rule
-→ не должен падать с ошибкой "Пока нет правил для field_key"
+procurement_subject
+nm_price_with_vat
+delivery_term
+warranty_obligations_guarantee
 ```
+
+Остальные 23 поля, включая `application_documents`, завершаются раньше через
+`terminal_requires_review`. Поэтому исторический `TR-2` подтверждает отсутствие
+неизвестного `field_key` внутри сохранённого inventory, но не расширяет
+разрешение на вызов Semantic Aggregator Round 2.
 
 ---
 
@@ -1452,7 +1493,10 @@ confirmed / requires_review / rejected
 - AI Extractor не может сам объявить invented quote доказательством;
 - AI Validator не может потерять candidate без ошибки;
 - rejected evidence не становится FINAL evidence;
-- Round 2 работает только с candidates, прошедшими предыдущие проверки.
+- Round 2 работает только с candidates, прошедшими предыдущие проверки, и
+  только для четырёх field key из canonical allow-list;
+- остальные 23 non-direct validated поля завершаются через
+  `terminal_requires_review`, сохраняя candidate/evidence/audit без Round 2.
 
 ---
 
@@ -1463,7 +1507,8 @@ confirmed / requires_review / rejected
 | `Есть candidate после Targeted Recheck?` | Independent Validator | проверить existing candidate |
 | `Есть исходный candidate после неудачного Recheck?` | `requires_review` | `not_found` |
 | `Есть принятые candidates после Validator?` | route selection | existing candidate → `requires_review`; без candidate → `not_found` |
-| `Можно завершить без Round 2?` | direct `resolved` | Semantic Aggregator Round 2 |
+| `Можно завершить без Round 2?` | direct `resolved` | проверить Round 2 allow-list |
+| `Round 2 разрешён для поля?` | Semantic Aggregator Round 2 | terminal `requires_review` через выделенную `...8` цепочку |
 
 Edge cases `TR-0` и `TR-1` закрыты: existing candidate не теряется ни при отсутствии нового context, ни при отклонении всех новых Recheck candidates.
 
@@ -1491,6 +1536,7 @@ Edge cases `TR-0` и `TR-1` закрыты: existing candidate не теряет
 16. Все финальные ветки обязаны привести результат к `tender_field_final_v1`.
 17. Каждый успешно обработанный item должен завершиться UPSERT в `tender_analysis_field_results`.
 18. Повторный execution того же поля не должен создавать дубль.
+19. Общий Round 2 разрешён только для четырёх canonical field key; остальные 23 non-direct validated результата обязаны завершаться через `terminal_requires_review`.
 
 ---
 
@@ -1503,12 +1549,14 @@ Edge cases `TR-0` и `TR-1` закрыты: existing candidate не теряет
 | no initial candidates + candidate найден + Validator rejected all | ✅ проверено | `not_found` |
 | existing candidate + Recheck `insufficient_evidence` | ✅ проверено | `requires_review` |
 | один новый confirmed candidate без старых | ✅ структурно проверено | direct FINAL / `resolved` |
-| existing + новый usable candidate | ✅ проверено | Round 2 |
+| existing + новый usable candidate для одного из четырёх разрешённых `field_key` | ✅ проверено | Round 2 |
+| existing + новый usable candidate для одного из остальных 23 `field_key` | ✅ проверено | `terminal_requires_review` |
 | Round 2 смог закрыть поле | ✅ проверено | `resolved` |
 | Round 2 всё ещё не уверен | ✅ проверено | `requires_review` |
 | no context + existing candidate | ✅ закрыто | existing candidate сохраняется → `requires_review` |
 | новые candidates all rejected + existing candidate | ✅ закрыто | existing candidate сохраняется → `requires_review` |
-| Round 2 для любого `field_key` каталога | ✅ закрыто для MVP на уровне code coverage | `FIELD_RULES` существуют для всех 27 полей; полный per-field regression ещё не выполнен |
+| Round 2 для четырёх разрешённых `field_key` | ✅ проверено route regression | `procurement_subject`, `nm_price_with_vat`, `delivery_term`, `warranty_obligations_guarantee` входят в общий Round 2 |
+| non-direct validated результат для остальных 23 `field_key` | ✅ проверено route regression | `terminal_requires_review`; общий Semantic Aggregator Round 2 не вызывается |
 | DeepSeek `finish_reason=stop`, но `message.content=""` | ⚠️ наблюдалось | сейчас execution падает |
 
 ---
@@ -1543,15 +1591,19 @@ Targeted Recheck candidates
 Результат:
 existing candidate сохраняется
 → requires_review
-TR-2 — Round 2 semantic rules для всех 27 полей
+TR-2 — historical Round 2 FIELD_RULES inventory для 27 полей
 Severity: Critical
-Status: ✅ Closed (MVP)
-В FIELD_RULES Semantic Aggregator Round 2 добавлены правила для всех 27 field_key.
+Status: ✅ Closed (historical compatibility/validation inventory)
+В FIELD_RULES Semantic Aggregator Round 2 сохранены правила для всех 27 field_key.
 Исторический failure `Пока нет правил для field_key=...` устранён для каталога `tender_fields_v1`.
+Это не route permission: общий Round 2 разрешён только для четырёх canonical
+field key. Остальные 23 проверяются terminal route regression и завершаются
+через `terminal_requires_review`.
 Что ещё остаётся как quality work:
-отдельный regression каждого field_key через Round 2
+отдельный semantic regression для четырёх разрешённых Round 2 field key
 → проверка качества resolved / requires_review
-Полный per-field regression ещё не выполнен; это не меняет закрытый статус TR-2 на уровне code coverage.
+Полный semantic regression разрешённого Round 2 ещё не выполнен; это не меняет
+закрытый статус historical inventory TR-2.
 TR-3 — зависимость child workflow от parent nodes
 Severity: Critical / architectural
 Status: ✅ Closed
@@ -1827,7 +1879,10 @@ field-aware ranking
 
 Профили Targeted Recheck уже существуют для всех 27 `field_key`.
 
-Round 2 `FIELD_RULES` уже существуют для всех 27 `field_key`. Текущий quality gap — отсутствие полного per-field regression через Round 2.
+Round 2 `FIELD_RULES` исторически существуют для всех 27 `field_key`, но это
+inventory, а не route permission. Общий Round 2 исполняется только для четырёх
+canonical field key; остальные 23 покрыты terminal route regression и не должны
+достигать `Semantic Aggregator1`.
 
 ---
 
@@ -1966,7 +2021,7 @@ needs_recheck = false
 ✅ TR-1 closed
 ```
 
-### R11 — Round 2 eligibility для всех 27 field_key
+### R11 — Round 2 eligibility: четыре разрешённых и 23 terminal field_key
 
 Статус:
 
@@ -1986,7 +2041,7 @@ needs_recheck = false
 selective retry только данного item
 ```
 
-### R13 — composite field completeness after Round 2
+### R13 — composite field completeness и запрет общего Round 2
 
 Проверенный local canonical contract:
 
@@ -1994,13 +2049,19 @@ selective retry только данного item
 частичный grounded candidate
 не может единолично закрыть unresolved material clauses
 
-application_documents + Round 2 + reported resolved
+application_documents + non-direct validated result
+→ terminal_requires_review / field_catalog_round_2_not_allowed
+→ общий Semantic Aggregator Round 2 не вызывается
 → effective requires_review / insufficient_evidence
 → needs_recheck=false / requires_human_review=true
 
-другие field_key:
-resolved остаётся допустимым
+только четыре field_key из canonical allow-list
+→ могут входить в общий Round 2
 ```
+
+Сохранённый внутри Round 2 deterministic containment для
+`application_documents` остаётся defense-in-depth для исторического/forged
+входа, но не является разрешённым current canonical route.
 
 ---
 
@@ -2029,7 +2090,8 @@ TR-15 execution-derived RED
 
 1. TR-6 — selective AI retry.
 2. TR-7 — убрать недетерминированный fallback existingCandidates[0].
-3. расширить regression coverage Round 2 для всех 27 полей.
+3. расширять semantic regression Round 2 только для четырёх разрешённых полей,
+   сохраняя terminal route regression для остальных 23.
 4. TR-5 — централизовать Normalize + UPSERT.
 5. TR-8 — централизовать versioned field rules.
 6. TR-9 — улучшать retrieval только на основании реальных miss cases.
@@ -2055,7 +2117,9 @@ field-aware retrieval
 → deterministic evidence validation
 → independent AI Validator
 → deterministic Validator validation
-→ direct FINAL или Semantic Aggregator Round 2
+→ direct FINAL
+  или Semantic Aggregator Round 2 для четырёх разрешённых field key
+  или terminal_requires_review для остальных 23 field key
 → tender_field_final_v1
 → UPSERT PostgreSQL
 ```

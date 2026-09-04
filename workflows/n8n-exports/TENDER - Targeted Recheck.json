@@ -373,7 +373,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const input = $json;\n\nconst ROUTE_GUARD_POLICY =\n  'field_catalog_round_2_allow_list_v1';\n\nconst ROUTE_GUARD_REASON =\n  'field_catalog_round_2_not_allowed';\n\nconst ROUND_2_FIELD_KEYS = [\n  'procurement_subject',\n  'nm_price_with_vat',\n  'delivery_term',\n  'warranty_obligations_guarantee',\n];\n\nif (!input.analysis_run_id) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет analysis_run_id'\n  );\n}\n\nif (!input.field_key) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет field_key'\n  );\n}\n\nif (\n  input.post_validator_route !==\n    'terminal_requires_review' ||\n  input.post_validator_route_reason !==\n    ROUTE_GUARD_REASON\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Некорректный route guard contract'\n  );\n}\n\nif (ROUND_2_FIELD_KEYS.includes(input.field_key)) {\n  throw new Error(\n    '[requires_review Round 2 guard] Разрешённое Round 2 поле не должно попадать в terminal guard'\n  );\n}\n\nif (\n  input.evidence_validated !== true ||\n  input.validator_validated !== true\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Evidence и Validator должны быть детерминированно проверены'\n  );\n}\n\nconst usableCandidates =\n  Array.isArray(input.usable_candidates)\n    ? input.usable_candidates\n    : [];\n\nif (usableCandidates.length === 0) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет usable_candidates'\n  );\n}\n\nconst existingCandidates =\n  Array.isArray(input.existing_candidates)\n    ? input.existing_candidates\n    : [];\n\nconst rejectedCandidates =\n  Array.isArray(input.rejected_candidates)\n    ? input.rejected_candidates\n    : [];\n\nconst original =\n  input.original_aggregation ?? {};\n\nif (\n  original.status !== 'requires_recheck' &&\n  original.status !== 'no_initial_candidates'\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Недопустимый original_aggregation.status'\n  );\n}\n\nif (\n  original.status === 'no_initial_candidates' &&\n  existingCandidates.length > 0\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] no_initial_candidates не может содержать existing candidates'\n  );\n}\n\nconst candidateAudit = [\n  ...existingCandidates.map(candidate => ({\n    candidate_ref:\n      typeof candidate.fact_id === 'string' && candidate.fact_id\n        ? 'fact:' + candidate.fact_id\n        : null,\n    origin: 'initial_analysis',\n    candidate,\n  })),\n  ...usableCandidates.map(candidate => ({\n    candidate_ref:\n      'recheck:' +\n      (input.recheck_attempt ?? 1) +\n      ':' +\n      candidate.candidate_index,\n    origin: 'targeted_recheck',\n    candidate,\n  })),\n];\n\nconst evidence =\n  candidateAudit.flatMap(({ candidate_ref, origin, candidate }) =>\n    (Array.isArray(candidate.evidence) ? candidate.evidence : [])\n      .map(item => ({\n        ...item,\n        candidate_ref,\n        candidate_origin: origin,\n        fact_id:\n          origin === 'initial_analysis'\n            ? candidate.fact_id ?? null\n            : null,\n        recheck_candidate_id:\n          origin === 'targeted_recheck'\n            ? candidate_ref\n            : null,\n        document:\n          candidate.document ?? null,\n        analysis_unit_id:\n          item.analysis_unit_id ??\n          candidate.analysis_unit_id ??\n          null,\n      }))\n  );\n\nconst preliminaryValue =\n  typeof original.preliminary_value === 'string' &&\n  original.preliminary_value.trim()\n    ? original.preliminary_value.trim()\n    : (\n        usableCandidates.length === 1 &&\n        typeof usableCandidates[0].value_text === 'string' &&\n        usableCandidates[0].value_text.trim()\n          ? usableCandidates[0].value_text.trim()\n          : null\n      );\n\nconst confidence =\n  typeof original.confidence === 'number' &&\n  Number.isFinite(original.confidence) &&\n  original.confidence >= 0 &&\n  original.confidence <= 1\n    ? original.confidence\n    : null;\n\nreturn {\n  json: {\n    analysis_run_id:\n      input.analysis_run_id,\n\n    field_catalog_version:\n      input.field_catalog_version,\n\n    field_index:\n      input.field_index,\n\n    field_key:\n      input.field_key,\n\n    recheck_attempt:\n      input.recheck_attempt ?? null,\n\n    aggregation_status:\n      'requires_review',\n\n    final_value_text:\n      preliminaryValue,\n\n    confidence,\n\n    needs_recheck:\n      false,\n\n    aggregation_validated:\n      true,\n\n    requires_human_review:\n      true,\n\n    resolution_method:\n      'targeted_recheck_round_2_route_guard',\n\n    evidence,\n\n    review_reason_code:\n      'insufficient_evidence',\n\n    review_note:\n      'Общий Semantic Aggregator Round 2 не разрешён для этого поля. Проверенные candidates и evidence сохранены для ручной проверки.',\n\n    aggregation_round:\n      1,\n\n    selected_candidate:\n      null,\n\n    existing_candidates:\n      existingCandidates,\n\n    original_aggregation:\n      original,\n\n    recheck_profile:\n      input.recheck_profile ?? null,\n\n    targeted_recheck_result: {\n      recheck_outcome:\n        input.recheck_outcome ?? null,\n\n      recheck_note:\n        input.recheck_note ?? null,\n\n      evidence_validated:\n        input.evidence_validated,\n\n      validator_validated:\n        input.validator_validated,\n\n      targeted_recheck_meta:\n        input.targeted_recheck_meta ?? null,\n\n      validator_meta:\n        input.validator_meta ?? null,\n\n      post_validator_route:\n        input.post_validator_route,\n\n      post_validator_route_reason:\n        input.post_validator_route_reason,\n\n      route_guard_applied:\n        true,\n\n      route_guard_policy:\n        ROUTE_GUARD_POLICY,\n\n      route_guard_reason:\n        ROUTE_GUARD_REASON,\n\n      round_2_allowed_field_keys:\n        ROUND_2_FIELD_KEYS,\n\n      existing_candidates:\n        existingCandidates,\n\n      usable_candidates:\n        usableCandidates,\n    },\n\n    candidate_decisions: [],\n\n    supporting_candidate_refs: [],\n\n    conflict_candidate_refs: [],\n\n    conflict_evidence: [],\n\n    validator_summary: {\n      confirmed_count:\n        input.confirmed_count ?? null,\n\n      requires_review_count:\n        input.requires_review_count ?? null,\n\n      rejected_count:\n        input.rejected_count ?? null,\n    },\n\n    rejected_candidates:\n      rejectedCandidates,\n  },\n};"
+        "jsCode": "const input = $json;\n\nconst ROUTE_GUARD_POLICY =\n  'field_catalog_round_2_allow_list_v1';\n\nconst ROUTE_GUARD_REASON =\n  'field_catalog_round_2_not_allowed';\n\nconst ROUND_2_FIELD_KEYS = [\n  'procurement_subject',\n  'nm_price_with_vat',\n  'delivery_term',\n  'warranty_obligations_guarantee',\n];\n\nif (!input.analysis_run_id) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет analysis_run_id'\n  );\n}\n\nif (!input.field_key) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет field_key'\n  );\n}\n\nif (\n  input.post_validator_route !==\n    'terminal_requires_review' ||\n  input.post_validator_route_reason !==\n    ROUTE_GUARD_REASON\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Некорректный route guard contract'\n  );\n}\n\nif (ROUND_2_FIELD_KEYS.includes(input.field_key)) {\n  throw new Error(\n    '[requires_review Round 2 guard] Разрешённое Round 2 поле не должно попадать в terminal guard'\n  );\n}\n\nif (\n  input.evidence_validated !== true ||\n  input.validator_validated !== true\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Evidence и Validator должны быть детерминированно проверены'\n  );\n}\n\nconst usableCandidates =\n  Array.isArray(input.usable_candidates)\n    ? input.usable_candidates\n    : [];\n\nif (usableCandidates.length === 0) {\n  throw new Error(\n    '[requires_review Round 2 guard] Нет usable_candidates'\n  );\n}\n\nconst existingCandidates =\n  Array.isArray(input.existing_candidates)\n    ? input.existing_candidates\n    : [];\n\nconst rejectedCandidates =\n  Array.isArray(input.rejected_candidates)\n    ? input.rejected_candidates\n    : [];\n\nconst original =\n  input.original_aggregation ?? {};\n\nif (\n  original.status !== 'requires_recheck' &&\n  original.status !== 'no_initial_candidates'\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] Недопустимый original_aggregation.status'\n  );\n}\n\nif (\n  original.status === 'no_initial_candidates' &&\n  existingCandidates.length > 0\n) {\n  throw new Error(\n    '[requires_review Round 2 guard] no_initial_candidates не может содержать existing candidates'\n  );\n}\n\nconst candidateAudit = [\n  ...existingCandidates.map(candidate => ({\n    candidate_ref:\n      typeof candidate.fact_id === 'string' && candidate.fact_id\n        ? 'fact:' + candidate.fact_id\n        : null,\n    origin: 'initial_analysis',\n    candidate,\n  })),\n  ...usableCandidates.map(candidate => ({\n    candidate_ref:\n      'recheck:' +\n      (input.recheck_attempt ?? 1) +\n      ':' +\n      candidate.candidate_index,\n    origin: 'targeted_recheck',\n    candidate,\n  })),\n];\n\nconst evidence =\n  candidateAudit.flatMap(({ candidate_ref, origin, candidate }) =>\n    (Array.isArray(candidate.evidence) ? candidate.evidence : [])\n      .map(item => ({\n        ...item,\n        candidate_ref,\n        candidate_origin: origin,\n        fact_id:\n          origin === 'initial_analysis'\n            ? candidate.fact_id ?? null\n            : null,\n        recheck_candidate_id:\n          origin === 'targeted_recheck'\n            ? candidate_ref\n            : null,\n        document:\n          candidate.document ?? null,\n        analysis_unit_id:\n          item.analysis_unit_id ??\n          candidate.analysis_unit_id ??\n          null,\n      }))\n  );\n\nconst preliminaryValue =\n  typeof original.preliminary_value === 'string' &&\n  original.preliminary_value.trim()\n    ? original.preliminary_value.trim()\n    : (\n        usableCandidates.length === 1 &&\n        typeof usableCandidates[0].value_text === 'string' &&\n        usableCandidates[0].value_text.trim()\n          ? usableCandidates[0].value_text.trim()\n          : null\n      );\n\nconst confidence =\n  typeof original.confidence === 'number' &&\n  Number.isFinite(original.confidence) &&\n  original.confidence >= 0 &&\n  original.confidence <= 1\n    ? original.confidence\n    : null;\n\nreturn {\n  json: {\n    analysis_run_id:\n      input.analysis_run_id,\n\n    field_catalog_version:\n      input.field_catalog_version,\n\n    field_index:\n      input.field_index,\n\n    field_key:\n      input.field_key,\n\n    recheck_attempt:\n      input.recheck_attempt ?? null,\n\n    aggregation_status:\n      'requires_review',\n\n    final_value_text:\n      preliminaryValue,\n\n    confidence,\n\n    needs_recheck:\n      false,\n\n    aggregation_validated:\n      true,\n\n    requires_human_review:\n      true,\n\n    resolution_method:\n      'targeted_recheck_round_2_route_guard',\n\n    evidence,\n\n    review_reason_code:\n      'insufficient_evidence',\n\n    review_note:\n      'Общий Semantic Aggregator Round 2 не разрешён для этого поля. Проверенные candidates и evidence сохранены для ручной проверки.',\n\n    aggregation_round:\n      original.status === 'requires_recheck'\n        ? 1\n        : null,\n\n    selected_candidate:\n      null,\n\n    existing_candidates:\n      existingCandidates,\n\n    original_aggregation:\n      original,\n\n    recheck_profile:\n      input.recheck_profile ?? null,\n\n    targeted_recheck_result: {\n      recheck_outcome:\n        input.recheck_outcome ?? null,\n\n      recheck_note:\n        input.recheck_note ?? null,\n\n      evidence_validated:\n        input.evidence_validated,\n\n      validator_validated:\n        input.validator_validated,\n\n      targeted_recheck_meta:\n        input.targeted_recheck_meta ?? null,\n\n      validator_meta:\n        input.validator_meta ?? null,\n\n      post_validator_route:\n        input.post_validator_route,\n\n      post_validator_route_reason:\n        input.post_validator_route_reason,\n\n      route_guard_applied:\n        true,\n\n      route_guard_policy:\n        ROUTE_GUARD_POLICY,\n\n      route_guard_reason:\n        ROUTE_GUARD_REASON,\n\n      round_2_allowed_field_keys:\n        ROUND_2_FIELD_KEYS,\n\n      existing_candidates:\n        existingCandidates,\n\n      usable_candidates:\n        usableCandidates,\n    },\n\n    candidate_decisions: [],\n\n    supporting_candidate_refs: [],\n\n    conflict_candidate_refs: [],\n\n    conflict_evidence: [],\n\n    validator_summary: {\n      confirmed_count:\n        input.confirmed_count ?? null,\n\n      requires_review_count:\n        input.requires_review_count ?? null,\n\n      rejected_count:\n        input.rejected_count ?? null,\n    },\n\n    rejected_candidates:\n      rejectedCandidates,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -383,6 +383,84 @@
       ],
       "id": "a9e2ad4c-bb34-4bcf-aa10-a1baa53994dc",
       "name": "Сформировать requires_review — Round 2 запрещён"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $json;\n\n\n// ============================================================\n// 1. Базовые проверки\n// ============================================================\n\nif (!input.analysis_run_id) {\n  throw new Error(\n    '[Нормализовать FINAL поле] Нет analysis_run_id'\n  );\n}\n\nif (!input.field_key) {\n  throw new Error(\n    '[Нормализовать FINAL поле] Нет field_key'\n  );\n}\n\nif (input.aggregation_validated !== true) {\n  throw new Error(\n    '[Нормализовать FINAL поле] aggregation_validated должен быть true'\n  );\n}\n\nif (input.needs_recheck !== false) {\n  throw new Error(\n    '[Нормализовать FINAL поле] FINAL поле не может иметь needs_recheck=true'\n  );\n}\n\n\n// ============================================================\n// 2. Допустимые FINAL-статусы\n// ============================================================\n\nconst status =\n  input.aggregation_status;\n\nconst ALLOWED_STATUSES =\n  new Set([\n    'resolved',\n    'not_found',\n    'requires_review',\n  ]);\n\nif (!ALLOWED_STATUSES.has(status)) {\n  throw new Error(\n    `[Нормализовать FINAL поле] Недопустимый aggregation_status=${status}`\n  );\n}\n\n\n// ============================================================\n// 3. resolution_method обязателен\n// ============================================================\n\nif (\n  typeof input.resolution_method !== 'string' ||\n  !input.resolution_method.trim()\n) {\n  throw new Error(\n    '[Нормализовать FINAL поле] Нет resolution_method'\n  );\n}\n\n\n// ============================================================\n// 4. Evidence\n// ============================================================\n\nconst evidence =\n  Array.isArray(input.evidence)\n    ? input.evidence\n    : [];\n\n\n// ============================================================\n// 5. Проверяем RESOLVED\n// ============================================================\n\nif (status === 'resolved') {\n\n  if (\n    typeof input.final_value_text !== 'string' ||\n    !input.final_value_text.trim()\n  ) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для resolved нужен final_value_text'\n    );\n  }\n\n  if (\n    typeof input.confidence !== 'number' ||\n    !Number.isFinite(input.confidence) ||\n    input.confidence < 0 ||\n    input.confidence > 1\n  ) {\n    throw new Error(\n      `[Нормализовать FINAL поле] Некорректный confidence=${input.confidence}`\n    );\n  }\n}\n\n\n// ============================================================\n// 6. Проверяем NOT_FOUND\n// ============================================================\n\nif (status === 'not_found') {\n\n  if (input.final_value_text !== null) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для not_found final_value_text должен быть null'\n    );\n  }\n\n  if (input.confidence !== null) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для not_found confidence должен быть null'\n    );\n  }\n\n  if (\n    typeof input.not_found_reason_code !== 'string' ||\n    !input.not_found_reason_code\n  ) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для not_found нужен not_found_reason_code'\n    );\n  }\n\n  if (\n    typeof input.not_found_note !== 'string' ||\n    !input.not_found_note.trim()\n  ) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для not_found нужен not_found_note'\n    );\n  }\n}\n\n\n// ============================================================\n// 7. Проверяем REQUIRES_REVIEW\n// ============================================================\n\nif (status === 'requires_review') {\n\n  if (\n    input.confidence !== null &&\n    (\n      typeof input.confidence !== 'number' ||\n      !Number.isFinite(input.confidence) ||\n      input.confidence < 0 ||\n      input.confidence > 1\n    )\n  ) {\n    throw new Error(\n      `[Нормализовать FINAL поле] Некорректный confidence=${input.confidence}`\n    );\n  }\n\n  if (\n    typeof input.review_reason_code !== 'string' ||\n    !input.review_reason_code\n  ) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для requires_review нужен review_reason_code'\n    );\n  }\n\n  if (\n    typeof input.review_note !== 'string' ||\n    !input.review_note.trim()\n  ) {\n    throw new Error(\n      '[Нормализовать FINAL поле] Для requires_review нужен review_note'\n    );\n  }\n}\n\n\n// ============================================================\n// 8. requires_human_review определяем детерминированно\n// ============================================================\n\nconst requiresHumanReview =\n  status === 'requires_review';\n\n\n// ============================================================\n// 9. Формируем единый FINAL-контракт\n// ============================================================\n\nreturn {\n  json: {\n\n    result_contract_version:\n      'tender_field_final_v1',\n\n\n    // --------------------------------------------------------\n    // Идентификаторы\n    // --------------------------------------------------------\n\n    analysis_run_id:\n      input.analysis_run_id,\n\n    field_catalog_version:\n      input.field_catalog_version ?? null,\n\n    field_index:\n      input.field_index ?? null,\n\n    field_key:\n      input.field_key,\n\n\n    // --------------------------------------------------------\n    // Канонический результат\n    // --------------------------------------------------------\n\n    status,\n\n    value_text:\n      input.final_value_text ?? null,\n\n    confidence:\n      input.confidence ?? null,\n\n    requires_human_review:\n      requiresHumanReview,\n\n    resolution_method:\n      input.resolution_method,\n\n    evidence,\n\n\n    // --------------------------------------------------------\n    // Причина ручной проверки\n    // --------------------------------------------------------\n\n    review:\n      status === 'requires_review'\n        ? {\n            reason_code:\n              input.review_reason_code,\n\n            note:\n              input.review_note,\n          }\n        : null,\n\n\n    // --------------------------------------------------------\n    // Причина not_found\n    // --------------------------------------------------------\n\n    not_found:\n      status === 'not_found'\n        ? {\n            scope:\n              input.not_found_scope ??\n              'provided_sources',\n\n            reason_code:\n              input.not_found_reason_code,\n\n            note:\n              input.not_found_note,\n          }\n        : null,\n\n\n    // --------------------------------------------------------\n    // Audit / provenance\n    //\n    // В отчёт это всё выводить не обязательно,\n    // но для отладки и проверки сохраняем.\n    // --------------------------------------------------------\n\n    audit: {\n\n      aggregation_round:\n        input.aggregation_round ?? null,\n\n      recheck_attempt:\n        input.recheck_attempt ?? null,\n\n      original_aggregation:\n        input.original_aggregation ?? null,\n\n      recheck_profile:\n        input.recheck_profile ?? null,\n\n      targeted_recheck_result:\n        input.targeted_recheck_result ?? null,\n\n      selected_candidate:\n        input.selected_candidate ?? null,\n\n      candidate_decisions:\n        Array.isArray(input.candidate_decisions)\n          ? input.candidate_decisions\n          : [],\n\n      supporting_candidate_refs:\n        Array.isArray(input.supporting_candidate_refs)\n          ? input.supporting_candidate_refs\n          : [],\n\n      conflict_candidate_refs:\n        Array.isArray(input.conflict_candidate_refs)\n          ? input.conflict_candidate_refs\n          : [],\n\n      conflict_evidence:\n        Array.isArray(input.conflict_evidence)\n          ? input.conflict_evidence\n          : [],\n\n      validator_summary:\n        input.validator_summary ?? null,\n\n      rejected_candidates:\n        Array.isArray(input.rejected_candidates)\n          ? input.rejected_candidates\n          : [],\n\n      semantic_aggregator_meta:\n        input.semantic_aggregator_meta ?? null,\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -304
+      ],
+      "id": "9ef288ef-607d-4f3c-b2c6-39853a3c9e68",
+      "name": "Нормализовать FINAL поле8"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tender_analysis_field_results (\n    analysis_run_id,\n    field_catalog_version,\n    result_contract_version,\n    field_index,\n    field_key,\n    status,\n    value_text,\n    confidence,\n    requires_human_review,\n    resolution_method,\n    result_json\n)\nVALUES (\n    $1::uuid,\n    $2::text,\n    $3::text,\n    $4::smallint,\n    $5::text,\n    $6::text,\n    $7::text,\n    $8::numeric,\n    $9::boolean,\n    $10::text,\n    $11::jsonb\n)\nON CONFLICT (analysis_run_id, field_key)\nDO UPDATE SET\n    field_catalog_version = EXCLUDED.field_catalog_version,\n    result_contract_version = EXCLUDED.result_contract_version,\n    field_index = EXCLUDED.field_index,\n    status = EXCLUDED.status,\n    value_text = EXCLUDED.value_text,\n    confidence = EXCLUDED.confidence,\n    requires_human_review = EXCLUDED.requires_human_review,\n    resolution_method = EXCLUDED.resolution_method,\n    result_json = EXCLUDED.result_json,\n    updated_at = NOW()\nRETURNING\n  analysis_run_id,\n  field_key,\n  field_index;",
+        "options": {
+          "queryReplacement": "={{[   $json.analysis_run_id,   $json.field_catalog_version,   $json.result_contract_version,   $json.field_index,   $json.field_key,   $json.status,   $json.value_text,   $json.confidence,   $json.requires_human_review,   $json.resolution_method,   JSON.stringify($json) ]}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        816,
+        -304
+      ],
+      "id": "cef01441-0ef8-4e59-bb1e-20ab6e77c3e1",
+      "name": "Сохранить FINAL результат поля в БД8",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  throw new Error(\n    '[Подготовить вызов Finalizer] FINAL UPSERT не вернул ни одной строки'\n  );\n}\n\nconst runIds = [\n  ...new Set(\n    items\n      .map(item => item.json.analysis_run_id)\n      .filter(Boolean)\n  ),\n];\n\nif (runIds.length !== 1) {\n  throw new Error(\n    `[Подготовить вызов Finalizer] Ожидался один analysis_run_id, получено: ${JSON.stringify(runIds)}`\n  );\n}\n\nconst fieldKeys = items\n  .map(item => item.json.field_key)\n  .filter(Boolean);\n\nreturn [\n  {\n    json: {\n      analysis_run_id: runIds[0],\n      trigger_source: 'targeted_recheck',\n      trigger_field_keys: fieldKeys,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -304
+      ],
+      "id": "2ea65eb9-8330-469e-8964-65435f2dfe83",
+      "name": "Подготовить вызов Finalizer8"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cSsh9yjpS7t5p0OO",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/cSsh9yjpS7t5p0OO",
+          "cachedResultName": "TENDER — Финализация анализа"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1280,
+        -304
+      ],
+      "id": "5103f61c-3cba-4f8c-9201-1bdca9740dbf",
+      "name": "Call 'TENDER — Финализация анализа'8"
     },
     {
       "parameters": {
@@ -2511,7 +2589,40 @@
       "main": [
         [
           {
-            "node": "Нормализовать FINAL поле5",
+            "node": "Нормализовать FINAL поле8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать FINAL поле8": {
+      "main": [
+        [
+          {
+            "node": "Сохранить FINAL результат поля в БД8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить FINAL результат поля в БД8": {
+      "main": [
+        [
+          {
+            "node": "Подготовить вызов Finalizer8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить вызов Finalizer8": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Финализация анализа'8",
             "type": "main",
             "index": 0
           }

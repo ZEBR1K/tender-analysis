@@ -246,7 +246,10 @@ targeted retrieval
 → Recheck Extractor
 → evidence validation
 → Validator
-→ direct FINAL / Round 2 / not_found / requires_review
+→ direct FINAL
+  / общий Round 2 только для 4 разрешённых field_key
+  / terminal requires_review для остальных 23 field_key
+  / not_found при отсутствии usable evidence
 → save FINAL
 ```
 
@@ -495,8 +498,9 @@ Targeted Recheck
 ✓
 
 Semantic Aggregator Round 2
-✓ rules для всех 27 field_key
-⚠ полный per-field regression Round 2 ещё не выполнен
+✓ historical FIELD_RULES inventory для всех 27 field_key
+✓ executable route только для 4 canonical field_key
+✓ terminal route regression для остальных 23 field_key
 
 FINAL contract
 ✓
@@ -550,7 +554,7 @@ Canonical `workflows/n8n-exports/TENDER — Обработать докумен�
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
-Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific boundary прошла offline regressions и paid runtime canary на beta SHA `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484`: checker принял `requires_recheck/ambiguous_scope`, Round 1 FINAL не создавался, route-aware oracle прошёл. Последующий read-only аудит live Targeted Recheck выявил P0 `TR-10`: Round 2 structural checker не доказывает completeness composite result и допускает частичный `resolved`. Local canonical Targeted Recheck candidate теперь содержит field-specific containment: `tender_fields_v1/application_documents/Round 2/reported resolved` становится effective terminal `requires_review/insufficient_evidence` с audit и сохранением decisions/evidence. LIVE workflow не изменён и остаётся vulnerable до promotion/runtime canary.
+Execution `14173` выявил отдельный `application_documents` false-resolved. В `[TEST CODEX]` field-specific Round 1 boundary прошла offline regressions и paid runtime canary. Owner-started run `14429` затем доказал P0 `TR-10`: validated `application_documents` ошибочно вошёл в общий Round 2. Current local canonical Targeted Recheck содержит `70/70` reachable nodes, допускает общий Round 2 только для четырёх canonical field key, а остальные 23 — включая `application_documents` — завершает через audited `terminal_requires_review` и отдельную Normalize8 / UPSERT8 / Finalizer8 chain. Execution `14449` подтвердил этот маршрут только в owner-modified inactive test topology: Recheck AI, exact evidence и Validator выполнились; общий Round 2 имел `0` runs; FINAL сохранился, barrier вернул `27/27`. Exact live parameter parity, production promotion и fresh full run этим не доказаны; LIVE production workflow не изменён.
 
 Первый полный test E2E для run `3caa7a89-b137-4cf6-b23d-941fb465c8f9` технически завершился: controller `14259`, body Aggregator `14260`, Targeted Recheck `14261`, completion owner `14267` и Report `14268` успешны; DB содержит ровно 27 FINAL (`19 resolved / 3 requires_review / 5 not_found`) и HTML artifact. Semantic audit принял 25/27, но отклонил canary из-за двух critical `false_resolved`: `participation_guarantee` не доказал применимость/размер обеспечения, а `required_official_certificates` не доказал полноту обязательных документов о статусе участника. Для обоих полей test drafts теперь применяют один audited safety contract: Round 1 reported `resolved` → effective `requires_recheck`; terminal Round 2 reported `resolved` → effective `requires_review`, сохраняя provisional text, candidates/evidence и reported/effective audit.
 
@@ -575,10 +579,10 @@ AG-8 production promotion
 verified test boundary → canonical production candidate
 
 application_documents production promotion
-verified beta boundary → canonical production candidate
+reviewed 70-node canonical candidate → отдельное решение о promotion
 
 application_documents Targeted Recheck
-safe deferred Round 1 → проверенный terminal result
+owner-modified test topology GREEN → после promotion fresh full run
 
 participation_guarantee / required_official_certificates containment
 baseline canary GREEN → technical fallback review → fresh confirmation
@@ -596,12 +600,14 @@ test workflow promotion / wiring
 
 # 10. Следующая задача
 
-Текущая точка продолжения после AG-8 и `application_documents` test GREEN, Document Worker packaging и Extractor model-selection checkpoint:
+Текущая точка продолжения после `application_documents` owner-modified test
+topology GREEN, local canonical hardening, Document Worker packaging и Extractor
+model-selection checkpoint:
 
 ```text
-application_documents Targeted Recheck local TR-10 candidate review
+application_documents Targeted Recheck 70-node canonical review
 → отдельное решение о production promotion
-→ runtime canary application_documents
+→ после promotion fresh full-path runtime validation
 → Aggregator AG-8 / application_documents production-candidate audit
 → затем full Document Worker runtime canary
 → fresh full run

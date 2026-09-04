@@ -28,6 +28,11 @@ const directRouteNodeName = 'Можно завершить без Round 2?';
 const round2CollectorNodeName = 'Собрать candidates для Round 2';
 const round2HttpNodeName = 'Semantic Aggregator1';
 const terminalReviewNodeName = 'Сформировать requires_review — Round 2 запрещён';
+const terminalReviewNormalizerNodeName = 'Нормализовать FINAL поле8';
+const terminalReviewSaveNodeName = 'Сохранить FINAL результат поля в БД8';
+const terminalReviewFinalizerInputNodeName = 'Подготовить вызов Finalizer8';
+const terminalReviewFinalizerNodeName = "Call 'TENDER — Финализация анализа'8";
+const sharedExistingCandidateNormalizerNodeName = 'Нормализовать FINAL поле5';
 const allowedRound2FieldKeys = [
   'procurement_subject',
   'nm_price_with_vat',
@@ -134,6 +139,27 @@ function buildRouteInput(fieldKey) {
   };
 }
 
+function buildNoInitialCandidatesNonDirectInput(fieldKey = 'application_documents') {
+  const input = buildRouteInput(fieldKey);
+  input.existing_candidates = [];
+  input.original_aggregation = {
+    ...input.original_aggregation,
+    status: 'no_initial_candidates',
+    preliminary_value: null,
+    confidence: null,
+  };
+  input.candidates = input.candidates.map((candidate) => ({
+    ...candidate,
+    validator_verdict: 'requires_review',
+    validator_confidence: 0.7,
+    validator_reason_code: 'unsupported_inference',
+    validator_reason_note: 'Candidate remains non-direct and needs review.',
+  }));
+  input.confirmed_count = 0;
+  input.requires_review_count = 1;
+  return input;
+}
+
 test('execution 14429 fixture retains the authoritative observed route symptom', () => {
   assert.equal(fixture.provenance.source_execution_id, '14429');
   assert.equal(
@@ -188,6 +214,11 @@ test('RED execution 14429 route: application_documents terminates requires_revie
   assert.deepEqual(
     trace.output.audit.targeted_recheck_result.validator_meta,
     fixture.route_input.validator_meta,
+  );
+  assert.equal(
+    trace.output.audit.aggregation_round,
+    1,
+    'requires_recheck originates from the completed Round 1 aggregation.',
   );
 });
 
@@ -283,4 +314,91 @@ test('post-Validator graph retains a dedicated guard between direct-final and Ro
   assert.deepEqual(nextNodes(workflow, routeNodeName), [directRouteNodeName]);
   assert.ok(workflow.nodes.some(({ name }) => name === terminalReviewNodeName));
   assert.notDeepEqual(nextNodes(workflow, directRouteNodeName, 1), [round2CollectorNodeName]);
+});
+
+test('terminal requires_review owns a dedicated duplicated normalizer, UPSERT, and Finalizer chain', () => {
+  const workflow = loadAggregatorWorkflow(workflowPath);
+  const nodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
+  const nodeNames = new Set(nodesByName.keys());
+
+  for (const nodeName of [
+    terminalReviewNormalizerNodeName,
+    terminalReviewSaveNodeName,
+    terminalReviewFinalizerInputNodeName,
+    terminalReviewFinalizerNodeName,
+  ]) {
+    assert.ok(nodeNames.has(nodeName), `Missing dedicated terminal node ${nodeName}.`);
+  }
+
+  const duplicatePairs = [
+    ['Нормализовать FINAL поле5', terminalReviewNormalizerNodeName],
+    ['Сохранить FINAL результат поля в БД5', terminalReviewSaveNodeName],
+    ['Подготовить вызов Finalizer2', terminalReviewFinalizerInputNodeName],
+    ["Call 'TENDER — Финализация анализа'2", terminalReviewFinalizerNodeName],
+  ];
+  for (const [sourceName, duplicateName] of duplicatePairs) {
+    const source = structuredClone(nodesByName.get(sourceName));
+    const duplicate = structuredClone(nodesByName.get(duplicateName));
+    assert.ok(source, `Missing source contract node ${sourceName}.`);
+    assert.ok(duplicate, `Missing duplicated contract node ${duplicateName}.`);
+    assert.notEqual(duplicate.id, source.id, `${duplicateName} must own a unique stable ID.`);
+    for (const node of [source, duplicate]) {
+      delete node.id;
+      delete node.name;
+      delete node.position;
+    }
+    assert.deepEqual(
+      duplicate,
+      source,
+      `${duplicateName} must preserve the exact ${sourceName} node contract.`,
+    );
+  }
+
+  assert.deepEqual(nextNodes(workflow, terminalReviewNodeName), [
+    terminalReviewNormalizerNodeName,
+  ]);
+  assert.notDeepEqual(nextNodes(workflow, terminalReviewNodeName), [
+    sharedExistingCandidateNormalizerNodeName,
+  ]);
+  assert.deepEqual(nextNodes(workflow, terminalReviewNormalizerNodeName), [
+    terminalReviewSaveNodeName,
+  ]);
+  assert.deepEqual(nextNodes(workflow, terminalReviewSaveNodeName), [
+    terminalReviewFinalizerInputNodeName,
+  ]);
+  assert.deepEqual(nextNodes(workflow, terminalReviewFinalizerInputNodeName), [
+    terminalReviewFinalizerNodeName,
+  ]);
+  assert.deepEqual(nextNodes(workflow, terminalReviewFinalizerNodeName), []);
+});
+
+test('no_initial_candidates non-direct terminal route normalizes without fabricated Round 1 audit provenance', async () => {
+  const workflow = loadAggregatorWorkflow(workflowPath);
+  const input = buildNoInitialCandidatesNonDirectInput();
+  const routed = await executeWorkflowCodeNode({
+    workflow,
+    nodeName: routeNodeName,
+    inputJson: input,
+  });
+  assert.equal(routed.post_validator_route, 'terminal_requires_review');
+
+  const terminal = await executeWorkflowCodeNode({
+    workflow,
+    nodeName: terminalReviewNodeName,
+    inputJson: routed,
+  });
+  assert.equal(
+    terminal.aggregation_round,
+    null,
+    'no_initial_candidates must not claim that Round 1 aggregation ran.',
+  );
+
+  const normalized = await executeWorkflowCodeNode({
+    workflow,
+    nodeName: terminalReviewNormalizerNodeName,
+    inputJson: terminal,
+  });
+  assert.equal(normalized.result_contract_version, 'tender_field_final_v1');
+  assert.equal(normalized.status, 'requires_review');
+  assert.equal(normalized.audit.aggregation_round, null);
 });

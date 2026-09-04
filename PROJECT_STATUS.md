@@ -17,7 +17,14 @@ Local canonical Targeted Recheck теперь имеет exact four-key Round 2 
 отдельный terminal `requires_review` для остальных 23 полей и defense-in-depth в
 Round 2 collector. `application_documents` сохраняет validated candidate
 evidence и route-guard audit; существующий `direct_final` contract не изменён.
-Execution-derived regression по `14429` GREEN offline.
+Выделенная canonical terminal-цепочка
+`Нормализовать FINAL поле8 → Сохранить FINAL результат поля в БД8 →
+Подготовить вызов Finalizer8 → Call 'TENDER — Финализация анализа'8` не сходится
+в ранее используемые `...5 / БД5 / Finalizer2` nodes. Все четыре node contracts
+скопированы из этих текущих canonical counterparts с изменением только
+name/id/position; PostgreSQL credential reference сохранён, credential values не
+добавлялись. Current candidate graph: `70/70` nodes reachable, disabled nodes
+нет. Execution-derived regression по `14429` GREEN offline.
 
 Owner-started manual execution `14449` в отдельном inactive test workflow
 `SKzmu0VqYRtJ0Ai1` прошёл runtime contour на пяти исходных field items execution
@@ -28,9 +35,10 @@ route guard выставил `terminal_requires_review` с причиной
 `field_catalog_round_2_not_allowed`. `Собрать candidates для Round 2` и
 `Semantic Aggregator1` имели `0` runs. Отдельная terminal-ветка один раз
 нормализовала и сохранила FINAL `requires_review`; Finalizer подтвердил валидный
-барьер `27/27` для уже завершённого run. Таким образом, exact runtime
-route-guard gate для `application_documents` GREEN и повторного canary этого
-gate не требует.
+барьер `27/27` для уже завершённого run. Это evidence owner-modified test
+топологии; exact parity её parameters/IDs/positions с local canonical не
+доказана, потому что отдельный read-only snapshot этой test topology для
+программного сравнения не сохранён.
 
 Это не production promotion и не fresh полный запуск от Orchestrator. Production
 Targeted Recheck не изменён; fresh независимый PostgreSQL `SELECT` после `14449`

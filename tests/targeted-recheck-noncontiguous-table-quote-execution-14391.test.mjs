@@ -45,6 +45,10 @@ const routeGuardChangedNodeNames = new Set([
 const routeGuardAddedNodeNames = new Set([
   'Round 2 разрешён для поля?',
   'Сформировать requires_review — Round 2 запрещён',
+  'Нормализовать FINAL поле8',
+  'Сохранить FINAL результат поля в БД8',
+  'Подготовить вызов Finalizer8',
+  "Call 'TENDER — Финализация анализа'8",
 ]);
 const strictEvidenceQuoteParagraph = `Каждый semantic_block evidence.quote должен быть одной непрерывной
 дословной подстрокой текста одного semantic block.
@@ -159,7 +163,10 @@ test('canonical workflow preserves the TR-15 prompt-only baseline outside the la
   const baseline = fixture.parent_workflow_baseline;
   const target = workflow.nodes.find(({ name }) => name === nodeName);
   assert.ok(target, `Missing node: ${nodeName}`);
-  assert.equal(workflow.nodes.length, baseline.node_count + 2);
+  assert.equal(
+    workflow.nodes.length,
+    baseline.node_count + routeGuardAddedNodeNames.size,
+  );
 
   const workflowProjection = structuredClone(workflow);
   workflowProjection.nodes = workflowProjection.nodes
@@ -183,10 +190,9 @@ test('canonical workflow preserves the TR-15 prompt-only baseline outside the la
       }
       return node;
     });
-  delete workflowProjection.connections['Round 2 разрешён для поля?'];
-  delete workflowProjection.connections[
-    'Сформировать requires_review — Round 2 запрещён'
-  ];
+  for (const addedNodeName of routeGuardAddedNodeNames) {
+    delete workflowProjection.connections[addedNodeName];
+  }
   workflowProjection.connections['Можно завершить без Round 2?'].main[1] = [{
     node: 'Собрать candidates для Round 2',
     type: 'main',

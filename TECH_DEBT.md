@@ -118,7 +118,7 @@ Naming, comments, cleanup, future hardening.
 |-|-|-|
 |TR-0|✅ Closed|Реализован сценарий existing candidate + no usable recheck context. Поле не уходит в not\_found, сохраняется исходный candidate и формируется requires\_review.|
 |TR-1|✅ Closed|Реализован lifecycle existing candidates + Targeted Recheck candidates. Round 2 Aggregator умеет объединять исходные и новые candidates, сохраняя candidate\_ref и evidence. Требуется отдельный regression-тест негативного сценария.|
-|TR-2|✅ Closed (MVP)<br />|✅ закрыто частично или полностью для MVP:<br /><br />все 27 field\_key прошли через Semantic Aggregator;<br />выполнен полный прогон закупки;<br />получены 27 final fields;<br />Round 1 Aggregator отработал.<br /><br />Остаётся:<br />- улучшение качества отдельных semantic rules;<br />- regression dataset;<br />- ручная проверка сложных полей.|
+|TR-2|✅ Closed (historical inventory)<br />|Round 2 `FIELD_RULES` существуют для всех 27 field\_key как compatibility/validation inventory, а не как route permission. Current canonical допускает общий Round 2 только для `procurement_subject`, `nm_price_with_vat`, `delivery_term`, `warranty_obligations_guarantee`; остальные 23 поля завершаются через `terminal_requires_review`. Исторический полный прогон и 27 FINAL не доказывают прохождение всех 27 полей через Round 2.<br /><br />Остаётся:<br />- улучшение качества отдельных semantic rules;<br />- regression dataset;<br />- ручная проверка сложных полей.|
 |TR-3|✅ Closed|Исправлены зависимости дочернего workflow от parent workflow nodes. Targeted Recheck workflow теперь получает необходимые данные через входной JSON и успешно выполняется отдельно.|
 |`DW-14 / EW-3`|handled evidence error может тихо закончить ветку и не вызвать Error Workflow|Document Worker / Error Workflow|
 |`DW-15`|реальный false-confirmed факт `customer="не указан"`|Document Worker / semantic safety|
@@ -132,9 +132,9 @@ Naming, comments, cleanup, future hardening.
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Mitigated / verified in test: universal `procurement_subject` current-scope boundary прошла offline beta contract, MCP read-back и один paid runtime canary `14104`. Остаётся открытой до production promotion и fresh full 27/27 run.|Aggregator semantic safety|
-|`AG-9`|⚠ Test runtime route-guard GREEN / production promotion pending: Aggregator boundary `14173/14254` сохранена. Owner-started run `14429` выявил defect: validated `application_documents` получил `post_validator_route=round_2` и вызвал общий `Semantic Aggregator1`. Execution `14449` на тех же пяти field items подтвердил исправленный путь: real Recheck AI → exact evidence → AI Validator → `terminal_requires_review`; общий Round 2 collector и `Semantic Aggregator1` имели `0` runs, отдельная terminal-ветка сохранила FINAL, Finalizer подтвердил `27/27`. Production не изменён; promotion и fresh full run остаются отдельными gates.|Aggregator / Targeted Recheck semantic safety|
+|`AG-9`|⚠ Owner-modified test topology runtime GREEN / production promotion pending: Aggregator boundary `14173/14254` сохранена. Owner-started run `14429` выявил defect: validated `application_documents` получил `post_validator_route=round_2` и вызвал общий `Semantic Aggregator1`. Execution `14449` на тех же пяти field items подтвердил исправленный test path: real Recheck AI → exact evidence → AI Validator → `terminal_requires_review`; общий Round 2 collector и `Semantic Aggregator1` имели `0` runs, отдельная terminal-ветка сохранила FINAL, Finalizer подтвердил `27/27`. Local canonical имеет отдельную `...8` normalize/UPSERT/Finalizer chain и `70/70` reachable nodes; exact live parameter/ID/position parity не доказана без snapshot. Production не изменён, fresh DB `SELECT` после `14449` не выполнялся; promotion и fresh full run остаются отдельными gates.|Aggregator / Targeted Recheck semantic safety|
 |`AG-10`|⚠ Offline GREEN / unpublished draft: execution `14260` доказал critical false-resolved для `participation_guarantee` и `required_official_certificates`. Round 1 containment переводит reported `resolved` в effective `requires_recheck/insufficient_evidence`, сохраняя provisional value/candidates/audit. Test draft `91c17313-…`; active `01ff5e9d-…` unchanged. Runtime GREEN не заявляется.|Aggregator semantic applicability/completeness|
-|`TR-10`|✅ Test runtime route-guard GREEN / production promotion pending: execution `14429` доказал нарушение route invariant. Исправленный test workflow в execution `14449` для `application_documents` прошёл real Recheck AI, exact evidence validator и AI Validator, затем terminal `requires_review`; общий Round 2 collector и `Semantic Aggregator1` имели `0` runs. Отдельные normalize / UPSERT / Finalizer nodes выполнились, barrier вернул `27/27`. Canonical allow-list остаётся: `procurement_subject`, `nm_price_with_vat`, `delivery_term`, `warranty_obligations_guarantee`; остальные 23 поля fail closed до Round 2. Production не изменён; fresh full run после promotion остаётся отдельным gate.|Targeted Recheck semantic safety|
+|`TR-10`|✅ Owner-modified test topology runtime route-guard GREEN / production promotion pending: execution `14429` доказал нарушение route invariant. В execution `14449` `application_documents` прошёл real Recheck AI, exact evidence validator и AI Validator, затем terminal `requires_review`; общий Round 2 collector и `Semantic Aggregator1` имели `0` runs. Отдельные normalize / UPSERT / Finalizer nodes выполнились, barrier вернул `27/27`. Canonical allow-list: `procurement_subject`, `nm_price_with_vat`, `delivery_term`, `warranty_obligations_guarantee`; остальные 23 поля fail closed до Round 2 через выделенную `Нормализовать FINAL поле8 → БД8 → Finalizer8` chain. Exact parameters/IDs/positions test topology не были read back для parity; production не изменён, fresh DB `SELECT` после `14449` не выполнялся. Fresh full run после promotion остаётся отдельным gate.|Targeted Recheck semantic safety|
 |`TR-13`|✅ Baseline canary GREEN: terminal containment для `participation_guarantee` и `required_official_certificates` прошёл exact 27/27 + semantic audit 27/27 в `14279/14280/14281/14285/14289`. Confirmation series не началась из-за отдельного technical failure `TR-14`.|Targeted Recheck terminal semantic containment|
 |`TR-14`|⚠ Offline GREEN / unpublished draft: execution `14292` зафиксировал четыре model contract/evidence failures из семи ответов. Typed local validation fallback сохраняет raw response/error/source/original candidates, не принимает unvalidated candidates и terminally materializes `requires_review` для `requires_recheck` или `no_initial_candidates`. Test draft `13b3c124-…`; active `c43b4ed3-…` unchanged. Publish/fresh confirmation pending.|Targeted Recheck technical validation containment|
 |`TR-15`|⚠ P0 observed prompt noncompliance. Execution `14391`, item `6/9`, field `advance_contract_guarantee`: structurally valid AI candidate stitched noncontiguous table rows/cells into one quote; deterministic validator correctly rejected it, leaving `0` FINAL writes and the claimed run inferred stuck in `aggregating`. Required fix is prompt-only; validator/retrieval/models/schema stay unchanged.|Targeted Recheck evidence quote generation|
@@ -335,7 +335,11 @@ delivery\\\\\\\\\\\\\\\_term
 warranty\\\\\\\\\\\\\\\_obligations\\\\\\\\\\\\\\\_guarantee
 ```
 
-Остальные 23 field\_key могли упасть при попадании в Round 2. Сейчас rules существуют для всех 27 `field_key`; полный per-field regression ещё не выполнен.
+Остальные 23 field\_key могли упасть при попадании в Round 2. Сейчас rules
+сохранены для всех 27 `field_key` только как historical compatibility/validation
+inventory. Это не разрешение маршрута: current canonical допускает общий Round 2
+только для четырёх полей выше, а остальные 23 завершаются через
+`terminal_requires_review`.
 
 ### Приоритет
 
@@ -343,9 +347,9 @@ warranty\\\\\\\\\\\\\\\_obligations\\\\\\\\\\\\\\\_guarantee
 P0
 ```
 
-### Историческое требование
+### Историческое требование и current boundary
 
-Исторически требовалось расширить Round 2 на все 27 полей в соответствии с:
+Исторически требовалось добавить `FIELD_RULES` для всех 27 полей в соответствии с:
 
 ```text
 FIELD\\\\\\\\\\\\\\\_CATALOG.md
@@ -353,7 +357,8 @@ FIELD\\\\\\\\\\\\\\\_CATALOG.md
 
 Не придумывать новые semantics отдельно от каталога.
 
-Требование выполнено; незакрытым остаётся только полный per-field regression.
+Inventory-требование выполнено. Оно не расширяет route permission за пределы
+четырёх canonical field key; terminal regression для остальных 23 обязателен.
 
 \---
 
@@ -834,13 +839,13 @@ Read-only аудит active Targeted Recheck `9uDOU31DGo30fGXX` показал, 
 
 Это потенциальный `false_resolved`, а не обычный prompt-quality debt. Один подтверждённый candidate не доказывает, что закрыт весь список документов, условий, сроков и форматов.
 
-### Source boundary
+### Historical source boundary — read-only snapshot 2026-08-30
 
 ```text
-live Targeted Recheck:
+historical live Targeted Recheck:
 64 nodes, active version 4e0858c9-6ca2-42c7-969b-e74a2f91b8c6
 
-local canonical export:
+historical local canonical export до route guard:
 63 nodes, version 7f82ae43-2ddc-4568-8d76-a6d460c13924
 ```
 
@@ -855,37 +860,30 @@ workflow implementation: общий Round 2 profile существует
 
 Каталог authoritative для канонического смысла поля; live workflow authoritative для текущего поведения. Противоречие нельзя закрывать молчаливым изменением каталога.
 
-### Local canonical mitigation
+### Current local canonical mitigation
 
-Execution-derived mutable candidate gate использует:
-
-```text
-fixture 14173
-→ synthetic grounded recheck candidate
-→ synthetic Validator confirmation
-→ partial schema-valid Round 2 resolved
-→ exact Code nodes:
-   Собрать candidates для Round 2
-   Подготовить запрос #2 Semantic Aggregator
-   Проверить ответ #2 Semantic Aggregator
-   Сформировать FINAL после Round 2
-→ raw structural acceptance
-→ field-specific effective requires_review / insufficient_evidence
-→ terminal FINAL + requires_human_review=true
-→ decisions/evidence/audit preserved
-→ application_documents safe terminal oracle PASS
-```
-
-Containment находится только в `Проверить ответ #2 Semantic Aggregator`, применяется после всех raw structural/status validations и только для:
+Current canonical содержит `70/70` reachable nodes и exact four-key Round 2
+allow-list. После Validator:
 
 ```text
-field_catalog_version=tender_fields_v1
-aggregation_round=2
-field_key=application_documents
-reported_status=resolved
+direct_final preconditions выполнены
+→ existing direct FINAL route
+
+иначе field_key входит в:
+procurement_subject / nm_price_with_vat / delivery_term /
+warranty_obligations_guarantee
+→ общий Semantic Aggregator Round 2
+
+иначе
+→ terminal_requires_review / field_catalog_round_2_not_allowed
+→ отдельная Normalize8 / UPSERT8 / Finalizer8 chain
 ```
 
-Raw `application_documents/requires_review` сохраняет исходные reason/note; `procurement_subject/resolved` остаётся допустимым. Clause coverage, `not_found` и `TR-11` не менялись.
+Для `application_documents` Targeted Recheck разрешён, но общий Round 2 запрещён.
+Candidate/evidence/rejected/original aggregation/Validator audit сохраняются;
+`no_initial_candidates` не получает ложный `aggregation_round=1`. Старый
+in-Round-2 containment остаётся defense-in-depth для historical/forged input, но
+не является current route permission.
 
 ### Remaining gate
 

@@ -1213,7 +1213,10 @@ retrieval
 → recheck extraction
 → evidence validation
 → validator
-→ direct final / Round 2 / not_found / requires_review
+→ direct final
+  / общий Round 2 только для 4 разрешённых field_key
+  / terminal requires_review для остальных 23 field_key
+  / not_found при отсутствии usable evidence
 → tender_field_final_v1
 → DB UPSERT
 ```
@@ -1274,9 +1277,14 @@ targeted retrieval
 Если есть usable candidates:
 
 ```text
-direct final
+direct final при выполнении существующих preconditions
 или
-Semantic Aggregator Round 2
+Semantic Aggregator Round 2 только для:
+procurement_subject / nm_price_with_vat / delivery_term /
+warranty_obligations_guarantee
+или
+terminal_requires_review для остальных 23 field_key,
+включая application_documents
 ```
 
 ---
@@ -1736,7 +1744,10 @@ existing candidate + all new rejected
 → requires_review
 
 TR-2 ✅ Closed (MVP)
-Round 2 FIELD_RULES существуют для всех 27 field_key
+Round 2 FIELD_RULES существуют для всех 27 field_key как historical
+compatibility/validation inventory; это не route permission.
+Общий Round 2 разрешён только для 4 canonical field_key,
+остальные 23 завершаются через terminal_requires_review.
 
 TR-3 ✅
 child workflow больше не зависит от parent-node references```
