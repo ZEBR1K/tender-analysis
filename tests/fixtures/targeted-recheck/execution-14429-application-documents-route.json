@@ -1,0 +1,99 @@
+{
+  "provenance": {
+    "source_execution_id": "14429",
+    "source_workflow_id": "nI47FcgzYwGzwGqy",
+    "analysis_run_id": "535461ec-8969-4e15-ad69-a87c3b9e4747",
+    "observed_first_incorrect_node": "Определить путь после Validator",
+    "observed_post_validator_route": "round_2",
+    "observed_downstream_node": "Semantic Aggregator1",
+    "sanitization": "Candidate text and identifiers are synthetic; field, route, validation flags, source counts, execution lineage, and graph symptom are retained from the read-only execution forensic."
+  },
+  "route_input": {
+    "analysis_run_id": "535461ec-8969-4e15-ad69-a87c3b9e4747",
+    "field_catalog_version": "tender_fields_v1",
+    "field_index": 27,
+    "field_key": "application_documents",
+    "recheck_attempt": 1,
+    "recheck_outcome": "candidate_found",
+    "recheck_note": "Targeted Recheck found grounded application-composition evidence.",
+    "evidence_validated": true,
+    "validator_validated": true,
+    "candidates": [
+      {
+        "candidate_index": 0,
+        "value_text": "Участник включает в заявку заполненную форму подтверждения.",
+        "status": "found",
+        "confidence": 0.93,
+        "evidence": [
+          {
+            "source_type": "semantic_block",
+            "analysis_unit_id": "sanitized-au-application-documents",
+            "semantic_block_id": "sanitized-sb-application-documents",
+            "quote": "В состав заявки включается заполненная форма подтверждения."
+          }
+        ],
+        "review_reason_code": null,
+        "review_note": null,
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.91,
+        "validator_reason_code": null,
+        "validator_reason_note": "Grounded direct evidence confirms this candidate."
+      }
+    ],
+    "candidates_count": 1,
+    "confirmed_count": 1,
+    "requires_review_count": 0,
+    "rejected_count": 0,
+    "existing_candidates": [
+      {
+        "fact_id": "sanitized-existing-application-documents-001",
+        "value_text": "В заявке требуется документ, подтверждающий полномочия подписанта.",
+        "validator_verdict": "confirmed",
+        "validator_confidence": 0.88,
+        "validator_reason_code": null,
+        "validator_reason_note": "Existing grounded candidate.",
+        "analysis_unit_id": "sanitized-au-existing-001",
+        "document": {
+          "document_id": "sanitized-document",
+          "document_index": 3,
+          "file_name": "sanitized.docx",
+          "file_extension": "docx"
+        },
+        "evidence": [
+          {
+            "source_type": "semantic_block",
+            "analysis_unit_id": "sanitized-au-existing-001",
+            "semantic_block_id": "sanitized-sb-existing-001",
+            "quote": "Документ, подтверждающий полномочия подписанта."
+          }
+        ]
+      }
+    ],
+    "original_aggregation": {
+      "status": "requires_recheck",
+      "preliminary_value": "В заявке требуется документ, подтверждающий полномочия подписанта.",
+      "confidence": 0.72,
+      "recheck_reason_code": "ambiguous_scope",
+      "recheck_note": "Состав заявки требует проверки полноты и условий."
+    },
+    "recheck_profile": {
+      "title": "Документы в составе заявки",
+      "objective": "Установить документы и сведения, предоставляемые именно в составе заявки."
+    },
+    "allowed_metadata": {},
+    "recheck_context": [
+      {
+        "analysis_unit_id": "sanitized-au-application-documents",
+        "semantic_block_id": "sanitized-sb-application-documents"
+      }
+    ],
+    "targeted_recheck_meta": {
+      "source_execution_id": "14429",
+      "raw_ai_response_retained": true
+    },
+    "validator_meta": {
+      "source_execution_id": "14429",
+      "finish_reason": "stop"
+    }
+  }
+}

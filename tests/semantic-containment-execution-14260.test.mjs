@@ -30,6 +30,13 @@ const targetedRecheckWorkflowPath = path.join(
   'n8n-exports',
   'TENDER - Targeted Recheck.json',
 );
+const immutablePreRouteGuardWorkflowPath = path.join(
+  repositoryRoot,
+  'workflows',
+  'n8n-exports',
+  'beta',
+  'TENDER - Targeted Recheck.live-4e0858c9-6ca2-42c7-969b-e74a2f91b8c6.json',
+);
 
 const round2NodeNames = [
   'Собрать candidates для Round 2',
@@ -168,8 +175,14 @@ function buildRound2Response({ prepared, caseFixture, status = 'resolved' }) {
 
 async function runRound2({ caseFixture, status = 'resolved', mutateResponse }) {
   const workflow = loadAggregatorWorkflow(targetedRecheckWorkflowPath);
+  const immutablePreRouteGuardWorkflow = loadAggregatorWorkflow(
+    immutablePreRouteGuardWorkflowPath,
+  );
+  // The current collector intentionally rejects these containment-only fields.
+  // Build its historical input with the immutable snapshot, then keep testing
+  // the current downstream checker as a defense-in-depth contract.
   const collected = await executeWorkflowCodeNode({
-    workflow,
+    workflow: immutablePreRouteGuardWorkflow,
     nodeName: round2NodeNames[0],
     inputJson: buildPostValidatorInput(caseFixture),
   });
@@ -464,4 +477,3 @@ test('anti-overfit: Round 2 malformed, linking, and cardinality guards remain fa
     /ровно один primary/iu,
   );
 });
-

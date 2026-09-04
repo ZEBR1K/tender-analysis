@@ -17,6 +17,13 @@ const mutableCanonicalWorkflowPath = path.join(
   'n8n-exports',
   'TENDER - Targeted Recheck.json',
 );
+const immutablePreRouteGuardWorkflowPath = path.join(
+  repositoryRoot,
+  'workflows',
+  'n8n-exports',
+  'beta',
+  'TENDER - Targeted Recheck.live-4e0858c9-6ca2-42c7-969b-e74a2f91b8c6.json',
+);
 const applicationDocumentsFixturePath = path.join(
   testDirectory,
   'fixtures',
@@ -205,8 +212,13 @@ function buildRequiresReviewApiResponse({
 
 async function runMutableCanonicalRound2({ postValidatorInput, responseFactory }) {
   const workflow = loadAggregatorWorkflow(mutableCanonicalWorkflowPath);
+  const immutablePreRouteGuardWorkflow = loadAggregatorWorkflow(
+    immutablePreRouteGuardWorkflowPath,
+  );
+  // The current collector now blocks application_documents before Round 2.
+  // Use the immutable collector input only to retain checker containment tests.
   const collected = await executeWorkflowCodeNode({
-    workflow,
+    workflow: immutablePreRouteGuardWorkflow,
     nodeName: round2NodeNames[0],
     inputJson: postValidatorInput,
   });

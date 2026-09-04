@@ -29,7 +29,23 @@ const currentPromptArtifactPath = path.join(
   'prompts',
   'targeted-recheck-extractor-system-prompt-v1.2-2026-09-03.txt',
 );
+const immutableLiveWorkflowPath = path.join(
+  testDirectory,
+  '..',
+  'workflows',
+  'n8n-exports',
+  'beta',
+  'TENDER - Targeted Recheck.live-4e0858c9-6ca2-42c7-969b-e74a2f91b8c6.json',
+);
 const nodeName = 'Подготовить запрос #2 AI Targeted Recheck';
+const routeGuardChangedNodeNames = new Set([
+  'Определить путь после Validator',
+  'Собрать candidates для Round 2',
+]);
+const routeGuardAddedNodeNames = new Set([
+  'Round 2 разрешён для поля?',
+  'Сформировать requires_review — Round 2 запрещён',
+]);
 const strictEvidenceQuoteParagraph = `Каждый semantic_block evidence.quote должен быть одной непрерывной
 дословной подстрокой текста одного semantic block.
 
@@ -137,24 +153,45 @@ test('Targeted Recheck system prompt owns the exact continuous-quote invariant a
   );
 });
 
-test('canonical workflow differs from the parent baseline only at the targeted jsCode parameter', () => {
+test('canonical workflow preserves the TR-15 prompt-only baseline outside the later route-guard slice', () => {
   const workflow = loadAggregatorWorkflow(workflowPath);
+  const immutableLiveWorkflow = loadAggregatorWorkflow(immutableLiveWorkflowPath);
   const baseline = fixture.parent_workflow_baseline;
   const target = workflow.nodes.find(({ name }) => name === nodeName);
   assert.ok(target, `Missing node: ${nodeName}`);
-  assert.equal(workflow.nodes.length, baseline.node_count);
+  assert.equal(workflow.nodes.length, baseline.node_count + 2);
 
   const workflowProjection = structuredClone(workflow);
-  workflowProjection.nodes = workflowProjection.nodes.map((node) =>
-    node.name === nodeName
-      ? {
+  workflowProjection.nodes = workflowProjection.nodes
+    .filter(({ name }) => !routeGuardAddedNodeNames.has(name))
+    .map((node) => {
+      if (node.name === nodeName) {
+        return {
           ...node,
           parameters: {
             ...node.parameters,
             jsCode: '__TARGET_PROMPT_JSCODE__',
           },
-        }
-      : node);
+        };
+      }
+      if (routeGuardChangedNodeNames.has(node.name)) {
+        const baselineNode = immutableLiveWorkflow.nodes.find(
+          ({ name }) => name === node.name,
+        );
+        assert.ok(baselineNode, `Missing immutable baseline node ${node.name}.`);
+        return structuredClone(baselineNode);
+      }
+      return node;
+    });
+  delete workflowProjection.connections['Round 2 разрешён для поля?'];
+  delete workflowProjection.connections[
+    'Сформировать requires_review — Round 2 запрещён'
+  ];
+  workflowProjection.connections['Можно завершить без Round 2?'].main[1] = [{
+    node: 'Собрать candidates для Round 2',
+    type: 'main',
+    index: 0,
+  }];
 
   const targetProjection = structuredClone(target);
   delete targetProjection.parameters.jsCode;
@@ -165,10 +202,13 @@ test('canonical workflow differs from the parent baseline only at the targeted j
     'A workflow path outside the allowed target parameters.jsCode changed.',
   );
   assert.equal(sha256(targetProjection), baseline.target_node_except_jsCode_sha256);
-  assert.equal(sha256(workflow.connections), baseline.connections_sha256);
+  assert.equal(
+    sha256(workflowProjection.connections),
+    baseline.connections_sha256,
+  );
   assert.equal(sha256(workflow.settings), baseline.settings_sha256);
   assert.equal(
-    sha256(workflow.nodes.filter(({ name }) => name !== nodeName)),
+    sha256(workflowProjection.nodes.filter(({ name }) => name !== nodeName)),
     baseline.other_nodes_sha256,
   );
   assert.notEqual(

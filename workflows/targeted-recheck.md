@@ -41,6 +41,35 @@ Workflow не анализирует тендер целиком. Он обра�
 Round 2 является последним semantic этапом.
 После Round 2 повторный Targeted Recheck не запускается.
 
+### Route-guard checkpoint — execution 14429
+
+Owner-started run `535461ec-8969-4e15-ad69-a87c3b9e4747` подтвердил новый P0
+route defect. Для `application_documents` Targeted Recheck вернул
+`candidate_found`, `evidence_validated=true`, `validator_validated=true`, после
+чего первая неправильная нода `Определить путь после Validator` выставила
+`post_validator_route=round_2`. Общий `Semantic Aggregator1` реально
+выполнился; существующий `application_documents_round2_requires_review_v1`
+containment предотвратил `false_resolved`, но не соблюдал маршрутный инвариант.
+
+Local canonical candidate теперь применяет authoritative Round 2 allow-list:
+
+```text
+procurement_subject
+nm_price_with_vat
+delivery_term
+warranty_obligations_guarantee
+```
+
+`direct_final` и его существующие preconditions не изменены. Для остальных 23
+полей non-direct validated result получает
+`post_validator_route=terminal_requires_review`, обходит общий Round 2 и
+terminally формирует `requires_review` через существующие normalize / UPSERT /
+Finalizer contracts. Candidate evidence, existing/new candidate audit,
+Validator summary и явные `route_guard_policy` / `route_guard_reason`
+сохраняются. Перед `Собрать candidates для Round 2` действует тот же allow-list
+как defense in depth. Local export содержит `66` nodes; production/test n8n не
+изменялись, runtime GREEN после fix не заявляется.
+
 ### Current verification boundary — 2026-08-30
 
 Read-only refresh authoritative live workflow:
@@ -1513,7 +1542,7 @@ TENDER - Targeted Recheck
 ### TR-10 — partial `false_resolved` для composite Round 2
 
 **Severity:** Critical / semantic safety
-**Status:** Mitigated / GREEN in local canonical candidate; LIVE promotion pending
+**Status:** Route guard offline GREEN in local canonical candidate; LIVE promotion pending
 
 Round 2 checker проверяет структуру ответа, IDs, cardinality и linking, но не доказывает, что `resolved` покрывает все существенные clauses составного поля.
 
@@ -1537,7 +1566,12 @@ LIVE checker accepts
 → application_documents semantic oracle fails
 ```
 
-Mutable local canonical gate теперь GREEN: тот же schema-valid partial `resolved` после raw validations получает effective terminal `requires_review`, сохраняет decisions/evidence/audit и материализует FINAL с обязательной ручной проверкой. Neutral `procurement_subject/resolved` и raw `application_documents/requires_review` controls остаются GREEN.
+Mutable local canonical gate теперь останавливает `application_documents` до
+общего Round 2. Если существующий `direct_final` contract неприменим, validated
+candidates terminally материализуются как `requires_review` с evidence и audit.
+Прежний Round 2 containment остаётся defense in depth и отдельно покрыт
+регрессией через immutable pre-route-guard collector. Neutral разрешённые Round
+2 поля и существующий `direct_final` contract остаются GREEN.
 
 Ограничение статуса: LIVE workflow не изменён; production promotion, runtime canary и fresh 27/27 run остаются отдельными gates.
 
@@ -1862,7 +1896,12 @@ targeted_recheck_single_confirmed_candidate
 Ожидание:
 
 ```text
-round_2
+field_key входит в Round 2 allow-list из 4 полей
+→ round_2
+
+field_key входит в остальные 23 поля каталога
+→ terminal_requires_review
+→ общий Semantic Aggregator1 не вызывается
 ```
 
 ### R7 — Round 2 resolved
@@ -1903,13 +1942,16 @@ needs_recheck = false
 ✅ TR-1 closed
 ```
 
-### R11 — Round 2 на любом из 27 field_key
+### R11 — Round 2 eligibility для всех 27 field_key
 
 Статус:
 
 ```text
-✅ code coverage реализован для всех 27 field_key
-⚠️ полный per-field regression ещё не выполнен
+✅ procurement_subject / nm_price_with_vat / delivery_term /
+   warranty_obligations_guarantee допускают общий Round 2
+✅ остальные 23 field_key terminally завершаются requires_review
+   без вызова общего Round 2
+✅ collector повторно проверяет тот же allow-list fail-closed
 ```
 
 ### R12 — transient DeepSeek empty content

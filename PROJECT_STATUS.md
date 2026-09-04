@@ -1,8 +1,25 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-03
+**Snapshot date:** 2026-09-04
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/tr14389-targeted-recheck-prompt`
+**Branch at snapshot:** `codex/application-documents-route-guard-14429`
+
+## Targeted Recheck route-guard checkpoint — execution 14429
+
+Owner-started full run `535461ec-8969-4e15-ad69-a87c3b9e4747` завершил 27/27,
+но не является semantic GREEN: `application_documents` после validated Targeted
+Recheck впервые стал неправильным в `Определить путь после Validator`
+(`post_validator_route=round_2`) и реально вызвал общий `Semantic Aggregator1`.
+Containment предотвратил `false_resolved`, однако FIELD_CATALOG запрещает Round 2
+для этого field key.
+
+Local canonical Targeted Recheck теперь имеет exact four-key Round 2 allow-list,
+отдельный terminal `requires_review` для остальных 23 полей и defense-in-depth в
+Round 2 collector. `application_documents` сохраняет validated candidate
+evidence и route-guard audit; существующий `direct_final` contract не изменён.
+Execution-derived regression по `14429` GREEN offline. Production/test n8n,
+PostgreSQL, credentials и executions не изменялись; следующий gate — отдельный
+owner-authorized import/read-back и runtime canary полного маршрута.
 
 ## ActiveX semantic checkpoint: parent 14409 / Worker 14410
 
