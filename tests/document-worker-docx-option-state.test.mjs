@@ -61,7 +61,40 @@ function sha256(buffer) {
 }
 
 function loadWorkflow() {
-  return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+  const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
+  if (process.env.DOCUMENT_WORKER_TEST_MUTATE_IDENTITY_TO_NUL !== '1') return workflow;
+
+  const replacements = new Map([
+    [nodeNames.normalizeDocling, [
+      [
+        "'v2i:' + JSON.stringify([documentPart, controlTarget])",
+        "[documentPart, controlTarget].join('\\u0000')",
+      ],
+      [
+        "'v2g:' + JSON.stringify([block.block_id, coordinate.source_table_ref, optionState.control_type, descriptor.discriminator])",
+        "[block.block_id, coordinate.source_table_ref, optionState.control_type, descriptor.discriminator].join('\\u0000')",
+      ],
+    ]],
+    [nodeNames.buildSemantic, [[
+      "'v2i:' + JSON.stringify([optionState.document_part.trim(), optionState.control_rel_target.trim()])",
+      "[optionState.document_part.trim(), optionState.control_rel_target.trim()].join('\\u0000')",
+    ]]],
+    [nodeNames.dispatchValidator, [[
+      "'v2i:' + JSON.stringify([String(optionState?.document_part ?? '').trim(), String(optionState?.control_rel_target ?? '').trim()])",
+      "[String(optionState?.document_part ?? '').trim(), String(optionState?.control_rel_target ?? '').trim()].join('\\u0000')",
+    ]]],
+  ]);
+  for (const [nodeName, nodeReplacements] of replacements) {
+    const node = findNode(workflow, nodeName);
+    for (const [currentExpression, oldExpression] of nodeReplacements) {
+      assert.ok(
+        node.parameters.jsCode.includes(currentExpression),
+        `Mutation target not found in ${nodeName}: ${currentExpression}`,
+      );
+      node.parameters.jsCode = node.parameters.jsCode.replace(currentExpression, oldExpression);
+    }
+  }
+  return workflow;
 }
 
 function findNode(workflow, name) {
@@ -611,9 +644,13 @@ function execution14359SemanticDocument({ cloneGuaranteeStructure = false } = {}
   };
 }
 
-async function normalizeBindingFixture(document, optionStates = bindingFixtureOptionStates()) {
+async function normalizeBindingFixture(
+  document,
+  optionStates = bindingFixtureOptionStates(),
+  workflow = loadWorkflow(),
+) {
   const [normalized] = await runCodeNode(
-    loadWorkflow(),
+    workflow,
     nodeNames.normalizeDocling,
     [{ json: document }],
     {
@@ -748,6 +785,23 @@ function buildValidatorResponse(unit, verdict = 'confirmed') {
     }],
     usage: {},
   };
+}
+
+function findLiteralNulPaths(value, pathParts = [], result = []) {
+  if (typeof value === 'string') {
+    if (value.includes('\u0000')) result.push(pathParts.join('.'));
+    return result;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => findLiteralNulPaths(entry, [...pathParts, index], result));
+    return result;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      findLiteralNulPaths(entry, [...pathParts, key], result);
+    }
+  }
+  return result;
 }
 
 test('fixture is a reviewed minimal derivative with exact source ActiveX parts', () => {
@@ -1631,12 +1685,197 @@ test('v2 local group projection is preserved in compact provenance', async () =>
   );
 });
 
+test('execution 14423 persistable ActiveX V2 projection is NUL-free and keeps exact groups', async () => {
+  const workflow = loadWorkflow();
+  const optionStates = bindingFixtureOptionStates();
+  const normalized = await normalizeBindingFixture(
+    execution14359SemanticDocument(),
+    optionStates,
+  );
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const targetBlocks = semanticBindingFixture.oracle.bindings.map((binding) => {
+    const block = semantic.json.semantic_blocks.find(
+      ({ source_block_ids: ids = [] }) => ids.includes(binding.expected_docling_table_ref),
+    );
+    assert.ok(block, binding.expected_docling_table_ref);
+    return block;
+  });
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'execution-14423-sanitized-unit',
+    primary_semantic_block_ids: targetBlocks.map(({ semantic_block_id: id }) => id),
+    overlap_semantic_block_ids: [],
+  }];
+
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  const persistable = {
+    analysis_unit: expanded.json.analysis_unit,
+    ai_segments: expanded.json.ai_segments,
+    provenance: expanded.json.provenance,
+  };
+  assert.deepEqual(findLiteralNulPaths(persistable), []);
+
+  for (const [index, block] of targetBlocks.entries()) {
+    const states = block.docx_option_states;
+    const groups = block.docx_option_state_semantic.option_groups;
+    assert.equal(groups.length, 1);
+    const group = groups[0];
+    const sourceState = optionStates[index === 0 ? 0 : 4];
+    assert.equal(
+      group.group_id,
+      'v2g:' + JSON.stringify([
+        block.source_block_ids[0],
+        group.source_table_ref,
+        sourceState.control_type,
+        sourceState.group_context,
+      ]),
+    );
+    assert.deepEqual(
+      group.control_identity_keys,
+      states.map((state) => (
+        'v2i:' + JSON.stringify([state.document_part, state.control_rel_target])
+      )),
+    );
+    for (const state of states) {
+      assert.equal(state.docx_option_group_semantic.group_id, group.group_id);
+    }
+  }
+});
+
+test('production path keeps adversarial tuple identities distinct and dispatches the exact identity', async () => {
+  const workflow = loadWorkflow();
+  const optionStates = sourceOptionStates();
+  optionStates[0] = {
+    ...optionStates[0],
+    document_part: 'a\u0000b',
+    control_rel_target: 'c',
+    control_type: 'option_button',
+    group_context: 'delimiter\u0000like',
+    state: 'selected',
+    raw_value: '1',
+  };
+  optionStates[1] = {
+    ...optionStates[1],
+    document_part: 'a',
+    control_rel_target: 'b\u0000c',
+    control_type: 'option_button',
+    group_context: 'x\u0000y',
+    state: 'selected',
+    raw_value: '1',
+  };
+  optionStates[2] = {
+    ...optionStates[2],
+    document_part: 'a|b"quoted"',
+    control_rel_target: 'c\\tail',
+    group_context: 'delimiter|like',
+  };
+  optionStates[3] = {
+    ...optionStates[3],
+    document_part: 'a',
+    control_rel_target: 'b|c"quoted"\\tail',
+    group_context: 'quotes"and\\slashes',
+  };
+
+  const normalized = await normalizeBindingFixture(
+    optionStateDoclingDocument(),
+    optionStates,
+    workflow,
+  );
+  const owner = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/0');
+  assert.ok(owner);
+
+  const expectedControlIdentities = [
+    'v2i:["a\\u0000b","c"]',
+    'v2i:["a","b\\u0000c"]',
+    'v2i:["a|b\\"quoted\\"","c\\\\tail"]',
+    'v2i:["a","b|c\\"quoted\\"\\\\tail"]',
+  ];
+  assert.deepEqual(
+    new Set(owner.docx_option_state_semantic.option_groups.flatMap(
+      ({ control_identity_keys: identities }) => identities,
+    )),
+    new Set(expectedControlIdentities),
+  );
+  const expectedGroupIds = [
+    'v2g:["#/tables/0","word/document.xml#table[2]","option_button","delimiter\\u0000like"]',
+    'v2g:["#/tables/0","word/document.xml#table[2]","option_button","x\\u0000y"]',
+    'v2g:["#/tables/0","word/document.xml#table[2]","checkbox","delimiter|like"]',
+    'v2g:["#/tables/0","word/document.xml#table[2]","checkbox","quotes\\"and\\\\slashes"]',
+  ];
+  assert.deepEqual(
+    new Set(owner.docx_option_state_semantic.option_groups.map(({ group_id: id }) => id)),
+    new Set(expectedGroupIds),
+  );
+
+  const publicIdentityProjection = {
+    control_identity_keys: owner.docx_option_state_semantic.option_groups.flatMap(
+      ({ control_identity_keys: identities }) => identities,
+    ),
+    group_ids: owner.docx_option_state_semantic.option_groups.map(({ group_id: id }) => id),
+  };
+  assert.deepEqual(findLiteralNulPaths(publicIdentityProjection), []);
+
+  const [prepared] = await runCodeNode(workflow, nodeNames.prepareBlocks, [normalized]);
+  const [semantic] = await runCodeNode(workflow, nodeNames.buildSemantic, [prepared]);
+  const semanticBlock = semantic.json.semantic_blocks.find(
+    ({ source_block_ids: ids = [] }) => ids.includes('#/tables/0'),
+  );
+  assert.ok(semanticBlock);
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'adversarial-production-identity-unit',
+    primary_semantic_block_ids: [semanticBlock.semantic_block_id],
+    overlap_semantic_block_ids: [],
+  }];
+  const [expanded] = await runCodeNode(workflow, nodeNames.expandForAi, [semantic]);
+  assert.deepEqual(findLiteralNulPaths({
+    group_ids: expanded.json.ai_segments.flatMap((segment) =>
+      segment.docx_option_state_semantic.option_groups.map(({ group_id: id }) => id)),
+    control_identity_keys: expanded.json.ai_segments.flatMap((segment) =>
+      segment.docx_option_state_semantic.option_groups.flatMap(
+        ({ control_identity_keys: identities }) => identities,
+      )),
+  }), []);
+
+  const target = optionStates[1];
+  const segment = expanded.json.ai_segments[0];
+  const source = buildOptionSource(segment, 'adversarial-production-identity-unit');
+  const [evidenceResult] = await runCodeNode(
+    workflow,
+    nodeNames.validateEvidence,
+    [{ json: buildExtractorResponse([
+      buildOptionFact('national_regime', target.exact_label, segment.semantic_block_id),
+    ], 'adversarial-production-identity-unit') }],
+    { sourceJsonByNode: { 'Подготовить запрос для AI': source } },
+  );
+  const [dispatch] = await runCodeNode(workflow, nodeNames.dispatchValidator, [evidenceResult]);
+  const dispatchedFact = dispatch.json.units_for_ai[0].verified_facts[0];
+  assert.equal(dispatchedFact.option_state_applicability, 'applicable');
+  assert.equal(dispatchedFact.option_state_evidence[0].document_part, 'a');
+  assert.equal(dispatchedFact.option_state_evidence[0].control_rel_target, 'b\u0000c');
+  assert.equal(dispatchedFact.option_state_groups[0].group_id, expectedGroupIds[1]);
+
+  const [validatorItem] = await runCodeNode(workflow, nodeNames.expandValidator, [dispatch]);
+  const [checked] = await runCodeNode(
+    workflow,
+    nodeNames.checkValidator,
+    [{ json: buildValidatorResponse(validatorItem.json, 'confirmed') }],
+    { sourceJsonByNode: { 'Развернуть units для AI Validator': validatorItem.json } },
+  );
+  assert.equal(checked.json.validated_facts[0].processing_status, 'confirmed');
+});
+
 test('resolved and unresolved groups in one semantic block are enforced independently', async () => {
   const workflow = loadWorkflow();
   const selected = bindingFixtureOptionStates()[4];
   const unresolved = { ...bindingFixtureOptionStates()[5], state: 'unknown', raw_value: null };
-  const selectedIdentity = `${selected.document_part}\u0000${selected.control_rel_target}`;
-  const unresolvedIdentity = `${unresolved.document_part}\u0000${unresolved.control_rel_target}`;
+  const selectedIdentity = 'v2i:' + JSON.stringify([
+    selected.document_part,
+    selected.control_rel_target,
+  ]);
+  const unresolvedIdentity = 'v2i:' + JSON.stringify([
+    unresolved.document_part,
+    unresolved.control_rel_target,
+  ]);
   const resolvedGroup = {
     group_id: 'sanitized-resolved-group',
     owner_status: 'resolved',
@@ -1704,7 +1943,10 @@ test('resolved and unresolved groups in one semantic block are enforced independ
 test('v2 applicability requires the exact option label in grounded evidence, not value_text alone', async () => {
   const workflow = loadWorkflow();
   const selected = bindingFixtureOptionStates()[4];
-  const identity = `${selected.document_part}\u0000${selected.control_rel_target}`;
+  const identity = 'v2i:' + JSON.stringify([
+    selected.document_part,
+    selected.control_rel_target,
+  ]);
   const neutralQuote = 'Sanitized grounded context without the option label.';
   const segment = {
     semantic_block_id: 'sb_quote_only_option_match',

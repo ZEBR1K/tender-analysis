@@ -6,6 +6,46 @@
 
 ## ActiveX semantic checkpoint: parent 14409 / Worker 14410
 
+### Execution 14423 PostgreSQL NUL containment — local implementation
+
+Execution `14423` впервые завершился ошибкой в `Save analysis unit`: PostgreSQL
+отклонил JSON payload как `unsupported Unicode escape`. Execution-derived
+диагностика насчитала `581` paths с literal U+0000; целевые ActiveX groups к
+этому моменту были разрешены корректно, а AI ещё не запускался.
+
+Local canonical Worker теперь использует tagged canonical JSON tuple encoding:
+
+```text
+control identity = 'v2i:' + JSON.stringify([document_part, control_rel_target])
+group identity   = 'v2g:' + JSON.stringify([block_id, source_table_ref, control_type, discriminator])
+```
+
+Normalizer публикует эти NUL-free identities, semantic builder и Validator
+dispatch вычисляют тот же contract без decoder. `Развернуть части для AI v1.2`
+не изменён. Старой persisted migration нет. Execution-derived sanitized RED
+воспроизвёл `54` NUL-bearing paths в target projection после real
+Normalizer→semantic→expand; после минимального изменения paths = `0`, exact
+group matching сохранён. Production-path adversarial regression дополнительно
+показал collision старого delimiter encoding (`3` identities вместо `4`) и
+GREEN для tagged tuples (`4/4` distinct identities), включая downstream
+Validator dispatch.
+
+Финальная offline verification после corrective review:
+
+- focused execution/mutation regressions: `2/2 PASS`;
+- focused option-state file: `83 tests / 82 pass / 1` baseline fixture-size fail;
+- file-isolated Document Worker suites: `249 / 248 / 1` против parent
+  `247 / 246 / 1`;
+- file-isolated full repository suite: `428 / 424 / 4` против parent
+  `426 / 422 / 4`;
+- failure files/signatures совпадают с parent, новых failures нет;
+- independent semantic review: `PASS`, blockers `0`;
+- independent JSONB/runtime-safety review: `PASS`, blockers `0`.
+
+Это offline evidence после read-only forensic execution `14423`: live n8n и
+PostgreSQL не изменялись, execution не перезапускался, runtime GREEN после fix
+не заявлен.
+
 Read-only MCP evidence on 2026-09-03 established that execution `14409` is the
 manual parent (`workflowId=5rYqVLDj4bHnnUD8`) and is not MCP-visible. Its child
 execution `14410` is the actual Document Worker run for exact workflow
