@@ -4,43 +4,60 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/dw-evidence-catalog-overflow-14487`
 
-## Document Worker Evidence Repair overflow checkpoint — execution 14487
+## Document Worker Evidence Repair overflow checkpoint — executions 14487 / 14491
 
-Read-only runtime evidence shows execution `14487` failed before the Evidence
-Repair AI call at `candidate_index=257` for an oversized table unit. Independent
-sanitized inspection corrected the first false-green assumption: the unit has
-`44,375` canonical characters, `2,016` structural candidates, `2,015` candidates
-in primary target `sb_0714`, and no candidate exactly equal to the normalized
-256-character value or 216-character invalid quote. The available runtime
-projection did not establish lexical-overlap scores or ranked candidate
-ordinals.
+Execution `14487` originally failed before the Evidence Repair AI call at
+`candidate_index=257` for `doc_7_au_0022`, primary target `sb_0714`. The local
+canonical Worker preserves byte-compatible full mode for `<=256` candidates and,
+for a single-fact overflow only, performs bounded deterministic retrieval of exact
+canonical fragments inside the violation-bound target block. Multi-fact overflow
+remains intentionally fail-closed until a fact-local catalog contract exists.
 
-The local canonical Worker now preserves byte-compatible full mode for `<=256`.
-Only on overflow, and only for exactly one invalid fact / one repaired-fact
-context, it uses bounded deterministic lexical overlap to rank exact canonical
-candidates inside known violation-bound target blocks, retaining at most eight
-anchors and fixed `±2` same-block neighbours with original ordinal refs.
-Multi-fact overflow intentionally hard-fails before ranking with an explicit
-audited error: the merged catalog has no fact-local relevance contract and could
-make primary material relevant to fact A selectable for fact B. Supporting that
-case is deferred until a future fact-local catalog/selection contract exists.
-This ranking is retrieval only: AI still selects refs, materialization still
-returns exact source strings, and unchanged strict evidence validation is
-authoritative. Empty, generic/high-frequency, zero-overlap, absent-target,
-missing relevant-primary, budget, and attempt-2 parity cases fail closed.
+Owner-started manual execution `14491` exercised the same observed geometry:
+`44,375` canonical characters, `2,016` structural candidates and `2,015` target
+candidates. `selection_mode=target_ranked_windows` retained `37` candidates and
+omitted `1,979`; the serialized request was `31,627 / 360,000` characters. One
+Evidence Repair call ran for the target unit. Attempt 2 independently rebuilt the
+catalog, accepted four allow-listed refs from `sb_0714`, materialized all four
+exactly, and returned `validation_passed=true` with zero evidence violations.
+Therefore the **DW-22 overflow runtime contour and exact/deterministic grounding
+are GREEN**. The repaired fact was subsequently rejected safely by AI Validator
+as `wrong_field_classification`; successful grounding did not bypass semantic
+validation.
 
-The corrected sanitized derivative preserves the observed `2,016 / 2,015 / 44,375`
-geometry without raw client content and uses explicitly synthetic distributed
-late fragments to test the retrieval hypothesis. It first made the blocked implementation
-RED with `Target-window exact material anchor missing for sb_0714`; the
-multi-fact review regression separately made the implementation RED with
-`Missing expected rejection`. Actual canonical jsCode now passes the focused
-file (`108/108`), including overflow fail-closed before any merged multi-fact
-ranking and a mutation back to whole-candidate equality that makes the corrected
-single-fact path fail. This checkpoint is **offline-only**: live n8n, PostgreSQL,
-credentials, models, prompts by meaning, and downstream workflows were not
-changed; import, promotion, real runtime token/window coverage, and runtime GREEN
-remain unverified.
+Execution `14491` later failed in `Проверить ответ AI Validator` on a different
+unit, `doc_7_au_0037`, fact `licenses_certificates`: validation item `1` omitted
+the mandatory `confidence` property, so the strict checker observed `undefined`
+and correctly failed closed with `validations[1].confidence должен быть числом от
+0 до 1`. Persistence, document completion, readiness and Aggregator dispatch were
+not reached. Thus DW-22 is runtime GREEN, but the complete Worker execution and
+full procurement run are not GREEN.
+
+### Agreed next change — selective bounded retry for invalid AI items
+
+Implement locally in the current workflow, **without a separate sub-workflow**:
+
+```text
+AI call
+→ strict response classification
+→ valid items continue
+→ only contract-invalid items enter a local retry branch
+→ merge by stable item identity
+→ final strict checker
+```
+
+The agreed default is three total attempts per item (initial call plus at most two
+retries), with bounded waits and explicit attempt audit. Already valid items must
+not be sent to the model again. Transport failures and retryable schema/contract
+failures are retried; semantic verdicts such as `wrong_field_classification` are
+not. After exhaustion the workflow must terminate the affected item safely using
+the stage-specific technical fallback (`requires_review` where its contract
+allows it), never infer `not_found`, never fabricate evidence or AI confidence,
+and never loop without a hard bound. Roll this pattern out one AI stage at a time,
+starting with `AI Validator v1 → Проверить ответ AI Validator`, with an
+execution-`14491`-derived RED fixture and item-level cardinality/cost assertions.
+Prompts, models, strict semantic validators, PostgreSQL schema and the 27-field
+catalog remain outside this change.
 
 ## Targeted Recheck route-guard checkpoint — executions 14429 / 14449
 
