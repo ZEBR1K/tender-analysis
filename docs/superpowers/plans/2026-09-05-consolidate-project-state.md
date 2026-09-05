@@ -37,7 +37,7 @@ $tests = @(rg --files tests | Where-Object { $_ -like '*.test.mjs' })
 
 Expected baseline observed on 2026-09-05: 458 tests, 450 pass, 8 fail. The failures must remain distinguishable from any merge-introduced regression.
 
-- [ ] **Step 3: Commit the integration plan**
+- [x] **Step 3: Commit the integration plan**
 
 ```powershell
 git add docs/superpowers/plans/2026-09-05-consolidate-project-state.md
@@ -50,7 +50,7 @@ git commit -m "docs: plan project state consolidation"
 - Modify only files reported by Git as merge conflicts.
 - Test: `tests/*.test.mjs`
 
-- [ ] **Step 1: Merge the divergent branch with history preserved**
+- [x] **Step 1: Merge the divergent branch with history preserved**
 
 ```powershell
 git merge --no-ff codex/dw21-structural-option-owner
@@ -58,11 +58,11 @@ git merge --no-ff codex/dw21-structural-option-owner
 
 Expected: either a merge commit or an explicit conflict list. Do not resolve workflow JSON conflicts by selecting one whole side.
 
-- [ ] **Step 2: Resolve each conflict by contract ownership**
+- [x] **Step 2: Resolve each conflict by contract ownership**
 
 For Document Worker files, retain DW-21 structural option ownership and DW-23 JSONB-safe identities, local applicability, evidence overflow handling, and selective Validator retry. For documentation, preserve both completed histories and mark no production promotion that was not actually performed.
 
-- [ ] **Step 3: Compare the post-merge failures with the recorded baseline**
+- [x] **Step 3: Compare the post-merge failures with the recorded baseline**
 
 ```powershell
 $tests = @(rg --files tests | Where-Object { $_ -like '*.test.mjs' })
@@ -78,7 +78,7 @@ Expected: no new failures beyond the eight recorded baseline failures. Any new f
 - Inspect: `workflows/n8n-exports/TENDER — Обработать документ.json`
 - Modify: `tests/document-worker-docx-option-state.test.mjs` only if a useful assertion is absent and the integrated implementation already satisfies it.
 
-- [ ] **Step 1: Compare snapshot-only assertions without merging the snapshot commit**
+- [x] **Step 1: Compare snapshot-only assertions without merging the snapshot commit**
 
 ```powershell
 git diff codex/consolidate-project-state...origin/codex/activex-jsonb-red-baseline-snapshot -- tests/document-worker-docx-option-state.test.mjs
@@ -86,11 +86,11 @@ git diff codex/consolidate-project-state...origin/codex/activex-jsonb-red-baseli
 
 Classify the four recorded scenarios: fixture-size pin, NUL-free persistence, collision-safe tuple identity, and group-local applicability.
 
-- [ ] **Step 2: Port only missing useful assertions**
+- [x] **Step 2: Port only missing useful assertions**
 
 Do not cherry-pick or merge `5b8f564`. Skip assertions already represented by equivalent or stronger passing tests. Do not copy a stale fixture byte-count assertion as behavior.
 
-- [ ] **Step 3: Verify the focused ActiveX suite**
+- [x] **Step 3: Verify the focused ActiveX suite**
 
 ```powershell
 & 'C:\Program Files\nodejs\node.exe' --test tests/document-worker-docx-option-state.test.mjs
@@ -98,3 +98,4 @@ Do not cherry-pick or merge `5b8f564`. Skip assertions already represented by eq
 
 Expected: the three behavioral scenarios pass; any remaining failure must be identified as a stale fixture pin or a genuine integrated regression.
 
+Observed on 2026-09-05: the NUL-free persistence and collision-safe tuple assertions were ported to the integrated DW-21 contract; group-local applicability already had equivalent stronger coverage. The snapshot commit was not merged. Focused Worker tests passed `98/99`; the only failure was the pre-existing stale fixture byte-count pin `1021 != 1012`.

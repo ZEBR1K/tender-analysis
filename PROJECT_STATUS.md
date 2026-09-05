@@ -4,6 +4,24 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/consolidate-project-state`
 
+## Integration checkpoint — DW-21 + DW-22 + DW-23 locally combined
+
+The isolated integration branch now combines DW-21 structural DOCX option
+ownership with the later bounded evidence-repair and selective AI Validator
+retry contracts. Persistable structural identities use versioned JSON tuples
+and are NUL-free and collision-safe. The primary Validator remains outside the
+retry loop; attributable partial responses retry only contract-invalid facts,
+while transport/unknown/unattributable responses fail closed by retrying the
+whole source unit. Attempts 2 and 3 are the only additional calls, and terminal
+exhaustion becomes audited `requires_review`.
+
+Independent spec and quality reviews approved commit `a83b092`. Fresh full
+offline verification: `465 total / 457 pass / 8` exact known baseline failures,
+with no ninth integration failure. The intentional snapshot commit `5b8f564`
+was not merged wholesale; only its missing NUL/collision regression properties
+were carried into the integrated contract. Local `main`, `origin/main`, live n8n
+and PostgreSQL were not changed. Production promotion/runtime remain pending.
+
 ## DW-23 selective AI Validator retry — local implementation GREEN
 
 Canonical local Document Worker now contains a bounded, fact-selective retry
