@@ -44,6 +44,29 @@ const NODES = {
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 
+test('persistable structural identities are versioned, NUL-free, collision-safe, and group-local', () => {
+  const normalizer = workflow.nodes.find(
+    (candidate) => candidate.name === 'Нормализовать документ Docling',
+  );
+  assert.ok(normalizer, 'Workflow node not found: Нормализовать документ Docling');
+
+  const code = normalizer.parameters.jsCode;
+  assert.doesNotMatch(code, /\.join\(['"]\\u0000['"]\)/u);
+  assert.match(code, /'v2i:'\s*\+\s*JSON\.stringify\(\[/u);
+  assert.match(
+    code,
+    /'v2q:'\s*\+\s*JSON\.stringify\(\[/u,
+  );
+
+  const encode = (parts) => `v2i:${JSON.stringify(parts)}`;
+  assert.notEqual(encode(['a\u0000b', 'c']), encode(['a', 'b\u0000c']));
+  assert.equal(JSON.stringify({ identity: encode(['a\u0000b', 'c']) }).includes('\u0000'), false);
+
+  const groupA = `v2g:${JSON.stringify(['owner', 'table', 'option_button', 'group-a'])}`;
+  const groupB = `v2g:${JSON.stringify(['owner', 'table', 'option_button', 'group-b'])}`;
+  assert.notEqual(groupA, groupB, 'group-local applicability must retain the discriminator');
+});
+
 function findNode(name) {
   const node = workflow.nodes.find((candidate) => candidate.name === name);
   assert.ok(node, `Workflow node not found: ${name}`);

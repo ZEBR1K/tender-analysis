@@ -23,7 +23,30 @@ function node(graph, name) {
 async function runCode(name, inputItems, sources = {}) {
   const graph = workflow();
   const code = node(graph, name).parameters.jsCode;
-  const items = structuredClone(inputItems);
+  const rawItems = structuredClone(inputItems);
+  const validatorSources = sources['Развернуть units для AI Validator'];
+  const sourceValues = Array.isArray(validatorSources) ? validatorSources : [validatorSources];
+  const items = name === 'Проверить ответ AI Validator'
+    ? rawItems.map((item, index) => {
+        if (item.json?.validator_source_envelope) return item;
+        const source = sourceValues[index] ?? sourceValues[0];
+        assert.ok(source, 'Strict Validator checker fixture requires explicit source.');
+        return {
+          ...item,
+          json: {
+            ...item.json,
+            validator_source_envelope: {
+              version: 'ai_validator_source_envelope_v1',
+              source_identity: {
+                analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+                facts: source.verified_facts.map(({ fact_index, field_key }) => ({ fact_index, field_key })),
+              },
+              source,
+            },
+          },
+        };
+      })
+    : rawItems;
   const first = items[0] ?? { json: {} };
   const executionContext = {
     helpers: {

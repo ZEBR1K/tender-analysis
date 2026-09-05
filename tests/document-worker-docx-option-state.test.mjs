@@ -169,7 +169,7 @@ function parseXmlLikeN8n(xml) {
 async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = {} } = {}) {
   const node = findNode(workflow, nodeName);
   assert.equal(node.type, 'n8n-nodes-base.code');
-  const items = nodeName === nodeNames.validateEvidence
+  let items = nodeName === nodeNames.validateEvidence
     ? inputItems.map((item) => {
         const raw = sourceJsonByNode['Подготовить запрос для AI'];
         const source = Array.isArray(raw) ? raw[0] : raw;
@@ -191,6 +191,29 @@ async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = 
         };
       })
     : structuredClone(inputItems);
+  if (nodeName === nodeNames.checkValidator) {
+    const rawSources = sourceJsonByNode[nodeNames.expandValidator];
+    const sources = Array.isArray(rawSources) ? rawSources : [rawSources];
+    items = items.map((item, index) => {
+      if (item.json?.validator_source_envelope) return item;
+      const source = sources[index] ?? sources[0];
+      assert.ok(source, 'Strict Validator checker fixture requires explicit source.');
+      return {
+        ...item,
+        json: {
+          ...item.json,
+          validator_source_envelope: {
+            version: 'ai_validator_source_envelope_v1',
+            source_identity: {
+              analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+              facts: source.verified_facts.map(({ fact_index, field_key }) => ({ fact_index, field_key })),
+            },
+            source,
+          },
+        },
+      };
+    });
+  }
   const executionContext = {
     helpers: {
       async getBinaryDataBuffer(itemIndex, binaryPropertyName) {
