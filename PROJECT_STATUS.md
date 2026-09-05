@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-09-05
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw23-validator-selective-retry`
+**Branch at snapshot:** `codex/consolidate-project-state`
 
 ## DW-23 selective AI Validator retry — local implementation GREEN
 
@@ -454,7 +454,9 @@ Technical runtime gate is **GREEN through readiness only**. Semantic gate is **F
 
 This is not production-ready. Exact details and sanitized repaired-unit tables: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
 
-**One next step:** add an execution-derived local RED and the smallest deterministic review cap for facts whose evidence depends on unresolved DOCX option ownership/mutually exclusive alternatives, beginning with `doc_3_au_0012#0`; preserve evidence/audit and neutral non-option behavior. Do not enable Aggregator or start another runtime before that gate is reviewed locally.
+`DW-21` is now local GREEN. The canonical Worker derives exact control/label cells and typed direct question ancestry, binds each option group to one source and semantic owner, carries the proof separately from canonical text, and enforces universal fact-local applicability after every evidence path. A mapped selected option remains eligible for Validator; mapped unselected is deterministically rejected; missing/multiple/conflicting ownership stays `requires_review`, cannot be promoted by AI and keeps the original verdict/evidence/audit. The sanitized fixture preserves execution-derived topology without client text or a full DOCX. Focused `19/19`, Worker `255/252/3`, full suite `423/416/7`; all failures are exact pre-existing signatures.
+
+**One next step:** review the local DW-21 candidate and its audit contracts. Only after explicit approval, run a bounded isolated Worker canary that exercises the corrected structural owner → Validator → persistence path. Aggregator remains disabled for that checkpoint.
 
 ### Aggregator candidate-decision omission recovery — local only — 2026-09-03
 
@@ -975,6 +977,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 - execution `14359` локализовал следующий первый incorrect state после корректного raw parser: global label-only normalizer не связывал selected state с нужным semantic owner при повторяющихся labels. Stage 1 TDD checkpoints: RED `4f6f23f`, GREEN `a5a1cb7`, Critical RED `e7e1987`, Critical GREEN `3643b29`, fixture-geometry correction `e8db92b`.
 - exact read-only replay полного input execution `14359` после local fix подтвердил: activeX5/6/7/8 привязаны только к `#/tables/2` как `unselected/unselected/unselected/selected`, activeX55/56 — только к `#/tables/25` как `selected/unselected`. Replay остаётся fail-closed: `docx_option_state_semantic_status = unknown`, `33` warning groups и semantic owners только для `83/290` controls; guarded fields должны оставаться `requires_review` до post-fix canary.
 - Worker semantic chain offline сохраняет option-state/audit до `validator_meta`, исключает exact-grounded unselected guarded facts, ограничивает unknown/indeterminate review-only и не разрешает AI Validator создавать новые facts.
+- `DW-21` local TDD replaces the field-specific guard with universal fact-local structural ownership: real parser refs, unique question/group/source/semantic owner, AI-visible mapped proof, lossless primary/fallback/repair propagation, quote-only lexical matching and a post-AI cap all pass `19/19`; the full suite adds no failure signature.
 - `AG-11` offline matrix проходит `31/31`: positive `national_regime/resolved` требует confirmed primary и exact-bound structured applicability proof; generic/conditional ПП 1875 clauses без proof понижаются до effective `requires_recheck/insufficient_evidence`.
 - test Aggregator `ftvmrEHoMbPOAqZG` обновлён только в draft `f11906df-f760-4c54-a59e-16f4423ab534`: read-back 24 nodes, ровно три изменённые AG-11-ноды, connections сохранены, unexpected drift отсутствует. Published active остаётся `91c17313-a593-4fb9-9072-79320a958dd7`.
 - fresh Stage 1 branch verification: focused `DW-18 69/69`; full suite `347 total / 341 pass / 6 fail`. Все шесть RED совпадают с принятым baseline: `RED actionable: procurement_subject FIELD_RULES contain the universal current-scope boundary`; `RED A/B runtime report contains the full execution, artifact, response, oracle, and exit audit`; `RED A/B harness refuses canonical production workflow and preserves fixture and beta SHA-256`; `immutable beta Worker snapshot retains its reviewed packaging hash`; `v1.2 prompt artifact is an exact clean copy of the imported validator system prompt`; `Targeted Recheck prompt aligns evidence coordinates with both trusted sources`. Новых failures нет.
@@ -984,7 +987,7 @@ Root cause для пунктов 2–3 подтверждён в source OOXML: �
 
 - promotion/wiring clean Document Worker candidate в test/production contour;
 - immutable execution-version attribution for `14374/14376`; current draft `62041fec-…` is observed state, because n8n metadata did not return an exact executed version ID;
-- semantic applicability after exact grounding: `doc_3_au_0012#0 / advance_contract_guarantee` is unsafe while DOCX option owner remains unresolved; `DW-21` review-cap regression/fix pending;
+- runtime semantic applicability after exact grounding: the local `DW-21` regression/fix is GREEN, but no post-fix execution has yet proved that unresolved ownership for the `doc_3_au_0012#0 / advance_contract_guarantee` class is capped through live Validator/persistence;
 - stable extraction across repeated runs: `analog_allowed`, the `application_documents` fact/verdict qualification distribution and the `delivery_term` verdict differed between `14374` and `14376`; root cause for the `application_documents` change is not established;
 - full runtime canary beyond Document Worker readiness: Aggregator was disabled, so 27/27 FINAL/report/delivery remain unverified;
 - production promotion Aggregator AG-8 boundary;

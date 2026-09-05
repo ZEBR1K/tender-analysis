@@ -125,7 +125,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-17`|⚠ Local GREEN / promotion+runtime pending. Canonical local Worker заменяет model-written quote на bounded allow-listed `ai_evidence_repair_v2` refs, deterministic materialization и lossless merge; exact grounding не ослаблен. Live production не изменён.|Document Worker / evidence grounding|
 |`DW-18 / AG-11`|⚠ Runtime-informed local GREEN, canary pending. Executions `14350–14352` закрыли split Compression path, XML metadata loss и nested-table ancestor ambiguity; execution `14359` добавил structural semantic binding по source-table group и relative row geometry вместо global label-only lookup. Full read-only replay связывает целевые 6 controls правильно, но остаётся `semantic_status=unknown` (`33` warning groups, owners `83/290`), поэтому guarded fields fail closed до canary. Нужны promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator runtime canary.|Document Worker / Aggregator semantic safety|
 |`DW-19`|⚠ Bounded runtime batch-first GREEN; clean-candidate packaging pending. Execution `14359` дал `0/16` safely attachable primary responses; `14362` выявил latency regression (`12` sequential runs / `423` s против одного `16`-item run / ~`32` s); `14365` подтвердил nested-batching configuration blocker. Disposable isolated execution `14367` прошёл: primary `1` run / `12` outputs / `4339 ms`, exact linked IDs/order `12/12`, Loop `12 + done`, один allow-listed fallback только для injected unit `0007`, barrier `12/12`, paid calls `13 <= 25`, forbidden downstream runs `0`. Это не production candidate и не full-path metrics/Validator/persistence GREEN: canonical `2ffe1de` ещё не импортирован как clean inactive candidate; packaging/read-back — следующий отдельный gate. Production не изменён.|Document Worker / Extractor reliability and latency|
-|`DW-21`|⚠ P0 observed semantic applicability failure. Executions `14374/14376` passed exact grounding and Worker readiness, but unresolved DOCX option ownership/mutually exclusive alternatives still allowed unsafe confirmation, concretely `doc_3_au_0012#0 / advance_contract_guarantee`. Owner reports a subsequent user-side implementation and `14386/14387` diagnostics, but that code is unavailable in this Git branch and is not re-audited here.|Document Worker / DOCX semantic applicability|
+|`DW-21`|⚠ P0 locally mitigated / runtime pending. The integrated canonical Worker includes execution-derived structural option ownership: exact ActiveX row/cells, unique typed question/group/source/semantic owner, AI-visible proof and universal fact-local applicability. Mapped selected stays Validator-eligible; mapped unselected is excluded; missing/multiple/conflicting owner cannot become confirmed and retains audit. The later DW-23 JSONB-safe, collision-safe and group-local contracts remain authoritative. Production promotion and a fresh runtime canary are still pending.|Document Worker / DOCX semantic applicability|
 |`DW-22`|✅ Isolated runtime contour + exact grounding GREEN / promotion pending. Execution `14491` reproduced execution `14487` geometry exactly: `44,375` canonical chars / `2,016` candidates / `2,015` primary `sb_0714` candidates. `target_ranked_windows` retained `37`, omitted `1,979`, kept the request within bounds, made one repair call for the target unit, rebuilt the catalog on attempt 2 and exactly materialized `4/4` allow-listed refs with zero evidence violations. The repaired fact was safely rejected as `wrong_field_classification`. Multi-fact overflow remains intentionally fail-closed pending a fact-local catalog contract. Persistence/full Worker GREEN was not reached because of independent `DW-23`; production promotion remains pending.|Document Worker / Evidence Repair catalog bounding|
 |`DW-23`|⚠ Local GREEN after critic remediation and audit hardening / promotion+runtime pending. Execution `14491` failed in `Проверить ответ AI Validator` for `doc_7_au_0037#1 / licenses_certificates` because `confidence` was absent. Canonical local Worker keeps the primary Validator outside retry, classifies exact `analysis_unit_id + fact_index + field_key`, and sends only contract-invalid facts through at most two additional calls; valid siblings/units and semantic verdicts are not retried. Any unknown/unattributable validation identity makes the whole source unit retry, preventing partial acceptance. Reassembly carries an immutable explicit `ai_validator_source_envelope_v1`; the strict checker hard-validates source unit/fact identities without positional lookup, and aggregate-to-many assemblers no longer emit invalid `pairedItem` indexes. `validator_retry_audit` is system-owned: non-retried units overwrite provider input with a canonical empty audit, retried units use only workflow-built audit, and the strict checker rejects foreign version/bound/shape. Exhaustion becomes deterministic `requires_review` with `confidence=0` system sentinel, `reason_code=other`, original value/evidence and complete three-attempt audit. Execution-derived sanitized focused tests `9/9`, related `264/261/3` baseline parity, and full `458/450/8` baseline parity are GREEN; production promotion/read-back and fresh runtime canary through persistence/completion remain pending.|Document Worker / AI reliability and terminal containment|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
@@ -1269,7 +1269,7 @@ Nonblocking `DW-20`: validated units still expose legacy `extractor.provider = d
 ### Статус
 
 ```text
-P0 / Critical / observed semantic applicability failure
+P0 / Critical / local GREEN / runtime verification pending
 ```
 
 ### Execution evidence
@@ -1289,11 +1289,11 @@ delivery_term: requires_review → rejected
 
 The DOCX boundary remained `647 normalized / 528 semantic / 290 controls / 126 resolved / 33 warnings`: `29 missing_structural_semantic_owner` and `4 conflicting_structural_option_coordinates`. `docx_option_state_semantic_status=unknown` is therefore authoritative for applicability even when every selected quote exists exactly in canonical source.
 
-Read-only semantic inspection linked `doc_3_au_0012#0` and its initial `sb_0466` context to this unresolved option boundary. Client text and raw coordinate payloads are deliberately absent from the handoff, so an execution-derived sanitized structural fixture is required before the diagnosis can become a byte-level reproducible regression.
+Read-only semantic inspection linked `doc_3_au_0012#0` and its initial `sb_0466` context to this unresolved option boundary. The checked-in sanitized fixture now preserves the execution-derived relationship topology, nested table/row/cell ancestry, relative coordinates and equality/collision structure with neutral tokens. Raw client text and the full DOCX/payload are not stored.
 
-### Required minimal behavior
+### Local implementation
 
-Do not weaken exact grounding and do not reinterpret absence as a negative fact. Add a narrow deterministic review cap:
+Exact grounding remains unchanged and absence is not reinterpreted as a negative fact. The canonical Worker now applies this boundary:
 
 ```text
 fact relies on DOCX option evidence
@@ -1303,21 +1303,24 @@ fact relies on DOCX option evidence
 → requires_review
 ```
 
-The cap must not manufacture a selected option, delete rejected facts, change any `field_key`, or modify the 27-field contract. It is a semantic-applicability boundary after grounding, not a replacement for Evidence Repair.
+Parser output additively records source table/row/control-cell/label-cell refs, table ancestry and a unique typed `direct_enclosing_cell_child` question candidate. Normalizer and semantic replay bind the option group to exactly one source and semantic owner; zero/multiple/conflicting candidates remain non-mapped. Canonical text/evidence are unchanged. AI-visible markers expose selected/unselected only for mapped proof.
+
+The terminal cap is universal and fact-local, not field-specific or document-wide. It matches only grounded evidence quote against structurally attached exact labels: normalized cell/line equality or a shorter continuous label fragment at Unicode lexical boundaries. It checks every candidate row, never uses `value_text`, and treats multiple state/group/owner matches as review-only. Primary, fallback, Evidence Repair attempt 2, partition/dispatch and post-AI paths retain the additive audit. The cap does not manufacture a selected option, delete rejected facts, change a `field_key`, or modify the 27-field contract.
 
 ### Regression gates
 
 ```text
-execution-derived RED reproduces doc_3_au_0012#0 / advance_contract_guarantee
-exact quote grounding remains PASS
-unknown owner and conflicting coordinates each cap confirmed → requires_review
-mutually exclusive alternatives cannot jointly support confirmed
-candidate/evidence/provenance/option-state audit remain lossless
-neutral non-option exact-grounded confirmed fact remains unchanged
-neutral resolved selected-option fact remains eligible for normal validation
-analog_allowed absence is detected as cross-run instability, not converted to a negative fact
-application_documents and delivery_term fixtures retain FIELD_CATALOG semantics
-focused local suite GREEN before any new execution or promotion
+PASS execution-derived sanitized RED reproduces doc_3_au_0012#0 applicability boundary while exact grounding passes
+PASS real parser derives exact source table/row/control-cell/label-cell and typed direct owner candidate
+PASS unique selected owner/group maps; unselected sibling is excluded
+PASS nested table and duplicate labels in separate table groups remain structurally isolated
+PASS missing owner, conflicting coordinates and multiple semantic owners fail closed
+PASS mutually exclusive selected/unselected alternatives cannot jointly support confirmed
+PASS full-label, unique partial-quote, shared-fragment and embedded-token collision cases are deterministic
+PASS primary/fallback/repair metadata and post-AI candidate/evidence/provenance/audit remain lossless
+PASS neutral non-option fact is unchanged and mapped selected option remains eligible for normal Validator
+PASS focused 19/19; Worker 255/252/3; full 423/416/7 with exact pre-existing failures only
+PENDING bounded isolated runtime canary and promotion review
 ```
 
 Detailed sanitized evidence: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
@@ -1325,7 +1328,7 @@ Detailed sanitized evidence: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_1
 ### Приоритет
 
 ```text
-P0 before another full/client-ready run
+P0 local mitigation complete; runtime gate remains before another full/client-ready run
 ```
 
 \---
