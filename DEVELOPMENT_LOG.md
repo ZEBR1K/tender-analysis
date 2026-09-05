@@ -5651,3 +5651,43 @@ Live drift owner checkpoint: Aggregator active=draft `24` nodes/version `89b33d0
 DW-21 implementation остаётся user-side и отсутствует в current branch. Owner conclusions `14386/14387` приняты без re-audit: Docling PASS; `14386` primary `28/28`, third Evidence Repair `429`; `14387` primary `6/28`, fallback `22/28`, fourth fallback `429`; ActiveX `national_regime` selected `Не применимо` grounded (`290 = 38 selected / 88 unselected / 164 unknown`, `126` reliable), но semantic mapping partial/unknown (`51 exact / 189 missing_owner / 50 conflicting`). Пользовательский Wait и последующий DW-21 code не входят в эту ветку; Worker portion `14389` завершился до downstream failure chain.
 
 Новый `TR-15` ограничивает следующий fix только prompt ноды `Подготовить запрос #2 AI Targeted Recheck`: один evidence quote = одна continuous verbatim substring; разные fragments = отдельные evidence objects с теми же unit/block IDs. Sanitized report: `evaluations/TARGETED_RECHECK_FORENSIC_14389_14391_2026-09-03.md`. Client payload, run/fact UUID, provider response ID, credentials и URLs не сохранены. Live n8n/DB не изменялись.
+
+---
+
+## 2026-09-05 — DW-23 selective AI Validator retry local GREEN
+
+Execution `14491` established the first incorrect terminal state after successful
+DW-22 repair: `Проверить ответ AI Validator` received two validations for
+`doc_7_au_0037`, but `licenses_certificates` omitted `confidence`; the valid
+`application_documents` sibling was lost with the unit-level hard stop and no
+persistence/completion ran.
+
+Strict TDD started with a sanitized `runtime_replay=false` fixture preserving the
+22-unit boundary and exact target/sibling identities. Initial result was
+`6 total / 1 pass / 5 fail`; the first expected failure was missing node
+`Обработать Validator retry facts по одной`. Minimal canonical implementation
+keeps primary `AI Validator v1` outside a new `batchSize=1` Loop and adds exact
+fact-level classification, two bounded retries, a one-second wait before attempt
+3, done-only reassembly and deterministic technical exhaustion. Valid facts,
+units and semantic verdicts are never re-sent. Exhaustion preserves original
+value/evidence and emits audited `requires_review`, `confidence=0` system
+sentinel, `reason_code=other`; final strict checker and source/programming hard
+failures remain active.
+
+Verification:
+
+```text
+focused DW-23: 6/6 PASS
+related Document Worker: 261 total / 258 pass / 3 baseline fail
+full repository: 455 total / 447 pass / 8 baseline fail
+workflow structure: 85 unique nodes / 82 connection sources / 101 resolved edges
+```
+
+The eight full-suite failures are unchanged signatures outside this task: three
+Aggregator/A-B baseline REDs, ActiveX fixture-size, immutable beta Worker hash,
+Validator prompt CRLF/LF artifact, and two Targeted Recheck prompt/artifact
+line-ending checks. Local official n8n references were checked for Loop Over
+Items, IF, HTTP Request, Code and Wait semantics. No live n8n/API/DB write,
+workflow import/publish, paid call, credential, schema, `FIELD_CATALOG` or main
+merge occurred. Promotion/read-back and a fresh runtime canary through strict
+checker, fact persistence and document completion remain pending.

@@ -1917,7 +1917,7 @@ test('Document persistence counts and stores every validated fact including reje
   assert.match(query, /d\.facts_count\s+AS\s+database_facts_count/);
 });
 
-test('dispatch topology has no Merge or new Loop and both document branches feed the collector', () => {
+test('dispatch topology keeps evidence and Validator retry loops isolated and both document branches feed the collector', () => {
   const workflow = loadWorkflow();
   for (const nodeName of [
     'Подготовить dispatch AI Validator',
@@ -1966,8 +1966,12 @@ test('dispatch topology has no Merge or new Loop and both document branches feed
   assert.deepEqual(
     workflow.nodes
       .filter(({ type }) => type === 'n8n-nodes-base.splitInBatches')
-      .map(({ name }) => name),
-    ['Обработать evidence units по одной'],
+      .map(({ name }) => name)
+      .sort(),
+    [
+      'Обработать Validator retry facts по одной',
+      'Обработать evidence units по одной',
+    ].sort(),
   );
 });
 
@@ -3686,13 +3690,12 @@ test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte
   );
 });
 
-test('DW-17 preserves base Validator preparation parameters byte-for-byte', () => {
+test('DW-23 extends Validator preparation only with the retry field-profile lookup', () => {
   const workflow = loadWorkflow();
-  const parameters = findNode(workflow, 'Развернуть units для AI Validator').parameters;
-  assert.equal(
-    crypto.createHash('sha256').update(JSON.stringify(parameters)).digest('hex'),
-    'cd95632a02b7beb442ea5f342c09f6e23671626926d44d0e1cfcf281810fb0ed',
-  );
+  const code = findNode(workflow, 'Развернуть units для AI Validator').parameters.jsCode;
+  assert.match(code, /field_profiles_by_key/);
+  assert.match(code, /validator_prompt_context/);
+  assert.match(code, /field_profiles_text/);
 });
 
 test('Evidence Repair v2 schema exposes selected refs only and prohibits model-authored evidence', async () => {
@@ -4657,7 +4660,7 @@ test('immutable beta Worker snapshot retains its reviewed packaging hash', () =>
   );
 });
 
-test('production import candidate preserves beta packaging outside reviewed DW-18 and Extractor recovery nodes', () => {
+test('production import candidate preserves beta packaging outside reviewed DW-18 and DW-23 nodes', () => {
   const workflow = loadWorkflow();
   const betaWorkflow = loadBetaWorkflow();
   const expectedRemovedNodes = [
@@ -4693,6 +4696,23 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Связать fallback Extractor response с source',
     'Связать primary Extractor response с source',
   ].sort();
+  const expectedDw23Nodes = [
+    'AI Validator retry attempt 2',
+    'AI Validator retry attempt 3',
+    'Validator retry attempt 2 accepted?',
+    'Validator retry attempt 3 accepted?',
+    'Wait before Validator retry attempt 3',
+    'Есть contract-invalid Validator facts?',
+    'Классифицировать Validator retry attempt 2',
+    'Классифицировать Validator retry attempt 3',
+    'Классифицировать primary AI Validator',
+    'Обработать Validator retry facts по одной',
+    'Развернуть Validator retry queue',
+    'Собрать ответы AI Validator без retry',
+    'Собрать ответы AI Validator после retry',
+    'Сформировать Validator technical fallback',
+  ].sort();
+  const expectedAddedNodes = [...expectedDw18Nodes, ...expectedDw23Nodes].sort();
   const expectedChangedSharedNodes = new Set([
     'AI Extractor v1.0',
     'связать результат Docling и метаданные',
@@ -4706,6 +4726,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Классифицировать bounded retry',
     'Проверить Lossless Fact Partition',
     'Подготовить dispatch AI Validator',
+    'Развернуть units для AI Validator',
     'Проверить ответ AI Validator',
     'Сформировать units without AI Validator',
     'Свести AI и units without AI',
@@ -4713,11 +4734,11 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     'Обработать evidence units по одной',
     'Собрать units после evidence validation',
   ]);
-  const expectedChangedRuntimeNodes = new Set(['AI Extractor v1.0']);
+  const expectedChangedRuntimeNodes = new Set(['AI Extractor v1.0', 'AI Validator v1']);
   const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));
   const candidateNodesByName = new Map(workflow.nodes.map((node) => [node.name, node]));
   assert.equal(betaNodesByName.size, 60);
-  assert.equal(candidateNodesByName.size, 71);
+  assert.equal(candidateNodesByName.size, 85);
   assert.deepEqual(
     [...betaNodesByName.keys()]
       .filter((name) => !candidateNodesByName.has(name))
@@ -4728,20 +4749,20 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     [...candidateNodesByName.keys()]
       .filter((name) => !betaNodesByName.has(name))
       .sort(),
-    expectedDw18Nodes,
+    expectedAddedNodes,
   );
 
   for (const [name, candidateNode] of candidateNodesByName) {
     const betaNode = betaNodesByName.get(name);
     if (!betaNode) {
-      assert.ok(expectedDw18Nodes.includes(name), `Unexpected candidate-only node: ${name}`);
+      assert.ok(expectedAddedNodes.includes(name), `Unexpected candidate-only node: ${name}`);
       continue;
     }
     if (!expectedChangedSharedNodes.has(name)) {
       assert.deepEqual(candidateNode.parameters, betaNode.parameters, `${name}: parameters drift`);
     }
     else {
-      assert.notDeepEqual(candidateNode.parameters, betaNode.parameters, `${name}: expected DW-18 parameters drift`);
+      assert.notDeepEqual(candidateNode.parameters, betaNode.parameters, `${name}: expected reviewed parameters drift`);
     }
     assert.deepEqual(candidateNode.credentials ?? null, betaNode.credentials ?? null, `${name}: credentials drift`);
     assert.equal(candidateNode.type, betaNode.type, `${name}: type drift`);
@@ -4761,6 +4782,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
     betaEdges.filter((edge) => !candidateEdges.includes(edge)),
     [
       'AI Extractor v1.0|main|0|Проверить и привязать evidence|main|0',
+      'AI Validator v1|main|0|Проверить ответ AI Validator|main|0',
       'Обработать evidence units по одной|main|0|Собрать units после evidence validation|main|0',
       'Обработать evidence units по одной|main|1|Evidence validation passed?|main|0',
       'Связать метаданные и файл|main|0|определить тип файла|main|0',
@@ -4769,7 +4791,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
   );
   const candidateOnlyEdges = candidateEdges.filter((edge) => !betaEdges.includes(edge));
   assert.deepEqual(
-    candidateOnlyEdges.filter((edge) => !expectedDw18Nodes.some(
+    candidateOnlyEdges.filter((edge) => !expectedAddedNodes.some(
       (nodeName) => edge.startsWith(`${nodeName}|`) || edge.includes(`|${nodeName}|`),
     )),
     [
@@ -4777,7 +4799,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
       'Развернуть части для AI v1.2|main|0|Сохранить analysis unit|main|0',
     ].sort(),
   );
-  assert.ok(candidateOnlyEdges.length > 2, 'DW-18 graph edges must be present');
+  assert.ok(candidateOnlyEdges.length > 2, 'DW-18 and DW-23 graph edges must be present');
 
   assert.equal(Object.hasOwn(workflow, 'id'), false);
   assert.equal(Object.hasOwn(workflow, 'versionId'), false);

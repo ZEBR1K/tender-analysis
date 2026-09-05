@@ -2,7 +2,38 @@
 
 **Snapshot date:** 2026-09-05
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw-evidence-catalog-overflow-14487`
+**Branch at snapshot:** `codex/dw23-validator-selective-retry`
+
+## DW-23 selective AI Validator retry — local implementation GREEN
+
+Canonical local Document Worker now contains a bounded, fact-selective retry
+contour for `AI Validator v1`. The initial Validator call remains outside the
+Loop. Its response is classified by exact
+`analysis_unit_id + fact_index + field_key`; valid facts and semantic verdicts
+are retained, while only contract-invalid facts are queued one-by-one for at
+most two additional calls (three total attempts). Valid siblings and unrelated
+units are not re-sent.
+
+If the third response is still contract-invalid, the affected original fact is
+reassembled deterministically as `requires_review` with `confidence=0` as an
+explicit system sentinel, `reason_code=other`, unchanged value/evidence and a
+three-attempt `validator_meta` audit. The existing strict
+`Проверить ответ AI Validator` remains after convergence and still validates the
+complete reassembled unit response. Missing/crossed source identity, duplicate
+fact identity and programming invariants remain hard failures.
+
+Execution-`14491`-derived sanitized regression is explicitly marked
+`runtime_replay=false`. Focused DW-23 tests are `6/6 PASS`; related Document
+Worker tests are `261 total / 258 pass / 3` exact baseline failures; full suite is
+`455 total / 447 pass / 8` exact pre-existing baseline signatures. Workflow
+structure validates as `85` unique nodes / `82` connection sources / `101`
+resolved edges. No production n8n, PostgreSQL, credentials, schema,
+`FIELD_CATALOG`, or main branch was changed.
+
+This is local-only implementation evidence. Promotion/read-back and a fresh
+runtime canary reproducing the malformed `doc_7_au_0037#1 /
+licenses_certificates` response remain pending; complete Worker persistence and
+document completion are not yet runtime GREEN.
 
 ## Document Worker Evidence Repair overflow checkpoint — executions 14487 / 14491
 

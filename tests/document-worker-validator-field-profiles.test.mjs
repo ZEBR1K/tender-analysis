@@ -434,16 +434,27 @@ test('single-field dynamic prompt omits the static 27-field catalog and is short
   assert.doesNotMatch(renderedSingleFieldPrompt, /FIELD PROFILE: delivery_term/);
 });
 
-test('model, response format, max tokens, timeout, topology, and HTTP call count stay unchanged', () => {
+test('DW-23 keeps Validator request parameters while adding two bounded retry calls', () => {
   const workflow = loadWorkflow();
-  const validator = findNode(workflow, 'AI Validator v1');
-  assert.match(
-    validator.parameters.jsonBody,
-    /google\/gemini-3\.7-flash@provider=google-ai-studio\/flex&reasoning_effort=low/,
-  );
-  assert.match(validator.parameters.jsonBody, /max_tokens:\s*8192/);
-  assert.match(validator.parameters.jsonBody, /response_format:\s*\{\s*type:\s*'json_object'/);
-  assert.equal(validator.parameters.options.timeout, 180000);
+  const validatorNames = [
+    'AI Validator v1',
+    'AI Validator retry attempt 2',
+    'AI Validator retry attempt 3',
+  ];
+  const primaryValidator = findNode(workflow, validatorNames[0]);
+  for (const name of validatorNames) {
+    const validator = findNode(workflow, name);
+    assert.match(
+      validator.parameters.jsonBody,
+      /google\/gemini-3\.7-flash@provider=google-ai-studio\/flex&reasoning_effort=low/,
+    );
+    assert.match(validator.parameters.jsonBody, /max_tokens:\s*8192/);
+    assert.match(validator.parameters.jsonBody, /response_format:\s*\{\s*type:\s*'json_object'/);
+    assert.equal(validator.parameters.options.timeout, 180000);
+    assert.equal(validator.retryOnFail, false);
+    assert.equal(validator.parameters.jsonBody, primaryValidator.parameters.jsonBody);
+    assert.deepEqual(validator.credentials, primaryValidator.credentials);
+  }
   assert.deepEqual(
     workflow.connections['Развернуть units для AI Validator'].main[0].map(
       ({ node }) => node,
@@ -452,10 +463,15 @@ test('model, response format, max tokens, timeout, topology, and HTTP call count
   );
   assert.deepEqual(
     workflow.connections['AI Validator v1'].main[0].map(({ node }) => node),
+    ['Классифицировать primary AI Validator'],
+  );
+  assert.deepEqual(
+    workflow.connections['Собрать ответы AI Validator без retry'].main[0].map(({ node }) => node),
     ['Проверить ответ AI Validator'],
   );
-  assert.equal(
-    workflow.nodes.filter(({ name }) => name === 'AI Validator v1').length,
-    1,
+  assert.deepEqual(
+    workflow.connections['Собрать ответы AI Validator после retry'].main[0].map(({ node }) => node),
+    ['Проверить ответ AI Validator'],
   );
+  assert.equal(validatorNames.filter((name) => findNode(workflow, name)).length, 3);
 });

@@ -1,0 +1,56 @@
+{
+  "schema_version": "document_worker_validator_selective_retry_fixture_v1",
+  "source_execution_id": 14491,
+  "runtime_replay": false,
+  "sanitization": "Execution-derived identity, cardinality and malformed-confidence boundary. Client text and provider payload content were replaced with synthetic exact-grounded controls.",
+  "recorded_counts": {
+    "primary_source_items": 22,
+    "primary_response_items": 22,
+    "target_source_facts": 2,
+    "contract_invalid_facts": 1
+  },
+  "unit_ids": [
+    "doc_7_au_0001",
+    "doc_7_au_0002",
+    "doc_7_au_0003",
+    "doc_7_au_0004",
+    "doc_7_au_0005",
+    "doc_7_au_0006",
+    "doc_7_au_0007",
+    "doc_7_au_0008",
+    "doc_7_au_0009",
+    "doc_7_au_0010",
+    "doc_7_au_0011",
+    "doc_7_au_0012",
+    "doc_7_au_0013",
+    "doc_7_au_0014",
+    "doc_7_au_0037",
+    "doc_7_au_0038",
+    "doc_7_au_0039",
+    "doc_7_au_0040",
+    "doc_7_au_0041",
+    "doc_7_au_0042",
+    "doc_7_au_0043",
+    "doc_7_au_0044"
+  ],
+  "target_identity": {
+    "analysis_unit_id": "doc_7_au_0037",
+    "fact_index": 1,
+    "field_key": "licenses_certificates",
+    "observed_failure_code": "invalid_confidence"
+  },
+  "preserved_sibling_identity": {
+    "analysis_unit_id": "doc_7_au_0037",
+    "fact_index": 0,
+    "field_key": "application_documents"
+  },
+  "fallback": {
+    "verdict": "requires_review",
+    "confidence": 0,
+    "reason_code": "other",
+    "origin": "deterministic_technical_fallback",
+    "version": "ai_validator_retry_fallback_v1",
+    "confidence_origin": "system_sentinel",
+    "attempt_count": 3
+  }
+}

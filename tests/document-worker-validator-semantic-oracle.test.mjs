@@ -236,7 +236,15 @@ test('validation cardinality and fact linking contracts remain unchanged', () =>
     ({ node }) => node,
   );
 
-  assert.deepEqual(targets, ['Проверить ответ AI Validator']);
+  assert.deepEqual(targets, ['Классифицировать primary AI Validator']);
+  assert.deepEqual(
+    workflow.connections['Собрать ответы AI Validator без retry'].main[0].map(({ node }) => node),
+    ['Проверить ответ AI Validator'],
+  );
+  assert.deepEqual(
+    workflow.connections['Собрать ответы AI Validator после retry'].main[0].map(({ node }) => node),
+    ['Проверить ответ AI Validator'],
+  );
   assert.match(body, /fact_index:\s*fact\.fact_index/);
   assert.match(body, /field_key:\s*fact\.field_key/);
   assert.match(body, /Верни ровно один validation для каждого переданного fact\./);

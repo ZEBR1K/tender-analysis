@@ -520,6 +520,64 @@ execution, database write, or runtime GREEN is claimed.
 
 ---
 
+## 9F. Selective AI Validator contract retry — execution 14491 local repair
+
+Execution `14491` passed the DW-22 Evidence Repair contour and later stopped in
+`Проверить ответ AI Validator`: unit `doc_7_au_0037` contained two facts, but the
+response for fact `1 / licenses_certificates` omitted mandatory `confidence`.
+Fact `0 / application_documents` was contract-valid. The strict checker behaved
+correctly, but its unit-level hard stop prevented all document persistence and
+completion.
+
+Canonical local topology now separates classification from the unchanged final
+strict checker:
+
+```text
+AI Validator v1 (primary, outside Loop)
+→ classify every response fact against explicit paired source
+→ no invalid facts: reassemble original unit responses
+→ invalid facts: queue exact analysis_unit_id + fact_index + field_key
+   → Loop Over Items, batchSize=1
+   → attempt 2
+   → accepted semantic verdict returns to Loop
+   → contract-invalid response waits 1 second and runs attempt 3
+   → accepted semantic verdict returns to Loop
+   → exhausted contract failure becomes deterministic technical fallback
+→ done-only reassembly of every original unit and fact
+→ existing strict Проверить ответ AI Validator
+```
+
+Only the failed fact is present in each retry request, together with its exact
+field profile. Valid siblings and unrelated units are preserved from the primary
+response and never sent again. Retry eligibility is limited to transport and
+response-contract failures; `confirmed`, `requires_review` and `rejected` are
+terminal semantic verdicts and never trigger retry. The provider response cannot
+supply or change source identity: classifiers use explicit paired source and
+hard-fail missing/crossed identity, duplicate source facts, exact `field_key`
+mismatch and programming invariants.
+
+After three invalid attempts, fallback preserves the original `value_text` and
+evidence and emits `requires_review`, `confidence=0`, `reason_code=other`, with
+`confidence_origin=system_sentinel`, `reported_ai_confidence=null`,
+`retry_exhausted=true`, attempt count, final failure code and all three attempt
+outcomes in `validator_meta`. It never emits `not_found` and does not pretend the
+sentinel is model confidence. The final strict checker remains outside the Loop,
+validates complete cardinality/linking and carries the retry audit into persisted
+fact metadata.
+
+The sanitized execution-derived fixture is labelled `runtime_replay=false` and
+preserves only the 22-unit identity/cardinality boundary and target/sibling
+geometry. TDD first failed on the missing retry topology; current focused result
+is `6/6 PASS`. Related Worker suite is `261 / 258 / 3` with only known baseline
+fixture/hash/prompt-line-ending failures. Full repository suite is
+`455 / 447 / 8`, all eight signatures pre-existing and outside DW-23. Structural
+validation reports `85` unique nodes, `82` connection sources and `101` resolved
+edges. This remains a local inactive export candidate: no n8n import/publish,
+runtime canary, PostgreSQL write, schema/catalog change or production promotion
+has occurred.
+
+---
+
 ## 10. Universal Docling Normalizer
 
 `Нормализовать документ Docling` принимает `DoclingDocument` и превращает provider-specific структуру в наш универсальный document representation.
