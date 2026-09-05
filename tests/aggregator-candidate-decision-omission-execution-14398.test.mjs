@@ -156,10 +156,19 @@ for (const workflowPath of workflowPaths) {
       nodeByName.get(checkerNodeName).parameters.jsCode,
     );
     assert.equal(nodeByName.get(retryCheckerNodeName).onError, 'continueErrorOutput');
+    const primaryRequestBody =
+      nodeByName.get('Semantic Aggregator').parameters.jsonBody;
+    const retryRequestBody =
+      nodeByName.get(retryHttpNodeName).parameters.jsonBody;
+    const normalizeModelAlias = (body) =>
+      body.replace(/model: '[^']+'/u, "model: '<model-alias>'");
     assert.equal(
-      nodeByName.get(retryHttpNodeName).parameters.jsonBody,
-      nodeByName.get('Semantic Aggregator').parameters.jsonBody,
+      normalizeModelAlias(retryRequestBody),
+      normalizeModelAlias(primaryRequestBody),
+      'bounded retry may change only the explicit model alias',
     );
+    assert.match(primaryRequestBody, /model: '[^']+'/u);
+    assert.match(retryRequestBody, /model: '[^']+'/u);
     assert.deepEqual(
       nodeByName.get(retryHttpNodeName).credentials,
       nodeByName.get('Semantic Aggregator').credentials,
