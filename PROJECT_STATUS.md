@@ -22,6 +22,22 @@ was not merged wholesale; only its missing NUL/collision regression properties
 were carried into the integrated contract. Local `main`, `origin/main`, live n8n
 and PostgreSQL were not changed. Production promotion/runtime remain pending.
 
+## Aggregator live synchronization — 2026-09-05
+
+Read-only n8n API export confirmed that workflow ID `ftvmrEHoMbPOAqZG`,
+historically named `[TEST CODEX] TENDER — Агрегация закупки`, is currently
+active and named `TENDER — Агрегация закупки`. Its 31-node live graph is now
+the canonical repository snapshot. The live `procurement_subject` rules already
+contain the verified AG-8 current-procurement boundary, so no additional prompt
+rewrite was needed after export. The same live graph also contains the safe
+`application_documents` Round 1 deferral and an explicit retry-model fallback.
+
+Offline verification after synchronization: `465 total / 458 pass / 7` known
+baseline failures. AG-8's prior intentional production RED gate is now GREEN;
+the remaining failures are artifact/fixture/prompt byte-pins unrelated to this
+sync. This read-back does not prove a fresh runtime execution or full 27/27
+semantic result. No n8n or PostgreSQL write was performed by Codex.
+
 ## DW-23 selective AI Validator retry — local implementation GREEN
 
 Canonical local Document Worker now contains a bounded, fact-selective retry

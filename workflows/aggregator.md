@@ -11,7 +11,7 @@
 **Основная модель Semantic Aggregator:** `deepseek/deepseek-v4-pro-0813`
 **Reasoning:** через alias модели `@reasoning_effort=low`
 
-> Protected production workflow не изменялся в текущем Aggregator hardening cycle. В изолированном workflow `[TEST CODEX] TENDER — Агрегация закупки` (`ftvmrEHoMbPOAqZG`) AG-8 прошёл offline beta contract, MCP read-back и paid runtime canary; `application_documents` boundary также прошла offline regressions и safe-deferred runtime canary. Production promotion, Targeted Recheck verification и fresh 27/27 run остаются отдельными gates; подробности перечислены в `PROJECT_STATUS.md`.
+> Read-only export 2026-09-05 подтвердил, что workflow `ftvmrEHoMbPOAqZG`, исторически `[TEST CODEX]`, сейчас active и называется `TENDER — Агрегация закупки`. Его 31-node graph синхронизирован в canonical export и уже содержит AG-8 boundary, safe `application_documents` deferral и explicit retry-model fallback. Fresh runtime canary и full 27/27 semantic review остаются отдельными gates; Codex не изменял live n8n.
 
 \---
 
@@ -1308,7 +1308,7 @@ Aggregator
 ### AG-8 — `procurement_subject` current-scope false-resolved
 
 **Severity:** Critical / P0 before client report
-**Status:** Mitigated / verified in test; open until production promotion and fresh full run
+**Status:** Live artifact and canonical export GREEN; open until fresh runtime canary and full 27/27 review
 
 Execution `14104` содержит четыре `confirmed` candidates для `procurement_subject`: три относятся к закупаемым стандартным закрытиям палуб, один описывает внутренний процесс поддержания технологического оборудования.
 
@@ -1337,7 +1337,7 @@ Previous DeepSeek canary on fixture `14104` returned `round1_final/resolved`, as
 
 Subsequent request-model-only A/B used exact beta artifact SHA-256 `dc214110d3086d9e147f0b2c7fe983ee0e93543ca31f7d82c2c52ef3a1f04484` and fixture SHA-256 `6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75`. It returned checker-accepted `round1_final` and semantic oracle 6/6 for both candidates. GLM (`z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`) chose `doc_7_au_0001` primary at 0.08151487 RUB / 12911 ms / 3290 tokens; Gemini (`google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low`) chose `doc_7_au_0008` at 0.25840089 RUB / 3711 ms / 3732 tokens. Both assigned `doc_7_au_0031` `not_applicable`. GLM is the recommended beta baseline on reliability/correctness/cost; Gemini is the latency/provider fallback. Full evidence: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 
-The harness did not access DB/n8n and changed only `request.model`; the beta workflow and fixture were not modified. Production Aggregator, topology, SQL и checker не менялись. Production promotion gate и fresh full 27/27 run обязательны до закрытия AG-8.
+The harness did not access DB/n8n and changed only `request.model`; the beta workflow and fixture were not modified. Subsequent read-only export confirmed the active live graph already contains the same AG-8 boundary and canonical was synchronized from it. Fresh runtime canary and full 27/27 review remain mandatory before closing AG-8.
 
 \---
 
