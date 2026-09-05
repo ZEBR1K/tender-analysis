@@ -312,7 +312,7 @@ test('anti-overfit cases are labeled as synthetic recorded structural controls',
   );
 });
 
-test('actual canonical production jsCode accepts the recorded response, routes Round 1 FINAL, and materializes resolved', async () => {
+test('actual canonical production jsCode contains the recorded false-resolved response and routes Targeted Recheck', async () => {
   const fixture = loadExecutionFixture();
   const pipeline = await runAggregatorRound1({
     fixture,
@@ -323,13 +323,12 @@ test('actual canonical production jsCode accepts the recorded response, routes R
   assert.deepEqual(pipeline.executed_nodes, [
     'Подготовить запрос Semantic Aggregator',
     'Проверить ответ Semantic Aggregator',
-    'Сформировать FINAL после Round 1',
   ]);
   assert.equal(pipeline.prepared.allowed_fact_ids.length, 28);
   assert.equal(new Set(pipeline.prepared.allowed_fact_ids).size, 28);
   assert.equal(pipeline.checked.aggregation_validated, true);
-  assert.equal(pipeline.checked.aggregation_status, 'resolved');
-  assert.equal(pipeline.checked.needs_recheck, false);
+  assert.equal(pipeline.checked.aggregation_status, 'requires_recheck');
+  assert.equal(pipeline.checked.needs_recheck, true);
   assert.deepEqual(countRoles(pipeline.checked.candidate_decisions), {
     primary: 1,
     complement: 22,
@@ -338,15 +337,11 @@ test('actual canonical production jsCode accepts the recorded response, routes R
     conflict: 0,
     not_applicable: 2,
   });
-  assert.equal(pipeline.route, 'round1_final');
-  assert.equal(pipeline.final.aggregation_status, 'resolved');
-  assert.equal(pipeline.final.requires_human_review, false);
-  assert.equal(pipeline.final.resolution_method, 'semantic_aggregator_round_1');
-  assert.equal(pipeline.final.aggregation_round, 1);
-  assert.equal(pipeline.final.confidence, 0.9);
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.final, null);
 });
 
-test('diagnostic proof: the schema-valid resolved path fails the application_documents semantic oracle', async () => {
+test('canonical containment defers the schema-valid false-resolved path before FINAL', async () => {
   const fixture = loadExecutionFixture();
   const pipeline = await runAggregatorRound1({
     fixture,
@@ -361,22 +356,11 @@ test('diagnostic proof: the schema-valid resolved path fails the application_doc
   });
 
   assert.equal(pipeline.checked.aggregation_validated, true);
-  assert.equal(pipeline.route, 'round1_final');
-  assert.equal(pipeline.final.aggregation_status, 'resolved');
-  assert.equal(oracle.passed, false);
-  assert.equal(oracle.semantic_outcome, 'round1_final_evaluated');
-  assert.deepEqual(oracle.failed_checks, [
-    'direct_current_application_scope_only',
-    'due_diligence_or_qualification_stage_not_equated_to_application',
-    'participant_type_conditions_preserved',
-    'exact_periods_preserved',
-    'exact_deadlines_preserved',
-    'authority_bankruptcy_and_location_preserved',
-    'file_format_size_and_media_preserved',
-    'vague_period_not_used',
-      'unresolved_material_requires_review_not_silently_promoted',
-    'all_material_confirmed_requirements_preserved',
-  ]);
+  assert.equal(pipeline.route, 'targeted_recheck');
+  assert.equal(pipeline.final, null);
+  assert.equal(oracle.passed, true);
+  assert.equal(oracle.semantic_outcome, 'deferred_to_targeted_recheck');
+  assert.ok(oracle.skipped_resolved_only_checks.includes('scope'));
 });
 
 test('safe synthetic execution-derived requires_recheck response passes the route-aware oracle', async () => {
