@@ -197,9 +197,45 @@ function providerResponse(source, validations, suffix = 'primary') {
   };
 }
 
-function assertExplicitSourceEnvelope(providerItem, expectedSource) {
-  assert.equal(providerItem.pairedItem, undefined);
-  assert.deepEqual(providerItem.json.validator_source_envelope, {
+function emptySystemRetryAudit() {
+  return {
+    version: 'ai_validator_selective_retry_v1',
+    max_total_attempts: 3,
+    facts: [],
+  };
+}
+
+function providerOwnedRetryAudit(source, validation) {
+  return {
+    version: 'provider-owned-retry-audit-v0',
+    max_total_attempts: 999,
+    facts: [{
+      analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+      fact_index: validation.fact_index,
+      field_key: validation.field_key,
+      validator_meta: {
+        origin: 'ai_validator_retry',
+        version: 'ai_validator_selective_retry_v1',
+        confidence_origin: 'model',
+        reported_ai_confidence: validation.confidence,
+        contract_validated: true,
+        retry_exhausted: false,
+        attempt_count: 2,
+        final_failure_code: null,
+        analysis_unit_id: source.analysis_unit_meta.analysis_unit_id,
+        fact_index: validation.fact_index,
+        field_key: validation.field_key,
+      },
+      attempt_audit: [
+        { attempt: 1, forged_by: 'provider' },
+        { attempt: 2, forged_by: 'provider' },
+      ],
+    }],
+  };
+}
+
+function explicitSourceEnvelope(expectedSource) {
+  return {
     version: 'ai_validator_source_envelope_v1',
     source_identity: {
       analysis_unit_id: expectedSource.analysis_unit_meta.analysis_unit_id,
@@ -209,10 +245,18 @@ function assertExplicitSourceEnvelope(providerItem, expectedSource) {
       })),
     },
     source: expectedSource,
-  });
+  };
 }
 
-async function buildExecutionBoundary() {
+function assertExplicitSourceEnvelope(providerItem, expectedSource) {
+  assert.equal(providerItem.pairedItem, undefined);
+  assert.deepEqual(
+    providerItem.json.validator_source_envelope,
+    explicitSourceEnvelope(expectedSource),
+  );
+}
+
+async function buildExecutionBoundary({ providerAuditUnitId = null } = {}) {
   const units = buildUnits();
   const dispatch = dispatchEnvelope(units);
   const sourceItems = await runCodeNode(NODES.expand, [{ json: dispatch }]);
@@ -224,8 +268,12 @@ async function buildExecutionBoundary() {
         ({ fact_index: factIndex }) => factIndex === fixture.target_identity.fact_index,
       ).confidence;
     }
+    const response = providerResponse(source, validations);
+    if (source.analysis_unit_meta.analysis_unit_id === providerAuditUnitId) {
+      response.validator_retry_audit = providerOwnedRetryAudit(source, validations[0]);
+    }
     return {
-      json: providerResponse(source, validations),
+      json: response,
       pairedItem: { item: sourceIndex },
     };
   });
@@ -309,14 +357,19 @@ test('execution 14491 classification retries only doc_7_au_0037#1 and preserves 
 test('all-valid primary responses use the explicit source envelope through no-retry assembly and strict checking', async () => {
   const units = buildUnits();
   const sourceItems = await runCodeNode(NODES.expand, [{ json: dispatchEnvelope(units) }]);
-  const primaryItems = sourceItems.map((item, sourceIndex) => ({
-    json: providerResponse(
+  const poisonedSourceIndex = 0;
+  const primaryItems = sourceItems.map((item, sourceIndex) => {
+    const validations = item.json.verified_facts.map((fact) => validationFor(fact));
+    const response = providerResponse(
       item.json,
-      item.json.verified_facts.map((fact) => validationFor(fact)),
+      validations,
       'all-valid',
-    ),
-    pairedItem: { item: sourceIndex },
-  }));
+    );
+    if (sourceIndex === poisonedSourceIndex) {
+      response.validator_retry_audit = providerOwnedRetryAudit(item.json, validations[0]);
+    }
+    return { json: response, pairedItem: { item: sourceIndex } };
+  });
   const [classified] = await runCodeNode(
     NODES.classifyPrimary,
     primaryItems,
@@ -332,10 +385,24 @@ test('all-valid primary responses use the explicit source envelope through no-re
 
   const checked = await runCodeNode(NODES.strictChecker, assembled);
   assert.equal(checked.length, sourceItems.length);
+  assert.deepEqual(
+    {
+      assembledAudit: assembled[poisonedSourceIndex].json.validator_retry_audit,
+      persistedRetry: checked[poisonedSourceIndex].json.validated_facts[0]
+        .validator_meta.validator_retry,
+    },
+    {
+      assembledAudit: emptySystemRetryAudit(),
+      persistedRetry: undefined,
+    },
+  );
 });
 
-test('valid attempt 2 reassembles all 22 units and passes the unchanged strict checker', async () => {
-  const boundary = await buildExecutionBoundary();
+test('valid attempt 2 reassembles all 22 units and strips provider audit from its non-retried units', async () => {
+  const providerAuditUnitId = fixture.unit_ids.find(
+    (unitId) => unitId !== fixture.target_identity.analysis_unit_id,
+  );
+  const boundary = await buildExecutionBoundary({ providerAuditUnitId });
   const retryItems = await runCodeNode(NODES.expandRetry, [boundary.classified]);
   assert.equal(retryItems.length, 1);
   assert.equal(retryItems[0].json.verified_facts.length, 1);
@@ -374,6 +441,9 @@ test('valid attempt 2 reassembles all 22 units and passes the unchanged strict c
     ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
   ).json;
   assertExplicitSourceEnvelope(targetAssembled, targetSource);
+  const nonRetriedAssembled = assembled.find(
+    ({ json }) => json.validator_source_envelope.source_identity.analysis_unit_id === providerAuditUnitId,
+  );
 
   const checked = await runCodeNode(NODES.strictChecker, assembled);
   assert.equal(checked.length, 22);
@@ -383,6 +453,61 @@ test('valid attempt 2 reassembles all 22 units and passes the unchanged strict c
   assert.equal(targetChecked.json.validated_facts[0].validator_meta.validator_retry, undefined);
   assert.equal(targetChecked.json.validated_facts[1].validator_meta.validator_retry.attempt_count, 2);
   assert.equal(targetChecked.json.validated_facts[1].validator_meta.validator_retry.contract_validated, true);
+  const nonRetriedChecked = checked.find(
+    ({ json }) => json.analysis_unit_meta.analysis_unit_id === providerAuditUnitId,
+  );
+  assert.deepEqual(
+    {
+      assembledAudit: nonRetriedAssembled.json.validator_retry_audit,
+      persistedRetry: nonRetriedChecked.json.validated_facts[0].validator_meta.validator_retry,
+    },
+    {
+      assembledAudit: emptySystemRetryAudit(),
+      persistedRetry: undefined,
+    },
+  );
+});
+
+test('strict checker rejects foreign validator retry audit version, attempt bound, and shape', async () => {
+  const [sourceItem] = await runCodeNode(
+    NODES.expand,
+    [{ json: dispatchEnvelope([buildUnits()[0]]) }],
+  );
+  const source = sourceItem.json;
+  const validation = validationFor(source.verified_facts[0]);
+  const baseAudit = providerOwnedRetryAudit(source, validation);
+  const cases = [
+    {
+      audit: baseAudit,
+      expected: /validator_retry_audit\.version/u,
+    },
+    {
+      audit: {
+        ...baseAudit,
+        version: 'ai_validator_selective_retry_v1',
+      },
+      expected: /validator_retry_audit\.max_total_attempts/u,
+    },
+    {
+      audit: {
+        ...emptySystemRetryAudit(),
+        provider_owned: true,
+      },
+      expected: /validator_retry_audit.*недопустимое поле "provider_owned"/u,
+    },
+  ];
+  for (const { audit, expected } of cases) {
+    await assert.rejects(
+      runCodeNode(NODES.strictChecker, [{
+        json: {
+          ...providerResponse(source, [validation], 'foreign-audit'),
+          validator_source_envelope: explicitSourceEnvelope(source),
+          validator_retry_audit: audit,
+        },
+      }]),
+      expected,
+    );
+  }
 });
 
 test('attempt 3 exhaustion becomes audited requires_review and reaches document fact collection', async () => {

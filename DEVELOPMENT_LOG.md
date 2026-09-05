@@ -5689,12 +5689,22 @@ model the real assembler boundary instead of positional `itemMatching` lookup;
 the `Развернуть units для AI Validator` regression now uses its exact reviewed
 parameter SHA-256.
 
+The final accepted-review hardening closed one low audit-integrity gap. Focused
+RED on `cf2ca3d` was `9 total / 6 pass / 3 fail`: provider-supplied
+`validator_retry_audit` reached the checker and fact `validator_meta` through the
+all-valid path and through a non-retried unit inside retry assembly, while the
+checker accepted a foreign audit envelope. Both assemblers now overwrite
+non-retried units with the canonical empty system audit; retried units retain
+only workflow-built audit. The checker rejects foreign top-level version,
+`max_total_attempts` and keys. Validator `message.content` and
+`validator_source_envelope` semantics were not changed.
+
 Verification:
 
 ```text
-focused DW-23: 8/8 PASS
-related Document Worker: 263 total / 260 pass / 3 baseline fail
-full repository: 457 total / 449 pass / 8 baseline fail
+focused DW-23: 9/9 PASS
+related Document Worker: 264 total / 261 pass / 3 baseline fail
+full repository: 458 total / 450 pass / 8 baseline fail
 workflow structure: 85 unique nodes / 82 connection sources / 101 resolved edges
 ```
 

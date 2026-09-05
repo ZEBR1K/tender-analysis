@@ -35,10 +35,17 @@ source plus exact unit/fact identities. The strict checker now requires and
 hard-validates that envelope without positional source lookup; its own 1:1
 `pairedItem` still references its immediate input.
 
+Final audit hardening makes `validator_retry_audit` system-owned on every
+reassembled item. Units without an actual retry receive a canonical empty
+envelope (`ai_validator_selective_retry_v1`, `max_total_attempts=3`, `facts=[]`),
+overwriting any provider-supplied top-level field. Retried units receive only the
+workflow-built audit. The strict checker rejects foreign audit versions, attempt
+bounds and extra top-level keys before fact metadata is produced.
+
 Execution-`14491`-derived sanitized regression is explicitly marked
-`runtime_replay=false`. Focused DW-23 tests are `8/8 PASS`; related Document
-Worker tests are `263 total / 260 pass / 3` exact baseline failures; full suite is
-`457 total / 449 pass / 8` exact pre-existing baseline signatures. Workflow
+`runtime_replay=false`. Focused DW-23 tests are `9/9 PASS`; related Document
+Worker tests are `264 total / 261 pass / 3` exact baseline failures; full suite is
+`458 total / 450 pass / 8` exact pre-existing baseline signatures. Workflow
 structure validates as `85` unique nodes / `82` connection sources / `101`
 resolved edges. No production n8n, PostgreSQL, credentials, schema,
 `FIELD_CATALOG`, or main branch was changed.

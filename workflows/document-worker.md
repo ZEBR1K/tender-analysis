@@ -581,12 +581,20 @@ exact identities, and performs no positional lookup into `Развернуть u
 AI Validator`. Reassembly emits no invalid `pairedItem`; the checker retains only
 its valid 1:1 link to the immediate provider item.
 
+`validator_retry_audit` is also system-owned at the assembler boundary. For a
+unit with no actual retry, both assembly paths overwrite any provider field with
+`{ version: ai_validator_selective_retry_v1, max_total_attempts: 3, facts: [] }`.
+For a retried unit, only the workflow-built fact audit is emitted. The strict
+checker validates the audit envelope's exact top-level keys, version and attempt
+bound whenever it is present, so provider-supplied audit cannot reach persisted
+`validator_meta`.
+
 The sanitized execution-derived fixture is labelled `runtime_replay=false` and
 preserves only the 22-unit identity/cardinality boundary and target/sibling
 geometry. TDD first failed on the missing retry topology; current focused result
-is `8/8 PASS`. Related Worker suite is `263 / 260 / 3` with only known baseline
+is `9/9 PASS`. Related Worker suite is `264 / 261 / 3` with only known baseline
 fixture/hash/prompt-line-ending failures. Full repository suite is
-`457 / 449 / 8`, all eight signatures pre-existing and outside DW-23. Structural
+`458 / 450 / 8`, all eight signatures pre-existing and outside DW-23. Structural
 validation reports `85` unique nodes, `82` connection sources and `101` resolved
 edges. This remains a local inactive export candidate: no n8n import/publish,
 runtime canary, PostgreSQL write, schema/catalog change or production promotion
