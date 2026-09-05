@@ -1,0 +1,59 @@
+{
+  "schema_version": "document_worker_evidence_overflow_structural_class_v2",
+  "fixture_kind": "deterministic_sanitized_derivative",
+  "runtime_replay": false,
+  "source_execution": 14487,
+  "contains_raw_client_content": false,
+  "analysis_unit_id": "doc_7_au_0022",
+  "analysis_unit_geometry": {
+    "part_index": 2,
+    "parts_total": 3,
+    "contains_table": true,
+    "oversized_atomic_block": true,
+    "route": "evidence_repair"
+  },
+  "runtime_observation": {
+    "canonical_source_chars": 44375,
+    "structural_candidates_count": 2016,
+    "target_candidates_count": 2015,
+    "target_block_id": "sb_0714",
+    "target_scope": "primary",
+    "normalized_value_text_length": 256,
+    "normalized_value_text_sha256": "ac570e483cf554d17ab77236846650015dcb9b833d259cba04bd4378399b2bc9",
+    "normalized_invalid_quote_length": 216,
+    "normalized_invalid_quote_sha256": "5e08b00f605d705b0fa2e8ba345d6138a00ca6071b1e3616092a42e105ec2752",
+    "whole_candidate_match_ordinals": []
+  },
+  "target_block_id": "sb_0714",
+  "other_block_id": "sb_sanitized_overlap",
+  "target_scope": "primary",
+  "other_scope": "overlap",
+  "target_type": "table",
+  "target_candidate_count": 2015,
+  "total_structural_candidate_count": 2016,
+  "canonical_source_chars": 44375,
+  "value_text": "qualificationmatrix alphaomega deliveryschedule betagamma compliancecertificate deltazeta primaryscope epsiloneta valuepad01 valuepad02 valuepad03 valuepad04 valuepad05 valuepad06 valuepad07 valuepad08 valuepad09 valuepad10 valuepad11 valuepad12 valuepad13",
+  "invalid_quote": "qualificationmatrix alphaomega deliveryschedule betagamma compliancecertificate deltazeta primaryscope epsiloneta quotepad01 quotepad02 quotepad03 quotepad04 quotepad05 quotepad06 quotepad07 quotepad08 quotepad09 quo",
+  "sanitized_anchor_sha256": {
+    "value_text": "97924c1c45ba60589c7843d7e172f8bbad684d9b07cd03fd4db0157864c64902",
+    "invalid_quote": "2a87d06fa4ef224237a685de804ae0e509a503607d4c27b1a4f3fb0cd8ec847c"
+  },
+  "relevant_target_fragments": [
+    {
+      "ordinal": 1988,
+      "canonical_quote": "qualificationmatrix alphaomega"
+    },
+    {
+      "ordinal": 1991,
+      "canonical_quote": "deliveryschedule betagamma"
+    },
+    {
+      "ordinal": 2007,
+      "canonical_quote": "compliancecertificate deltazeta primaryscope epsiloneta"
+    }
+  ],
+  "expected_violations": [
+    "missing_primary_evidence",
+    "quote_not_found"
+  ]
+}

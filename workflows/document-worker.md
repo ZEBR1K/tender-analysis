@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-03
+**Последнее обновление:** 2026-09-05
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -454,6 +454,69 @@ semantic status = unknown
 Cross-run instability was also material: `46 → 42` facts, `179 → 171` evidence, loss of `analog_allowed` in `14376`, a changed `application_documents` fact/verdict qualification distribution, and `delivery_term` changing from `requires_review` to `rejected`. The aggregate audit does not establish the cause of the `application_documents` change. Exact grounding must remain strict; it is necessary but insufficient for a final semantic verdict.
 
 Current unresolved gate is `DW-21`: add an execution-derived deterministic review cap for option-derived facts with unresolved owner or conflicting mutually exclusive coordinates. Preserve candidate/evidence/provenance and audit, route unsafe confirmation to `requires_review`, and prove neutral non-option/fully-resolved controls are unchanged. Detailed sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+---
+
+## 9E. Evidence Repair catalog overflow — execution 14487 local repair
+
+Execution `14487` stopped in `Подготовить Evidence Repair` at structural candidate
+`257` for unit `doc_7_au_0022`: the oversized table target `sb_0714` appeared in
+two-segment provenance and the invalid fact carried `missing_primary_evidence` plus
+`quote_not_found`. No repair AI call, attempt-2 validation, or fact persistence ran.
+The checked-in regression is an explicitly labelled deterministic sanitized
+derivative; it contains no raw client text or production identifiers beyond the
+execution/unit/block coordinates needed to reproduce the geometry.
+
+Canonical local jsCode preserves byte-compatible full-catalog behavior for
+`<=256`. Independent sanitized inspection showed the real unit has `44,375`
+canonical characters, `2,016` structural candidates, `2,015` candidates in
+primary target `sb_0714`, and no structural candidate exactly equal to the
+normalized 256-character value or 216-character invalid quote. This proves
+that exact whole-candidate equality is unavailable as a retrieval prerequisite;
+the available runtime projection did not establish actual lexical-overlap
+scores or ranked candidate ordinals.
+
+Only on overflow the builder scans at most `4096` exact structural candidates
+and, only for exactly one invalid fact / one repaired-fact context, derives target
+block IDs from that fact and its violation details. Multi-fact overflow hard-fails
+before ranking with an explicit audited error: the current merged catalog has no
+fact-local relevance contract and could expose primary material relevant to one
+fact as selectable for another. A future multi-fact path requires a fact-local
+catalog contract. Bounded normalized material (`3000` chars, `64` anchor tokens)
+is used for deterministic token-overlap ranking inside those known targets;
+empty/short/stop and high-frequency (`>64` candidates) tokens are ignored.
+Candidate tokenization, scoring work, target blocks, ranked anchors (`8`) and
+fixed `±2` neighbours are all bounded. Ties resolve by original source order.
+Original block-local ordinals remain in refs (`er2:<block>:<original ordinal>`).
+
+This lexical score is retrieval-only, never evidence acceptance. Every outgoing
+catalog quote is still an exact canonical source candidate; AI can select refs
+only; attempt 2 materializes those exact strings and runs the unchanged strict
+validator. For `missing_primary_evidence`, selected target candidates with
+`scope=primary` satisfy retrieval coverage; otherwise a deterministically
+relevant primary candidate is required. Zero useful overlap, generic/ambiguous
+anchors, absent targets, missing primary coverage, scan/scoring/outbound budget
+overflow, and attempt-2 catalog/selection parity mismatch fail closed.
+
+The outgoing limits remain unchanged: `256` candidates, `250000` catalog chars,
+`1500` chars per quote, and `360000` serialized request chars. Selection audit
+records only bounds, counts, scores/refs, omissions, targets, primary coverage
+and ordinal ranges—never raw anchor text. Materialization, exact grounding,
+one-call topology, models, prompts by meaning, persistence, and downstream
+workflows are unchanged.
+
+The corrected sanitized derivative preserves the observed `2,016 / 2,015 / 44,375`
+geometry and adds explicitly synthetic distributed late fragments to exercise
+the bounded retrieval hypothesis. It first made the blocked implementation
+RED with `Target-window exact material anchor missing for sb_0714`; the added
+multi-fact overflow regression separately made the review-blocked implementation
+RED with `Missing expected rejection`. Focused actual-jsCode tests now pass
+`108/108`, including multi-fact overflow fail-closed before ranking, zero/ambiguous
+overlap, target/primary guards, deterministic tie-break, attempt-2 tamper parity,
+request size, old adversarial overflow, exact materialization, and mutation back
+to whole-candidate equality. This is **offline-only**: real runtime token/window
+coverage is not yet proven, and no workflow import/publication, production
+execution, database write, or runtime GREEN is claimed.
 
 ---
 

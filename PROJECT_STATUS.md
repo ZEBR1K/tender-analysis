@@ -1,8 +1,46 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-04
+**Snapshot date:** 2026-09-05
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/application-documents-route-guard-14429`
+**Branch at snapshot:** `codex/dw-evidence-catalog-overflow-14487`
+
+## Document Worker Evidence Repair overflow checkpoint — execution 14487
+
+Read-only runtime evidence shows execution `14487` failed before the Evidence
+Repair AI call at `candidate_index=257` for an oversized table unit. Independent
+sanitized inspection corrected the first false-green assumption: the unit has
+`44,375` canonical characters, `2,016` structural candidates, `2,015` candidates
+in primary target `sb_0714`, and no candidate exactly equal to the normalized
+256-character value or 216-character invalid quote. The available runtime
+projection did not establish lexical-overlap scores or ranked candidate
+ordinals.
+
+The local canonical Worker now preserves byte-compatible full mode for `<=256`.
+Only on overflow, and only for exactly one invalid fact / one repaired-fact
+context, it uses bounded deterministic lexical overlap to rank exact canonical
+candidates inside known violation-bound target blocks, retaining at most eight
+anchors and fixed `±2` same-block neighbours with original ordinal refs.
+Multi-fact overflow intentionally hard-fails before ranking with an explicit
+audited error: the merged catalog has no fact-local relevance contract and could
+make primary material relevant to fact A selectable for fact B. Supporting that
+case is deferred until a future fact-local catalog/selection contract exists.
+This ranking is retrieval only: AI still selects refs, materialization still
+returns exact source strings, and unchanged strict evidence validation is
+authoritative. Empty, generic/high-frequency, zero-overlap, absent-target,
+missing relevant-primary, budget, and attempt-2 parity cases fail closed.
+
+The corrected sanitized derivative preserves the observed `2,016 / 2,015 / 44,375`
+geometry without raw client content and uses explicitly synthetic distributed
+late fragments to test the retrieval hypothesis. It first made the blocked implementation
+RED with `Target-window exact material anchor missing for sb_0714`; the
+multi-fact review regression separately made the implementation RED with
+`Missing expected rejection`. Actual canonical jsCode now passes the focused
+file (`108/108`), including overflow fail-closed before any merged multi-fact
+ranking and a mutation back to whole-candidate equality that makes the corrected
+single-fact path fail. This checkpoint is **offline-only**: live n8n, PostgreSQL,
+credentials, models, prompts by meaning, and downstream workflows were not
+changed; import, promotion, real runtime token/window coverage, and runtime GREEN
+remain unverified.
 
 ## Targeted Recheck route-guard checkpoint — executions 14429 / 14449
 

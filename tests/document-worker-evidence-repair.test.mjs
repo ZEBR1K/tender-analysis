@@ -69,6 +69,12 @@ const synthetic14371ReferenceOnlyFixturePath = path.join(
   'document-worker-evidence',
   'synthetic-14371-reference-only-structure.json',
 );
+const execution14487SanitizedDerivativePath = path.join(
+  testDirectory,
+  'fixtures',
+  'document-worker-evidence',
+  'execution-14487-sanitized-derivative.json',
+);
 
 function loadWorkflow() {
   return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
@@ -295,6 +301,78 @@ function buildSource(segments, analysisUnitId = 'fixture-unit') {
       field_catalog_version: 'tender_fields_v1',
     },
   };
+}
+
+function buildExecution14487SanitizedDerivative() {
+  const fixture = JSON.parse(fs.readFileSync(execution14487SanitizedDerivativePath, 'utf8'));
+  assert.equal(fixture.fixture_kind, 'deterministic_sanitized_derivative');
+  assert.equal(fixture.runtime_replay, false);
+  assert.equal(fixture.contains_raw_client_content, false);
+  assert.equal(fixture.target_scope, 'primary');
+  assert.equal(fixture.runtime_observation.target_scope, 'primary');
+  assert.deepEqual(fixture.runtime_observation.whole_candidate_match_ordinals, []);
+  assert.equal(fixture.value_text.length, 256);
+  assert.equal(fixture.invalid_quote.length, 216);
+  assert.equal(
+    crypto.createHash('sha256').update(fixture.value_text).digest('hex'),
+    fixture.sanitized_anchor_sha256.value_text,
+  );
+  assert.equal(
+    crypto.createHash('sha256').update(fixture.invalid_quote).digest('hex'),
+    fixture.sanitized_anchor_sha256.invalid_quote,
+  );
+
+  const relevantByOrdinal = new Map(fixture.relevant_target_fragments.map(
+    ({ ordinal, canonical_quote }) => [ordinal, canonical_quote],
+  ));
+  const targetLines = Array.from({ length: fixture.target_candidate_count }, (_, index) => {
+    const ordinal = index + 1;
+    return `[C1] ${relevantByOrdinal.get(ordinal) ?? `sanitized row ${String(ordinal).padStart(4, '0')} x`}`;
+  });
+  // Preserve the observed 44,375 canonical-character geometry without adding
+  // another structural candidate or exposing runtime text.
+  targetLines[0] += ` ${'z'.repeat(994)}`;
+  targetLines[1] += ` ${'z'.repeat(994)}`;
+
+  const source = buildSource([
+    {
+      semantic_block_id: fixture.other_block_id,
+      scope: fixture.other_scope,
+      type: 'text',
+      role: 'body',
+      text: 'overlap context only',
+    },
+    {
+      semantic_block_id: fixture.target_block_id,
+      scope: fixture.target_scope,
+      type: fixture.target_type,
+      role: 'body',
+      text: targetLines.join('\n'),
+    },
+  ], fixture.analysis_unit_id);
+  source.analysis_unit_meta = {
+    ...source.analysis_unit_meta,
+    ...fixture.analysis_unit_geometry,
+  };
+  const canonicalSourceChars = source.ai_segments.reduce((sum, segment) => (
+    sum + String(segment.text)
+      .replace(/^[\t ]*\[(?:C[1-9]\d*(?:-C[1-9]\d*)?|R[1-9]\d*(?:-R[1-9]\d*)?,C[1-9]\d*(?:-C[1-9]\d*)?)\][\t ]*/gm, '')
+      .replace(/\s+/g, ' ')
+      .trim().length
+  ), 0);
+  assert.equal(canonicalSourceChars, fixture.canonical_source_chars);
+  assert.equal(1 + targetLines.length, fixture.total_structural_candidate_count);
+  assert.equal(targetLines.length, fixture.runtime_observation.target_candidates_count);
+  assert.ok(!targetLines.some((line) => {
+    const normalized = line.replace(/^\[C1\]\s*/, '');
+    return normalized === fixture.value_text || normalized === fixture.invalid_quote;
+  }));
+
+  const fact = buildFact([{
+    semantic_block_id: fixture.target_block_id,
+    quote: fixture.invalid_quote,
+  }], { value_text: fixture.value_text });
+  return { fixture, source, fact };
 }
 
 function buildExtractorResponse(facts, analysisUnitId = 'fixture-unit') {
@@ -1029,8 +1107,17 @@ test('Extractor prompt targets remain below the deterministic hard evidence limi
   assert.match(prepareRepairCode, /maxCandidates:\s*256/);
   assert.match(prepareRepairCode, /maxTotalChars:\s*250000/);
   assert.match(prepareRepairCode, /maxQuoteLength:\s*1500/);
+  assert.match(prepareRepairCode, /maxSerializedRequestChars:\s*360000/);
+  assert.match(prepareRepairCode, /maxScannedCandidates:\s*4096/);
+  assert.match(prepareRepairCode, /maxAnchorMaterialChars:\s*3000/);
+  assert.match(prepareRepairCode, /maxAnchorTokens:\s*64/);
+  assert.match(prepareRepairCode, /maxCandidateTokens:\s*256/);
+  assert.match(prepareRepairCode, /maxScoringOperations:\s*1048576/);
+  assert.match(prepareRepairCode, /maxRankedAnchors:\s*8/);
+  assert.match(prepareRepairCode, /targetWindowRadius:\s*2/);
   assert.match(prepareRepairCode, /maxItems:\s*25/);
   assert.match(prepareRepairCode, /selected_evidence_refs/);
+  assert.doesNotMatch(prepareRepairCode, /levenshtein|editDistance|embedding|vector/i);
   assert.doesNotMatch(prepareRepairCode, /required:\s*\['semantic_block_id', 'quote'\]/);
 });
 
@@ -2654,6 +2741,12 @@ test('Evidence Repair v2 builds stable canonical refs from block IDs and ordinal
     first.repair_request.evidence_catalog_contract,
     second.repair_request.evidence_catalog_contract,
   );
+  assert.deepEqual(Object.keys(first.repair_request.evidence_catalog_contract), [
+    'version', 'max_candidates', 'max_total_chars', 'max_quote_length',
+    'max_canonical_source_chars', 'canonical_source_chars', 'candidates_count',
+    'total_chars', 'max_serialized_request_chars', 'serialized_request_chars',
+  ]);
+  assert.equal(first.repair_request.evidence_catalog_contract.selection_mode, undefined);
 });
 
 test('independent adjacent sentences remain two evidence refs and are never packed', async () => {
@@ -3102,6 +3195,317 @@ test('identical canonical text in distinct blocks produces distinct identity-saf
   );
 });
 
+test('multi-fact catalog overflow fails closed before merged ranked retrieval can cross-select fact-local primary material', async () => {
+  const workflow = loadWorkflow();
+  const unitId = 'multi-fact-overflow-unit';
+  const source = buildSource([
+    {
+      semantic_block_id: 'sb_primary_fact_a', scope: 'primary', type: 'text', role: 'body',
+      text: 'alphacriterion tender certificate',
+    },
+    {
+      semantic_block_id: 'sb_primary_fact_b', scope: 'primary', type: 'text', role: 'body',
+      text: 'betacriterion delivery schedule',
+    },
+    {
+      semantic_block_id: 'sb_target_fact_a', scope: 'overlap', type: 'text', role: 'body',
+      text: 'alphacriterion tender requirement',
+    },
+    {
+      semantic_block_id: 'sb_target_fact_b', scope: 'overlap', type: 'text', role: 'body',
+      text: 'betacriterion delivery requirement',
+    },
+    {
+      semantic_block_id: 'sb_overflow_fill', scope: 'overlap', type: 'table', role: 'body',
+      text: Array.from({ length: 257 }, (_, index) => (
+        `[C1] bounded filler row ${String(index + 1).padStart(4, '0')}`
+      )).join('\n'),
+    },
+  ], unitId);
+  const facts = [
+    buildFact([{
+      semantic_block_id: 'sb_target_fact_a',
+      quote: 'alphacriterion invalid quotation',
+    }], { value_text: 'alphacriterion tender certificate' }),
+    buildFact([{
+      semantic_block_id: 'sb_target_fact_b',
+      quote: 'betacriterion invalid quotation',
+    }], {
+      field_key: 'delivery_term',
+      value_text: 'betacriterion delivery schedule',
+    }),
+  ];
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse(facts, unitId),
+    source,
+  );
+  const classified = await classifyRetry(workflow, first);
+  assert.deepEqual(classified.retry_decision.invalid_fact_indexes, [0, 1]);
+  assert.deepEqual(classified.retry_decision.evidence_repair_fact_indexes, [0, 1]);
+  assert.equal(
+    classified.violations.filter(({ code }) => code === 'missing_primary_evidence').length,
+    2,
+  );
+
+  await assert.rejects(
+    runCodeNode(
+      workflow,
+      'Подготовить Evidence Repair',
+      classified,
+      classified,
+    ),
+    /multi-fact evidence repair catalog overflow.*invalid_facts=2.*repaired_fact_contexts=2/i,
+  );
+});
+
+test('execution 14487 sanitized derivative ranks distributed late target fragments without whole-candidate equality', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  assert.equal(source.ai_segments.length, 2);
+  assert.equal(Object.keys(source.provenance.index).length, 2);
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  assert.deepEqual(
+    [...new Set(first.violations.map(({ code }) => code))].sort(),
+    [...fixture.expected_violations].sort(),
+  );
+
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const repeated = await prepareEvidenceRepair(workflow, first);
+  assert.deepEqual(prepared.repair_request, repeated.repair_request);
+  const catalog = prepared.repair_request.evidence_catalog;
+  const contract = prepared.repair_request.evidence_catalog_contract;
+  assert.equal(contract.selection_mode, 'target_ranked_windows');
+  assert.equal(contract.observed_candidates_count, 2016);
+  assert.equal(contract.target_candidates_count, 2015);
+  assert.equal(contract.canonical_source_chars, 44375);
+  assert.equal(contract.anchor_material_chars, 472);
+  assert.ok(contract.anchor_tokens_count <= 64);
+  assert.ok(contract.useful_anchor_tokens_count >= 8);
+  assert.ok(contract.scored_candidates_count <= 4096);
+  assert.ok(contract.ranked_anchors_count <= 8);
+  assert.equal(contract.required_primary, true);
+  assert.equal(contract.primary_coverage_mode, 'target_candidates_primary');
+  assert.equal(contract.retained_candidates_count, catalog.length);
+  assert.equal(
+    contract.omitted_candidates_count,
+    contract.observed_candidates_count - contract.retained_candidates_count,
+  );
+  assert.deepEqual(contract.target_block_ids, [fixture.target_block_id]);
+  assert.ok(contract.candidates_count <= contract.max_candidates);
+  assert.ok(contract.total_chars <= contract.max_total_chars);
+  assert.ok(contract.serialized_request_chars <= contract.max_serialized_request_chars);
+
+  const selectedRefs = fixture.relevant_target_fragments.map(({ ordinal, canonical_quote }) => {
+    const ref = catalogRef(prepared, fixture.target_block_id, canonical_quote);
+    assert.equal(ref, `er2:${fixture.target_block_id}:${String(ordinal).padStart(4, '0')}`);
+    return ref;
+  });
+  assert.ok(selectedRefs.every((ref) => prepared.repair_request.response_schema
+    .properties.repairs.items.properties.selected_evidence_refs.items.enum.includes(ref)));
+
+  const repaired = await runCodeNode(
+    workflow,
+    'Проверить evidence — попытка 2',
+    buildRepairResponse([{
+      fact_index: 0,
+      violation_codes: fixture.expected_violations,
+      selected_evidence_refs: selectedRefs,
+    }], { analysis_unit_id: fixture.analysis_unit_id }),
+    prepared,
+  );
+  assert.equal(repaired.validation_passed, true, JSON.stringify(repaired.violations));
+  assert.equal(repaired.extractor.repair.requests_count, 1);
+  assert.deepEqual(
+    repaired.verified_facts[0].evidence.map(({ semantic_block_id, quote }) => ({
+      semantic_block_id,
+      quote,
+    })),
+    fixture.relevant_target_fragments.map(({ canonical_quote }) => ({
+      semantic_block_id: fixture.target_block_id,
+      quote: canonical_quote,
+    })),
+  );
+});
+
+test('execution 14487 structural derivative makes exact-whole-anchor selection RED', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  const mutated = structuredClone(workflow);
+  for (const nodeName of ['Подготовить Evidence Repair', 'Проверить evidence — попытка 2']) {
+    const node = findNode(mutated, nodeName);
+    assert.ok(
+      node.parameters.jsCode.includes('candidateTokenSet.has(token)'),
+      `${nodeName}: lexical selection mutation anchor missing`,
+    );
+    node.parameters.jsCode = node.parameters.jsCode
+      .replace("candidateTokenSet.has(token)", "materialLiterals.has(candidate.canonical_quote)");
+  }
+  await assert.rejects(
+    prepareEvidenceRepair(mutated, first),
+    new RegExp(`ranked material overlap missing for ${fixture.target_block_id}`, 'i'),
+  );
+});
+
+test('overflow ranked retrieval fails closed on zero useful target overlap', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  fact.value_text = 'uniquely absent anchor material';
+  fact.evidence[0].quote = 'another entirely absent quotation';
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /zero useful overlap|ranked material overlap missing/i,
+  );
+});
+
+test('overflow ranked retrieval rejects generic ambiguous low-information anchors', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  const target = source.ai_segments.find(
+    ({ semantic_block_id }) => semantic_block_id === fixture.target_block_id,
+  );
+  target.text = target.text.replace(/sanitized row \d{4} x/g, 'document required application');
+  fact.value_text = 'document required application';
+  fact.evidence[0].quote = 'required document application';
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /low-information|useful anchor tokens/i,
+  );
+});
+
+test('overflow ranked retrieval fails closed when the violation-bound target block is absent', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  fact.evidence[0].semantic_block_id = 'sb_absent_target';
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, first),
+    /target block.*absent|no source target block/i,
+  );
+});
+
+test('missing_primary_evidence requires relevant primary retrieval unless selected targets are primary', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  const target = source.ai_segments.find(
+    ({ semantic_block_id }) => semantic_block_id === fixture.target_block_id,
+  );
+  target.scope = 'overlap';
+  source.provenance.index[fixture.target_block_id].scope = 'overlap';
+  const firstWithoutPrimary = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  await assert.rejects(
+    prepareEvidenceRepair(workflow, firstWithoutPrimary),
+    /relevant primary.*missing|primary retrieval.*missing/i,
+  );
+
+  const primary = source.ai_segments.find(
+    ({ semantic_block_id }) => semantic_block_id === fixture.other_block_id,
+  );
+  primary.scope = 'primary';
+  primary.text = fixture.relevant_target_fragments[0].canonical_quote;
+  source.provenance.index[fixture.other_block_id].scope = 'primary';
+  const firstWithPrimary = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, firstWithPrimary);
+  assert.equal(
+    prepared.repair_request.evidence_catalog_contract.primary_coverage_mode,
+    'ranked_relevant_primary',
+  );
+  assert.ok(prepared.repair_request.evidence_catalog.some(({ scope }) => scope === 'primary'));
+});
+
+test('overflow ranked retrieval uses source-order tie-breaking deterministically', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  const target = source.ai_segments.find(
+    ({ semantic_block_id }) => semantic_block_id === fixture.target_block_id,
+  );
+  target.text = target.text.replace(
+    '[C1] sanitized row 1980 x',
+    '[C1] qualificationmatrix tieleft',
+  ).replace(
+    '[C1] sanitized row 1981 x',
+    '[C1] qualificationmatrix tieright',
+  );
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const ranked = prepared.repair_request.evidence_catalog_contract.ranked_anchor_refs;
+  assert.ok(ranked.indexOf('er2:sb_0714:1980') < ranked.indexOf('er2:sb_0714:1981'));
+});
+
+test('attempt 2 rejects ranked-window selection audit tampering', async () => {
+  const workflow = loadWorkflow();
+  const { fixture, source, fact } = buildExecution14487SanitizedDerivative();
+  const first = await runCodeNode(
+    workflow,
+    'Проверить и привязать evidence',
+    buildExtractorResponse([fact], fixture.analysis_unit_id),
+    source,
+  );
+  const prepared = await prepareEvidenceRepair(workflow, first);
+  const selectedRefs = fixture.relevant_target_fragments.map(({ canonical_quote }) => (
+    catalogRef(prepared, fixture.target_block_id, canonical_quote)
+  ));
+  const tampered = structuredClone(prepared);
+  tampered.repair_request.evidence_catalog_contract.ranked_anchors_count += 1;
+  await assert.rejects(
+    runCodeNode(
+      workflow,
+      'Проверить evidence — попытка 2',
+      buildRepairResponse([{
+        fact_index: 0,
+        violation_codes: fixture.expected_violations,
+        selected_evidence_refs: selectedRefs,
+      }], { analysis_unit_id: fixture.analysis_unit_id }),
+      tampered,
+    ),
+    /catalog contract parity mismatch/i,
+  );
+});
+
 test('Evidence Repair v2 catalog has explicit hard bounds and never truncates overflow', async () => {
   const workflow = loadWorkflow();
   const segments = [{
@@ -3126,7 +3530,7 @@ test('Evidence Repair v2 catalog has explicit hard bounds and never truncates ov
 
   await assert.rejects(
     prepareEvidenceRepair(workflow, first),
-    /candidate count overflow.*candidate_index=257/i,
+    /ranked retrieval zero useful overlap/i,
   );
 
   const charOverflowSegments = Array.from({ length: 251 }, (_, index) => ({
