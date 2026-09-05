@@ -12,7 +12,10 @@ Loop. Its response is classified by exact
 `analysis_unit_id + fact_index + field_key`; valid facts and semantic verdicts
 are retained, while only contract-invalid facts are queued one-by-one for at
 most two additional calls (three total attempts). Valid siblings and unrelated
-units are not re-sent.
+units are not re-sent. If any primary validation has no attributable integer
+`fact_index` or otherwise cannot be bound to one exact source identity, the
+response unit is not partially accepted: every source fact in that unit enters
+retry with `unattributable_validation_identity`.
 
 If the third response is still contract-invalid, the affected original fact is
 reassembled deterministically as `requires_review` with `confidence=0` as an
@@ -22,10 +25,20 @@ three-attempt `validator_meta` audit. The existing strict
 complete reassembled unit response. Missing/crossed source identity, duplicate
 fact identity and programming invariants remain hard failures.
 
+Independent review rejected the first local implementation because assemblers
+expanded one aggregate input into many outputs while assigning impossible
+upstream `pairedItem` indexes, and because a mixed known-invalid + unknown
+identity could partially clear a unit. The remediation removes those invalid
+links and gives every reassembled provider item an immutable top-level
+`validator_source_envelope` (`ai_validator_source_envelope_v1`) containing the
+source plus exact unit/fact identities. The strict checker now requires and
+hard-validates that envelope without positional source lookup; its own 1:1
+`pairedItem` still references its immediate input.
+
 Execution-`14491`-derived sanitized regression is explicitly marked
-`runtime_replay=false`. Focused DW-23 tests are `6/6 PASS`; related Document
-Worker tests are `261 total / 258 pass / 3` exact baseline failures; full suite is
-`455 total / 447 pass / 8` exact pre-existing baseline signatures. Workflow
+`runtime_replay=false`. Focused DW-23 tests are `8/8 PASS`; related Document
+Worker tests are `263 total / 260 pass / 3` exact baseline failures; full suite is
+`457 total / 449 pass / 8` exact pre-existing baseline signatures. Workflow
 structure validates as `85` unique nodes / `82` connection sources / `101`
 resolved edges. No production n8n, PostgreSQL, credentials, schema,
 `FIELD_CATALOG`, or main branch was changed.

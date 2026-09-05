@@ -5674,12 +5674,27 @@ value/evidence and emits audited `requires_review`, `confidence=0` system
 sentinel, `reason_code=other`; final strict checker and source/programming hard
 failures remain active.
 
+Independent critic review rejected commit `91b8dfd`: aggregate-to-many
+assemblers emitted `pairedItem.item` indexes outside their immediate single-item
+input, and mixed known-invalid plus unattributable response identities could
+partially accept a unit. Follow-up TDD reproduced five focused failures against
+that commit: both reassembly paths lacked an explicit source envelope, the strict
+checker still depended on the old source node, the mixed-identity unit retried
+only its known invalid fact, and a multi-item retry queue emitted invalid links.
+Remediation makes any unattributable identity retry every source fact in its unit,
+removes invalid assembler `pairedItem`, carries complete immutable source and
+exact unit/fact identities in `ai_validator_source_envelope_v1`, and makes the
+strict checker validate only that envelope. Existing harnesses were updated to
+model the real assembler boundary instead of positional `itemMatching` lookup;
+the `Развернуть units для AI Validator` regression now uses its exact reviewed
+parameter SHA-256.
+
 Verification:
 
 ```text
-focused DW-23: 6/6 PASS
-related Document Worker: 261 total / 258 pass / 3 baseline fail
-full repository: 455 total / 447 pass / 8 baseline fail
+focused DW-23: 8/8 PASS
+related Document Worker: 263 total / 260 pass / 3 baseline fail
+full repository: 457 total / 449 pass / 8 baseline fail
 workflow structure: 85 unique nodes / 82 connection sources / 101 resolved edges
 ```
 

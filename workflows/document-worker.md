@@ -529,12 +529,13 @@ Fact `0 / application_documents` was contract-valid. The strict checker behaved
 correctly, but its unit-level hard stop prevented all document persistence and
 completion.
 
-Canonical local topology now separates classification from the unchanged final
-strict checker:
+Canonical local topology now separates classification from the existing final
+strict checker, whose source intake is minimally adapted to the explicit
+envelope:
 
 ```text
 AI Validator v1 (primary, outside Loop)
-→ classify every response fact against explicit paired source
+→ classify every response fact against its exact source unit
 → no invalid facts: reassemble original unit responses
 → invalid facts: queue exact analysis_unit_id + fact_index + field_key
    → Loop Over Items, batchSize=1
@@ -565,12 +566,27 @@ sentinel is model confidence. The final strict checker remains outside the Loop,
 validates complete cardinality/linking and carries the retry audit into persisted
 fact metadata.
 
+The first local implementation was rejected by independent review: its
+assemblers produced many outputs from one aggregate/terminal stream while using
+`pairedItem.item` values that did not exist on the immediate input, and a mixed
+known-invalid plus unknown response identity could partially clear a unit. The
+remediation makes an unattributable validation identity a unit-level contract
+failure: every source fact in that unit is retried with
+`unattributable_validation_identity`. Both reassembly paths now attach an
+immutable top-level `validator_source_envelope` versioned
+`ai_validator_source_envelope_v1`, containing the complete source and exact
+`analysis_unit_id + ordered fact_index + field_key` identity list. The strict
+checker reads only this envelope, hard-validates its keys/version/cardinality and
+exact identities, and performs no positional lookup into `Развернуть units для
+AI Validator`. Reassembly emits no invalid `pairedItem`; the checker retains only
+its valid 1:1 link to the immediate provider item.
+
 The sanitized execution-derived fixture is labelled `runtime_replay=false` and
 preserves only the 22-unit identity/cardinality boundary and target/sibling
 geometry. TDD first failed on the missing retry topology; current focused result
-is `6/6 PASS`. Related Worker suite is `261 / 258 / 3` with only known baseline
+is `8/8 PASS`. Related Worker suite is `263 / 260 / 3` with only known baseline
 fixture/hash/prompt-line-ending failures. Full repository suite is
-`455 / 447 / 8`, all eight signatures pre-existing and outside DW-23. Structural
+`457 / 449 / 8`, all eight signatures pre-existing and outside DW-23. Structural
 validation reports `85` unique nodes, `82` connection sources and `101` resolved
 edges. This remains a local inactive export candidate: no n8n import/publish,
 runtime canary, PostgreSQL write, schema/catalog change or production promotion

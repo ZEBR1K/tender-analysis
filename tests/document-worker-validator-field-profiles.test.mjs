@@ -96,9 +96,30 @@ async function executeCode({ code, inputJsons, sources = {} }) {
 }
 
 async function runNode(workflow, name, inputJsons, sources = {}) {
+  const effectiveInputJsons = name === 'Проверить ответ AI Validator'
+    ? inputJsons.map((providerResponse, index) => {
+        const sourceItems = sources['Развернуть units для AI Validator'];
+        const source = sourceItems?.[index] ?? sourceItems?.[0];
+        assert.ok(source, 'AI Validator checker fixture requires explicit source.');
+        return {
+          ...structuredClone(providerResponse),
+          validator_source_envelope: {
+            version: 'ai_validator_source_envelope_v1',
+            source_identity: {
+              analysis_unit_id: source.analysis_unit_meta?.analysis_unit_id ?? null,
+              facts: (source.verified_facts ?? []).map((fact) => ({
+                fact_index: fact.fact_index,
+                field_key: fact.field_key,
+              })),
+            },
+            source: structuredClone(source),
+          },
+        };
+      })
+    : inputJsons;
   return executeCode({
     code: findNode(workflow, name).parameters.jsCode,
-    inputJsons,
+    inputJsons: effectiveInputJsons,
     sources,
   });
 }

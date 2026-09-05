@@ -202,7 +202,31 @@ function parseXmlLikeN8n(xml) {
 async function runCodeNode(workflow, nodeName, inputItems, { sourceJsonByNode = {} } = {}) {
   const node = findNode(workflow, nodeName);
   assert.equal(node.type, 'n8n-nodes-base.code');
-  const items = nodeName === nodeNames.validateEvidence
+  const items = nodeName === nodeNames.checkValidator
+    ? inputItems.map((item, index) => {
+        const raw = sourceJsonByNode[nodeNames.expandValidator];
+        const sources = Array.isArray(raw) ? raw : [raw];
+        const source = sources[index] ?? sources[0];
+        assert.ok(source, 'AI Validator checker fixture requires explicit source.');
+        return {
+          ...structuredClone(item),
+          json: {
+            ...structuredClone(item.json),
+            validator_source_envelope: {
+              version: 'ai_validator_source_envelope_v1',
+              source_identity: {
+                analysis_unit_id: source.analysis_unit_meta?.analysis_unit_id ?? null,
+                facts: (source.verified_facts ?? []).map((fact) => ({
+                  fact_index: fact.fact_index,
+                  field_key: fact.field_key,
+                })),
+              },
+              source: structuredClone(source),
+            },
+          },
+        };
+      })
+    : nodeName === nodeNames.validateEvidence
     ? inputItems.map((item) => {
         const raw = sourceJsonByNode['Подготовить запрос для AI'];
         const source = Array.isArray(raw) ? raw[0] : raw;

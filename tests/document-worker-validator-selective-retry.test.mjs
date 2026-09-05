@@ -197,6 +197,21 @@ function providerResponse(source, validations, suffix = 'primary') {
   };
 }
 
+function assertExplicitSourceEnvelope(providerItem, expectedSource) {
+  assert.equal(providerItem.pairedItem, undefined);
+  assert.deepEqual(providerItem.json.validator_source_envelope, {
+    version: 'ai_validator_source_envelope_v1',
+    source_identity: {
+      analysis_unit_id: expectedSource.analysis_unit_meta.analysis_unit_id,
+      facts: expectedSource.verified_facts.map(({ fact_index, field_key }) => ({
+        fact_index,
+        field_key,
+      })),
+    },
+    source: expectedSource,
+  });
+}
+
 async function buildExecutionBoundary() {
   const units = buildUnits();
   const dispatch = dispatchEnvelope(units);
@@ -291,6 +306,34 @@ test('execution 14491 classification retries only doc_7_au_0037#1 and preserves 
   assert.deepEqual(targetState.retry_fact_indexes, [fixture.target_identity.fact_index]);
 });
 
+test('all-valid primary responses use the explicit source envelope through no-retry assembly and strict checking', async () => {
+  const units = buildUnits();
+  const sourceItems = await runCodeNode(NODES.expand, [{ json: dispatchEnvelope(units) }]);
+  const primaryItems = sourceItems.map((item, sourceIndex) => ({
+    json: providerResponse(
+      item.json,
+      item.json.verified_facts.map((fact) => validationFor(fact)),
+      'all-valid',
+    ),
+    pairedItem: { item: sourceIndex },
+  }));
+  const [classified] = await runCodeNode(
+    NODES.classifyPrimary,
+    primaryItems,
+    { [NODES.expand]: sourceItems },
+  );
+  assert.equal(classified.json.retry_queue.length, 0);
+
+  const assembled = await runCodeNode(NODES.assembleNoRetry, [classified]);
+  assert.equal(assembled.length, sourceItems.length);
+  for (let index = 0; index < assembled.length; index += 1) {
+    assertExplicitSourceEnvelope(assembled[index], sourceItems[index].json);
+  }
+
+  const checked = await runCodeNode(NODES.strictChecker, assembled);
+  assert.equal(checked.length, sourceItems.length);
+});
+
 test('valid attempt 2 reassembles all 22 units and passes the unchanged strict checker', async () => {
   const boundary = await buildExecutionBoundary();
   const retryItems = await runCodeNode(NODES.expandRetry, [boundary.classified]);
@@ -327,12 +370,12 @@ test('valid attempt 2 reassembles all 22 units and passes the unchanged strict c
   const parsedTarget = JSON.parse(targetAssembled.json.choices[0].message.content);
   assert.deepEqual(parsedTarget.validations.map(({ fact_index: factIndex }) => factIndex), [0, 1]);
   assert.equal(parsedTarget.validations[1].confidence, 0.88);
+  const targetSource = boundary.sourceItems.find(
+    ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
+  ).json;
+  assertExplicitSourceEnvelope(targetAssembled, targetSource);
 
-  const checked = await runCodeNode(
-    NODES.strictChecker,
-    assembled,
-    { [NODES.expand]: boundary.sourceItems },
-  );
+  const checked = await runCodeNode(NODES.strictChecker, assembled);
   assert.equal(checked.length, 22);
   const targetChecked = checked.find(
     ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
@@ -386,11 +429,7 @@ test('attempt 3 exhaustion becomes audited requires_review and reaches document 
     [fallback],
     { [NODES.classifyPrimary]: [boundary.classified] },
   );
-  const checked = await runCodeNode(
-    NODES.strictChecker,
-    assembled,
-    { [NODES.expand]: boundary.sourceItems },
-  );
+  const checked = await runCodeNode(NODES.strictChecker, assembled);
   const targetChecked = checked.find(
     ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
   );
@@ -495,7 +534,6 @@ test('response identity violations are never accepted and source invariant viola
   const unknownIdentityContent = JSON.parse(
     unknownIdentityItems[targetSourceIndex].json.choices[0].message.content,
   );
-  unknownIdentityContent.validations[1].confidence = 0.9;
   unknownIdentityContent.validations.push({
     ...unknownIdentityContent.validations[0],
     fact_index: 999,
@@ -559,4 +597,58 @@ test('response identity violations are never accepted and source invariant viola
     runCodeNode(NODES.classifyPrimary, boundary.primaryItems, { [NODES.expand]: mismatchedSourceItems }),
     /validator_field_keys mismatch/u,
   );
+});
+
+test('two invalid identities survive queue expansion, shuffled terminal order, and explicit-envelope reassembly', async () => {
+  const boundary = await buildExecutionBoundary();
+  const secondSourceIndex = boundary.sourceItems.findIndex(
+    ({ json }) => json.analysis_unit_meta.analysis_unit_id !== fixture.target_identity.analysis_unit_id,
+  );
+  const secondInvalidItems = structuredClone(boundary.primaryItems);
+  const secondInvalidContent = JSON.parse(
+    secondInvalidItems[secondSourceIndex].json.choices[0].message.content,
+  );
+  delete secondInvalidContent.validations[0].confidence;
+  secondInvalidItems[secondSourceIndex].json.choices[0].message.content =
+    JSON.stringify(secondInvalidContent);
+  const [classified] = await runCodeNode(
+    NODES.classifyPrimary,
+    secondInvalidItems,
+    { [NODES.expand]: boundary.sourceItems },
+  );
+  assert.equal(classified.json.retry_queue.length, 2);
+
+  const retryItems = await runCodeNode(NODES.expandRetry, [classified]);
+  assert.equal(retryItems.length, 2);
+  assert.ok(retryItems.every((item) => item.pairedItem === undefined));
+  const terminalItems = [];
+  for (const retryItem of retryItems) {
+    const response = providerResponse(
+      retryItem.json,
+      [validationFor(retryItem.json.verified_facts[0], { confidence: 0.86 })],
+      'multi-attempt-2',
+    );
+    const [terminal] = await runCodeNode(
+      NODES.classifyRetry2,
+      [{ json: response }],
+      { [NODES.loop]: [retryItem] },
+    );
+    terminalItems.unshift(terminal);
+  }
+
+  const assembled = await runCodeNode(
+    NODES.assembleRetry,
+    terminalItems,
+    { [NODES.classifyPrimary]: [classified] },
+  );
+  assert.equal(assembled.length, boundary.sourceItems.length);
+  for (const assembledItem of assembled) {
+    const unitId = assembledItem.json.validator_source_envelope.source_identity.analysis_unit_id;
+    const expectedSource = boundary.sourceItems.find(
+      ({ json }) => json.analysis_unit_meta.analysis_unit_id === unitId,
+    ).json;
+    assertExplicitSourceEnvelope(assembledItem, expectedSource);
+  }
+  const checked = await runCodeNode(NODES.strictChecker, assembled);
+  assert.equal(checked.length, boundary.sourceItems.length);
 });

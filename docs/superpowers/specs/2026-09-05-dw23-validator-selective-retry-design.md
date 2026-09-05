@@ -89,4 +89,3 @@ An execution-`14491`-derived sanitized fixture must prove:
 6. the fallback preserves original fact/evidence and reaches document fact collection;
 7. duplicate/unknown/mismatched identities and source invariant failures remain fail-closed;
 8. no production workflow, credential, DB state, or 27-field semantics are changed.
-

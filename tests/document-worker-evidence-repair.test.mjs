@@ -172,7 +172,27 @@ async function runCodeNodeItemsWithSources(
   sourceJsonsByNode,
 ) {
   const node = findNode(workflow, nodeName);
-  const effectiveInputJsons = nodeName === 'Проверить и привязать evidence'
+  const effectiveInputJsons = nodeName === 'Проверить ответ AI Validator'
+    ? inputJsons.map((providerResponse, index) => {
+        const sources = sourceJsonsByNode['Развернуть units для AI Validator'];
+        const source = sources?.[index] ?? sources?.[0];
+        assert.ok(source, 'AI Validator checker fixture requires explicit source.');
+        return {
+          ...structuredClone(providerResponse),
+          validator_source_envelope: {
+            version: 'ai_validator_source_envelope_v1',
+            source_identity: {
+              analysis_unit_id: source.analysis_unit_meta?.analysis_unit_id ?? null,
+              facts: (source.verified_facts ?? []).map((fact) => ({
+                fact_index: fact.fact_index,
+                field_key: fact.field_key,
+              })),
+            },
+            source: structuredClone(source),
+          },
+        };
+      })
+    : nodeName === 'Проверить и привязать evidence'
     ? inputJsons.map((providerResponse, index) => {
         const sources = sourceJsonsByNode['Подготовить запрос для AI'];
         const source = sources?.[index] ?? sources?.[0];
@@ -2117,7 +2137,7 @@ test('repair topology cannot bypass validation attempt 2 or the completeness bar
   );
 });
 
-test('per-item validators use linked items, never a fixed positional item 0', () => {
+test('per-item validators preserve valid immediate links and the reassembled Validator uses an explicit source envelope', () => {
   const workflow = loadWorkflow();
   const primaryWrapper = findNode(
     workflow,
@@ -2147,6 +2167,14 @@ test('per-item validators use linked items, never a fixed positional item 0', ()
     workflow,
     'Проверить ответ AI Validator',
   ).parameters.jsCode;
+  const assembleValidatorRetry = findNode(
+    workflow,
+    'Собрать ответы AI Validator после retry',
+  ).parameters.jsCode;
+  const assembleValidatorNoRetry = findNode(
+    workflow,
+    'Собрать ответы AI Validator без retry',
+  ).parameters.jsCode;
 
   assert.match(primaryWrapper, /\$\('Подготовить запрос для AI'\)\.item\.json/);
   assert.match(attemptOne, /attempt_transport/);
@@ -2156,14 +2184,18 @@ test('per-item validators use linked items, never a fixed positional item 0', ()
     validatePartition,
     /\$\('Подготовить Lossless Fact Partition'\)\.item\.json/,
   );
-  assert.match(
-    validateAiResponse,
-    /\$\(CONFIG\.sourceNodeName\)[\s\S]*\.itemMatching\(itemIndex\)/,
-  );
+  assert.match(validateAiResponse, /apiResponse\?\.validator_source_envelope/);
+  assert.match(validateAiResponse, /source_identity/);
+  assert.doesNotMatch(validateAiResponse, /itemMatching\(/);
+  assert.doesNotMatch(validateAiResponse, /Развернуть units для AI Validator/);
   assert.doesNotMatch(
     validateAiResponse,
     /sourceItems\[itemIndex\]\?\.json/,
   );
+  for (const assemblerCode of [assembleValidatorRetry, assembleValidatorNoRetry]) {
+    assert.match(assemblerCode, /ai_validator_source_envelope_v1/);
+    assert.doesNotMatch(assemblerCode, /pairedItem\s*:/);
+  }
   for (const code of [
     attemptOne,
     prepareRepair,
@@ -3690,12 +3722,13 @@ test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte
   );
 });
 
-test('DW-23 extends Validator preparation only with the retry field-profile lookup', () => {
+test('DW-23 Validator preparation parameters retain the reviewed exact hash', () => {
   const workflow = loadWorkflow();
-  const code = findNode(workflow, 'Развернуть units для AI Validator').parameters.jsCode;
-  assert.match(code, /field_profiles_by_key/);
-  assert.match(code, /validator_prompt_context/);
-  assert.match(code, /field_profiles_text/);
+  const parameters = findNode(workflow, 'Развернуть units для AI Validator').parameters;
+  assert.equal(
+    crypto.createHash('sha256').update(JSON.stringify(parameters)).digest('hex'),
+    'e3633fc11feff560badad97d47cdccae65992a16f4d05a159b9cdac7db075b11',
+  );
 });
 
 test('Evidence Repair v2 schema exposes selected refs only and prohibits model-authored evidence', async () => {

@@ -56,4 +56,3 @@ Verification:
 5. run full `node --test tests/*.test.mjs` and compare failures with the accepted baseline;
 6. inspect `git diff --check`, `git diff --stat`, and `git status`;
 7. perform independent code review before declaring completion.
-
