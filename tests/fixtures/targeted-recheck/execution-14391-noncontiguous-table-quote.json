@@ -80,11 +80,11 @@
     "target_node": "Подготовить запрос #2 AI Targeted Recheck",
     "allowed_parameter_path": "nodes[name=Подготовить запрос #2 AI Targeted Recheck].parameters.jsCode",
     "node_count": 64,
-    "workflow_with_target_jsCode_sentinel_sha256": "d333b128d13113fc9a501de4652c953db75217cc42804a8cc11f34e81db3313e",
+    "workflow_with_target_jsCode_sentinel_sha256": "b808451977967c661b7aed96c4303c270fe7ff7d741ec97a8c0c1cd890f58c33",
     "target_node_except_jsCode_sha256": "7c0e1a06365991c33515cc574b96a15d308dfa76efca1e8c67084c38a85745c3",
     "target_jsCode_sha256": "acb91d5136a0e063359bc36493dca6bcf60c04e490022a7728324cf5c8190ab3",
     "connections_sha256": "b078cd5e190798559405ce5e2ed530dade0b9485a6fa9d92cdb924b99a83f574",
     "settings_sha256": "e36b9fd3c1c6e9f9ba743be50901c37f3cb62d0ee4c8638232d4d8c5004cf447",
-    "other_nodes_sha256": "fd08d6e35124d0415ee80f3da6f3faaa4a339c90bba6c5b020e85cefce91d82d"
+    "other_nodes_sha256": "f2ef247ee6d85bc5a967ccbc68c8bc7a20973e5c43158ffab8dad6b7fd5d04d1"
   }
 }
