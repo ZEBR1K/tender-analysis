@@ -48,10 +48,10 @@ Canonical содержит `85` уникальных нод, beta — `86`; вс
 моделью `AI Extractor v1.0` и конфигурацией/именем Aggregator call; `Wait` есть
 только в beta.
 
-Offline verification: focused canonical Worker suite — `237 total / 235 pass /
+Offline verification: focused canonical Worker/package suite — `241 total / 239 pass /
 2 fail`, где оба RED являются прежними pins (ActiveX fixture byte count и
-immutable beta hash); overlay suite — `3/3 PASS`; full repository suite — `468
-total / 461 pass / 7 fail`, все семь signatures существовали до этого packaging
+immutable beta hash); overlay/package suite — `4/4 PASS`; full repository suite — `469
+total / 462 pass / 7 fail`, все семь signatures существовали до этого packaging
 разделения. Live n8n и PostgreSQL не изменялись. Ни canonical, ни beta ещё не
 импортированы/read-back и runtime GREEN не заявляется. Следующий шаг — ручной
 import beta, read-back точной конфигурации и isolated runtime canary.
@@ -375,7 +375,7 @@ Semantic owner после Docling определяется отдельно и �
 
 После нормализации canonical block text остаётся неизменным. State/provenance передаются отдельно в source/semantic blocks и AI-visible marker; evidence validators принимают quotes только из canonical text. Полный document-level mapping audit и scalar `docx_option_state_semantic_status` сохраняются без изменений, но больше не служат applicability veto для независимо доказанной локальной группы.
 
-Normalizer добавляет к каждому block versioned container `docx_option_state_semantic_v2`. Persisted/public stable control identity определяется только парой canonical `document_part + control_rel_target` и кодируется collision-safe строкой `'v2i:' + JSON.stringify([document_part, control_rel_target])`; несовпадающие observed snapshots одной identity дают `conflict`. Public group identity кодируется как `'v2g:' + JSON.stringify([block_id, source_table_ref, control_type, discriminator])`. Эти identity JSONB-safe и не содержат literal U+0000; downstream вычисляет то же encoding без decoder. Миграция старых persisted identities не предусмотрена, поскольку старого persisted контракта нет. Structural group включает unique semantic owner, exact source table, control type и exact trimmed `GroupName`; checkbox без GroupName является singleton, option button без GroupName остаётся unresolved. Radio group требует ровно один `selected`; zero selected даёт `unknown`, multiple selected — `conflict`, а caller-supplied all-cleared flag не учитывается. Distinct GroupName в одной таблице остаются разными группами.
+Normalizer добавляет к owner block versioned container `docx_option_state_semantic_v2`. Persisted control identity кодируется как `'v2i:' + JSON.stringify([document_part, control_rel_target])`; question identity — как `'v2q:' + JSON.stringify([source_table_ref, source_row_ref, normalized_question_label])`; public group identity — как `'v2g:' + JSON.stringify([owner_block_id, source_table_ref, control_type, group_discriminator])`. Exact trimmed `GroupName` сохраняется как discriminator, а для unnamed structurally owned options используется normalized question label. Versioned identities проходят через option records, semantic blocks и AI segments. Execution-level tests реальной Normalizer-ноды подтверждают tuple members, collision-safe encoding и рекурсивное отсутствие literal U+0000. Existing group-local owner guards, rejected alternatives, fail-closed mapping audit и post-Validator caps сохраняются.
 
 V2 container сохраняется через semantic blocks, AI segments и persisted analysis unit/provenance. Для byte-stable shared evidence validator соответствующий group verdict также вложен в semantic-layer копию control record и доходит через существующий evidence context до `Подготовить dispatch AI Validator`. Для `national_regime` и `participation_guarantee` каждый option-bearing evidence item должен по exact canonical label/control identity разрешиться ровно в одну локальную группу. `selected` в `resolved` group остаётся applicable даже при постороннем document-wide `unknown`; `unselected` становится audited rejected fact с `unselected_option_not_applicable`; target group `unknown`/`conflict`, zero/multiple group match и mixed resolved/unresolved evidence дают `requires_review`. AI Validator не может повысить review-only или вернуть rejected unselected alternative. Issues другой группы остаются в document audit и не отравляют resolved group.
 
@@ -597,6 +597,12 @@ supply or change source identity: classifiers use explicit paired source and
 hard-fail missing/crossed identity, duplicate source facts, exact `field_key`
 mismatch and programming invariants.
 
+Classifier and retry assembly use the same JSONB-safe key encoding:
+`'v1vf:' + JSON.stringify([analysis_unit_id, fact_index])`. Execution-level
+classification and shuffled reassembly tests verify exact tuple round-trip,
+collision-free distinct keys and recursively NUL-free retry queues, source
+envelopes and system-owned audit objects.
+
 After three invalid attempts, fallback preserves the original `value_text` and
 evidence and emits `requires_review`, `confidence=0`, `reason_code=other`, with
 `confidence_origin=system_sentinel`, `reported_ai_confidence=null`,
@@ -632,9 +638,9 @@ bound whenever it is present, so provider-supplied audit cannot reach persisted
 The sanitized execution-derived fixture is labelled `runtime_replay=false` and
 preserves only the 22-unit identity/cardinality boundary and target/sibling
 geometry. TDD first failed on the missing retry topology; current selective
-retry suite is GREEN. The combined focused canonical Worker suite is `237 / 235
+retry suite is GREEN. The combined focused canonical Worker/package suite is `241 / 239
 / 2`, with only the known ActiveX fixture-size and immutable beta-hash pins.
-The full repository suite is `468 / 461 / 7`, all seven signatures pre-existing.
+The full repository suite is `469 / 462 / 7`, all seven signatures pre-existing.
 Canonical graph validation reports `85` unique nodes; the import-ready DW-23 beta
 package reports `86`, with resolved endpoints in both. This remains local-only:
 no n8n import/publish, runtime canary, PostgreSQL write, schema/catalog change or

@@ -83,6 +83,103 @@ function renameConnectionTargets(connections, oldName, newName) {
   }
 }
 
+function inboundConnections(candidateWorkflow, targetName) {
+  const inbound = [];
+  for (const [source, connection] of Object.entries(candidateWorkflow.connections)) {
+    for (const [type, outputsByType] of Object.entries(connection ?? {})) {
+      if (!Array.isArray(outputsByType)) continue;
+      for (let outputIndex = 0; outputIndex < outputsByType.length; outputIndex += 1) {
+        const branch = outputsByType[outputIndex];
+        if (!Array.isArray(branch)) continue;
+        for (const edge of branch) {
+          if (edge?.node === targetName) {
+            inbound.push({ source, type, outputIndex, inputIndex: edge.index });
+          }
+        }
+      }
+    }
+  }
+  return inbound;
+}
+
+function assertApprovedPackageBoundary(canonicalPackage, betaPackage) {
+  const canonicalNames = new Set(canonicalPackage.nodes.map(({ name }) => name));
+  const betaNames = new Set(betaPackage.nodes.map(({ name }) => name));
+  assert.deepEqual(
+    [...canonicalNames].filter((name) => !betaNames.has(name)).sort(),
+    [canonicalAggregatorName],
+  );
+  assert.deepEqual(
+    [...betaNames].filter((name) => !canonicalNames.has(name)).sort(),
+    [betaAggregatorName, 'Wait'].sort(),
+  );
+
+  const canonicalCodeNodes = canonicalPackage.nodes
+    .filter(({ type }) => type === 'n8n-nodes-base.code')
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const betaCodeNodes = betaPackage.nodes
+    .filter(({ type }) => type === 'n8n-nodes-base.code')
+    .sort((left, right) => left.name.localeCompare(right.name));
+  assert.equal(canonicalCodeNodes.length, betaCodeNodes.length);
+  assert.deepEqual(
+    betaCodeNodes.map(comparableCodeNode),
+    canonicalCodeNodes.map(comparableCodeNode),
+  );
+
+  assert.deepEqual(betaPackage.nodes.find(({ name }) => name === 'Wait'), {
+    parameters: { amount: 2 },
+    type: 'n8n-nodes-base.wait',
+    typeVersion: 1.1,
+    position: [4688, 1312],
+    id: '28370d0b-84d6-4488-a4c9-2b3d2e63fcd5',
+    name: 'Wait',
+    webhookId: 'd989853c-4672-4ab4-bc1f-d8f040f7b1a1',
+  });
+  assert.deepEqual(betaPackage.connections.Wait, {
+    main: [[{ node: 'Primary Extractor accepted?', type: 'main', index: 0 }]],
+  });
+  assert.deepEqual(inboundConnections(betaPackage, 'Wait'), [{
+    source: 'Обработать evidence units по одной',
+    type: 'main',
+    outputIndex: 1,
+    inputIndex: 0,
+  }]);
+
+  const normalizedCanonical = structuredClone(canonicalPackage);
+  const normalizedBeta = structuredClone(betaPackage);
+  delete normalizedBeta.id;
+  normalizedBeta.name = normalizedCanonical.name;
+  normalizedBeta.active = normalizedCanonical.active;
+  delete normalizedBeta.settings.errorWorkflow;
+  assert.deepEqual(normalizedBeta.settings, normalizedCanonical.settings);
+
+  normalizedBeta.nodes = normalizedBeta.nodes.filter(({ name }) => name !== 'Wait');
+  const betaAggregator = normalizedBeta.nodes.find(({ name }) => name === betaAggregatorName);
+  const canonicalAggregator = normalizedCanonical.nodes.find(({ name }) => name === canonicalAggregatorName);
+  assert.ok(betaAggregator);
+  assert.ok(canonicalAggregator);
+  betaAggregator.name = canonicalAggregatorName;
+  for (const leaf of ['value', 'cachedResultName', 'cachedResultUrl']) {
+    betaAggregator.parameters.workflowId[leaf] = canonicalAggregator.parameters.workflowId[leaf];
+  }
+
+  const betaExtractor = normalizedBeta.nodes.find(({ name }) => name === 'AI Extractor v1.0');
+  assert.ok(betaExtractor.parameters.jsonBody.includes(betaExtractorModel));
+  betaExtractor.parameters.jsonBody = betaExtractor.parameters.jsonBody.replace(
+    betaExtractorModel,
+    canonicalExtractorModel,
+  );
+
+  delete normalizedBeta.connections.Wait;
+  normalizedBeta.connections['Обработать evidence units по одной'].main[1] = [
+    { node: 'Primary Extractor accepted?', type: 'main', index: 0 },
+  ];
+  renameConnectionTargets(normalizedBeta.connections, betaAggregatorName, canonicalAggregatorName);
+  assert.equal(Object.hasOwn(normalizedBeta.connections, betaAggregatorName), false);
+
+  assert.deepEqual(normalizedBeta, normalizedCanonical);
+}
+
 test('canonical Worker retains neutral packaging', () => {
   assert.equal(Object.hasOwn(canonicalWorkflow, 'id'), false);
   assert.equal(Object.hasOwn(canonicalWorkflow, 'versionId'), false);
@@ -165,58 +262,26 @@ test('beta Worker carries the approved live test operational overlay', () => {
 });
 
 test('canonical and beta packages differ only by the approved operational overlay', () => {
-  const canonicalNames = new Set(canonicalWorkflow.nodes.map(({ name }) => name));
-  const betaNames = new Set(workflow.nodes.map(({ name }) => name));
-  assert.deepEqual(
-    [...canonicalNames].filter((name) => !betaNames.has(name)).sort(),
-    [canonicalAggregatorName],
-  );
-  assert.deepEqual(
-    [...betaNames].filter((name) => !canonicalNames.has(name)).sort(),
-    [betaAggregatorName, 'Wait'].sort(),
-  );
+  assertApprovedPackageBoundary(canonicalWorkflow, workflow);
+});
 
-  const canonicalCodeNodes = canonicalWorkflow.nodes
-    .filter(({ type }) => type === 'n8n-nodes-base.code')
-    .sort((left, right) => left.name.localeCompare(right.name));
-  const betaCodeNodes = workflow.nodes
-    .filter(({ type }) => type === 'n8n-nodes-base.code')
-    .sort((left, right) => left.name.localeCompare(right.name));
-  assert.equal(canonicalCodeNodes.length, betaCodeNodes.length);
-  assert.deepEqual(
-    betaCodeNodes.map(comparableCodeNode),
-    canonicalCodeNodes.map(comparableCodeNode),
+test('package boundary rejects an unexpected Aggregator option and extra Wait edge', () => {
+  const aggregatorMutation = structuredClone(workflow);
+  aggregatorMutation.nodes.find(({ name }) => name === betaAggregatorName)
+    .parameters.options.unexpectedNestedOption = true;
+  assert.throws(
+    () => assertApprovedPackageBoundary(canonicalWorkflow, aggregatorMutation),
+    assert.AssertionError,
   );
 
-  const normalizedCanonical = structuredClone(canonicalWorkflow);
-  const normalizedBeta = structuredClone(workflow);
-  delete normalizedBeta.id;
-  normalizedBeta.name = normalizedCanonical.name;
-  normalizedBeta.active = normalizedCanonical.active;
-  delete normalizedBeta.settings.errorWorkflow;
-  assert.deepEqual(normalizedBeta.settings, normalizedCanonical.settings);
-
-  normalizedBeta.nodes = normalizedBeta.nodes.filter(({ name }) => name !== 'Wait');
-  const betaAggregator = normalizedBeta.nodes.find(({ name }) => name === betaAggregatorName);
-  const canonicalAggregator = normalizedCanonical.nodes.find(({ name }) => name === canonicalAggregatorName);
-  assert.ok(betaAggregator);
-  assert.ok(canonicalAggregator);
-  betaAggregator.name = canonicalAggregatorName;
-  betaAggregator.parameters = structuredClone(canonicalAggregator.parameters);
-
-  const betaExtractor = normalizedBeta.nodes.find(({ name }) => name === 'AI Extractor v1.0');
-  assert.ok(betaExtractor.parameters.jsonBody.includes(betaExtractorModel));
-  betaExtractor.parameters.jsonBody = betaExtractor.parameters.jsonBody.replace(
-    betaExtractorModel,
-    canonicalExtractorModel,
+  const waitMutation = structuredClone(workflow);
+  waitMutation.connections.Wait.main[0].push({
+    node: 'Проверить полноту Extractor recovery',
+    type: 'main',
+    index: 0,
+  });
+  assert.throws(
+    () => assertApprovedPackageBoundary(canonicalWorkflow, waitMutation),
+    assert.AssertionError,
   );
-
-  delete normalizedBeta.connections.Wait;
-  normalizedBeta.connections['Обработать evidence units по одной'].main[1] = [
-    { node: 'Primary Extractor accepted?', type: 'main', index: 0 },
-  ];
-  renameConnectionTargets(normalizedBeta.connections, betaAggregatorName, canonicalAggregatorName);
-  assert.equal(Object.hasOwn(normalizedBeta.connections, betaAggregatorName), false);
-
-  assert.deepEqual(normalizedBeta, normalizedCanonical);
 });

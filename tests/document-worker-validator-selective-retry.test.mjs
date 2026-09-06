@@ -44,33 +44,36 @@ const NODES = {
 const workflow = JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 
-test('persistable structural identities are versioned, NUL-free, collision-safe, and group-local', () => {
-  const normalizer = workflow.nodes.find(
-    (candidate) => candidate.name === 'Нормализовать документ Docling',
-  );
-  assert.ok(normalizer, 'Workflow node not found: Нормализовать документ Docling');
-
-  const code = normalizer.parameters.jsCode;
-  assert.doesNotMatch(code, /\.join\(['"]\\u0000['"]\)/u);
-  assert.match(code, /'v2i:'\s*\+\s*JSON\.stringify\(\[/u);
-  assert.match(
-    code,
-    /'v2q:'\s*\+\s*JSON\.stringify\(\[/u,
-  );
-
-  const encode = (parts) => `v2i:${JSON.stringify(parts)}`;
-  assert.notEqual(encode(['a\u0000b', 'c']), encode(['a', 'b\u0000c']));
-  assert.equal(JSON.stringify({ identity: encode(['a\u0000b', 'c']) }).includes('\u0000'), false);
-
-  const groupA = `v2g:${JSON.stringify(['owner', 'table', 'option_button', 'group-a'])}`;
-  const groupB = `v2g:${JSON.stringify(['owner', 'table', 'option_button', 'group-b'])}`;
-  assert.notEqual(groupA, groupB, 'group-local applicability must retain the discriminator');
-});
-
 function findNode(name) {
   const node = workflow.nodes.find((candidate) => candidate.name === name);
   assert.ok(node, `Workflow node not found: ${name}`);
   return node;
+}
+
+function assertRecursivelyNulFree(value, location = '$') {
+  if (typeof value === 'string') {
+    assert.equal(value.includes('\u0000'), false, `${location} contains U+0000`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertRecursivelyNulFree(entry, `${location}[${index}]`));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      assert.equal(key.includes('\u0000'), false, `${location} has a U+0000 key`);
+      assertRecursivelyNulFree(entry, `${location}.${key}`);
+    }
+  }
+}
+
+function validatorFactIdentity(value) {
+  assert.equal(typeof value, 'string');
+  assert.ok(value.startsWith('v1vf:'));
+  assert.equal(value.includes('\u0000'), false);
+  const tuple = JSON.parse(value.slice('v1vf:'.length));
+  assert.equal(tuple.length, 2);
+  return tuple;
 }
 
 function outputsFrom(name, outputIndex = 0) {
@@ -360,6 +363,11 @@ test('execution 14491 classification retries only doc_7_au_0037#1 and preserves 
   });
   assert.equal(classified.json.retry_queue[0].attempt_audit.length, 1);
   assert.equal(classified.json.retry_queue[0].attempt_audit[0].failure_code, 'invalid_confidence');
+  assert.deepEqual(validatorFactIdentity(classified.json.retry_queue[0].identity_key), [
+    fixture.target_identity.analysis_unit_id,
+    fixture.target_identity.fact_index,
+  ]);
+  assertRecursivelyNulFree(classified.json);
 
   const targetSourceIndex = sourceItems.findIndex(
     ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
@@ -464,6 +472,7 @@ test('valid attempt 2 reassembles all 22 units and strips provider audit from it
     ({ json }) => json.analysis_unit_meta.analysis_unit_id === fixture.target_identity.analysis_unit_id,
   ).json;
   assertExplicitSourceEnvelope(targetAssembled, targetSource);
+  assertRecursivelyNulFree(assembled);
   const nonRetriedAssembled = assembled.find(
     ({ json }) => json.validator_source_envelope.source_identity.analysis_unit_id === providerAuditUnitId,
   );
@@ -765,6 +774,15 @@ test('two invalid identities survive queue expansion, shuffled terminal order, a
     { [NODES.expand]: boundary.sourceItems },
   );
   assert.equal(classified.json.retry_queue.length, 2);
+  const identityKeys = classified.json.retry_queue.map(({ identity_key: identityKey }) => identityKey);
+  assert.equal(new Set(identityKeys).size, classified.json.retry_queue.length);
+  for (const queueItem of classified.json.retry_queue) {
+    assert.deepEqual(validatorFactIdentity(queueItem.identity_key), [
+      queueItem.identity.analysis_unit_id,
+      queueItem.identity.fact_index,
+    ]);
+  }
+  assertRecursivelyNulFree(classified.json);
 
   const retryItems = await runCodeNode(NODES.expandRetry, [classified]);
   assert.equal(retryItems.length, 2);
@@ -790,6 +808,7 @@ test('two invalid identities survive queue expansion, shuffled terminal order, a
     { [NODES.classifyPrimary]: [classified] },
   );
   assert.equal(assembled.length, boundary.sourceItems.length);
+  assertRecursivelyNulFree(assembled);
   for (const assembledItem of assembled) {
     const unitId = assembledItem.json.validator_source_envelope.source_identity.analysis_unit_id;
     const expectedSource = boundary.sourceItems.find(

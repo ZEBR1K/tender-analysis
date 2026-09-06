@@ -235,6 +235,32 @@ async function semanticReplay(normalized) {
   return (await runCode('Собрать смысловые разделы v1.4', [prepared]))[0];
 }
 
+function tupleIdentity(value, prefix, expectedLength) {
+  assert.equal(typeof value, 'string');
+  assert.ok(value.startsWith(prefix), `Expected ${prefix} identity, got ${value}`);
+  assert.equal(value.includes('\u0000'), false, `${prefix} identity contains U+0000`);
+  const tuple = JSON.parse(value.slice(prefix.length));
+  assert.equal(tuple.length, expectedLength);
+  return tuple;
+}
+
+function assertRecursivelyNulFree(value, location = '$') {
+  if (typeof value === 'string') {
+    assert.equal(value.includes('\u0000'), false, `${location} contains U+0000`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertRecursivelyNulFree(entry, `${location}[${index}]`));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, entry] of Object.entries(value)) {
+      assert.equal(key.includes('\u0000'), false, `${location} has a U+0000 key`);
+      assertRecursivelyNulFree(entry, `${location}.${key}`);
+    }
+  }
+}
+
 function sourceFromSegment(segment, analysisUnitId = 'doc_3_au_0012') {
   return {
     tender: { tender_id: 'sanitized' }, document: { document_id: 'sanitized-document' },
@@ -407,6 +433,76 @@ test('RED: current Normalizer preserves exact states but lacks unique question/g
     assert.equal(typeof option.source_control_cell_ref, 'string');
     assert.equal(typeof option.source_label_cell_ref, 'string');
   }
+});
+
+test('Normalizer emits approved collision-safe v2 control, question, and group identities from real owner fixtures', async () => {
+  const normalized = await normalize();
+  const alphaOwner = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/58');
+  const betaOwner = normalized.json.blocks.find(({ block_id: id }) => id === '#/tables/59');
+  assert.ok(alphaOwner);
+  assert.ok(betaOwner);
+
+  for (const [owner, expectedQuestion] of [
+    [alphaOwner, 'QUESTION_ALPHA'],
+    [betaOwner, 'QUESTION_BETA'],
+  ]) {
+    assert.equal(owner.docx_option_state_semantic?.contract_version, 'docx_option_state_semantic_v2');
+    for (const option of owner.docx_option_states) {
+      assert.deepEqual(tupleIdentity(option.control_identity_key, 'v2i:', 2), [
+        option.document_part,
+        option.control_rel_target,
+      ]);
+      assert.deepEqual(tupleIdentity(option.question_identity_key, 'v2q:', 3), [
+        option.source_table_ref,
+        option.source_row_ref,
+        expectedQuestion,
+      ]);
+      const expectedDiscriminator = typeof option.group_context === 'string' && option.group_context.trim()
+        ? option.group_context.trim()
+        : expectedQuestion;
+      assert.equal(option.group_discriminator, expectedDiscriminator);
+      assert.deepEqual(tupleIdentity(option.option_group_id, 'v2g:', 4), [
+        owner.block_id,
+        option.source_table_ref,
+        option.control_type,
+        expectedDiscriminator,
+      ]);
+    }
+    assert.deepEqual(
+      owner.docx_option_state_semantic.option_groups.map(({ group_id }) => group_id),
+      [...new Set(owner.docx_option_states.map(({ option_group_id }) => option_group_id))],
+    );
+  }
+
+  const collisionStates = structuredClone(fixture.input.option_states);
+  collisionStates[0].document_part = 'ab';
+  collisionStates[0].control_rel_target = 'c';
+  collisionStates[1].document_part = 'a';
+  collisionStates[1].control_rel_target = 'bc';
+  assert.equal(
+    collisionStates[0].document_part + collisionStates[0].control_rel_target,
+    collisionStates[1].document_part + collisionStates[1].control_rel_target,
+  );
+  const collisionNormalized = await normalize(doclingDocument(), collisionStates);
+  const collisionOwner = collisionNormalized.json.blocks.find(({ block_id: id }) => id === '#/tables/58');
+  const collisionKeys = collisionOwner.docx_option_states.slice(0, 2).map(({ control_identity_key }) => control_identity_key);
+  assert.equal(new Set(collisionKeys).size, 2);
+
+  const semantic = await semanticReplay(normalized);
+  const semanticAlpha = semantic.json.semantic_blocks.find(({ semantic_block_id: id }) => id === 'sb_0002');
+  assert.equal(semanticAlpha.docx_option_state_semantic.contract_version, 'docx_option_state_semantic_v2');
+  assert.ok(semanticAlpha.docx_option_state_semantic.option_groups.every(({ group_id }) => group_id.startsWith('v2g:')));
+  semantic.json.analysis_units = [{
+    analysis_unit_id: 'doc_3_au_0012',
+    primary_semantic_block_ids: ['sb_0001', 'sb_0002', 'sb_0003', 'sb_0004'],
+    overlap_semantic_block_ids: [],
+  }];
+  const expanded = await runCode('Развернуть части для AI v1.2', [semantic]);
+  const expandedAlpha = expanded[0].json.ai_segments.find(({ semantic_block_id: id }) => id === 'sb_0002');
+  assert.deepEqual(expandedAlpha.docx_option_state_semantic, semanticAlpha.docx_option_state_semantic);
+  assertRecursivelyNulFree(normalized.json);
+  assertRecursivelyNulFree(semantic.json);
+  assertRecursivelyNulFree(expanded);
 });
 
 test('RED: duplicate option labels bind inside their own structural question groups', async () => {

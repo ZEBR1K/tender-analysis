@@ -27,13 +27,21 @@ Both packages use the JSON-verified Validator model
 `google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low`
 for primary validation and retry attempts 2–3.
 
-Fresh verification: canonical focused Worker tests `237 total / 235 pass / 2
+Fresh verification: canonical focused Worker/package tests `241 total / 239 pass / 2
 fail` (only the pre-existing ActiveX fixture byte-count and immutable beta-hash
-pins); overlay tests `3/3 PASS`; full repository suite `468 total / 461 pass / 7
+pins); overlay/package tests `4/4 PASS`; full repository suite `469 total / 462 pass / 7
 fail`, with the seven known baseline artifact/fixture/prompt pins and no new
 Worker behavior failure. No live n8n or PostgreSQL change, push, merge or runtime
 execution occurred. Canonical is not promoted and runtime GREEN is not claimed.
 Next step is manual beta import, exact read-back, then an isolated runtime canary.
+
+Execution-level tests now run the real `Нормализовать документ Docling` path on
+the checked-in ActiveX ownership fixture. They prove emitted `v2i`, `v2q` and
+`v2g` tuple members, exact group-discriminator retention, collision-safe tuple
+round-trip and recursive U+0000 absence through semantic blocks and AI segments.
+The real primary Validator classifier and retry assembler likewise prove
+`v1vf:` JSON tuple identities, shuffled multi-identity reassembly and NUL-free
+retry audit/envelopes. This is offline evidence only, not runtime promotion.
 
 ## Aggregator live synchronization — 2026-09-05
 
