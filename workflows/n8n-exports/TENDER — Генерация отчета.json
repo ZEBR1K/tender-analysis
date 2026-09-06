@@ -129,26 +129,7 @@
       "name": "Сгенерировать HTML1"
     }
   ],
-  "pinData": {
-    "When Executed by Another Workflow": [
-      {
-        "json": {
-          "analysis_run_id": "f9d8e1d7-f01a-4d91-8eac-89c8376535c2",
-          "run_exists": true,
-          "run_status_before": "aggregating",
-          "final_count": 27,
-          "barrier_ready": true,
-          "completion_claimed": true,
-          "missing_keys": [],
-          "unexpected_keys": [],
-          "invalid_status_keys": [],
-          "invalid_catalog_keys": [],
-          "invalid_contract_keys": [],
-          "finalization_state": "completed_now"
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "When Executed by Another Workflow": {
       "main": [

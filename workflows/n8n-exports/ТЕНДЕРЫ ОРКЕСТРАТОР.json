@@ -74,7 +74,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -208,
+        -272,
         -176
       ],
       "id": "3d7e969f-b264-41db-8893-030977ffc7a7",
@@ -252,10 +252,10 @@
       "parameters": {
         "workflowId": {
           "__rl": true,
-          "value": "1Pw61ZY3HgBSvcUr",
+          "value": "URFdslUfULtOLv9B",
           "mode": "list",
-          "cachedResultUrl": "/workflow/1Pw61ZY3HgBSvcUr",
-          "cachedResultName": "TENDER — Обработать документ"
+          "cachedResultUrl": "/workflow/URFdslUfULtOLv9B",
+          "cachedResultName": "[DW-23 TEST CODEX] TENDER — Обработать документ"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -417,9 +417,10 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "availableInMCP": false
   },
-  "versionId": "2d0b4c62-b674-49fc-b931-ab6180751ddd",
+  "versionId": "466ed98e-17f1-4735-b547-2cb60bbaed51",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"

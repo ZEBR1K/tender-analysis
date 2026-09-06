@@ -1,5 +1,5 @@
 {
-  "name": "TENDER - Targeted Recheck",
+  "name": "[TEST ROUTE GUARD 14449] TENDER - Targeted Recheck",
   "nodes": [
     {
       "parameters": {
@@ -8,10 +8,10 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.2,
       "position": [
-        -5264,
-        -496
+        -6816,
+        688
       ],
-      "id": "2741ebb1-ce3d-4cab-a6f8-16accdaf4cea",
+      "id": "ba9176ee-0912-4df8-a615-d5758627b364",
       "name": "When Executed by Another Workflow"
     },
     {
@@ -22,10 +22,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        912,
-        -560
+        -640,
+        624
       ],
-      "id": "27f6ea0a-0f93-45c9-999e-8f8ad71dc31b",
+      "id": "a5c677e4-0aaa-45a3-9c1f-de4c49d21a5c",
       "name": "Подготовить запрос #2 Semantic Aggregator"
     },
     {
@@ -36,10 +36,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        -560
+        -192,
+        624
       ],
-      "id": "9813a081-d261-4b41-ba53-28256f24630a",
+      "id": "c0b02914-b9f2-48bc-8d37-b5173fc93463",
       "name": "Проверить ответ #2 Semantic Aggregator"
     },
     {
@@ -63,10 +63,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1136,
-        -560
+        -416,
+        624
       ],
-      "id": "722d149c-2293-4b53-a4af-8fa787643bf8",
+      "id": "5b6a0911-fd3a-46b6-bcb2-7444e7646614",
       "name": "Semantic Aggregator1",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -85,10 +85,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4624,
-        -496
+        -6176,
+        688
       ],
-      "id": "e8388007-ca16-4c8b-866e-a3c9b8416ef0",
+      "id": "ab3fa074-c66d-45d3-bc6b-aac695ca57c5",
       "name": "Подготовить #2 Targeted Recheck Request"
     },
     {
@@ -99,10 +99,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4096,
-        -496
+        -5648,
+        688
       ],
-      "id": "4125779f-daab-4f18-bdc2-7b2b6ce32d8d",
+      "id": "f6accadf-1052-45fd-8023-088fea64c08d",
       "name": "Подготовить контекст #2 Targeted Recheck"
     },
     {
@@ -116,10 +116,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -4304,
-        -496
+        -5856,
+        688
       ],
-      "id": "8e32d2a7-bafc-4275-9fa0-e21f787411f6",
+      "id": "1aed370a-0694-4d08-899b-278e114ba0bf",
       "name": "Найти контекст для #2 Targeted Recheck",
       "credentials": {
         "postgres": {
@@ -156,10 +156,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -3712,
-        -496
+        -5264,
+        688
       ],
-      "id": "aa73f8e0-0f37-48b5-b12d-7214f479a9bf",
+      "id": "cbd00c24-cc7a-4fb2-bf67-1d9c202bcdc2",
       "name": "Контекст для Targeted Recheck найден?"
     },
     {
@@ -170,10 +170,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -3392,
-        -512
+        -4944,
+        672
       ],
-      "id": "69010b38-960a-4707-b918-a2fca306b88f",
+      "id": "35483c55-ad23-4c03-b799-49efc8373c3e",
       "name": "Подготовить запрос #2 AI Targeted Recheck"
     },
     {
@@ -197,10 +197,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -3104,
-        -512
+        -4656,
+        672
       ],
-      "id": "09aa452b-83af-4561-8d6a-e20aa0e3bfab",
+      "id": "8223b48a-6ade-4acd-9e09-ba9323ba5723",
       "name": "#2 AI Targeted Recheck v1",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -239,10 +239,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2432,
-        -512
+        -3984,
+        672
       ],
-      "id": "792e366a-ef27-44f7-83ca-2a9691ed595e",
+      "id": "109486c5-91b1-4e73-9de9-0fc5721bcb85",
       "name": "Есть candidate после Targeted Recheck?"
     },
     {
@@ -253,10 +253,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2032,
-        -528
+        -3584,
+        656
       ],
-      "id": "57515689-cfea-4b62-9260-7dc543f53415",
+      "id": "d6b5fb60-76fd-4682-9bfc-244f4144ac9b",
       "name": "Подготовить запрос #2 Validator Targeted Recheck"
     },
     {
@@ -280,10 +280,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -1744,
-        -528
+        -3296,
+        656
       ],
-      "id": "fce71be5-d20d-4181-88ae-282b788d58f4",
+      "id": "749819d1-ddd6-4daa-8561-12c88f3b65b6",
       "name": "#2 AI Validator Targeted Recheck",
       "retryOnFail": true,
       "waitBetweenTries": 5000,
@@ -302,10 +302,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -1520,
-        -528
+        -3072,
+        656
       ],
-      "id": "1c5d38db-39e7-469c-9d20-b50bacdf7deb",
+      "id": "255fafd7-98d9-4335-84dd-89f360334b55",
       "name": "Проверить ответ #2 Validator Targeted Recheck"
     },
     {
@@ -316,10 +316,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -400,
-        -560
+        -1952,
+        624
       ],
-      "id": "358aaba7-f402-4d10-808f-c0d3992ca153",
+      "id": "4e37826b-ea5c-4c15-b0f8-51c71b1fe404",
       "name": "Определить путь после Validator"
     },
     {
@@ -330,10 +330,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1552,
-        -1184
+        0,
+        0
       ],
-      "id": "0cd79843-e770-4265-a74f-514bb473445f",
+      "id": "904e988e-5dad-4906-bdfb-79ba2a5798e8",
       "name": "Сформировать FINAL из Recheck candidate"
     },
     {
@@ -364,10 +364,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        320,
-        -560
+        -1232,
+        624
       ],
-      "id": "7a0a29d7-4288-4aec-96cb-572cf24f0294",
+      "id": "ae864a7e-83fa-43ac-97ac-8cd624511123",
       "name": "Round 2 разрешён для поля?"
     },
     {
@@ -378,10 +378,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        320,
-        -304
+        -1024,
+        848
       ],
-      "id": "a9e2ad4c-bb34-4bcf-aa10-a1baa53994dc",
+      "id": "17feea2e-e58d-41a7-9640-373c2b59e624",
       "name": "Сформировать requires_review — Round 2 запрещён"
     },
     {
@@ -392,10 +392,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        576,
-        -304
+        -768,
+        848
       ],
-      "id": "9ef288ef-607d-4f3c-b2c6-39853a3c9e68",
+      "id": "61806ed5-2c8e-43a4-a982-500a096bf6df",
       "name": "Нормализовать FINAL поле8"
     },
     {
@@ -409,10 +409,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        816,
-        -304
+        -528,
+        848
       ],
-      "id": "cef01441-0ef8-4e59-bb1e-20ab6e77c3e1",
+      "id": "a89486bd-4294-4d70-8d8c-ca933854281b",
       "name": "Сохранить FINAL результат поля в БД8",
       "credentials": {
         "postgres": {
@@ -428,10 +428,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1072,
-        -304
+        -272,
+        848
       ],
-      "id": "2ea65eb9-8330-469e-8964-65435f2dfe83",
+      "id": "5491cc0c-6728-4285-9c79-fee907628b1c",
       "name": "Подготовить вызов Finalizer8"
     },
     {
@@ -456,10 +456,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1280,
-        -304
+        -64,
+        848
       ],
-      "id": "5103f61c-3cba-4f8c-9201-1bdca9740dbf",
+      "id": "38aaaac3-d988-4ba7-b765-b79414f4219f",
       "name": "Call 'TENDER — Финализация анализа'8"
     },
     {
@@ -470,10 +470,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        576,
-        -560
+        -976,
+        624
       ],
-      "id": "12b90fae-910b-4dce-b20b-51a5e4e9a6c7",
+      "id": "898b760d-7db1-4335-8e03-360dafbbeedb",
       "name": "Собрать candidates для Round 2"
     },
     {
@@ -484,10 +484,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1744,
-        -560
+        192,
+        624
       ],
-      "id": "163e7a71-19e8-4cd0-b1d4-4950416d13f0",
+      "id": "f20c0f38-80ec-451d-b209-460f151c12f0",
       "name": "Сформировать FINAL после Round 2"
     },
     {
@@ -498,10 +498,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2816,
-        -512
+        -4368,
+        672
       ],
-      "id": "cf9fbd85-9eeb-450c-832c-3672df343a07",
+      "id": "d8d6bd30-f077-46df-b7d0-8e990d1edec9",
       "name": "Проверить #2 evidence Targeted Recheck"
     },
     {
@@ -532,10 +532,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -2624,
-        -512
+        -4176,
+        672
       ],
-      "id": "dbf311fe-e41b-4d30-a9d0-8e163eed969d",
+      "id": "84a9730c-bbe3-4c7a-ae91-46c01b6e1792",
       "name": "Технический fallback после Targeted Recheck?"
     },
     {
@@ -566,10 +566,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1168,
-        464
+        -2720,
+        1648
       ],
-      "id": "bfdc08ab-4e06-40d4-9d43-5a7f6c1f91ab",
+      "id": "5ad05e89-cc51-4280-9ab3-95f002753fe9",
       "name": "Есть исходный candidate после неудачного Recheck?"
     },
     {
@@ -580,10 +580,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -624,
-        384
+        -2176,
+        1568
       ],
-      "id": "2c9e456a-53c3-41c8-970f-2d22664f3f60",
+      "id": "19a5db67-5d33-4d1b-a00a-ab5c7bdb81b6",
       "name": "Сформировать requires_review после неудачного Targeted Recheck"
     },
     {
@@ -594,10 +594,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1808,
-        -1184
+        256,
+        0
       ],
-      "id": "93a72a03-2481-43ca-ba6d-a1beefd66818",
+      "id": "6027fd8d-9775-476d-8123-a903c017c866",
       "name": "Нормализовать FINAL поле3"
     },
     {
@@ -608,10 +608,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1968,
-        -560
+        416,
+        624
       ],
-      "id": "c1ffe80b-d338-4c48-a10c-3f3aea9d8297",
+      "id": "5513c221-03e8-4f58-ad46-c7a12791d3b1",
       "name": "Нормализовать FINAL поле4"
     },
     {
@@ -622,10 +622,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -400,
-        384
+        -1952,
+        1568
       ],
-      "id": "29f6a9e9-7c58-4d59-8341-5b853bedbc8a",
+      "id": "76e110f5-b1e9-4e95-8ec9-54b4577aea89",
       "name": "Нормализовать FINAL поле5"
     },
     {
@@ -636,10 +636,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -640,
-        608
+        -2192,
+        1792
       ],
-      "id": "750a6114-2e18-4ecf-9ff0-15a7671aeb95",
+      "id": "2017e681-9248-4b0c-994c-815dbbfddf58",
       "name": "Сформировать not_found после Targeted Recheck1"
     },
     {
@@ -650,10 +650,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -352,
-        608
+        -1904,
+        1792
       ],
-      "id": "dbd280d4-322a-4100-916a-dd030768ba20",
+      "id": "f50c4408-9afe-4c7b-832f-8ce63bace204",
       "name": "Нормализовать FINAL поле6"
     },
     {
@@ -664,10 +664,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        80,
-        -112
+        -2192,
+        1120
       ],
-      "id": "bd8bf510-2eac-490b-ab40-20f1f09ecd0c",
+      "id": "f6bf2a70-1674-44bd-8a8e-8f48aef13e4e",
       "name": "Нормализовать FINAL поле7"
     },
     {
@@ -681,10 +681,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2080,
-        -1184
+        528,
+        0
       ],
-      "id": "22344f9e-0699-4dc1-b3e9-1e043b3a2b60",
+      "id": "5caa4fa2-8e9f-43af-9f68-558f64ce27af",
       "name": "Сохранить FINAL результат поля в БД3",
       "credentials": {
         "postgres": {
@@ -704,10 +704,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        2208,
-        -560
+        656,
+        624
       ],
-      "id": "15c22070-161c-420e-9a55-b7e71985b6b4",
+      "id": "d7dfb439-9101-4642-aa9b-de7953bfd255",
       "name": "Сохранить FINAL результат поля в БД4",
       "credentials": {
         "postgres": {
@@ -727,10 +727,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -128,
-        384
+        -1680,
+        1568
       ],
-      "id": "69af22c4-e73f-45d7-9b06-db87a5716813",
+      "id": "d4b2d860-dcdc-49fa-8931-e805561083b8",
       "name": "Сохранить FINAL результат поля в БД5",
       "credentials": {
         "postgres": {
@@ -750,10 +750,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -112,
-        608
+        -1664,
+        1792
       ],
-      "id": "87fa5f30-f169-4baa-935f-fd9a4cec6b0c",
+      "id": "a5989a09-44b6-4901-86b8-9d644345d7cd",
       "name": "Сохранить FINAL результат поля в БД6",
       "credentials": {
         "postgres": {
@@ -773,10 +773,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        336,
-        -112
+        -1936,
+        1120
       ],
-      "id": "9c9189a1-2b4e-481d-9ac2-8def327a5893",
+      "id": "524e6bfb-fa14-4963-8cf5-f78c7dfe6cc4",
       "name": "Сохранить FINAL результат поля в БД7",
       "credentials": {
         "postgres": {
@@ -813,10 +813,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -3472,
-        224
+        -5024,
+        1408
       ],
-      "id": "fbd81509-8454-4081-8e58-fb77e3658ff2",
+      "id": "e534869f-1a04-413b-9342-dd99ce9ffb1a",
       "name": "Есть исходный candidate после отсутствия контекста?"
     },
     {
@@ -827,10 +827,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2912,
-        96
+        -4464,
+        1280
       ],
-      "id": "02581097-f9c2-4c2d-ae0a-a96ee329b5f7",
+      "id": "e077bbef-a5a2-4c66-9886-93933a1a59b7",
       "name": "Сформировать requires_review — нет контекста"
     },
     {
@@ -841,10 +841,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2688,
-        96
+        -4240,
+        1280
       ],
-      "id": "b4528a6d-896c-4a18-abd9-5169e614690d",
+      "id": "3600b501-636c-4e0e-85d6-490561d51797",
       "name": "Нормализовать FINAL — нет контекста requires_review"
     },
     {
@@ -858,10 +858,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -2416,
-        96
+        -3968,
+        1280
       ],
-      "id": "f41aafb0-e2be-4cad-8847-d5eef4e09e9b",
+      "id": "78415102-fe95-4a65-9bc6-9b6f237d32bf",
       "name": "Сохранить FINAL — нет контекста requires_review",
       "credentials": {
         "postgres": {
@@ -878,10 +878,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2912,
-        336
+        -4464,
+        1520
       ],
-      "id": "b02bac3f-1bb5-48f2-bdb2-615160cc6363",
+      "id": "d1021b0e-0c85-45b7-aa00-6ba178eefe70",
       "name": "Сформировать not_found — нет контекста"
     },
     {
@@ -892,10 +892,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2688,
-        336
+        -4240,
+        1520
       ],
-      "id": "eeadfd08-0c79-4e42-a0ec-281e4ab93e15",
+      "id": "0ddb639d-4da6-4321-9054-4c030ba59ec2",
       "name": "Нормализовать FINAL — нет контекста not_found"
     },
     {
@@ -909,10 +909,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -2416,
-        336
+        -3968,
+        1520
       ],
-      "id": "520bd3a3-c743-4237-87b5-f477fc90912f",
+      "id": "1c29d794-fdaa-49b8-9466-88ad42e1880c",
       "name": "Сохранить FINAL — нет контекста not_found",
       "credentials": {
         "postgres": {
@@ -932,10 +932,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        -4912,
-        -496
+        -6464,
+        688
       ],
-      "id": "0ceff4d7-d36b-4b69-ba3c-276e7850c8f2",
+      "id": "a01e5091-d24e-4a59-869b-90c59392e6e6",
       "name": "Загрузить tender_meta для Targeted Recheck",
       "credentials": {
         "postgres": {
@@ -952,10 +952,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        64,
-        -368
+        -2208,
+        864
       ],
-      "id": "131b54c3-5e13-4b88-81f1-793279d67332",
+      "id": "8dcc9b62-ba40-425c-b631-5505f4ead75b",
       "name": "Нормализовать FINAL поле"
     },
     {
@@ -969,10 +969,10 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        336,
-        -368
+        -1936,
+        864
       ],
-      "id": "e035187d-42c7-4340-8898-d7fa270f882b",
+      "id": "a666e297-2f7c-46f1-b222-d08ce36d5434",
       "name": "Сохранить FINAL результат поля в БД",
       "credentials": {
         "postgres": {
@@ -1009,10 +1009,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -640,
-        -320
+        -2912,
+        912
       ],
-      "id": "8263c942-1f61-4e0f-bdf4-ed59045a0e68",
+      "id": "3fef612f-b44d-43c7-b1fa-a775a9a86a13",
       "name": "Есть исходный candidate для fallback?"
     },
     {
@@ -1043,10 +1043,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -1040,
-        -528
+        -2592,
+        656
       ],
-      "id": "dc94a717-9f96-4da0-b674-5b50848124b8",
+      "id": "99c11ae3-ee36-4a68-bb3a-83023ffb3daa",
       "name": "Есть принятые candidates после Validator?"
     },
     {
@@ -1057,10 +1057,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -160,
-        -368
+        -2432,
+        864
       ],
-      "id": "d4d7bec9-5a5f-41b8-8165-cc53a66f02ae",
+      "id": "63b884bb-de90-4bec-99b3-6ab110cc79b8",
       "name": "Сформировать requires_review с сохранением existing candidate"
     },
     {
@@ -1071,10 +1071,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -160,
-        -112
+        -2432,
+        1120
       ],
-      "id": "73c8ad4d-b213-482c-a1b4-ec4492cadfdc",
+      "id": "21f1b4fb-a953-49d3-b2db-ce9ac74d7e4c",
       "name": "Сформировать not_found после отсутствия кандидатов"
     },
     {
@@ -1105,10 +1105,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        -80,
-        -560
+        -1632,
+        624
       ],
-      "id": "8f8c5c56-1031-4f9c-995f-38fdb11f49ad",
+      "id": "3fcdcbf6-55f9-437a-8ae2-aef9d19d1b17",
       "name": "Можно завершить без Round 2?"
     },
     {
@@ -1133,10 +1133,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -1984,
-        96
+        -3536,
+        1280
       ],
-      "id": "89e99274-91d0-4130-9ecf-5250e0f81cda",
+      "id": "27c3b63e-614b-4989-93bf-897c6b9ba5b6",
       "name": "Call 'TENDER — Финализация анализа'1"
     },
     {
@@ -1146,10 +1146,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2176,
-        96
+        -3728,
+        1280
       ],
-      "id": "35a7200c-13c8-4ad9-a64b-748f4652fb12",
+      "id": "5913a46b-1484-420a-8acb-21286c8f5b43",
       "name": "Подготовить вызов Finalizer1"
     },
     {
@@ -1174,10 +1174,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        -1984,
-        336
+        -3536,
+        1520
       ],
-      "id": "35905478-b881-4478-a4f9-fcc0ad7c94e9",
+      "id": "08c53faf-3d96-4483-a628-96c8db715534",
       "name": "Call 'TENDER — Финализация анализа'"
     },
     {
@@ -1187,10 +1187,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -2176,
-        336
+        -3728,
+        1520
       ],
-      "id": "dca3f6e8-2cbf-413f-b9a4-df75075ddcea",
+      "id": "d8182c84-ba75-42c8-9303-e01eb9284220",
       "name": "Подготовить вызов Finalizer"
     },
     {
@@ -1215,10 +1215,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        400,
-        384
+        -1152,
+        1568
       ],
-      "id": "cf8623ea-61b0-4cc3-b1c6-7da9eca00972",
+      "id": "7a1f3a63-76fb-4945-9a0a-b677e547c3dd",
       "name": "Call 'TENDER — Финализация анализа'2"
     },
     {
@@ -1228,10 +1228,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        208,
-        384
+        -1344,
+        1568
       ],
-      "id": "b29c1d7e-eac4-42f4-ab46-9a2eb6185203",
+      "id": "7daa1b1e-5546-47dc-8c4a-5e88868de435",
       "name": "Подготовить вызов Finalizer2"
     },
     {
@@ -1256,10 +1256,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        432,
-        608
+        -1120,
+        1792
       ],
-      "id": "3836eeca-afe4-4bcf-9489-e13d80fe8f78",
+      "id": "3cd59410-a1ce-47a2-8307-5aeb2098bd8a",
       "name": "Call 'TENDER — Финализация анализа'3"
     },
     {
@@ -1269,10 +1269,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        192,
-        608
+        -1360,
+        1792
       ],
-      "id": "1b266bd3-cc07-45bd-8f31-7e541f36b0e5",
+      "id": "98d1c45f-a776-4377-9c02-1e78de663588",
       "name": "Подготовить вызов Finalizer3"
     },
     {
@@ -1297,10 +1297,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        832,
-        -368
+        -1440,
+        864
       ],
-      "id": "3b933105-deca-47b5-939e-850f5b7c0add",
+      "id": "d2785ccf-7d82-4521-aa58-7b2afd40fa6b",
       "name": "Call 'TENDER — Финализация анализа'4"
     },
     {
@@ -1310,10 +1310,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        640,
-        -368
+        -1632,
+        864
       ],
-      "id": "76331336-db24-464e-a552-39f7b8e56dff",
+      "id": "67829c56-0ab4-4ce7-85cf-d69d7f7feac9",
       "name": "Подготовить вызов Finalizer4"
     },
     {
@@ -1338,10 +1338,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        864,
-        -112
+        -1408,
+        1120
       ],
-      "id": "cb1186d4-eef2-4c10-a7fd-e24e7bff5c93",
+      "id": "d5c85f94-dbda-412f-979b-ca4498889107",
       "name": "Call 'TENDER — Финализация анализа'5"
     },
     {
@@ -1351,10 +1351,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        656,
-        -112
+        -1616,
+        1120
       ],
-      "id": "39999290-4fef-4e25-ad0d-842f6dab0c1d",
+      "id": "9f6e44bd-b3b5-45cb-95ee-82fcace370f6",
       "name": "Подготовить вызов Finalizer5"
     },
     {
@@ -1379,10 +1379,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        2656,
-        -560
+        1104,
+        624
       ],
-      "id": "4a0c1de0-586f-44f0-8d7e-5787dfd0c99e",
+      "id": "01944061-3fa1-4359-8e67-d07876c7455b",
       "name": "Call 'TENDER — Финализация анализа'6"
     },
     {
@@ -1392,10 +1392,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2464,
-        -560
+        912,
+        624
       ],
-      "id": "c7737f1b-a5f0-4c9f-9b1f-be7d37b20d80",
+      "id": "7be6cd4a-04d5-412f-bbf9-1ba88498b20e",
       "name": "Подготовить вызов Finalizer6"
     },
     {
@@ -1420,10 +1420,10 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        2560,
-        -1184
+        1008,
+        0
       ],
-      "id": "6d2c5fec-559c-421b-be99-be061ddeca98",
+      "id": "0c7d5c00-8dc4-4daf-8faa-e32dd611dc20",
       "name": "Call 'TENDER — Финализация анализа'7"
     },
     {
@@ -1433,467 +1433,14 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2368,
-        -1184
+        816,
+        0
       ],
-      "id": "8f3e7995-0557-4a49-82c6-5cdc42236197",
+      "id": "fb42abb2-2bf2-42eb-9b1b-01bf9e453431",
       "name": "Подготовить вызов Finalizer7"
     }
   ],
-  "pinData": {
-    "When Executed by Another Workflow": [
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 2,
-          "field_key": "nm_price_with_vat",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 2,
-            "field_key": "nm_price_with_vat",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 0
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 6,
-          "field_key": "application_review_date",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 6,
-            "field_key": "application_review_date",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 1
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 7,
-          "field_key": "results_date",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 7,
-            "field_key": "results_date",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 2
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 10,
-          "field_key": "participation_cost",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 10,
-            "field_key": "participation_cost",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 3
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 11,
-          "field_key": "participation_guarantee",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 11,
-            "field_key": "participation_guarantee",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 4
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 12,
-          "field_key": "evaluation_criteria",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 12,
-            "field_key": "evaluation_criteria",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 5
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 15,
-          "field_key": "special_account_or_treasury",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 15,
-            "field_key": "special_account_or_treasury",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 6
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 16,
-          "field_key": "bank_support",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 16,
-            "field_key": "bank_support",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 7
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 17,
-          "field_key": "government_contract",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 17,
-            "field_key": "government_contract",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 8
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 18,
-          "field_key": "rebidding",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 18,
-            "field_key": "rebidding",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 9
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 20,
-          "field_key": "advance_contract_guarantee",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 20,
-            "field_key": "advance_contract_guarantee",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 10
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 21,
-          "field_key": "warranty_obligations_guarantee",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 21,
-            "field_key": "warranty_obligations_guarantee",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 11
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 24,
-          "field_key": "similar_supply_experience",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 24,
-            "field_key": "similar_supply_experience",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 12
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 26,
-          "field_key": "analog_definition",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 26,
-            "field_key": "analog_definition",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 13
-        }
-      },
-      {
-        "json": {
-          "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-          "field_catalog_version": "tender_fields_v1",
-          "field_index": 27,
-          "field_key": "application_documents",
-          "metadata_resolved": false,
-          "aggregation_status": null,
-          "final_value_text": null,
-          "confidence": null,
-          "resolution_method": null,
-          "evidence": [],
-          "original_field": {
-            "analysis_run_id": "16677957-641c-4822-92d2-cfd7b843d9e8",
-            "field_catalog_version": "tender_fields_v1",
-            "field_index": 27,
-            "field_key": "application_documents",
-            "has_candidates": false,
-            "candidates_count": 0,
-            "confirmed_count": 0,
-            "requires_review_count": 0,
-            "source_documents_count": 0,
-            "source_documents": [],
-            "candidates": []
-          }
-        },
-        "pairedItem": {
-          "item": 14
-        }
-      }
-    ]
-  },
+  "pinData": {},
   "connections": {
     "Подготовить запрос #2 Semantic Aggregator": {
       "main": [
@@ -2630,18 +2177,17 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "7f82ae43-2ddc-4568-8d76-a6d460c13924",
+  "versionId": "cae31e7f-0a58-424c-aacc-9e71cb5d4e37",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
   },
   "nodeGroups": [],
-  "id": "9uDOU31DGo30fGXX",
+  "id": "pReSd1KIRTgbysUZ",
   "tags": []
 }
