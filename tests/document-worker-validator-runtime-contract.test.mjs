@@ -52,10 +52,15 @@ function systemPrompt(body) {
   return match[1];
 }
 
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n/g, '\n');
+}
+
 test('v1.2 prompt artifact is an exact clean copy of the imported validator system prompt', () => {
   assert.ok(fs.existsSync(promptArtifactPath), 'Missing v1.2 prompt artifact');
-  const artifact = fs.readFileSync(promptArtifactPath, 'utf8');
-  assert.equal(artifact, `${systemPrompt(validatorBody(loadWorkflow()))}\n`);
+  const artifact = normalizeLineEndings(fs.readFileSync(promptArtifactPath, 'utf8'));
+  const executablePrompt = normalizeLineEndings(systemPrompt(validatorBody(loadWorkflow())));
+  assert.equal(artifact, `${executablePrompt}\n`);
 });
 
 test('execution-derived fixtures preserve exact validator inputs for all required executions', () => {

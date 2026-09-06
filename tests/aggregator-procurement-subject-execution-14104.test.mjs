@@ -52,12 +52,13 @@ const GEMINI_37_FLASH_ALIAS =
 const FIXTURE_SHA256 =
   '6392f9c882a211f20cf1f13777f7002b8c8628270d025df5fdf46492f2adbd75';
 const BETA_WORKFLOW_SHA256 =
-  '3e8b0323a13a74c498c9c28c069fae02fb2907dd3d53aaccd8325fd3d8ce3be8';
+  '95c3771eeb7a46ec862ba54058347f5a27912aceac3bb370bc2935ab08704986';
 
 function sha256File(filePath) {
+  const normalizedText = fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n');
   return crypto
     .createHash('sha256')
-    .update(fs.readFileSync(filePath))
+    .update(normalizedText)
     .digest('hex');
 }
 

@@ -465,11 +465,13 @@ test('Targeted Recheck prompt aligns evidence coordinates with both trusted sour
   assert.match(prepared.system_prompt, /never.*invent.*coordinates/is);
   assert.match(prepared.system_prompt, /does not.*prove.*completeness/is);
 
-  const historicalPromptArtifact = fs.readFileSync(promptArtifactPath, 'utf8');
+  const historicalPromptArtifact = fs
+    .readFileSync(promptArtifactPath, 'utf8')
+    .replace(/\r\n/g, '\n');
   assert.equal(
     crypto.createHash('sha256').update(historicalPromptArtifact).digest('hex'),
     'de088fa41055cb952ef0d1f35ab93d4486f0dc279b26b270d0b4bc5e0b445576',
-    'Historical v1.1 prompt artifact must remain byte-unchanged.',
+    'Historical v1.1 prompt artifact must remain content-unchanged across checkout line endings.',
   );
   assert.match(historicalPromptArtifact, /11\. quote должен быть непрерывной дословной цитатой/u);
   assert.doesNotMatch(historicalPromptArtifact, /Каждый semantic_block evidence\.quote/u);

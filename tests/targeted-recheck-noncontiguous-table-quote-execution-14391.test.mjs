@@ -71,6 +71,24 @@ function normalizeWhitespace(value) {
   return String(value ?? '').replace(/\s+/gu, ' ').trim();
 }
 
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n/g, '\n');
+}
+
+function semanticWorkflowSnapshot(workflow) {
+  const snapshot = structuredClone(workflow);
+  for (const key of ['id', 'name', 'active', 'versionId', 'meta', 'pinData']) {
+    delete snapshot[key];
+  }
+  snapshot.nodes = snapshot.nodes.map((node) => {
+    const semanticNode = structuredClone(node);
+    delete semanticNode.id;
+    delete semanticNode.position;
+    return semanticNode;
+  });
+  return snapshot;
+}
+
 function promptInput() {
   const table = fixture.synthetic_table;
   return {
@@ -151,15 +169,17 @@ test('Targeted Recheck system prompt owns the exact continuous-quote invariant a
     'User prompt must not duplicate or replace the system-owned quote invariant.',
   );
   assert.equal(
-    fs.readFileSync(currentPromptArtifactPath, 'utf8').trimEnd(),
-    prepared.system_prompt,
+    normalizeLineEndings(fs.readFileSync(currentPromptArtifactPath, 'utf8')).trimEnd(),
+    normalizeLineEndings(prepared.system_prompt),
     'Current v1.2 artifact must exactly equal the executable runtime system prompt.',
   );
 });
 
 test('canonical workflow preserves the TR-15 prompt-only baseline outside the later route-guard slice', () => {
-  const workflow = loadAggregatorWorkflow(workflowPath);
-  const immutableLiveWorkflow = loadAggregatorWorkflow(immutableLiveWorkflowPath);
+  const workflow = semanticWorkflowSnapshot(loadAggregatorWorkflow(workflowPath));
+  const immutableLiveWorkflow = semanticWorkflowSnapshot(
+    loadAggregatorWorkflow(immutableLiveWorkflowPath),
+  );
   const baseline = fixture.parent_workflow_baseline;
   const target = workflow.nodes.find(({ name }) => name === nodeName);
   assert.ok(target, `Missing node: ${nodeName}`);

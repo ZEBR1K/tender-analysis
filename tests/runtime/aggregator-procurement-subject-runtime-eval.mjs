@@ -46,7 +46,9 @@ class RuntimeHttpError extends Error {
 }
 
 function sha256(value) {
-  return crypto.createHash('sha256').update(value).digest('hex');
+  const normalizedText = (Buffer.isBuffer(value) ? value.toString('utf8') : String(value))
+    .replace(/\r\n/g, '\n');
+  return crypto.createHash('sha256').update(normalizedText).digest('hex');
 }
 
 function requireExplicitBetaWorkflowPath(workflowPath) {
