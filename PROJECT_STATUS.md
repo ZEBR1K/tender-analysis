@@ -1,26 +1,36 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-05
+**Snapshot date:** 2026-09-06
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/consolidate-project-state`
+**Branch at snapshot:** `codex/dw23-three-way-integration`
 
-## Integration checkpoint — DW-21 + DW-22 + DW-23 locally combined
+## Integration checkpoint — one DW-23 implementation, two packages
 
-The isolated integration branch now combines DW-21 structural DOCX option
-ownership with the later bounded evidence-repair and selective AI Validator
-retry contracts. Persistable structural identities use versioned JSON tuples
-and are NUL-free and collision-safe. The primary Validator remains outside the
-retry loop; attributable partial responses retry only contract-invalid facts,
-while transport/unknown/unattributable responses fail closed by retrying the
-whole source unit. Attempts 2 and 3 are the only additional calls, and terminal
-exhaustion becomes audited `requires_review`.
+The isolated integration branch combines `03fee9b` group-local ActiveX ownership
+and DW-22 `target_ranked_windows`, `689859e` JSONB-safe `v2i:/v2q:/v2g:` tuple
+identities, and the final selective Validator retry contract from `012bcff`.
+The primary Validator remains outside the retry loop; only contract-invalid
+facts retry, valid siblings remain intact, source identity is carried in an
+immutable `ai_validator_source_envelope_v1`, retry audit is system-owned, and
+attempt-three exhaustion becomes audited `requires_review`.
 
-Independent spec and quality reviews approved commit `a83b092`. Fresh full
-offline verification: `465 total / 457 pass / 8` exact known baseline failures,
-with no ninth integration failure. The intentional snapshot commit `5b8f564`
-was not merged wholesale; only its missing NUL/collision regression properties
-were carried into the integrated contract. Local `main`, `origin/main`, live n8n
-and PostgreSQL were not changed. Production promotion/runtime remain pending.
+The core has two local packages. Canonical
+`workflows/n8n-exports/TENDER — Обработать документ.json` is neutral and inactive,
+has no top-level instance identity, uses the generic Aggregator and canonical
+Cloudflare GLM Extractor, and has `85` unique nodes. Beta
+`workflows/n8n-exports/beta/[DW-23 TEST CODEX] TENDER — Обработать документ.json`
+is import-ready for `[DW-23 TEST CODEX]`, with workflow ID `URFdslUfULtOLv9B`,
+test Aggregator `ftvmrEHoMbPOAqZG`, Novita FP8 Extractor, configured Error
+Workflow and beta-only two-second Wait; it has `86` unique nodes. Every common
+Code node is identical between packages and every connection endpoint resolves.
+
+Fresh verification: canonical focused Worker tests `237 total / 235 pass / 2
+fail` (only the pre-existing ActiveX fixture byte-count and immutable beta-hash
+pins); overlay tests `2/2 PASS`; full repository suite `467 total / 460 pass / 7
+fail`, with the seven known baseline artifact/fixture/prompt pins and no new
+Worker behavior failure. No live n8n or PostgreSQL change, push, merge or runtime
+execution occurred. Canonical is not promoted and runtime GREEN is not claimed.
+Next step is manual beta import, exact read-back, then an isolated runtime canary.
 
 ## Aggregator live synchronization — 2026-09-05
 

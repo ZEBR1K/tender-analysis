@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-05
+**Последнее обновление:** 2026-09-06
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
@@ -11,10 +11,42 @@
 **PostgreSQL credential:** `KITATEH Tenders`  
 **Docling:** IBM Docling async API  
 **AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
-**AI Extractor:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=none`
+**AI Extractor:** canonical `z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`; DW-23 test package uses the approved Novita FP8 route
 **AI Validator:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low`
 
 > Production metadata выше относится к неизменённому live workflow `1Pw61ZY3HgBSvcUr`. Test/calibration workflow `2T7szFpiGcfNpKkB` сохранён локально как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical path содержит clean inactive offline production candidate с именем `TENDER — Обработать документ`, без top-level instance identity и test state. Candidate ещё не promoted/wired и не прошёл runtime canary; точная граница зафиксирована в `PROJECT_STATUS.md`.
+
+## 0A. DW-23: одна реализация, две упаковки
+
+Текущий локальный core собран семантическим merge из `03fee9b` (group-local
+ActiveX ownership и DW-22 `target_ranked_windows`), `689859e` (JSONB-safe
+versioned tuple identities `v2i:/v2q:/v2g:`) и `012bcff` (selective AI Validator
+retry, immutable source envelope, system-owned retry audit, максимум три попытки
+и terminal `requires_review`). Новые retry-ноды добавлены поверх owner-aware
+Code-нод; Code-ноды не заменялись старым snapshot целиком.
+
+Один и тот же core упакован в два export-файла:
+
+- canonical `workflows/n8n-exports/TENDER — Обработать документ.json` — neutral,
+  inactive, без `id`, `versionId` и `meta`, с generic production Aggregator,
+  Cloudflare GLM Extractor и прямым done-output Extractor loop;
+- beta `workflows/n8n-exports/beta/[DW-23 TEST CODEX] TENDER — Обработать
+  документ.json` — import-ready test package с ID `URFdslUfULtOLv9B`, test
+  Aggregator `ftvmrEHoMbPOAqZG`, Novita FP8 Extractor, Error Workflow и
+  двухсекундным Wait перед проверкой primary Extractor completion.
+
+Canonical содержит `85` уникальных нод, beta — `86`; все connection endpoints
+разрешаются. Все `40` общих Code-нод идентичны. Различия общих нод ограничены
+моделью `AI Extractor v1.0` и конфигурацией/именем Aggregator call; `Wait` есть
+только в beta.
+
+Offline verification: focused canonical Worker suite — `237 total / 235 pass /
+2 fail`, где оба RED являются прежними pins (ActiveX fixture byte count и
+immutable beta hash); overlay suite — `2/2 PASS`; full repository suite — `467
+total / 460 pass / 7 fail`, все семь signatures существовали до этого packaging
+разделения. Live n8n и PostgreSQL не изменялись. Ни canonical, ни beta ещё не
+импортированы/read-back и runtime GREEN не заявляется. Следующий шаг — ручной
+import beta, read-back точной конфигурации и isolated runtime canary.
 
 Beta snapshot и clean candidate используют GLM 5.3 Flash с `reasoning_effort=low` для primary Extractor и Gemini 3.7 Flash с `reasoning_effort=low` для Validator. Canonical local candidate дополнительно использует Gemini 3.7 Flash low как максимум один Extractor fallback после typed primary contract failure. Он содержит bounded evidence repair, lossless fact partition, document-level Validator dispatch, field-specific profiles и fact-local literal guard. Extractor выбран как provisional baseline после model benchmark на одинаковых 16 pinned units; сводный отчёт находится в `evaluations/EXTRACTOR_MODEL_COMPARISON_2026-08-29.md`. Offline packaging/completeness tests GREEN; выбор модели и offline tests не доказывают full runtime behavior.
 
@@ -591,14 +623,14 @@ bound whenever it is present, so provider-supplied audit cannot reach persisted
 
 The sanitized execution-derived fixture is labelled `runtime_replay=false` and
 preserves only the 22-unit identity/cardinality boundary and target/sibling
-geometry. TDD first failed on the missing retry topology; current focused result
-is `9/9 PASS`. Related Worker suite is `264 / 261 / 3` with only known baseline
-fixture/hash/prompt-line-ending failures. Full repository suite is
-`458 / 450 / 8`, all eight signatures pre-existing and outside DW-23. Structural
-validation reports `85` unique nodes, `82` connection sources and `101` resolved
-edges. This remains a local inactive export candidate: no n8n import/publish,
-runtime canary, PostgreSQL write, schema/catalog change or production promotion
-has occurred.
+geometry. TDD first failed on the missing retry topology; current selective
+retry suite is GREEN. The combined focused canonical Worker suite is `237 / 235
+/ 2`, with only the known ActiveX fixture-size and immutable beta-hash pins.
+The full repository suite is `467 / 460 / 7`, all seven signatures pre-existing.
+Canonical graph validation reports `85` unique nodes; the import-ready DW-23 beta
+package reports `86`, with resolved endpoints in both. This remains local-only:
+no n8n import/publish, runtime canary, PostgreSQL write, schema/catalog change or
+production promotion has occurred.
 
 ---
 
