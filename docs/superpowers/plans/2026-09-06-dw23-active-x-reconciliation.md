@@ -252,7 +252,7 @@ Expected: `1` test, `1` pass, `0` fail.
 Run:
 
 ```powershell
-git diff --word-diff=porcelain 4334b4f -- 'workflows/n8n-exports/TENDER — Обработать документ.json' | rg "^[-+]" 
+git diff --word-diff=porcelain 4334b4f -- 'workflows/n8n-exports/TENDER — Обработать документ.json' | rg "^[-+]"
 ```
 
 Expected differences are limited to workflow identity/settings, the test Aggregator node and edge, the Extractor model string, and the Wait node/edge. Any ActiveX, Evidence Repair, Extractor recovery, or Validator Code-node body difference is a blocker.
