@@ -23,6 +23,11 @@ const betaWorkflowPath = path.join(
 const canonicalWorkflow = JSON.parse(fs.readFileSync(canonicalWorkflowPath, 'utf8'));
 const workflow = JSON.parse(fs.readFileSync(betaWorkflowPath, 'utf8'));
 
+const canonicalAggregatorName = "Call 'TENDER — Агрегация закупки'";
+const betaAggregatorName = "Call '[TEST CODEX] TENDER — Агрегация закупки'";
+const canonicalExtractorModel = 'z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low';
+const betaExtractorModel = 'z-ai/glm-5.3-flash@provider=novita/fp8&reasoning_effort=low';
+
 function node(name) {
   const found = workflow.nodes.find((candidate) => candidate.name === name);
   assert.ok(found, `Workflow node not found: ${name}`);
@@ -33,6 +38,49 @@ function outputs(name, index = 0) {
   return (workflow.connections[name]?.main?.[index] ?? []).map(
     ({ node: target, type, index: targetIndex }) => ({ node: target, type, index: targetIndex }),
   );
+}
+
+function validateConnections(candidateWorkflow) {
+  const nodeNames = new Set(candidateWorkflow.nodes.map(({ name }) => name));
+  for (const [source, connection] of Object.entries(candidateWorkflow.connections)) {
+    assert.ok(nodeNames.has(source), `Unknown connection source: ${source}`);
+    assert.ok(connection && typeof connection === 'object', `Invalid connection object: ${source}`);
+    for (const outputsByType of Object.values(connection)) {
+      assert.ok(Array.isArray(outputsByType), `Invalid connection outputs: ${source}`);
+      for (const branch of outputsByType) {
+        if (branch == null) continue;
+        assert.ok(Array.isArray(branch), `Invalid connection branch: ${source}`);
+        for (const edge of branch) {
+          assert.ok(edge && typeof edge === 'object', `Invalid connection edge: ${source}`);
+          assert.ok(nodeNames.has(edge.node), `Unknown connection target: ${source} -> ${edge.node}`);
+        }
+      }
+    }
+  }
+}
+
+function comparableCodeNode(candidate) {
+  const copy = structuredClone(candidate);
+  delete copy.id;
+  delete copy.position;
+  copy.settings ??= {};
+  copy.disabled = copy.disabled === true;
+  return copy;
+}
+
+function renameConnectionTargets(connections, oldName, newName) {
+  for (const connection of Object.values(connections)) {
+    if (!connection || typeof connection !== 'object') continue;
+    for (const outputsByType of Object.values(connection)) {
+      if (!Array.isArray(outputsByType)) continue;
+      for (const branch of outputsByType) {
+        if (!Array.isArray(branch)) continue;
+        for (const edge of branch) {
+          if (edge && typeof edge === 'object' && edge.node === oldName) edge.node = newName;
+        }
+      }
+    }
+  }
 }
 
 test('canonical Worker retains neutral packaging', () => {
@@ -51,9 +99,10 @@ test('canonical Worker retains neutral packaging', () => {
   });
   assert.equal(canonicalWorkflow.nodes.some(({ name }) => name === 'Wait'), false);
   assert.equal(
-    canonicalWorkflow.nodes.some(({ name }) => name === "Call 'TENDER — Агрегация закупки'"),
+    canonicalWorkflow.nodes.some(({ name }) => name === canonicalAggregatorName),
     true,
   );
+  validateConnections(canonicalWorkflow);
 });
 
 test('beta Worker carries the approved live test operational overlay', () => {
@@ -69,21 +118,26 @@ test('beta Worker carries the approved live test operational overlay', () => {
     executionOrder: 'v1',
     binaryMode: 'separate',
     availableInMCP: false,
-    timeSavedMode: 'fixed',
     errorWorkflow: 'jYzQ8RtNmnTM2PGz',
-    callerPolicy: 'workflowsFromSameOwner',
   });
+  for (const setting of ['timeSavedMode', 'callerPolicy']) {
+    if (Object.hasOwn(canonicalWorkflow.settings, setting)) {
+      assert.deepEqual(workflow.settings[setting], canonicalWorkflow.settings[setting]);
+    } else {
+      assert.equal(Object.hasOwn(workflow.settings, setting), false);
+    }
+  }
 
   const aggregatorCalls = workflow.nodes.filter(
     (candidate) => candidate.type === 'n8n-nodes-base.executeWorkflow',
   );
-  const testAggregator = node("Call '[TEST CODEX] TENDER — Агрегация закупки'");
+  const testAggregator = node(betaAggregatorName);
   assert.equal(testAggregator.parameters.workflowId.value, 'ftvmrEHoMbPOAqZG');
   assert.equal(testAggregator.parameters.workflowId.cachedResultName, '[TEST CODEX] TENDER — Агрегация закупки');
   assert.equal(testAggregator.parameters.workflowId.cachedResultUrl, '/workflow/ftvmrEHoMbPOAqZG');
   assert.equal(Object.hasOwn(workflow.connections, testAggregator.name), false);
   assert.equal(
-    aggregatorCalls.some((candidate) => candidate.name === "Call 'TENDER — Агрегация закупки'"),
+    aggregatorCalls.some((candidate) => candidate.name === canonicalAggregatorName),
     false,
   );
 
@@ -107,4 +161,62 @@ test('beta Worker carries the approved live test operational overlay', () => {
   assert.deepEqual(outputs('Wait'), [
     { node: 'Primary Extractor accepted?', type: 'main', index: 0 },
   ]);
+  validateConnections(workflow);
+});
+
+test('canonical and beta packages differ only by the approved operational overlay', () => {
+  const canonicalNames = new Set(canonicalWorkflow.nodes.map(({ name }) => name));
+  const betaNames = new Set(workflow.nodes.map(({ name }) => name));
+  assert.deepEqual(
+    [...canonicalNames].filter((name) => !betaNames.has(name)).sort(),
+    [canonicalAggregatorName],
+  );
+  assert.deepEqual(
+    [...betaNames].filter((name) => !canonicalNames.has(name)).sort(),
+    [betaAggregatorName, 'Wait'].sort(),
+  );
+
+  const canonicalCodeNodes = canonicalWorkflow.nodes
+    .filter(({ type }) => type === 'n8n-nodes-base.code')
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const betaCodeNodes = workflow.nodes
+    .filter(({ type }) => type === 'n8n-nodes-base.code')
+    .sort((left, right) => left.name.localeCompare(right.name));
+  assert.equal(canonicalCodeNodes.length, betaCodeNodes.length);
+  assert.deepEqual(
+    betaCodeNodes.map(comparableCodeNode),
+    canonicalCodeNodes.map(comparableCodeNode),
+  );
+
+  const normalizedCanonical = structuredClone(canonicalWorkflow);
+  const normalizedBeta = structuredClone(workflow);
+  delete normalizedBeta.id;
+  normalizedBeta.name = normalizedCanonical.name;
+  normalizedBeta.active = normalizedCanonical.active;
+  delete normalizedBeta.settings.errorWorkflow;
+  assert.deepEqual(normalizedBeta.settings, normalizedCanonical.settings);
+
+  normalizedBeta.nodes = normalizedBeta.nodes.filter(({ name }) => name !== 'Wait');
+  const betaAggregator = normalizedBeta.nodes.find(({ name }) => name === betaAggregatorName);
+  const canonicalAggregator = normalizedCanonical.nodes.find(({ name }) => name === canonicalAggregatorName);
+  assert.ok(betaAggregator);
+  assert.ok(canonicalAggregator);
+  betaAggregator.name = canonicalAggregatorName;
+  betaAggregator.parameters = structuredClone(canonicalAggregator.parameters);
+
+  const betaExtractor = normalizedBeta.nodes.find(({ name }) => name === 'AI Extractor v1.0');
+  assert.ok(betaExtractor.parameters.jsonBody.includes(betaExtractorModel));
+  betaExtractor.parameters.jsonBody = betaExtractor.parameters.jsonBody.replace(
+    betaExtractorModel,
+    canonicalExtractorModel,
+  );
+
+  delete normalizedBeta.connections.Wait;
+  normalizedBeta.connections['Обработать evidence units по одной'].main[1] = [
+    { node: 'Primary Extractor accepted?', type: 'main', index: 0 },
+  ];
+  renameConnectionTargets(normalizedBeta.connections, betaAggregatorName, canonicalAggregatorName);
+  assert.equal(Object.hasOwn(normalizedBeta.connections, betaAggregatorName), false);
+
+  assert.deepEqual(normalizedBeta, normalizedCanonical);
 });

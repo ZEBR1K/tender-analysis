@@ -8,7 +8,7 @@
 
 The isolated integration branch combines `03fee9b` group-local ActiveX ownership
 and DW-22 `target_ranked_windows`, `689859e` JSONB-safe `v2i:/v2q:/v2g:` tuple
-identities, and the final selective Validator retry contract from `012bcff`.
+identities, and the selective Validator retry series `91b8dfd..012bcff`.
 The primary Validator remains outside the retry loop; only contract-invalid
 facts retry, valid siblings remain intact, source identity is carried in an
 immutable `ai_validator_source_envelope_v1`, retry audit is system-owned, and
@@ -23,10 +23,13 @@ is import-ready for `[DW-23 TEST CODEX]`, with workflow ID `URFdslUfULtOLv9B`,
 test Aggregator `ftvmrEHoMbPOAqZG`, Novita FP8 Extractor, configured Error
 Workflow and beta-only two-second Wait; it has `86` unique nodes. Every common
 Code node is identical between packages and every connection endpoint resolves.
+Both packages use the JSON-verified Validator model
+`google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low`
+for primary validation and retry attempts 2–3.
 
 Fresh verification: canonical focused Worker tests `237 total / 235 pass / 2
 fail` (only the pre-existing ActiveX fixture byte-count and immutable beta-hash
-pins); overlay tests `2/2 PASS`; full repository suite `467 total / 460 pass / 7
+pins); overlay tests `3/3 PASS`; full repository suite `468 total / 461 pass / 7
 fail`, with the seven known baseline artifact/fixture/prompt pins and no new
 Worker behavior failure. No live n8n or PostgreSQL change, push, merge or runtime
 execution occurred. Canonical is not promoted and runtime GREEN is not claimed.

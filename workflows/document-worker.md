@@ -4,6 +4,8 @@
 **Последнее обновление:** 2026-09-06
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
+
+**Неизменённая live production metadata (reference only):**
 **Workflow ID:** `1Pw61ZY3HgBSvcUr`  
 **Вызывается:** `ТЕНДЕРЫ ОРКЕСТРАТОР`  
 **Вызывает:** `TENDER — Агрегация закупки` — только когда текущий Worker атомарно переводит run в `ready_for_aggregation`  
@@ -11,8 +13,14 @@
 **PostgreSQL credential:** `KITATEH Tenders`  
 **Docling:** IBM Docling async API  
 **AI transport:** Polza AI (`https://polza.ai/api/v1/chat/completions`)
-**AI Extractor:** canonical `z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`; DW-23 test package uses the approved Novita FP8 route
-**AI Validator:** `deepseek/deepseek-v4-pro-0813@reasoning_effort=low`
+
+**Local package models verified from both JSON exports:**
+
+**Canonical AI Extractor:** `z-ai/glm-5.3-flash@provider=cloudflare&reasoning_effort=low`
+
+**DW-23 beta AI Extractor:** `z-ai/glm-5.3-flash@provider=novita/fp8&reasoning_effort=low`
+
+**Canonical and beta AI Validator (primary/retry attempts 2–3):** `google/gemini-3.7-flash@provider=google-ai-studio/flex&reasoning_effort=low`
 
 > Production metadata выше относится к неизменённому live workflow `1Pw61ZY3HgBSvcUr`. Test/calibration workflow `2T7szFpiGcfNpKkB` сохранён локально как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json`. Canonical path содержит clean inactive offline production candidate с именем `TENDER — Обработать документ`, без top-level instance identity и test state. Candidate ещё не promoted/wired и не прошёл runtime canary; точная граница зафиксирована в `PROJECT_STATUS.md`.
 
@@ -20,7 +28,7 @@
 
 Текущий локальный core собран семантическим merge из `03fee9b` (group-local
 ActiveX ownership и DW-22 `target_ranked_windows`), `689859e` (JSONB-safe
-versioned tuple identities `v2i:/v2q:/v2g:`) и `012bcff` (selective AI Validator
+versioned tuple identities `v2i:/v2q:/v2g:`) и `91b8dfd..012bcff` (selective AI Validator
 retry, immutable source envelope, system-owned retry audit, максимум три попытки
 и terminal `requires_review`). Новые retry-ноды добавлены поверх owner-aware
 Code-нод; Code-ноды не заменялись старым snapshot целиком.
@@ -42,8 +50,8 @@ Canonical содержит `85` уникальных нод, beta — `86`; вс
 
 Offline verification: focused canonical Worker suite — `237 total / 235 pass /
 2 fail`, где оба RED являются прежними pins (ActiveX fixture byte count и
-immutable beta hash); overlay suite — `2/2 PASS`; full repository suite — `467
-total / 460 pass / 7 fail`, все семь signatures существовали до этого packaging
+immutable beta hash); overlay suite — `3/3 PASS`; full repository suite — `468
+total / 461 pass / 7 fail`, все семь signatures существовали до этого packaging
 разделения. Live n8n и PostgreSQL не изменялись. Ни canonical, ни beta ещё не
 импортированы/read-back и runtime GREEN не заявляется. Следующий шаг — ручной
 import beta, read-back точной конфигурации и isolated runtime canary.
@@ -626,7 +634,7 @@ preserves only the 22-unit identity/cardinality boundary and target/sibling
 geometry. TDD first failed on the missing retry topology; current selective
 retry suite is GREEN. The combined focused canonical Worker suite is `237 / 235
 / 2`, with only the known ActiveX fixture-size and immutable beta-hash pins.
-The full repository suite is `467 / 460 / 7`, all seven signatures pre-existing.
+The full repository suite is `468 / 461 / 7`, all seven signatures pre-existing.
 Canonical graph validation reports `85` unique nodes; the import-ready DW-23 beta
 package reports `86`, with resolved endpoints in both. This remains local-only:
 no n8n import/publish, runtime canary, PostgreSQL write, schema/catalog change or
