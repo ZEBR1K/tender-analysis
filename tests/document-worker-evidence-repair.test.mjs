@@ -4682,9 +4682,12 @@ test('completeness barrier references the canonical upstream persistence node by
 });
 
 test('immutable beta Worker snapshot retains its reviewed packaging hash', () => {
+  const betaBytes = Buffer.from(
+    fs.readFileSync(betaWorkflowPath, 'utf8').replace(/\r\n/g, '\n'),
+  );
   const betaHash = crypto
     .createHash('sha256')
-    .update(fs.readFileSync(betaWorkflowPath))
+    .update(betaBytes)
     .digest('hex');
 
   assert.equal(

@@ -60,6 +60,10 @@ function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
+function normalizeCheckoutLineEndings(buffer) {
+  return Buffer.from(buffer.toString('utf8').replace(/\r\n/g, '\n'));
+}
+
 function loadWorkflow() {
   return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 }
@@ -800,7 +804,12 @@ test('fixture is a reviewed minimal derivative with exact source ActiveX parts',
 
   for (const part of manifest.derived_parts) {
     assert.equal(path.extname(part.path).toLowerCase() === '.docx', false);
-    const data = fs.readFileSync(path.join(ooxmlRoot, ...part.path.split('/')));
+    const rawData = fs.readFileSync(path.join(ooxmlRoot, ...part.path.split('/')));
+    const rawMatchesManifest =
+      rawData.length === part.size && sha256(rawData) === part.sha256;
+    const data = part.path.endsWith('.bin') || rawMatchesManifest
+      ? rawData
+      : normalizeCheckoutLineEndings(rawData);
     assert.equal(data.length, part.size, part.path);
     assert.equal(sha256(data), part.sha256, part.path);
     if (part.path.endsWith('.bin')) {
