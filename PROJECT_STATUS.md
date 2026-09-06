@@ -4,6 +4,22 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/dw23-three-way-integration`
 
+## DW-24 ActiveX GroupName NUL containment — local implementation
+
+Execution `14592` failed in `Сохранить analysis unit` because a corrupted
+MS-OFORMS GroupName containing literal U+0000 reached a JSONB query parameter,
+although the same control's option Value `0/1` was decoded reliably. The local
+canonical Worker and required `[DW-23 TEST CODEX]` parity package now reject only
+an implausible GroupName to `group_context=null`, retain selected/unselected
+state, and add bounded NUL-free `invalid_activex_group_name` audit. Existing
+`Развернуть части для AI v1.2`, immediately before persistence, recursively
+hard-fails on any residual literal NUL without stripping it.
+
+The fixture is a sanitized structural derivative with no client text, raw
+binary, tender identifiers, UUIDs or credentials. This is local/offline
+evidence only. Live n8n and PostgreSQL were not changed; execution `14592` has
+not been replayed after the fix, so runtime GREEN and promotion remain pending.
+
 ## Integration checkpoint — one DW-23 implementation, two packages
 
 The isolated integration branch combines `03fee9b` group-local ActiveX ownership

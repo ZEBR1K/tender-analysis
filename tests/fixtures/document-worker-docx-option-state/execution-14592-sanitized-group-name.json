@@ -1,0 +1,16 @@
+{
+  "fixture_version": "execution_14592_sanitized_group_name_v1",
+  "runtime_replay": false,
+  "source": {
+    "execution_id": 14592,
+    "analysis_unit_id": "doc_2_au_0003",
+    "notes": "Sanitized structural derivative. No client text, raw binary bytes, credentials, UUIDs, or tender identifiers are included."
+  },
+  "malformed_group_name": "AuctionGroup1аȀ 5\u0000SANITIZED_BINARY_GARBAGE",
+  "positive_group_names": [
+    "AuctionGroup1",
+    "ГруппаАукциона_№1"
+  ],
+  "expected_warning_code": "invalid_activex_group_name",
+  "max_warning_json_chars": 256
+}

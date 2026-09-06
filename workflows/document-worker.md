@@ -387,6 +387,26 @@ Exact read-only replay полного execution `14359` input связал activ
 
 Promotion follow-up: checked-in semantic replay сокращён до `6` controls и `4` meaningful tables, хотя fixture хранит observed source counts (`290` controls, `64` raw tables, `6` raw body children, `647` normalized blocks, `528` semantic blocks). Изолированный post-fix Worker runtime gate закрыт execution `14425`; Aggregator/27 FINAL и production promotion остаются отдельными непроверенными gates. Перед promotion по-прежнему нужен reproducible sanitized full-payload replay либо точное переименование сокращённого fixture/replay contract.
 
+### DW-24 — malformed ActiveX GroupName NUL containment (local implementation)
+
+Sanitized regression из execution `14592` подтвердил отдельный parser defect:
+надёжно декодированный `Value=0/1` мог сопровождаться повреждённым `GroupName`
+с literal U+0000, который попадал в `ai_segments` и ломал PostgreSQL JSONB write.
+
+Canonical и `[DW-23 TEST CODEX]` beta package локально валидируют только
+GroupName: bounded `1..256` Unicode code points, хотя бы одна Unicode
+letter/number и отсутствие categories `Cc/Cf/Cs/Co/Cn`. Невалидное значение не
+очищается и не становится discriminator: `group_context=null`, bounded warning
+`invalid_activex_group_name` не содержит сырого значения, а корректный option
+`state/raw_value` сохраняется. Обычные ASCII и Unicode GroupName сохраняются.
+
+Непосредственно перед `Сохранить analysis unit` существующая
+`Развернуть части для AI v1.2` рекурсивно проверяет весь output JSON, включая
+ключи, и hard-fail с bounded path при любом остаточном literal U+0000. Guard
+ничего не strip/replace. Это local/offline implementation: execution `14592`
+не переигрывался, production workflow и PostgreSQL не менялись, runtime GREEN
+не заявляется.
+
 ---
 
 ## 9B. AI Extractor envelope and bounded fallback boundary (`DW-19`)

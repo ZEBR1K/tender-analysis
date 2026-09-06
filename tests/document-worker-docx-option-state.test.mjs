@@ -29,6 +29,12 @@ const semanticBindingFixture = JSON.parse(
     'utf8',
   ),
 );
+const invalidGroupNameFixture = JSON.parse(
+  fs.readFileSync(
+    path.join(fixtureRoot, 'execution-14592-sanitized-group-name.json'),
+    'utf8',
+  ),
+);
 
 const nodeNames = Object.freeze({
   prepareArchive: 'Подготовить DOCX archive alias',
@@ -348,20 +354,35 @@ function expectFailClosed(record, warningCode, expectedState = 'unknown') {
   assert.notEqual(record.state, 'selected');
 }
 
-function buildMorphDataContents({ displayStyle = 4, value }) {
+function encodeFmString(value) {
+  const text = String(value);
+  const compressed = [...text].every((character) => character.codePointAt(0) <= 0xff);
+  const encoded = Buffer.from(text, compressed ? 'latin1' : 'utf16le');
+  const descriptor = (compressed ? 0x80000000 : 0) | (encoded.length / (compressed ? 1 : 2));
+  return { descriptor: descriptor >>> 0, encoded };
+}
+
+function buildMorphDataContents({ displayStyle = 4, value, groupName = null }) {
   const VALUE_BIT = 22n;
   const DISPLAY_STYLE_BIT = 6n;
   const SIZE_BIT = 8n;
   const RESERVED_BIT = 31n;
   let mask = (1n << DISPLAY_STYLE_BIT) | (1n << SIZE_BIT) | (1n << RESERVED_BIT);
   if (value !== null) mask |= 1n << VALUE_BIT;
+  if (groupName !== null) mask |= 1n << 32n;
 
   const dataBytes = [displayStyle];
   while ((12 + dataBytes.length) % 4 !== 0) dataBytes.push(0);
   if (value !== null) {
-    const encoded = Buffer.from(value, 'latin1');
+    const encoded = encodeFmString(value);
     const descriptor = Buffer.alloc(4);
-    descriptor.writeUInt32LE((0x80000000 | encoded.length) >>> 0);
+    descriptor.writeUInt32LE(encoded.descriptor);
+    dataBytes.push(...descriptor);
+  }
+  if (groupName !== null) {
+    const encoded = encodeFmString(groupName);
+    const descriptor = Buffer.alloc(4);
+    descriptor.writeUInt32LE(encoded.descriptor);
     dataBytes.push(...descriptor);
   }
   while ((12 + dataBytes.length) % 4 !== 0) dataBytes.push(0);
@@ -371,7 +392,11 @@ function buildMorphDataContents({ displayStyle = 4, value }) {
   size.writeUInt32LE(451, 0);
   size.writeUInt32LE(451, 4);
   extraBytes.push(...size);
-  if (value !== null) extraBytes.push(...Buffer.from(value, 'latin1'));
+  if (value !== null) extraBytes.push(...encodeFmString(value).encoded);
+  if (groupName !== null) {
+    while ((12 + dataBytes.length + extraBytes.length) % 4 !== 0) extraBytes.push(0);
+    extraBytes.push(...encodeFmString(groupName).encoded);
+  }
   while ((12 + dataBytes.length + extraBytes.length) % 4 !== 0) extraBytes.push(0);
 
   const header = Buffer.alloc(12);
@@ -380,6 +405,58 @@ function buildMorphDataContents({ displayStyle = 4, value }) {
   header.writeUInt16LE(8 + dataBytes.length + extraBytes.length, 2);
   header.writeBigUInt64LE(mask, 4);
   return Buffer.concat([header, Buffer.from(dataBytes), Buffer.from(extraBytes)]);
+}
+
+function minimalExpandInput(optionState) {
+  return {
+    analysis_run_id: '00000000-0000-4000-8000-000000000001',
+    tender_meta: {},
+    document: {
+      document_id: '00000000-0000-4000-8000-000000000002',
+      document_index: 2,
+      file_name: 'SANITIZED_FIXTURE.docx',
+      file_extension: 'docx',
+    },
+    parser: { provider: 'fixture', schema: 'fixture' },
+    analysis_unit_building: { source_semantic_blocks_count: 1 },
+    analysis_units: [{
+      analysis_unit_id: invalidGroupNameFixture.source.analysis_unit_id,
+      section_id: 'fixture-section',
+      section_title: 'SANITIZED',
+      section_kind: 'table',
+      part_index: 1,
+      parts_total: 1,
+      source_pages: [],
+      primary_semantic_block_ids: ['sb_sanitized'],
+      overlap_semantic_block_ids: [],
+    }],
+    semantic_blocks: [{
+      semantic_block_id: 'sb_sanitized',
+      text: 'SANITIZED OPTION LABEL',
+      type: 'table',
+      role: 'table',
+      section_id: 'fixture-section',
+      section_title: 'SANITIZED',
+      section_path: [],
+      source_block_ids: ['fixture-block'],
+      sources: [{ block_id: 'fixture-block' }],
+      docx_option_states: [optionState],
+    }],
+  };
+}
+
+function literalNulPaths(value, pathPrefix = '$', found = []) {
+  if (typeof value === 'string') {
+    if (value.includes('\u0000')) found.push(pathPrefix);
+    return found;
+  }
+  if (!value || typeof value !== 'object') return found;
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => literalNulPaths(entry, `${pathPrefix}[${index}]`, found));
+  } else {
+    Object.entries(value).forEach(([key, entry]) => literalNulPaths(entry, `${pathPrefix}.${key}`, found));
+  }
+  return found;
 }
 
 function writeDirectoryEntry(buffer, offset, {
@@ -1955,6 +2032,82 @@ test('MS-OFORMS Value other than 0 or 1 is indeterminate, never selected', async
   ]]);
   const result = await runOptionParser({ binaryOverrides });
   expectFailClosed(stateByName(result, 'CommonSupplierCheckBox11'), 'indeterminate_value', 'indeterminate');
+});
+
+test('execution 14592 sanitized malformed GroupName is rejected without losing selected state', async () => {
+  const binaryOverrides = new Map([[
+    'word/activeX/activeX55.bin',
+    buildCfbWithContents(buildMorphDataContents({
+      displayStyle: 5,
+      value: '1',
+      groupName: invalidGroupNameFixture.malformed_group_name,
+    })),
+  ]]);
+  const result = await runOptionParser({ binaryOverrides });
+  const record = stateByName(result, 'OptionButton25221111131');
+
+  assert.equal(record.state, 'selected');
+  assert.equal(record.raw_value, '1');
+  assert.equal(record.group_context, null);
+  const auditWarning = record.warnings.find(
+    ({ code }) => code === invalidGroupNameFixture.expected_warning_code,
+  );
+  assert.ok(auditWarning, 'Malformed GroupName must produce a stable audit warning');
+  const warningJson = JSON.stringify(auditWarning);
+  assert.ok(warningJson.length <= invalidGroupNameFixture.max_warning_json_chars);
+  assert.equal(warningJson.includes('\u0000'), false);
+  assert.equal(warningJson.includes('SANITIZED_BINARY_GARBAGE'), false);
+
+  const [expanded] = await runCodeNode(
+    loadWorkflow(),
+    nodeNames.expandForAi,
+    [{ json: minimalExpandInput(record) }],
+  );
+  assert.deepEqual(literalNulPaths(expanded.json), []);
+  const jsonbBoundPayload = JSON.stringify(expanded.json);
+  assert.equal(jsonbBoundPayload.includes('\\u0000'), false);
+  assert.doesNotThrow(() => JSON.parse(jsonbBoundPayload));
+});
+
+for (const groupName of invalidGroupNameFixture.positive_group_names) {
+  test(`plausible ASCII or Unicode GroupName is retained: ${groupName}`, async () => {
+    const binaryOverrides = new Map([[
+      'word/activeX/activeX55.bin',
+      buildCfbWithContents(buildMorphDataContents({ displayStyle: 5, value: '0', groupName })),
+    ]]);
+    const result = await runOptionParser({ binaryOverrides });
+    const record = stateByName(result, 'OptionButton25221111131');
+    assert.equal(record.state, 'unselected');
+    assert.equal(record.raw_value, '0');
+    assert.equal(record.group_context, groupName);
+    assert.equal(
+      record.warnings.some(({ code }) => code === invalidGroupNameFixture.expected_warning_code),
+      false,
+    );
+  });
+}
+
+test('analysis-unit persistence guard fails fast on an artificial nested literal NUL', async () => {
+  const optionState = {
+    ...sourceOptionStates()[4],
+    state: 'selected',
+    raw_value: '1',
+    group_context: `synthetic${String.fromCharCode(0)}nested`,
+  };
+  await assert.rejects(
+    runCodeNode(
+      loadWorkflow(),
+      nodeNames.expandForAi,
+      [{ json: minimalExpandInput(optionState) }],
+    ),
+    (error) => {
+      assert.match(error.message, /^\[Analysis unit persistence guard\] Literal NUL found at /u);
+      assert.match(error.message, /ai_segments\[0\]\.docx_option_states\[0\]\.group_context/u);
+      assert.equal(error.message.includes('synthetic'), false);
+      assert.equal(error.message.includes('\u0000'), false);
+      return true;
+    },
+  );
 });
 
 test('one control mapping to multiple labels is unknown', async () => {
