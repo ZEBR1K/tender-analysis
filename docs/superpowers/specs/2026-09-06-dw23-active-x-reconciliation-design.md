@@ -15,9 +15,16 @@ Replacing that Worker wholesale with the live export introduced new Worker regre
 
 ## Decision
 
-Use the Worker from commit `4334b4f` as the implementation base. Apply only intentional operational differences from the current live DW-23 export.
+Post-approval verification proved that commit `4334b4f` is not a valid implementation base: its Worker is byte-identical to `a83b092`, lacks the `v2g:` identity contract, and fails the current ActiveX ownership suite. No existing commit contains all required contracts correctly.
 
-Do not use the live export as the code base and do not replay the historical implementation commits manually.
+Build the reconciled Worker as a controlled three-way semantic integration:
+
+- `03fee9b` supplies the passing group-local ActiveX ownership implementation and bounded DW-22 Evidence Repair;
+- `91b8dfd` through `012bcff` supply selective AI Validator retry, source-envelope reassembly, and system-owned retry audit;
+- `689859e` supplies JSONB-safe versioned tuple identities, merged into the newer owner implementation without replacing it;
+- the current live DW-23 export supplies only the approved operational overlay.
+
+Do not use the live export, `4334b4f`, `a83b092`, or `012bcff` wholesale as the final code base. Tests define the required combined contract where those histories conflict.
 
 ## Operational overlay
 

@@ -1,5 +1,7 @@
 # DW-23 ActiveX Reconciliation Implementation Plan
 
+> **Superseded:** Independent implementation audit proved that `4334b4f` does not contain the claimed combined ActiveX contract. Do not execute this plan. Use `docs/superpowers/plans/2026-09-06-dw23-active-x-three-way-integration.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Produce one importable DW-23 Worker that keeps the verified `main` implementation of ActiveX ownership, DW-22 overflow handling, and selective Validator retry while retaining only the intentional operational settings from the current live test workflow.
