@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/dw23-three-way-integration`
 
-## DW-24 ActiveX GroupName NUL containment — local implementation
+## DW-24 ActiveX GroupName NUL containment — runtime GREEN
 
 Execution `14592` failed in `Сохранить analysis unit` because a corrupted
 MS-OFORMS GroupName containing literal U+0000 reached a JSONB query parameter,
@@ -16,9 +16,14 @@ state, and add bounded NUL-free `invalid_activex_group_name` audit. Existing
 hard-fails on any residual literal NUL without stripping it.
 
 The fixture is a sanitized structural derivative with no client text, raw
-binary, tender identifiers, UUIDs or credentials. This is local/offline
-evidence only. Live n8n and PostgreSQL were not changed; execution `14592` has
-not been replayed after the fix, so runtime GREEN and promotion remain pending.
+binary, tender identifiers, UUIDs or credentials. Execution `14596` verified
+the fixed `[DW-23 TEST CODEX]` Worker on the previously failing document:
+ActiveX parsing and analysis-unit persistence succeeded, residual NUL count was
+zero, `8/8` units and `15` facts were persisted, and the document reached
+`completed`. The two malformed GroupName values were retained only as bounded
+`invalid_activex_group_name` audit warnings. The test Aggregator was not invoked
+because this was a document-level replay; production promotion and a fresh full
+run remain separate gates.
 
 ## Integration checkpoint — one DW-23 implementation, two packages
 

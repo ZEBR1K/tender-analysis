@@ -3714,11 +3714,15 @@ test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte
     'Связать primary Extractor response с source': 'e42b9b2c4d0e2dc00bd2387702c53b39732c529456c9fbb1839c770775271176',
     'Проверить и привязать evidence': '22195356bcece450952479fcb473fa5e37ac121b101464aae7d313e3284be34d',
   });
+  const evidenceRepairHttpNode = structuredClone(
+    findNode(workflow, 'AI Evidence Repair v1'),
+  );
+  delete evidenceRepairHttpNode.position;
   assert.equal(
     crypto.createHash('sha256')
-      .update(JSON.stringify(findNode(workflow, 'AI Evidence Repair v1')))
+      .update(JSON.stringify(evidenceRepairHttpNode))
       .digest('hex'),
-    'b2eb9ea0dfe99de44b3d113cc9f1663b0ed0fa2f8394e1369a221d82160479f3',
+    'b0c37751df58775870662d9e3120697cdef0993c316c58e0be96e6aa372668f6',
   );
 });
 

@@ -12,8 +12,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -64,
-        176
+        3312,
+        2368
       ],
       "id": "aa63fd41-70e9-4aae-b5d8-e576da760dbd",
       "name": "Захватить документ в обработку",
@@ -65,8 +65,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -272,
-        176
+        3088,
+        2368
       ],
       "id": "3ba2fe37-c339-4240-b383-f12aac1e3cd9",
       "name": "Проверить вход Worker"
@@ -87,8 +87,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        672,
-        160
+        3760,
+        2368
       ],
       "id": "3ab8f2fe-0113-404d-82e0-cc638368e37b",
       "name": "скачать документы RU PROXY"
@@ -101,8 +101,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        896,
-        160
+        3984,
+        2368
       ],
       "id": "f6453129-1c03-4b2b-932b-1a9f08e545bf",
       "name": "Связать метаданные и файл"
@@ -135,8 +135,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        320,
-        176
+        3536,
+        2368
       ],
       "id": "906d2f2c-42e6-4d82-9d0d-261096b4fd1c",
       "name": "Документ захвачен?"
@@ -227,8 +227,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        -448,
-        512
+        6448,
+        2448
       ],
       "id": "484946e1-9200-488b-b390-4a1a6124dd22",
       "name": "определить тип файла"
@@ -263,8 +263,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -96,
-        496
+        6672,
+        2304
       ],
       "id": "167eddee-e0c5-415d-b4ec-958d5025633b",
       "name": "Загрузка файла в Docling",
@@ -285,8 +285,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        368,
-        496
+        7120,
+        2224
       ],
       "id": "97345b43-1baf-451a-baa0-3f13faf0a12a",
       "name": "Docling Проверить статус задачи",
@@ -403,8 +403,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        592,
-        480
+        7344,
+        2272
       ],
       "id": "b91d8aa7-138d-44ef-acc1-1a8de73e1a45",
       "name": "Задача завершена?"
@@ -416,8 +416,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        192,
-        496
+        6896,
+        2304
       ],
       "id": "f4954456-cf77-4d34-8bc8-84fd235e01dc",
       "name": "Wait 3 sec",
@@ -433,8 +433,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        992,
-        464
+        7568,
+        2304
       ],
       "id": "d3bada68-8acf-49db-b129-b9df64ee60ac",
       "name": "Docling получить результат задачи",
@@ -455,8 +455,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
-        464
+        7792,
+        2304
       ],
       "id": "e58256db-eecc-47f6-ac10-1b3c0864b0e3",
       "name": "связать результат Docling и метаданные"
@@ -469,8 +469,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1520,
-        464
+        8016,
+        2304
       ],
       "id": "e89a2961-081f-43fb-8c9f-045201695d4b",
       "name": "Скачать текст документа Docling"
@@ -483,8 +483,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1808,
-        576
+        8240,
+        2304
       ],
       "id": "3260d2d3-3187-40fd-bbad-6ef55ea89195",
       "name": "Нормализовать документ Docling"
@@ -496,8 +496,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -448,
-        1072
+        8464,
+        2304
       ],
       "id": "eff9e744-e917-424c-a511-a16f6bbef090",
       "name": "подготовить блоки к анализу"
@@ -509,8 +509,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        224,
-        1072
+        8912,
+        2304
       ],
       "id": "d9b187ab-1072-4df5-91a8-7a6a9f5bd31d",
       "name": "подготовить части для анализа v1.3"
@@ -522,8 +522,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -112,
-        1072
+        8688,
+        2304
       ],
       "id": "e8acf97e-d5a5-4267-a255-9cfdce48bba3",
       "name": "Собрать смысловые разделы v1.4"
@@ -535,8 +535,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        608,
-        1072
+        9136,
+        2304
       ],
       "id": "ccd18aed-8e8b-4f39-83b1-6958dbe53e7c",
       "name": "Развернуть части для AI v1.2"
@@ -548,8 +548,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -464,
-        1664
+        9584,
+        2304
       ],
       "id": "0cbfc425-88b7-494d-a25b-4abfceff0357",
       "name": "Подготовить запрос для AI"
@@ -581,8 +581,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        16,
-        1664
+        9808,
+        2304
       ],
       "id": "f34c0c9c-8a5c-443e-b1ee-474efced848f",
       "name": "AI Extractor v1.0",
@@ -615,8 +615,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        976,
-        1680
+        11824,
+        1632
       ],
       "id": "d4e3ad34-8cd4-4e37-b3a5-65fdd9044f48",
       "name": "AI Validator v1",
@@ -640,8 +640,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2128,
-        1664
+        13840,
+        1456
       ],
       "id": "e3219a53-e2df-4129-a546-142c69927db2",
       "name": "Сохранить факты документа",
@@ -663,8 +663,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2432,
-        1664
+        14064,
+        1456
       ],
       "id": "aec5f037-0c08-430c-9bff-d6ffe9a74487",
       "name": "Завершить обработку документа",
@@ -686,8 +686,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        2704,
-        1664
+        14288,
+        1456
       ],
       "id": "bf044a14-8bf3-4d38-95ce-3b8de60c5c9a",
       "name": "Проверить готовность к агрегации",
@@ -726,8 +726,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2960,
-        1664
+        14512,
+        1456
       ],
       "id": "fdf9cfe4-b758-407f-8123-f7bf06fa6163",
       "name": "Проверить готовность к агрегации1"
@@ -756,8 +756,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        3264,
-        1648
+        14736,
+        1456
       ],
       "id": "006fff94-15de-46f6-a22c-ad22c6a4c697",
       "name": "Call 'TENDER — Агрегация закупки'"
@@ -770,8 +770,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        496,
-        1664
+        10256,
+        2304
       ],
       "id": "8e256b08-8331-44f6-96a7-f16c763cc419",
       "name": "Проверить и привязать evidence",
@@ -784,8 +784,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        1664
+        13616,
+        1456
       ],
       "id": "93a55d93-d04b-4f95-94de-e249e6386328",
       "name": "Собрать факты документа1"
@@ -797,8 +797,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1248,
-        1680
+        13168,
+        1456
       ],
       "id": "9d900e26-5224-4e91-8596-bece9f2d4275",
       "name": "Проверить ответ AI Validator"
@@ -811,8 +811,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -224,
-        1664
+        10576,
+        2256
       ],
       "id": "e1f0b4c0-7c32-4faf-bafc-9f58572de753",
       "name": "Обработать evidence units по одной"
@@ -845,8 +845,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2176,
-        1664
+        12832,
+        2592
       ],
       "id": "9c518b83-10ef-4306-917d-c712e2f8eaef",
       "name": "Evidence validation passed?"
@@ -859,8 +859,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1424,
-        1808
+        13504,
+        2400
       ],
       "id": "3171a90b-52ea-431c-b7ec-309da944d6c6",
       "name": "Подготовить Evidence Repair"
@@ -886,8 +886,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1696,
-        1808
+        13728,
+        2400
       ],
       "id": "cb5eb30f-76ac-4320-b592-71ec67973be6",
       "name": "AI Evidence Repair v1",
@@ -906,8 +906,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1968,
-        1808
+        13952,
+        2400
       ],
       "id": "c60d2fa4-9cbe-428b-9f18-0433c2b308c2",
       "name": "Проверить evidence — попытка 2"
@@ -940,8 +940,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2240,
-        1808
+        14176,
+        2400
       ],
       "id": "1a539b83-10cf-4572-98aa-e6b797a7b4bf",
       "name": "Evidence repair passed?"
@@ -954,8 +954,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2496,
-        1936
+        14400,
+        2592
       ],
       "id": "132da188-04ad-403d-9049-d121fcb81d39",
       "name": "Завершить unit: evidence validation failed"
@@ -967,8 +967,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        704,
-        1440
+        10928,
+        1840
       ],
       "id": "a3f710f9-ecf8-47e0-9558-edc60c79d975",
       "name": "Собрать units после evidence validation"
@@ -981,8 +981,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        944,
-        1920
+        13056,
+        2592
       ],
       "id": "e1bd963f-6dd8-4665-9b71-b52fb4832328",
       "name": "Классифицировать bounded retry"
@@ -1070,8 +1070,8 @@
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
       "position": [
-        1184,
-        1936
+        13280,
+        2576
       ],
       "id": "fc8260ed-4eea-43c8-b079-6afdaf538013",
       "name": "Выбрать bounded retry route"
@@ -1084,8 +1084,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1424,
-        2032
+        13504,
+        2592
       ],
       "id": "66296897-22ca-4aa3-a9c2-1195e894cf5e",
       "name": "Подготовить Lossless Fact Partition"
@@ -1111,8 +1111,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1696,
-        2032
+        13728,
+        2592
       ],
       "id": "3d07c2e7-0891-4678-8849-6fd24868e237",
       "name": "AI Lossless Fact Partition v1",
@@ -1131,8 +1131,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1968,
-        2032
+        13952,
+        2592
       ],
       "id": "25748834-9122-45df-b095-fc0970a9cf9a",
       "name": "Проверить Lossless Fact Partition"
@@ -1165,8 +1165,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2240,
-        2032
+        14176,
+        2592
       ],
       "id": "fe2f750a-dccf-4e2e-ac1a-d719112f12ef",
       "name": "Fact partition passed?"
@@ -1179,8 +1179,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1424,
-        2256
+        13504,
+        2784
       ],
       "id": "859a5e9c-d4ab-4618-bfc3-70061a626113",
       "name": "Завершить unit: retry route unavailable"
@@ -1192,8 +1192,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        944,
-        1440
+        11152,
+        1840
       ],
       "id": "06a8d305-c95a-4f99-bc95-8f4db03ed7f4",
       "name": "Подготовить dispatch AI Validator"
@@ -1226,8 +1226,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1184,
-        1440
+        11376,
+        1840
       ],
       "id": "3b5a6701-2008-4a22-aeed-072e5a43a523",
       "name": "Есть units для AI Validator?"
@@ -1239,8 +1239,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        1408
+        11600,
+        1632
       ],
       "id": "f5c200d6-40da-4d33-ade2-1d604fec1cb2",
       "name": "Развернуть units для AI Validator"
@@ -1252,8 +1252,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1520,
-        1696
+        13392,
+        1456
       ],
       "id": "5a881295-2a78-4004-aa21-051e4a79d262",
       "name": "Свести AI и units without AI"
@@ -1265,8 +1265,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1552,
-        1520
+        13392,
+        2224
       ],
       "id": "5a5e7652-5aec-4cf8-b371-58223e41df55",
       "name": "Сформировать units without AI Validator"
@@ -1282,8 +1282,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        1104,
-        1088
+        9360,
+        2304
       ],
       "id": "0d7297da-bef6-4f86-a217-802373addc8b",
       "name": "Сохранить analysis unit",
@@ -1301,8 +1301,8 @@
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
       "position": [
-        -656,
-        176
+        2864,
+        2368
       ],
       "id": "9f14362f-2b99-402f-8c8d-cbe6cdef1f0d",
       "name": "When Executed by Another Workflow"
@@ -1315,8 +1315,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1120,
-        160
+        4208,
+        2368
       ],
       "id": "2fd7acb4-6d57-4711-9f80-18fe0a03d001",
       "name": "Подготовить DOCX archive alias"
@@ -1348,8 +1348,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1344,
-        160
+        4432,
+        2368
       ],
       "id": "bc6d9438-9b58-4d78-8943-ee7f4a1bd003",
       "name": "DOCX option-state extraction?"
@@ -1363,8 +1363,8 @@
       "type": "n8n-nodes-base.compression",
       "typeVersion": 1.1,
       "position": [
-        1568,
-        64
+        4656,
+        2048
       ],
       "id": "3519fe4a-3ef1-419a-9517-39e68e52d004",
       "name": "Извлечь DOCX OOXML"
@@ -1377,8 +1377,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1792,
-        64
+        4880,
+        2048
       ],
       "id": "84cd21b9-57f1-412c-af98-d4fa58e2d005",
       "name": "Развернуть DOCX OOXML части"
@@ -1410,8 +1410,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2016,
-        64
+        5104,
+        2048
       ],
       "id": "7252d647-bd53-4452-a238-2cabf278d007",
       "name": "OOXML часть XML?"
@@ -1426,8 +1426,8 @@
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        2240,
-        -48
+        5328,
+        1968
       ],
       "id": "40131b69-486f-48bd-a234-52f0cf2fd008",
       "name": "Прочитать DOCX XML"
@@ -1449,8 +1449,8 @@
       "type": "n8n-nodes-base.xml",
       "typeVersion": 1,
       "position": [
-        2464,
-        -144
+        5552,
+        1968
       ],
       "id": "0960eabb-b155-40dd-9afd-ac91e24ed009",
       "name": "Разобрать DOCX XML"
@@ -1464,8 +1464,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        2688,
-        -48
+        5776,
+        1968
       ],
       "id": "ae88c0e4-0acf-4356-b5c5-925bf609d010",
       "name": "Привязать parsed XML к части"
@@ -1478,8 +1478,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        2912,
-        64
+        6000,
+        2112
       ],
       "id": "39acdf40-afaa-426b-b328-4d1a4ebed011",
       "name": "Собрать DOCX parts для parser"
@@ -1492,8 +1492,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3136,
-        64
+        6224,
+        2112
       ],
       "id": "563311a2-bf76-464f-91fd-30d13e85d012",
       "name": "Разобрать состояния DOCX ActiveX"
@@ -1507,8 +1507,8 @@
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        3360,
-        160
+        6448,
+        2192
       ],
       "id": "79703afb-49f8-4b15-85c8-bd0ece55d013",
       "name": "Вернуть DOCX binary для Docling"
@@ -1523,8 +1523,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        256,
-        1664
+        10032,
+        2304
       ],
       "retryOnFail": false
     },
@@ -1558,8 +1558,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        736,
-        1664
+        11488,
+        2592
       ]
     },
     {
@@ -1572,8 +1572,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        976,
-        1536
+        12464,
+        2560
       ],
       "retryOnFail": false
     },
@@ -1587,8 +1587,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        976,
-        1792
+        11712,
+        2688
       ],
       "retryOnFail": false
     },
@@ -1613,8 +1613,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1216,
-        1792
+        11936,
+        2688
       ],
       "id": "7638780a-30a7-4865-a3e8-83995621e0b6",
       "name": "AI Extractor fallback v1.0",
@@ -1636,8 +1636,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1456,
-        1792
+        12160,
+        2688
       ],
       "retryOnFail": false
     },
@@ -1651,8 +1651,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1696,
-        1792
+        12384,
+        2688
       ],
       "retryOnFail": false
     },
@@ -1666,8 +1666,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1936,
-        1792
+        12608,
+        2688
       ],
       "retryOnFail": false
     },
@@ -1681,8 +1681,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        464,
-        1440
+        10704,
+        1840
       ],
       "retryOnFail": false
     },
@@ -1693,8 +1693,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1248,
-        1680
+        12048,
+        1632
       ],
       "id": "da39ce52-ecca-42aa-93da-f10184d557b7",
       "name": "Классифицировать primary AI Validator"
@@ -1727,8 +1727,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1504,
-        1680
+        12272,
+        1632
       ],
       "id": "df69ed5b-7b48-4ac4-915b-b88f932b3965",
       "name": "Есть contract-invalid Validator facts?"
@@ -1740,8 +1740,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        1808
+        12496,
+        1792
       ],
       "id": "305cb405-189e-4daa-9ec5-3b78038333c2",
       "name": "Развернуть Validator retry queue"
@@ -1754,8 +1754,8 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        2016,
-        1808
+        12720,
+        1792
       ],
       "id": "9768cf2c-b17d-48cd-ab4e-267fa2705b77",
       "name": "Обработать Validator retry facts по одной"
@@ -1781,8 +1781,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        2272,
-        1808
+        12944,
+        1648
       ],
       "id": "75b84b9e-cb8b-40ca-a80b-299eff527411",
       "name": "AI Validator retry attempt 2",
@@ -1802,8 +1802,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2528,
-        1808
+        13168,
+        1648
       ],
       "id": "fc3c9914-1688-45b9-ad62-6f05c3c0bad3",
       "name": "Классифицировать Validator retry attempt 2"
@@ -1836,8 +1836,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2784,
-        1808
+        13392,
+        1792
       ],
       "id": "37685851-1820-4a23-8738-be2b6961454b",
       "name": "Validator retry attempt 2 accepted?"
@@ -1849,8 +1849,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        3040,
-        1936
+        13616,
+        1792
       ],
       "id": "454f4ed6-fdf7-4ea4-b726-791fb8b1eb86",
       "name": "Wait before Validator retry attempt 3",
@@ -1877,8 +1877,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        3296,
-        1936
+        13840,
+        1792
       ],
       "id": "f20be924-a3ed-4ecc-b44b-e96032d3c111",
       "name": "AI Validator retry attempt 3",
@@ -1898,8 +1898,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3552,
-        1936
+        14064,
+        1792
       ],
       "id": "49cc6b78-a2ce-451b-8851-380a3c6378b3",
       "name": "Классифицировать Validator retry attempt 3"
@@ -1932,8 +1932,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        3808,
-        1936
+        14288,
+        1888
       ],
       "id": "21907a99-1fbb-419d-93a3-01e0456cfc02",
       "name": "Validator retry attempt 3 accepted?"
@@ -1945,8 +1945,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4064,
-        2064
+        14512,
+        1968
       ],
       "id": "dc6b7f21-cd2e-43d3-bc2e-d367481b99c7",
       "name": "Сформировать Validator technical fallback"
@@ -1958,8 +1958,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2272,
-        1552
+        12944,
+        1456
       ],
       "id": "f47907d0-9f37-4740-a9ac-cc920793797a",
       "name": "Собрать ответы AI Validator после retry"
@@ -1971,8 +1971,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1760,
-        1552
+        12944,
+        1264
       ],
       "id": "e3174def-7b84-4087-b318-ec5ec5012efd",
       "name": "Собрать ответы AI Validator без retry"

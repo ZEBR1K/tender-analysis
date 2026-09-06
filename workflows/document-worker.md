@@ -403,9 +403,11 @@ letter/number и отсутствие categories `Cc/Cf/Cs/Co/Cn`. Невали�
 Непосредственно перед `Сохранить analysis unit` существующая
 `Развернуть части для AI v1.2` рекурсивно проверяет весь output JSON, включая
 ключи, и hard-fail с bounded path при любом остаточном literal U+0000. Guard
-ничего не strip/replace. Это local/offline implementation: execution `14592`
-не переигрывался, production workflow и PostgreSQL не менялись, runtime GREEN
-не заявляется.
+ничего не strip/replace. Execution `14596` подтвердил isolated Worker runtime:
+parser и persistence прошли, residual NUL отсутствовал, сохранились `8/8` units
+и `15` facts, document достиг `completed`; два повреждённых GroupName остались
+только bounded audit warnings. Test Aggregator в этом replay не запускался,
+поэтому production promotion и fresh full run остаются отдельными gates.
 
 ---
 
