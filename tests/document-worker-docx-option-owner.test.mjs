@@ -458,6 +458,7 @@ test('Normalizer emits approved collision-safe v2 control, question, and group i
         expectedQuestion,
       ]);
       assert.equal(Number.isInteger(option.source_row_index), true);
+      assert.ok(option.source_row_index >= 1);
       const expectedDiscriminator = typeof option.group_context === 'string' && option.group_context.trim()
         ? option.group_context.trim()
         : expectedQuestion;
@@ -474,6 +475,8 @@ test('Normalizer emits approved collision-safe v2 control, question, and group i
       [...new Set(owner.docx_option_states.map(({ option_group_id }) => option_group_id))],
     );
     const distinctRows = owner.docx_option_states.slice(0, 2);
+    assert.ok(distinctRows.every(({ source_row_index }) =>
+      Number.isInteger(source_row_index) && source_row_index >= 1));
     assert.notEqual(distinctRows[0].source_row_index, distinctRows[1].source_row_index);
     assert.notEqual(distinctRows[0].question_identity_key, distinctRows[1].question_identity_key);
   }
