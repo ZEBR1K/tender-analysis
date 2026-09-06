@@ -105,10 +105,26 @@ structure validates as `85` unique nodes / `82` connection sources / `101`
 resolved edges. No production n8n, PostgreSQL, credentials, schema,
 `FIELD_CATALOG`, or main branch was changed.
 
-This is local-only implementation evidence. Promotion/read-back and a fresh
-runtime canary reproducing the malformed `doc_7_au_0037#1 /
-licenses_certificates` response remain pending; complete Worker persistence and
-document completion are not yet runtime GREEN.
+### DW-23 pinned runtime canary — execution 14589 GREEN
+
+Owner-started execution `14589` in `[DW-23 TEST CODEX] TENDER — Обработать
+документ` reproduced the exact malformed primary response from execution
+`14491`: `doc_7_au_0037 / fact_index=1 / licenses_certificates` omitted
+`confidence`. Classifier `ai_validator_selective_retry_v1` retained the valid
+primary results and queued only this one contract-invalid item. Attempt 2 was
+accepted as contract-valid `rejected`, `confidence=0.95`,
+`reason_code=wrong_field_classification`; retry was not exhausted.
+
+After retry assembly the strict checker accepted all `22/22` Validator unit
+responses. Worker persisted `69` audited facts across `66/66` analysis units and
+completed document `a87ba83e-9341-405b-bce7-5f485061fde2`; execution status is
+`success`. Full evidence is recorded in
+`evaluations/DOCUMENT_WORKER_DW23_RUNTIME_14589_2026-09-06.md`.
+
+This closes the exact pinned `invalid_confidence` runtime gate through
+persistence and document completion. A fresh full run without pinned data and
+live production promotion remain separate gates; no live n8n workflow was
+changed while recording this evidence.
 
 ## Document Worker Evidence Repair overflow checkpoint — executions 14487 / 14491
 
