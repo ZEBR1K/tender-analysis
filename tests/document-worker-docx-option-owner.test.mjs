@@ -454,9 +454,10 @@ test('Normalizer emits approved collision-safe v2 control, question, and group i
       ]);
       assert.deepEqual(tupleIdentity(option.question_identity_key, 'v2q:', 3), [
         option.source_table_ref,
-        option.source_row_ref,
+        option.source_row_index,
         expectedQuestion,
       ]);
+      assert.equal(Number.isInteger(option.source_row_index), true);
       const expectedDiscriminator = typeof option.group_context === 'string' && option.group_context.trim()
         ? option.group_context.trim()
         : expectedQuestion;
@@ -472,6 +473,9 @@ test('Normalizer emits approved collision-safe v2 control, question, and group i
       owner.docx_option_state_semantic.option_groups.map(({ group_id }) => group_id),
       [...new Set(owner.docx_option_states.map(({ option_group_id }) => option_group_id))],
     );
+    const distinctRows = owner.docx_option_states.slice(0, 2);
+    assert.notEqual(distinctRows[0].source_row_index, distinctRows[1].source_row_index);
+    assert.notEqual(distinctRows[0].question_identity_key, distinctRows[1].question_identity_key);
   }
 
   const collisionStates = structuredClone(fixture.input.option_states);
