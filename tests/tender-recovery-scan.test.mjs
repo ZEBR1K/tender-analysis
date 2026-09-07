@@ -138,9 +138,10 @@ test('recovery scan selects retryable runs and delegates each run to Intake Resu
     false,
   );
   const sourceEventKey = dispatcher.parameters.workflowInputs.value.source_event_key;
-  assert.match(sourceEventKey, /recovery:/u);
-  assert.match(sourceEventKey, /\$execution\.id/u);
-  assert.match(sourceEventKey, /\$json\.analysis_run_id/u);
+  assert.equal(
+    sourceEventKey,
+    "={{ 'recovery:' + $execution.id + ':' + $json.analysis_run_id }}",
+  );
 
   assert.deepEqual(workflow.connections, {
     [schedule.name]: {
