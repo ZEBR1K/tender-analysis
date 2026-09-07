@@ -73,8 +73,26 @@ async function runCodeNode(source, inputJson, namedInputs = {}) {
   return execute(input, namedNode, input.first().json);
 }
 
-function singleJson(result, label) {
-  assert.ok(Array.isArray(result), `${label} must return an item array`);
+function codeResultJson(result, node, label) {
+  const mode = node.parameters?.mode;
+
+  if (mode === 'runOnceForEachItem') {
+    assert.equal(
+      Array.isArray(result),
+      false,
+      `${label} must return one item object in runOnceForEachItem mode`,
+    );
+    assert.ok(result?.json && typeof result.json === 'object', `${label} must return JSON`);
+    assert.deepEqual(
+      Object.keys(result),
+      ['json'],
+      `${label} must return exactly { json: {...} } in runOnceForEachItem mode`,
+    );
+    return result.json;
+  }
+
+  assert.equal(mode, 'runOnceForAllItems', `${label} must declare a supported Code mode`);
+  assert.ok(Array.isArray(result), `${label} must return an item array in runOnceForAllItems mode`);
   assert.equal(result.length, 1, `${label} must return exactly one item`);
   assert.ok(result[0]?.json && typeof result[0].json === 'object', `${label} must return JSON`);
   return result[0].json;
@@ -147,7 +165,7 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
     'normalizer must not fall back to undocumented payload or runtime fields',
   );
 
-  const primaryResult = singleJson(
+  const primaryResult = codeResultJson(
     await runCodeNode(normalizeCode, [{
       execution: {
         id: '  execution-123  ',
@@ -157,40 +175,44 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
         },
       },
     }]),
+    normalize,
     'Normalize Intake Error',
   );
   assert.equal(primaryResult.n8n_execution_id, 'execution-123');
   assert.equal(primaryResult.error_message, 'primary failure');
 
-  const descriptionResult = singleJson(
+  const descriptionResult = codeResultJson(
     await runCodeNode(normalizeCode, [{
       execution: {
         id: 'execution-124',
         error: { message: '   ', description: '  description failure  ' },
       },
     }]),
+    normalize,
     'Normalize Intake Error description fallback',
   );
   assert.equal(descriptionResult.error_message, 'description failure');
 
-  const fallbackResult = singleJson(
+  const fallbackResult = codeResultJson(
     await runCodeNode(normalizeCode, [{
       execution: { id: 'execution-125', error: {} },
       errorMessage: 'undocumented decoy',
     }]),
+    normalize,
     'Normalize Intake Error bounded fallback',
   );
   assert.match(fallbackResult.error_message, /\S/u, 'fallback message must be non-empty');
   assert.notEqual(fallbackResult.error_message, 'undocumented decoy');
   assert.ok(fallbackResult.error_message.length <= 2000, 'fallback message must be bounded');
 
-  const boundedMessageResult = singleJson(
+  const boundedMessageResult = codeResultJson(
     await runCodeNode(normalizeCode, [{
       execution: {
         id: 'execution-126',
         error: { message: `  ${'x'.repeat(2500)}  ` },
       },
     }]),
+    normalize,
     'Normalize Intake Error long message',
   );
   assert.equal(boundedMessageResult.error_message.length, 2000);
@@ -235,10 +257,16 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
     'error update must preserve event ownership and audit fields',
   );
 
-  const whereClause = sql.match(/\bWHERE\b([\s\S]*?)(?:\bRETURNING\b|;|$)/iu)?.[1] ?? '';
-  assert.match(whereClause, /\bn8n_execution_id\b\s*=\s*\$1\b/iu);
-  assert.match(whereClause, /\bstatus\b\s*=\s*'processing'/iu);
-  assert.match(sql, /\bRETURNING\b[\s\S]*\bid\b[\s\S]*\bevent_key\b[\s\S]*\banalysis_run_id\b[\s\S]*\bstatus\b/iu);
+  assert.match(
+    sql,
+    /\bUPDATE\s+(?:(?:"?public"?)\.)?"?tender_analysis_intake_events"?\s+AS\s+"?event"?\b[\s\S]*?\bWHERE\s+"?event"?\."?id"?\s*=\s*\(\s*SELECT\s+"?owned"?\."?id"?\s+FROM\s+(?:(?:"?public"?)\.)?"?tender_analysis_intake_events"?\s+AS\s+"?owned"?\s+WHERE\s+"?owned"?\."?n8n_execution_id"?\s*=\s*\$1\s+AND\s+"?owned"?\."?status"?\s*=\s*'processing'\s*\)/iu,
+    'UPDATE target must be selected by an unbounded scalar subquery so duplicate owners fail before mutation',
+  );
+  assert.doesNotMatch(sql, /\bLIMIT\b/iu, 'cardinality guard must not mask duplicate owners with LIMIT');
+  assert.match(
+    sql,
+    /\bRETURNING\s+"?event"?\."?id"?\s*,\s*"?event"?\."?event_key"?\s*,\s*"?event"?\."?analysis_run_id"?\s*,\s*"?event"?\."?status"?/iu,
+  );
   assert.doesNotMatch(sql, /\$[3-9]\d*\b/u, 'query contract must use only $1 and $2');
 
   const replacements = String(markFailed.parameters?.options?.queryReplacement ?? '');
@@ -261,8 +289,9 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
   assert.match(returnCode, /\breturn\s*\[/iu);
 
   const namedNormalizeInput = { 'Normalize Intake Error': [primaryResult] };
-  const zeroRowResult = singleJson(
+  const zeroRowResult = codeResultJson(
     await runCodeNode(returnCode, [{}], namedNormalizeInput),
+    returnNode,
     'Return Error Audit Result zero-row case',
   );
   assert.equal(zeroRowResult.event_updated, false);
@@ -274,8 +303,9 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
     analysis_run_id: '22222222-2222-4222-8222-222222222222',
     status: 'failed',
   };
-  const oneRowResult = singleJson(
+  const oneRowResult = codeResultJson(
     await runCodeNode(returnCode, [returnedRow], namedNormalizeInput),
+    returnNode,
     'Return Error Audit Result updated-row case',
   );
   assert.equal(oneRowResult.event_updated, true);
@@ -291,8 +321,9 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
     analysis_run_id: 'r'.repeat(5000),
     status: 'failed',
   };
-  const boundedAuditResult = singleJson(
+  const boundedAuditResult = codeResultJson(
     await runCodeNode(returnCode, [oversizedAuditRow], namedNormalizeInput),
+    returnNode,
     'Return Error Audit Result bounded audit case',
   );
   for (const field of ['event_id', 'event_key', 'analysis_run_id']) {
@@ -340,4 +371,19 @@ test('intake error workflow has a guarded, bounded, audit-safe four-node contrac
     false,
     'intake error workflow must not inherit document-error behavior',
   );
+});
+
+test('intake error SQL fails before mutation when execution ownership is ambiguous', () => {
+  const workflow = readWorkflow(workflowPath);
+  const markFailed = workflow.nodes?.find(
+    (node) => node.name === 'Mark Owned Intake Event Failed',
+  );
+  const sql = sqlSource(markFailed);
+
+  assert.match(
+    sql,
+    /\bUPDATE\s+(?:(?:"?public"?)\.)?"?tender_analysis_intake_events"?\s+AS\s+"?event"?\b[\s\S]*?\bWHERE\s+"?event"?\."?id"?\s*=\s*\(\s*SELECT\s+"?owned"?\."?id"?\s+FROM\s+(?:(?:"?public"?)\.)?"?tender_analysis_intake_events"?\s+AS\s+"?owned"?\s+WHERE\s+"?owned"?\."?n8n_execution_id"?\s*=\s*\$1\s+AND\s+"?owned"?\."?status"?\s*=\s*'processing'\s*\)/iu,
+    'ambiguous n8n_execution_id ownership must raise a scalar-subquery cardinality error before UPDATE',
+  );
+  assert.doesNotMatch(sql, /\bLIMIT\b/iu, 'LIMIT must not hide duplicate ownership');
 });
