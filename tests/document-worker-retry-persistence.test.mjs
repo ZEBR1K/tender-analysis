@@ -67,6 +67,16 @@ test('Document Worker retry persistence removes only facts and units stale for t
     ({ parameters }) => parameters.query,
   );
   assert.equal(canonicalSql, betaSql, 'Canonical and beta persistence SQL must match');
+  assert.equal(
+    (canonicalSql.match(/DELETE\s+FROM\s+tender_analysis_facts\b/giu) ?? []).length,
+    1,
+    'Persistence SQL must contain exactly one scoped fact DELETE',
+  );
+  assert.equal(
+    (canonicalSql.match(/DELETE\s+FROM\s+tender_analysis_units\b/giu) ?? []).length,
+    1,
+    'Persistence SQL must contain exactly one scoped unit DELETE',
+  );
 
   const currentUnitIds = cteBody(canonicalSql, 'current_unit_ids');
   assert.match(
@@ -122,6 +132,15 @@ test('Document Worker retry persistence removes only facts and units stale for t
   const savedFacts = cteBody(canonicalSql, 'saved_facts');
   assert.match(savedFacts, /INSERT\s+INTO\s+tender_analysis_facts/iu);
   assert.match(savedFacts, /FROM\s+input_facts/iu);
+  const persistedInputSelection = savedFacts.match(
+    /FROM\s+input_facts([\s\S]*?)ON\s+CONFLICT/iu,
+  );
+  assert.ok(persistedInputSelection, 'Missing saved_facts input selection');
+  assert.doesNotMatch(
+    persistedInputSelection[1],
+    /\bWHERE\b[\s\S]*?(?:extractor_status|validator_verdict)/iu,
+    'saved_facts must persist rejected and all other statuses from input_facts',
+  );
   assert.match(
     savedFacts,
     /ON\s+CONFLICT\s*\(\s*document_id\s*,\s*analysis_unit_id\s*,\s*fact_index\s*\)\s*DO\s+UPDATE\s+SET/iu,
