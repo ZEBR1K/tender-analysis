@@ -38,14 +38,14 @@
       "parameters": {
         "fieldToSplitOut": "attachments",
         "include": "selectedOtherFields",
-        "fieldsToInclude": "analysis_run_id,tender_meta",
+        "fieldsToInclude": "analysis_run_id,tender_meta,created_new_run",
         "options": {}
       },
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        592,
-        -176
+        816,
+        -304
       ],
       "id": "c0257d0e-3976-4861-a25c-1bc2e88f1f3c",
       "name": "разделить документы"
@@ -53,7 +53,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const input = $json;\nconst tender = input.tender;\n\nif (!tender) {\n  throw new Error('TenderPlan response does not contain \"tender\"');\n}\n\n// TenderPlan отдаёт даты как Unix timestamp в миллисекундах.\n// Переводим их в нормальный ISO-формат.\nfunction toIso(timestamp) {\n  if (timestamp === null || timestamp === undefined) {\n    return null;\n  }\n\n  const date = new Date(timestamp);\n\n  if (Number.isNaN(date.getTime())) {\n    return null;\n  }\n\n  return date.toISOString();\n}\n\n// Определяем расширение только из реального имени файла.\n// Ничего не додумываем.\nfunction getExtension(fileName) {\n  if (!fileName || typeof fileName !== 'string') {\n    return null;\n  }\n\n  const lastDot = fileName.lastIndexOf('.');\n\n  if (lastDot === -1 || lastDot === fileName.length - 1) {\n    return null;\n  }\n\n  return fileName.slice(lastDot + 1).toLowerCase();\n}\n\n\n// ----------------------------------------------------\n// 1. ДОКУМЕНТЫ\n// ----------------------------------------------------\n\nconst attachments = Array.isArray(tender.attachments)\n  ? tender.attachments.map((file, index) => ({\n      document_index: index + 1,\n\n      // Оригинальное имя файла из TenderPlan\n      file_name: file.realName ?? null,\n\n      // Расширение пригодится в следующем блоке\n      file_extension: getExtension(file.realName),\n\n      // Категория / отображаемое название TenderPlan\n      display_name: file.displayName ?? null,\n\n      // Прямая ссылка на скачивание\n      download_url: file.href ?? null,\n\n      // Дата публикации документа\n      publication_at: toIso(file.publicationDateTime),\n\n      // TenderPlan в твоём примере возвращает null,\n      // но поле сохраняем\n      source_size: file.size ?? null,\n    }))\n  : [];\n\n\n// ----------------------------------------------------\n// 2. ЗАКАЗЧИКИ\n// ----------------------------------------------------\n\n// Не ограничиваемся первым заказчиком.\n// В некоторых закупках их потенциально может быть несколько.\nconst customers = Array.isArray(tender.customers)\n  ? tender.customers.map(customer => ({\n      id: customer.guid ?? null,\n      name: customer.name ?? null,\n      region: customer.region ?? null,\n    }))\n  : [];\n\n\n// ----------------------------------------------------\n// 3. НОРМАЛИЗОВАННАЯ КАРТОЧКА ТЕНДЕРА\n// ----------------------------------------------------\n\nconst tenderMeta = {\n  // Источник данных\n  source: 'tenderplan',\n\n  // Идентификаторы TenderPlan / закупки\n  tender_id: tender._id ?? null,\n  tender_number: tender.number ?? null,\n  tender_external_id: tender.id ?? null,\n  eid: tender.eid ?? null,\n\n  // Основная информация\n  title: tender.orderName ?? null,\n  max_price: tender.maxPrice ?? null,\n\n  // Не подставляем RUB самостоятельно.\n  // Если TenderPlan не сообщил валюту — оставляем null.\n  currency: tender.currency ?? null,\n\n  region: tender.region ?? null,\n  status: tender.status ?? null,\n  kind: tender.kind ?? null,\n  type: tender.type ?? null,\n  placing_way: tender.placingWay ?? null,\n\n  // Даты\n  publication_at: toIso(tender.publicationDateTime),\n  receive_at: toIso(tender.receiveDateTime),\n  submission_start_at: toIso(tender.submissionStartDateTime),\n  submission_close_at: toIso(tender.submissionCloseDateTime),\n  scoring_at: toIso(tender.scoringDateTime),\n  summing_up_at: toIso(tender.summingUpDateTime),\n  updated_at_source: toIso(tender.updateDateTime),\n\n  // Заказчики\n  customers,\n\n  // Для удобства отдельно первый заказчик.\n  // Это не означает, что остальных мы теряем.\n  primary_customer: customers[0] ?? null,\n\n  // Площадка\n  platform: {\n    name: tender.platform?.name ?? null,\n    url: tender.platform?.href ?? null,\n  },\n\n  // Ссылка непосредственно на закупку на ЭТП\n  tender_url: tender.href ?? null,\n\n  // Финансовые / обеспечительные данные,\n  // которые TenderPlan уже отдаёт структурированно\n  prepayment: tender.prepayment ?? null,\n  guarantee_application: tender.guaranteeApp ?? null,\n  guarantee_contract: tender.guaranteeContract ?? null,\n  guarantee_provision: tender.guaranteeProv ?? null,\n\n  // Классификаторы\n  okpd2: Array.isArray(tender.okpd2) ? tender.okpd2 : [],\n  okpd: Array.isArray(tender.okpd) ? tender.okpd : [],\n  ktru: Array.isArray(tender.ktru) ? tender.ktru : [],\n\n  // Дополнительные признаки\n  smp: tender.smp ?? null,\n  multilot: tender.multilot ?? null,\n  is_changed: tender.isChanged ?? null,\n  is_deleted: tender.isDeleted ?? null,\n\n  // Количество документов\n  documents_count: attachments.length,\n};\n\n\n// ----------------------------------------------------\n// 4. РЕЗУЛЬТАТ\n// ----------------------------------------------------\n\nreturn {\n  json: {\n    // Нормализованная информация,\n    // которую удобно использовать во всём workflow\n    tender_meta: tenderMeta,\n\n    // Документы. Следующая Split Out работает именно с этим массивом.\n    attachments,\n\n    // ВАЖНО:\n    // сохраняем полный оригинальный ответ TenderPlan вообще без изменений.\n    // Если позже обнаружим полезное поле — оно не потеряно.\n    raw_source: input,\n  },\n};"
+        "jsCode": "const input = $json;\nconst tender = input.tender;\nconst request = $('Проверить вход Orchestrator').item.json;\n\nif (!tender) {\n  throw new Error('TenderPlan response does not contain \"tender\"');\n}\n\nconst requestedTenderId = request.tender_id;\nconst responseTenderId = String(tender._id ?? '').trim();\n\nif (!responseTenderId) {\n  throw new Error('[Orchestrator FullInfo] TenderPlan response tender._id is required.');\n}\nif (responseTenderId !== requestedTenderId) {\n  throw new Error('[Orchestrator FullInfo] TenderPlan response identity mismatch.');\n}\n\n// TenderPlan отдаёт даты как Unix timestamp в миллисекундах.\n// Переводим их в нормальный ISO-формат.\nfunction toIso(timestamp) {\n  if (timestamp === null || timestamp === undefined) {\n    return null;\n  }\n\n  const date = new Date(timestamp);\n\n  if (Number.isNaN(date.getTime())) {\n    return null;\n  }\n\n  return date.toISOString();\n}\n\n// Определяем расширение только из реального имени файла.\n// Ничего не додумываем.\nfunction getExtension(fileName) {\n  if (!fileName || typeof fileName !== 'string') {\n    return null;\n  }\n\n  const lastDot = fileName.lastIndexOf('.');\n\n  if (lastDot === -1 || lastDot === fileName.length - 1) {\n    return null;\n  }\n\n  return fileName.slice(lastDot + 1).toLowerCase();\n}\n\n\n// ----------------------------------------------------\n// 1. ДОКУМЕНТЫ\n// ----------------------------------------------------\n\nconst attachments = Array.isArray(tender.attachments)\n  ? tender.attachments.map((file, index) => ({\n      document_index: index + 1,\n\n      // Оригинальное имя файла из TenderPlan\n      file_name: file.realName ?? null,\n\n      // Расширение пригодится в следующем блоке\n      file_extension: getExtension(file.realName),\n\n      // Категория / отображаемое название TenderPlan\n      display_name: file.displayName ?? null,\n\n      // Прямая ссылка на скачивание\n      download_url: file.href ?? null,\n\n      // Дата публикации документа\n      publication_at: toIso(file.publicationDateTime),\n\n      // TenderPlan в твоём примере возвращает null,\n      // но поле сохраняем\n      source_size: file.size ?? null,\n    }))\n  : [];\n\n\n// ----------------------------------------------------\n// 2. ЗАКАЗЧИКИ\n// ----------------------------------------------------\n\n// Не ограничиваемся первым заказчиком.\n// В некоторых закупках их потенциально может быть несколько.\nconst customers = Array.isArray(tender.customers)\n  ? tender.customers.map(customer => ({\n      id: customer.guid ?? null,\n      name: customer.name ?? null,\n      region: customer.region ?? null,\n    }))\n  : [];\n\n\n// ----------------------------------------------------\n// 3. НОРМАЛИЗОВАННАЯ КАРТОЧКА ТЕНДЕРА\n// ----------------------------------------------------\n\nconst tenderMeta = {\n  // Источник данных\n  source: request.source,\n\n  // Идентификаторы TenderPlan / закупки\n  tender_id: requestedTenderId,\n  tender_number: tender.number ?? null,\n  tender_external_id: tender.id ?? null,\n  eid: tender.eid ?? null,\n\n  // Основная информация\n  title: tender.orderName ?? null,\n  max_price: tender.maxPrice ?? null,\n\n  // Не подставляем RUB самостоятельно.\n  // Если TenderPlan не сообщил валюту — оставляем null.\n  currency: tender.currency ?? null,\n\n  region: tender.region ?? null,\n  status: tender.status ?? null,\n  kind: tender.kind ?? null,\n  type: tender.type ?? null,\n  placing_way: tender.placingWay ?? null,\n\n  // Даты\n  publication_at: toIso(tender.publicationDateTime),\n  receive_at: toIso(tender.receiveDateTime),\n  submission_start_at: toIso(tender.submissionStartDateTime),\n  submission_close_at: toIso(tender.submissionCloseDateTime),\n  scoring_at: toIso(tender.scoringDateTime),\n  summing_up_at: toIso(tender.summingUpDateTime),\n  updated_at_source: toIso(tender.updateDateTime),\n\n  // Заказчики\n  customers,\n\n  // Для удобства отдельно первый заказчик.\n  // Это не означает, что остальных мы теряем.\n  primary_customer: customers[0] ?? null,\n\n  // Площадка\n  platform: {\n    name: tender.platform?.name ?? null,\n    url: tender.platform?.href ?? null,\n  },\n\n  // Ссылка непосредственно на закупку на ЭТП\n  tender_url: tender.href ?? null,\n\n  // Финансовые / обеспечительные данные,\n  // которые TenderPlan уже отдаёт структурированно\n  prepayment: tender.prepayment ?? null,\n  guarantee_application: tender.guaranteeApp ?? null,\n  guarantee_contract: tender.guaranteeContract ?? null,\n  guarantee_provision: tender.guaranteeProv ?? null,\n\n  // Классификаторы\n  okpd2: Array.isArray(tender.okpd2) ? tender.okpd2 : [],\n  okpd: Array.isArray(tender.okpd) ? tender.okpd : [],\n  ktru: Array.isArray(tender.ktru) ? tender.ktru : [],\n\n  // Дополнительные признаки\n  smp: tender.smp ?? null,\n  multilot: tender.multilot ?? null,\n  is_changed: tender.isChanged ?? null,\n  is_deleted: tender.isDeleted ?? null,\n\n  // Количество документов\n  documents_count: attachments.length,\n};\n\n\n// ----------------------------------------------------\n// 4. РЕЗУЛЬТАТ\n// ----------------------------------------------------\n\nreturn {\n  json: {\n    source: request.source,\n    source_event_key: request.source_event_key,\n    trigger_kind: request.trigger_kind,\n\n    // Нормализованная информация,\n    // которую удобно использовать во всём workflow\n    tender_meta: tenderMeta,\n\n    // Документы. Следующая Split Out работает именно с этим массивом.\n    attachments,\n\n    // ВАЖНО:\n    // сохраняем полный оригинальный ответ TenderPlan вообще без изменений.\n    // Если позже обнаружим полезное поле — оно не потеряно.\n    raw_source: input,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -172,8 +172,8 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
       "position": [
-        816,
-        -176
+        1040,
+        -304
       ],
       "id": "fc239939-1a67-4da7-991b-503bb9523957",
       "name": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ"
@@ -195,7 +195,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT\n    id AS analysis_run_id,\n    source,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    status,\n    documents_total,\n    tender_meta,\n    created_at,\n    updated_at,\n    false AS created_new_run\nFROM tender_analysis_runs\nWHERE source = $1\n  AND tender_id = $2\n  AND status <> 'completed'\nORDER BY created_at DESC\nLIMIT 1;",
+        "query": "SELECT\n    id AS analysis_run_id,\n    source,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    status,\n    documents_total,\n    tender_meta,\n    created_at,\n    updated_at,\n    false AS created_new_run\nFROM tender_analysis_runs\nWHERE source = $1\n  AND tender_id = $2\n  AND status <> 'completed'\nORDER BY created_at DESC;",
         "options": {
           "queryReplacement": "={{ [ $json.source, $json.tender_id ] }}"
         }
@@ -203,8 +203,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        -576,
-        -384
+        592,
+        384
       ],
       "id": "8e2d0991-d7b7-435e-97c5-ba2d46896d42",
       "name": "Загрузить существующий незавершённый запуск",
@@ -221,7 +221,7 @@
         "operation": "executeQuery",
         "query": "WITH input_documents AS (\n    SELECT\n        (document->>'document_index')::integer AS document_index,\n        NULLIF(document->>'file_name', '') AS file_name,\n        NULLIF(document->>'file_extension', '') AS file_extension,\n        NULLIF(document->>'display_name', '') AS display_name,\n        NULLIF(document->>'download_url', '') AS download_url,\n        NULLIF(document->>'publication_at', '')::timestamptz AS publication_at,\n        NULLIF(document->>'source_size', '')::bigint AS source_size\n    FROM jsonb_array_elements($7::jsonb) AS document\n),\ninserted_run AS (\n    INSERT INTO tender_analysis_runs (\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta\n    )\n    VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), 'processing', $5::integer, $6::jsonb)\n    ON CONFLICT (source, tender_id) WHERE status <> 'completed'\n    DO NOTHING\n    RETURNING *\n),\nregistered_documents AS (\n    INSERT INTO tender_analysis_documents (\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n    )\n    SELECT\n        run.id,\n        document.document_index,\n        document.file_name,\n        document.file_extension,\n        document.display_name,\n        document.download_url,\n        document.publication_at,\n        document.source_size,\n        'pending'\n    FROM inserted_run AS run\n    CROSS JOIN input_documents AS document\n    ON CONFLICT (analysis_run_id, document_index) DO UPDATE SET\n        file_name = EXCLUDED.file_name,\n        file_extension = EXCLUDED.file_extension,\n        display_name = EXCLUDED.display_name,\n        download_url = EXCLUDED.download_url,\n        publication_at = EXCLUDED.publication_at,\n        source_size = EXCLUDED.source_size\n    RETURNING\n        id AS document_id,\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n),\ndocument_stats AS (\n    SELECT\n        count(*)::integer AS registered_documents_count,\n        COALESCE(\n            jsonb_agg(\n                jsonb_build_object(\n                    'document_id', document_id,\n                    'document_index', document_index,\n                    'file_name', file_name,\n                    'file_extension', file_extension,\n                    'display_name', display_name,\n                    'download_url', download_url,\n                    'publication_at', publication_at,\n                    'source_size', source_size,\n                    'status', status\n                ) ORDER BY document_index\n            ),\n            '[]'::jsonb\n        ) AS attachments\n    FROM registered_documents\n),\nactivated_run AS (\n    SELECT\n        inserted.*,\n        stats.registered_documents_count,\n        stats.attachments\n    FROM inserted_run AS inserted\n    CROSS JOIN document_stats AS stats\n)\nSELECT\n    run.id AS analysis_run_id,\n    run.source,\n    run.tender_id,\n    run.tender_number,\n    run.tender_external_id,\n    run.status,\n    run.documents_total,\n    run.registered_documents_count,\n    run.tender_meta,\n    run.attachments,\n    run.created_at,\n    run.updated_at,\n    true AS created_new_run\nFROM activated_run AS run\n\nUNION ALL\n\nSELECT\n    NULL::uuid AS analysis_run_id,\n    $1::text AS source,\n    $2::text AS tender_id,\n    NULL::text AS tender_number,\n    NULL::text AS tender_external_id,\n    NULL::text AS status,\n    0::integer AS documents_total,\n    0::integer AS registered_documents_count,\n    $6::jsonb AS tender_meta,\n    '[]'::jsonb AS attachments,\n    NULL::timestamptz AS created_at,\n    NULL::timestamptz AS updated_at,\n    false AS created_new_run\nWHERE NOT EXISTS (SELECT 1 FROM inserted_run);",
         "options": {
-          "queryReplacement": "={{[  $json.tender_meta.source ?? 'tenderplan',  $json.tender_meta.tender_id,  $json.tender_meta.tender_number ?? '',  $json.tender_meta.tender_external_id ?? '',  $json.attachments.length,  JSON.stringify($json.tender_meta),  JSON.stringify($json.attachments)]}}"
+          "queryReplacement": "={{[  $json.source,  $json.tender_meta.tender_id,  $json.tender_meta.tender_number ?? '',  $json.tender_meta.tender_external_id ?? '',  $json.attachments.length,  JSON.stringify($json.tender_meta),  JSON.stringify($json.attachments)]}}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -292,14 +292,14 @@
         },
         "mode": "each",
         "options": {
-          "waitForSubWorkflow": true
+          "waitForSubWorkflow": false
         }
       },
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        1072,
-        -176
+        1264,
+        -304
       ],
       "id": "d3100d5c-fb0c-44c8-99ec-9905c0f44778",
       "name": "Запустить обработку документа"
@@ -312,11 +312,59 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -560,
-        -512
+        816,
+        384
       ],
       "id": "73f55e3c-45fc-4fb9-865a-5bed6f5c20f0",
       "name": "Проверить существующий запуск"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f8f6e509-6e21-4aa8-8bd7-1e4d29f8f7b2",
+              "leftValue": "={{ Array.isArray($json.attachments) && $json.attachments.some((attachment) => ['pdf', 'docx', 'xlsx'].includes(String(attachment?.file_extension ?? '').trim().toLowerCase())) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        592,
+        -64
+      ],
+      "id": "6bb570a8-c642-42c7-861e-1e02c770d8da",
+      "name": "Есть поддерживаемые документы?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Проверить вход Orchestrator').first().json;\nconst createdRow = $('Создать запуск и зарегистрировать документы').first().json;\nconst inputRow = $input.first()?.json ?? {};\nconst createdNewRun = inputRow.created_new_run === true;\nconst row = createdNewRun ? createdRow : inputRow;\n\nif (!row.analysis_run_id || !row.status) {\n  throw new Error('[Orchestrator result] analysis_run_id and status are required.');\n}\nif (row.source !== request.source || row.tender_id !== request.tender_id) {\n  throw new Error('[Orchestrator result] Run identity does not match validated input.');\n}\n\nconst supportedExtensions = new Set(['pdf', 'docx', 'xlsx']);\nconst documentsDispatched = createdNewRun && Array.isArray(createdRow.attachments)\n  ? createdRow.attachments.filter((attachment) =>\n      supportedExtensions.has(String(attachment?.file_extension ?? '').trim().toLowerCase()),\n    ).length\n  : 0;\nconst action = createdNewRun ? 'created_new_run' : 'concurrent_existing_run';\nconst nextState = createdNewRun\n  ? (documentsDispatched > 0 ? 'documents_dispatched' : 'no_supported_documents')\n  : 'existing_run_preserved';\n\nreturn [{\n  json: {\n    success: true,\n    analysis_run_id: row.analysis_run_id,\n    source: request.source,\n    tender_id: request.tender_id,\n    source_event_key: request.source_event_key,\n    trigger_kind: request.trigger_kind,\n    created_new_run: createdNewRun,\n    action,\n    status: row.status,\n    next_state: nextState,\n    documents_total: Number(row.documents_total ?? 0),\n    registered_documents_count: Number(row.registered_documents_count ?? row.documents_total ?? 0),\n    documents_dispatched: documentsDispatched,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        192
+      ],
+      "id": "a66ecb85-3d55-4055-ad8c-2ec0b90cc579",
+      "name": "Вернуть результат Orchestrator"
     }
   ],
   "pinData": {},
@@ -380,7 +428,7 @@
       "main": [
         [
           {
-            "node": "разделить документы",
+            "node": "Есть поддерживаемые документы?",
             "type": "main",
             "index": 0
           }
@@ -399,6 +447,11 @@
         [
           {
             "node": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Вернуть результат Orchestrator",
             "type": "main",
             "index": 0
           }
@@ -433,6 +486,35 @@
       ]
     },
     "Проверить существующий запуск": {
+      "main": [
+        [
+          {
+            "node": "Вернуть результат Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Есть поддерживаемые документы?": {
+      "main": [
+        [
+          {
+            "node": "разделить документы",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Вернуть результат Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вернуть результат Orchestrator": {
       "main": [
         []
       ]
