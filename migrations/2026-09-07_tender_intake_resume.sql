@@ -20,7 +20,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tender_analysis_runs_one_unfinished
   WHERE status <> 'completed';
 
 CREATE TABLE IF NOT EXISTS public.tender_analysis_intake_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  id uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
   source text NOT NULL DEFAULT 'tenderplan',
   event_key text NOT NULL,
   event_type text NOT NULL,
@@ -192,7 +192,10 @@ BEGIN
             WHEN 'none' THEN actual.column_default IS NOT NULL
             WHEN 'uuid' THEN
               actual.column_default IS NULL
-              OR actual.normalized_default !~ '(^|[.])gen_random_uuid[(][)]$'
+              OR actual.normalized_default NOT IN (
+                'gen_random_uuid()',
+                'pg_catalog.gen_random_uuid()'
+              )
             WHEN 'tenderplan' THEN
               actual.column_default IS NULL
               OR replace(actual.normalized_default, '::text', '') <> '''tenderplan'''
@@ -233,6 +236,9 @@ BEGIN
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'p'
       AND constraint_row.conkey = ARRAY[id_column.attnum]::smallint[]
+      AND constraint_row.convalidated
+      AND NOT constraint_row.condeferrable
+      AND NOT constraint_row.condeferred
   ) THEN
     RAISE EXCEPTION
       'Migration postcondition failed: tender_analysis_intake_events primary key must be (id)';
@@ -258,6 +264,9 @@ BEGIN
         source_column.attnum,
         event_key_column.attnum
       ]::smallint[]
+      AND constraint_row.convalidated
+      AND NOT constraint_row.condeferrable
+      AND NOT constraint_row.condeferred
   ) THEN
     RAISE EXCEPTION
       'Migration postcondition failed: tender_analysis_intake_events unique key must be (source, event_key)';
@@ -282,7 +291,12 @@ BEGIN
       AND constraint_row.confrelid = runs_oid
       AND constraint_row.conkey = ARRAY[local_column.attnum]::smallint[]
       AND constraint_row.confkey = ARRAY[referenced_column.attnum]::smallint[]
+      AND constraint_row.convalidated
+      AND NOT constraint_row.condeferrable
+      AND NOT constraint_row.condeferred
+      AND constraint_row.confupdtype = 'a'
       AND constraint_row.confdeltype = 'n'
+      AND constraint_row.confmatchtype = 's'
   ) THEN
     RAISE EXCEPTION
       'Migration postcondition failed: analysis_run_id FK must reference public.tender_analysis_runs(id) ON DELETE SET NULL';
@@ -303,6 +317,7 @@ BEGIN
     FROM pg_catalog.pg_constraint AS constraint_row
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
+      AND constraint_row.convalidated
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
         ~* 'trigger_kind[[:space:]]*=[[:space:]]*ANY[[:space:]]*[(][[:space:]]*ARRAY'
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
@@ -326,6 +341,7 @@ BEGIN
     FROM pg_catalog.pg_constraint AS constraint_row
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
+      AND constraint_row.convalidated
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
         ~* 'status[[:space:]]*=[[:space:]]*ANY[[:space:]]*[(][[:space:]]*ARRAY'
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
@@ -349,6 +365,7 @@ BEGIN
     FROM pg_catalog.pg_constraint AS constraint_row
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
+      AND constraint_row.convalidated
       AND replace(
         pg_catalog.regexp_replace(
           lower(pg_catalog.pg_get_constraintdef(constraint_row.oid, true)),

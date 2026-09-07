@@ -28,6 +28,23 @@ function getDoBlocks(sql) {
   }));
 }
 
+function getPostconditions(sql) {
+  const postconditions = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$postconditions$',
+  );
+  assert.ok(postconditions, 'missing postcondition validation DO block');
+  return postconditions.body;
+}
+
+function getConditionForException(postconditions, exceptionFragment) {
+  const exceptionIndex = postconditions.indexOf(exceptionFragment);
+  assert.notEqual(exceptionIndex, -1, `missing exception: ${exceptionFragment}`);
+
+  const conditionIndex = postconditions.lastIndexOf('  IF ', exceptionIndex);
+  assert.notEqual(conditionIndex, -1, `missing condition for: ${exceptionFragment}`);
+  return postconditions.slice(conditionIndex, exceptionIndex);
+}
+
 test('SQL comment stripping removes statement decoys', () => {
   const stripped = stripSqlComments(`
     -- BEGIN;
@@ -116,10 +133,7 @@ test('migration creates the durable intake event ledger', async () => {
 
 test('migration validates created or pre-existing schema objects fail closed', async () => {
   const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
-  const postconditions = getDoBlocks(sql).find(
-    (block) => block.tag.toLowerCase() === '$postconditions$',
-  );
-  assert.ok(postconditions, 'missing postcondition validation DO block');
+  const postconditions = getPostconditions(sql);
 
   for (const catalogContract of [
     /pg_catalog\.pg_class/i,
@@ -139,7 +153,7 @@ test('migration validates created or pre-existing schema objects fail closed', a
     /\bconfkey\b/i,
     /\bconfdeltype\b/i,
   ]) {
-    assert.match(postconditions.body, catalogContract);
+    assert.match(postconditions, catalogContract);
   }
 
   for (const objectName of [
@@ -148,7 +162,7 @@ test('migration validates created or pre-existing schema objects fail closed', a
     'idx_tender_analysis_intake_events_run',
     'idx_tender_analysis_intake_events_status_started',
   ]) {
-    assert.match(postconditions.body, new RegExp(`\\b${objectName}\\b`, 'i'));
+    assert.match(postconditions, new RegExp(`\\b${objectName}\\b`, 'i'));
   }
 
   for (const checkLiteral of [
@@ -159,10 +173,68 @@ test('migration validates created or pre-existing schema objects fail closed', a
     'completed',
     'failed',
   ]) {
-    assert.match(postconditions.body, new RegExp(`'${checkLiteral}'`, 'i'));
+    assert.match(postconditions, new RegExp(`'${checkLiteral}'`, 'i'));
   }
 
-  assert.match(postconditions.body, /count\(\*\)[\s\S]*?<>\s*17/i);
-  assert.match(postconditions.body, /attempts[\s\S]*?>=\s*0/i);
-  assert.match(postconditions.body, /RAISE\s+EXCEPTION/i);
+  assert.match(postconditions, /count\(\*\)[\s\S]*?<>\s*17/i);
+  assert.match(postconditions, /attempts[\s\S]*?>=\s*0/i);
+  assert.match(postconditions, /RAISE\s+EXCEPTION/i);
+});
+
+test('constraint postconditions require validated immediate semantics', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const postconditions = getPostconditions(sql);
+
+  for (const exceptionFragment of [
+    'primary key must be (id)',
+    'unique key must be (source, event_key)',
+  ]) {
+    const condition = getConditionForException(postconditions, exceptionFragment);
+    assert.match(condition, /constraint_row\.convalidated/i);
+    assert.match(condition, /NOT\s+constraint_row\.condeferrable/i);
+    assert.match(condition, /NOT\s+constraint_row\.condeferred/i);
+  }
+
+  const foreignKey = getConditionForException(
+    postconditions,
+    'analysis_run_id FK must reference',
+  );
+  assert.match(foreignKey, /constraint_row\.convalidated/i);
+  assert.match(foreignKey, /NOT\s+constraint_row\.condeferrable/i);
+  assert.match(foreignKey, /NOT\s+constraint_row\.condeferred/i);
+  assert.match(foreignKey, /constraint_row\.confupdtype\s*=\s*'a'/i);
+  assert.match(foreignKey, /constraint_row\.confdeltype\s*=\s*'n'/i);
+  assert.match(foreignKey, /constraint_row\.confmatchtype\s*=\s*'s'/i);
+
+  for (const exceptionFragment of [
+    'trigger_kind CHECK values are incompatible',
+    'status CHECK values are incompatible',
+    'attempts CHECK must enforce attempts >= 0',
+  ]) {
+    const condition = getConditionForException(postconditions, exceptionFragment);
+    assert.match(condition, /constraint_row\.convalidated/i);
+  }
+});
+
+test('UUID default creation and validation allow only pg_catalog semantics', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const table = findRequired(
+    sql,
+    /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.tender_analysis_intake_events\s*\([\s\S]*?\n\s*\);/i,
+    'bounded intake ledger definition',
+  )[0];
+  const postconditions = getPostconditions(sql);
+
+  assert.match(
+    table,
+    /\bid\s+uuid\s+PRIMARY\s+KEY\s+DEFAULT\s+pg_catalog\.gen_random_uuid\(\)/i,
+  );
+  assert.match(
+    postconditions,
+    /actual\.normalized_default\s+NOT\s+IN\s*\(\s*'gen_random_uuid\(\)'\s*,\s*'pg_catalog\.gen_random_uuid\(\)'\s*\)/i,
+  );
+  assert.doesNotMatch(
+    postconditions,
+    /\(\^\|\[\.\]\)gen_random_uuid/i,
+  );
 });
