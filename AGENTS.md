@@ -40,7 +40,7 @@
 
 ## Workflow documentation
 
-`workflows/orchestrator.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
+`workflows/orchestrator.md`, `workflows/document-preparation.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
 
 ## Workflow exports
 
@@ -49,6 +49,7 @@
 Canonical exports:
 
 * Orchestrator — `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
+* Document Preparation — `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 * Worker — `workflows/n8n-exports/TENDER — Обработать документ.json`
 * Error — `workflows/n8n-exports/TENDER — Ошибка обработки документа.json`
 * Aggregator — `workflows/n8n-exports/TENDER — Агрегация закупки.json`
@@ -112,6 +113,14 @@ Canonical exports:
 
 * `workflows/orchestrator.md`
 * `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
+* `DATA\_MODEL.md`
+* `TECH\_DEBT.md`
+
+Если работа касается Document Preparation / archive ingestion:
+
+* `workflows/document-preparation.md`
+* `workflows/n8n-exports/TENDER — Подготовить документацию.json`
+* `deploy/archive-extractor/README.md`
 * `DATA\_MODEL.md`
 * `TECH\_DEBT.md`
 

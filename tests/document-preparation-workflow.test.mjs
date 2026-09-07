@@ -36,7 +36,6 @@ async function executeCode({ workflow, name, inputItems, sourceItemsByNode = {},
     Object,
     RegExp,
     JSON,
-    structuredClone,
     $input: {
       all: () => items,
       first: () => items[0],

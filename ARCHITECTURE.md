@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-29
+**Последнее обновление:** 2026-09-08
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -92,6 +92,8 @@ tender_analysis_units
 tender_analysis_facts
 tender_analysis_field_results
 ```
+
+Подготовлен, но пока не подключён к production data flow, восьмой reusable workflow `TENDER — Подготовить документацию` (`0scTZu1aBKsMd6AM`). Он должен стать preprocessing boundary между TenderPlan attachments и массовой регистрацией документов: прямые PDF/DOCX/XLSX проходят как metadata, архивы раскрываются внутренним bounded extractor, а Orchestrator получает полный manifest либо typed failure до запуска Workers. До отдельной интеграции текущая production-архитектура из семи workflow выше не меняется.
 
 ---
 

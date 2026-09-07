@@ -149,6 +149,18 @@ internal Gotenberg conversion + binary report_pdf
 
 # 4. Основные workflow
 
+## `TENDER — Подготовить документацию` — inactive integration candidate
+
+Новый reusable sub-workflow принимает metadata всех TenderPlan attachments, пропускает прямые PDF/DOCX/XLSX без скачивания, последовательно распаковывает архивы через внутренний bounded extractor и возвращает полный manifest либо typed failure. Workflow `0scTZu1aBKsMd6AM` создан в n8n как inactive draft и пока не подключён к production Orchestrator.
+
+Документация:
+
+```text
+workflows/document-preparation.md
+```
+
+---
+
 ## `ТЕНДЕРЫ ОРКЕСТРАТОР`
 
 Отвечает за:
