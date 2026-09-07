@@ -116,11 +116,60 @@ function reachableFromOutput(workflow, startName, outputIndex, blockedNames = []
   return visited;
 }
 
-function assertGateReads(gate, ...fieldNames) {
-  const parameters = JSON.stringify(gate.parameters ?? {});
-  for (const fieldName of fieldNames) {
-    assert.match(parameters, new RegExp(`\\b${fieldName}\\b`, 'u'), `${gate.name} must read ${fieldName}`);
+function unwrapN8nExpression(value) {
+  assert.equal(typeof value, 'string');
+  const withoutMarker = value.trim().replace(/^=/u, '').trim();
+  const match = /^\{\{([\s\S]*)\}\}$/u.exec(withoutMarker);
+  assert.ok(match, `expected n8n expression, got ${value}`);
+  return match[1].trim().replace(/\s+/gu, '');
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function assertIfGateCondition(gate, { field, equals }) {
+  assert.equal(gate.type, 'n8n-nodes-base.if');
+  const conditions = gate.parameters?.conditions;
+  assert.equal(conditions?.combinator, 'and', `${gate.name} must use AND conditions`);
+  assert.equal(
+    conditions?.conditions?.length,
+    1,
+    `${gate.name} must have exactly one auditable predicate`,
+  );
+  const condition = conditions.conditions[0];
+  const expression = unwrapN8nExpression(condition.leftValue);
+  const fieldExpression = `$json.${field}`;
+  const operator = condition.operator ?? {};
+
+  if (expression === fieldExpression) {
+    if (typeof equals === 'boolean') {
+      assert.equal(operator.type, 'boolean', `${gate.name} must use a boolean predicate`);
+      assert.equal(
+        operator.operation,
+        equals ? 'true' : 'false',
+        `${gate.name} has reversed boolean polarity`,
+      );
+      assert.equal(operator.singleValue, true, `${gate.name} must use a unary boolean operator`);
+    } else {
+      assert.equal(operator.type, 'string', `${gate.name} must compare an action string`);
+      assert.equal(operator.operation, 'equals', `${gate.name} must use exact string equality`);
+      assert.equal(condition.rightValue, equals, `${gate.name} compares the wrong action`);
+    }
+    return;
   }
+
+  const literal = typeof equals === 'boolean'
+    ? String(equals)
+    : `(['"])${escapeRegExp(equals)}\\1`;
+  assert.match(
+    expression,
+    new RegExp(`^\\$json\\.${escapeRegExp(field)}===${literal}$`, 'u'),
+    `${gate.name} must compare only $json.${field} to ${String(equals)}`,
+  );
+  assert.equal(operator.type, 'boolean', `${gate.name} comparison must yield boolean`);
+  assert.equal(operator.operation, 'true', `${gate.name} comparison has reversed output polarity`);
+  assert.equal(operator.singleValue, true, `${gate.name} must use a unary boolean operator`);
 }
 
 async function executeCodeNode(node, inputJson, globals = {}) {
@@ -647,7 +696,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const runEntryGate = requireNode(workflow, 'Is Run-authoritative Invocation?');
   assert.equal(runEntryGate.type, 'n8n-nodes-base.if');
-  assertGateReads(runEntryGate, 'run_authoritative');
+  assertIfGateCondition(runEntryGate, { field: 'run_authoritative', equals: true });
   assert.deepEqual(
     directTargets(workflow, runEntryGate.name, 0),
     ['Load Authoritative Run'],
@@ -674,7 +723,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const runResolutionGate = requireNode(workflow, 'Route Run Resolution');
   assert.equal(runResolutionGate.type, 'n8n-nodes-base.if');
-  assertGateReads(runResolutionGate, 'run_authoritative');
+  assertIfGateCondition(runResolutionGate, { field: 'run_authoritative', equals: true });
   assert.deepEqual(
     directTargets(workflow, runResolutionGate.name, 0),
     ['Apply Run Entry Policy'],
@@ -749,11 +798,18 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const eventNoopGate = requireNode(workflow, 'Event Outcome Is No-op?');
   assert.equal(eventNoopGate.type, 'n8n-nodes-base.if');
-  assertGateReads(eventNoopGate, 'event_route');
+  assertIfGateCondition(eventNoopGate, { field: 'event_route', equals: 'no_op' });
   assert.deepEqual(
     directTargets(workflow, eventNoopGate.name, 0),
     ['Return Event No-op'],
   );
+  assert.deepEqual(
+    directTargets(workflow, eventNoopGate.name, 1),
+    ['Route Event Continuation'],
+  );
+  const eventContinuePath = reachableFromOutput(workflow, eventNoopGate.name, 1);
+  assert.ok(eventContinuePath.has('Read Intake Event Owner Execution'));
+  assert.ok(eventContinuePath.has('Route Run Resolution'));
   const eventNoopReachable = reachableFromOutput(workflow, eventNoopGate.name, 0);
   assert.deepEqual([...eventNoopReachable], ['Return Event No-op']);
   for (const forbiddenNode of [
@@ -783,7 +839,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.ok(canReach(workflow, 'Read Intake Event Owner Execution', 'Reclaim Stale Intake Event'));
   const eventReclaimGate = requireNode(workflow, 'Is Intake Event Owner Reclaimable?');
   assert.equal(eventReclaimGate.type, 'n8n-nodes-base.if');
-  assertGateReads(eventReclaimGate, 'reclaimable');
+  assertIfGateCondition(eventReclaimGate, { field: 'reclaimable', equals: true });
   const eventReclaimTruePath = reachableFromOutput(workflow, eventReclaimGate.name, 0);
   const eventReclaimFalsePath = reachableFromOutput(workflow, eventReclaimGate.name, 1);
   assert.ok(eventReclaimTruePath.has('Reclaim Stale Intake Event'));
@@ -948,6 +1004,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     ],
   }));
   assert.deepEqual(mixedDocumentDecision.attachments, [expectedAttachment]);
+  assert.equal(mixedDocumentDecision.has_documents_to_dispatch, true);
   assert.deepEqual(
     mixedDocumentDecision.document_actions.map(({ id, action }) => ({ id, action })),
     [
@@ -961,6 +1018,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     documents: [{ ...baseDocument, status: 'failed', attempts: 2 }],
   }));
   assert.deepEqual(exhaustedAutomatic.attachments, []);
+  assert.equal(exhaustedAutomatic.has_documents_to_dispatch, false);
   assert.equal(exhaustedAutomatic.document_actions[0].action, 'exhausted');
   const exhaustedManual = await executeSingleCodeJson(documentDecision, decisionInput({
     trigger_kind: 'manual',
@@ -970,6 +1028,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.deepEqual(exhaustedManual.attachments, [
     { ...expectedAttachment, status: 'failed' },
   ]);
+  assert.equal(exhaustedManual.has_documents_to_dispatch, true);
   assert.equal(exhaustedManual.document_actions[0].action, 'dispatch');
 
   const completedRunDecision = await executeSingleCodeJson(documentDecision, decisionInput({
@@ -979,6 +1038,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     documents: [baseDocument],
   }));
   assert.deepEqual(completedRunDecision.attachments, []);
+  assert.equal(completedRunDecision.has_documents_to_dispatch, false);
   assert.equal(completedRunDecision.document_actions[0].action, 'skip_run_completed');
   assert.equal(completedRunDecision.stage_action, 'already_completed');
 
@@ -989,6 +1049,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   }));
   assert.equal(invalidFinalBarrierDecision.final_count, 27);
   assert.equal(invalidFinalBarrierDecision.final_barrier_valid, false);
+  assert.equal(invalidFinalBarrierDecision.should_start_finalization, false);
   assert.equal(invalidFinalBarrierDecision.stage_action, 'manual_attention_required');
   const validFinalBarrierDecision = await executeSingleCodeJson(documentDecision, decisionInput({
     run_status: 'aggregating',
@@ -996,6 +1057,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     final_barrier_valid: true,
   }));
   assert.equal(validFinalBarrierDecision.final_barrier_valid, true);
+  assert.equal(validFinalBarrierDecision.should_start_finalization, true);
   assert.equal(validFinalBarrierDecision.stage_action, 'call_finalization');
 
   assert.doesNotMatch(
@@ -1097,18 +1159,14 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
       },
       expected: { execution_observation: 'unavailable', reclaimable: false },
     },
-    {
-      name: 'unknown execution status',
-      input: {
-        owner_id: 'owner-unknown-status',
-        statusCode: 200,
-        body: { id: 'execution-unknown', status: 'mystery', finished: true },
-      },
-      expected: { execution_observation: 'unavailable', reclaimable: false },
-    },
   ];
+  const unknownExecutionStatus = {
+    owner_id: 'owner-unknown-status',
+    statusCode: 200,
+    body: { id: 'execution-unknown', status: 'mystery', finished: true },
+  };
   for (const normalizer of [eventObservationNormalizer, documentObservationNormalizer]) {
-    assert.doesNotMatch(normalizer.parameters.jsCode, /\.body(?:\?\.)?\.data|\.body\[['"]data['"]\]/u);
+    assert.doesNotMatch(normalizer.parameters.jsCode, /\.body(?:\?\.|\.)data|\.body\[['"]data['"]\]/u);
     for (const scenario of executionObservationCases) {
       const normalized = await executeSingleCodeJson(normalizer, scenario.input);
       assert.equal(normalized.owner_id, scenario.input.owner_id, `${normalizer.name}: ${scenario.name}`);
@@ -1130,11 +1188,16 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
         );
       }
     }
+    await assert.rejects(
+      () => executeSingleCodeJson(normalizer, unknownExecutionStatus),
+      /unknown execution (?:status|observation)/iu,
+      `${normalizer.name}: syntactically valid unknown status must fail closed`,
+    );
   }
 
   const reclaimDecision = requireNode(workflow, 'Any Reclaimable Documents?');
   assert.equal(reclaimDecision.type, 'n8n-nodes-base.if');
-  assertGateReads(reclaimDecision, 'reclaimable');
+  assertIfGateCondition(reclaimDecision, { field: 'reclaimable', equals: true });
   assert.ok(canReach(workflow, 'Read Document Owner Execution', 'CAS Stale Document to Failed'));
   const reclaimTruePath = reachableFromOutput(workflow, reclaimDecision.name, 0);
   const reclaimFalsePath = reachableFromOutput(workflow, reclaimDecision.name, 1);
@@ -1144,6 +1207,10 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     reclaimFalsePath.has('CAS Stale Document to Failed'),
     false,
     'API-unavailable/invalid/owned route must bypass stale CAS',
+  );
+  assert.ok(
+    reclaimFalsePath.has('Decide Document and Stage Action'),
+    'non-reclaimable document observations must continue without mutation',
   );
 
   const documentCas = requireNode(workflow, 'CAS Stale Document to Failed');
@@ -1201,13 +1268,21 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const dispatchGate = requireNode(workflow, 'Has Documents to Dispatch?');
   assert.equal(dispatchGate.type, 'n8n-nodes-base.if');
-  assertGateReads(dispatchGate, 'attachments');
+  assertIfGateCondition(dispatchGate, {
+    field: 'has_documents_to_dispatch',
+    equals: true,
+  });
   const dispatchTruePath = reachableFromOutput(workflow, dispatchGate.name, 0);
   const dispatchFalsePath = reachableFromOutput(workflow, dispatchGate.name, 1);
   assert.ok(dispatchTruePath.has(splitDispatch.name));
   assert.ok(dispatchTruePath.has(workerCall.name));
   assert.equal(dispatchFalsePath.has(splitDispatch.name), false);
   assert.equal(dispatchFalsePath.has(workerCall.name), false);
+  assert.ok(
+    dispatchFalsePath.has('Apply Worker Readiness') ||
+      dispatchFalsePath.has('Should Start Aggregator?'),
+    'false dispatch output must continue into DB-backed stage routing',
+  );
 
   const aggregatorCall = requireNode(workflow, 'Call Aggregator');
   assert.equal(aggregatorCall.parameters.workflowId.value, 'ftvmrEHoMbPOAqZG');
@@ -1218,13 +1293,19 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const completedRunGate = requireNode(workflow, 'Is Run Already Completed?');
   assert.equal(completedRunGate.type, 'n8n-nodes-base.if');
-  assertGateReads(completedRunGate, 'stage_action');
+  assertIfGateCondition(completedRunGate, {
+    field: 'stage_action',
+    equals: 'already_completed',
+  });
   assert.ok(canReach(workflow, documentDecision.name, completedRunGate.name));
   assert.deepEqual(
     directTargets(workflow, completedRunGate.name, 0),
     ['Complete Intake Event'],
   );
   const completedRunPath = reachableFromOutput(workflow, completedRunGate.name, 0);
+  const nonCompletedRunPath = reachableFromOutput(workflow, completedRunGate.name, 1);
+  assert.ok(nonCompletedRunPath.has(dispatchGate.name));
+  assert.equal(completedRunPath.has(dispatchGate.name), false);
   for (const forbiddenNode of [
     'Apply Worker Readiness',
     'Guard Exhausted Run Failure',
@@ -1238,15 +1319,14 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const finalizationGate = requireNode(workflow, 'Should Start Finalization?');
   assert.equal(finalizationGate.type, 'n8n-nodes-base.if');
-  assertGateReads(
-    finalizationGate,
-    'run_status',
-    'final_count',
-    'final_barrier_valid',
-  );
+  assertIfGateCondition(finalizationGate, {
+    field: 'should_start_finalization',
+    equals: true,
+  });
   const finalizationTruePath = reachableFromOutput(workflow, finalizationGate.name, 0);
   const finalizationFalsePath = reachableFromOutput(workflow, finalizationGate.name, 1);
   assert.ok(finalizationTruePath.has(finalizationCall.name));
+  assert.ok(finalizationFalsePath.has('Complete Intake Event'));
   assert.equal(
     finalizationFalsePath.has(finalizationCall.name),
     false,
@@ -1333,7 +1413,10 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   assert.ok(directTargets(workflow, dispatchGate.name, 0).includes('Complete Intake Event'));
   const aggregatorGate = requireNode(workflow, 'Should Start Aggregator?');
-  assertGateReads(aggregatorGate, 'stage_action');
+  assertIfGateCondition(aggregatorGate, {
+    field: 'stage_action',
+    equals: 'call_aggregator',
+  });
   const aggregatorTruePath = reachableFromOutput(workflow, aggregatorGate.name, 0);
   const aggregatorFalsePath = reachableFromOutput(workflow, aggregatorGate.name, 1);
   assert.ok(aggregatorTruePath.has('Call Aggregator'));
