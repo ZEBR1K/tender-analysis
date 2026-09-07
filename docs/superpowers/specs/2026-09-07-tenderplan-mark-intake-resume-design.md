@@ -211,7 +211,8 @@ Typed input:
 Validation rules:
 
 - `tenderplan_mark` requires `tender_id` and `source_event_key`;
-- `recovery_scan` requires `analysis_run_id` and never enables `manual_override`;
+- `tenderplan_mark` and `recovery_scan` are automatic intents and require `manual_override=false`;
+- `recovery_scan` requires `analysis_run_id`;
 - `manual` requires `analysis_run_id` and sets `manual_override=true` only through the protected admin path;
 - ambiguous or unknown identifiers fail before any state mutation.
 
@@ -266,12 +267,12 @@ For `manual` and `recovery_scan`, `analysis_run_id` is authoritative. The dispat
 
 The dispatcher evaluates every document in the selected run:
 
-| Document state | Automatic `recovery_scan` | Mark/manual resume |
+| Document state | Automatic `tenderplan_mark` / `recovery_scan` | `manual` with `manual_override=true` |
 |---|---|---|
 | `completed` | Skip | Skip |
 | `pending`, `attempts < 2` | Dispatch | Dispatch |
 | `failed`, `attempts < 2` | Dispatch | Dispatch |
-| `pending` or `failed`, `attempts >= 2` | Exhausted; do not dispatch | Dispatch only with manual intent |
+| `pending` or `failed`, `attempts >= 2` | Exhausted; do not dispatch | Dispatch |
 | `processing`, age < 1 hour | Active; do not dispatch | Active; do not dispatch |
 | `processing`, age >= 1 hour | Verify n8n execution, then conditionally reclaim | Same verification; no blind reclaim |
 | `skipped` | Preserve; do not reinterpret | Preserve; do not reinterpret |
@@ -284,9 +285,9 @@ attempts = 1 → one automatic retry → attempts = 2
 attempts >= 2 → no further automatic Worker call
 ```
 
-Manual resume is an operator action and may call the Worker when `attempts >= 2`. The Worker increments the counter normally. The counter is never reset or decremented.
+Only `trigger_kind=manual` with `manual_override=true` may call the Worker when `attempts >= 2`. The Worker increments the counter normally. The counter is never reset or decremented.
 
-A unique repeated TenderPlan mark is treated as manual employee intent for an existing failed run. It may reopen that same run after automatic exhaustion. A duplicate delivery of the same notification cannot do so because the event ledger rejects its `event_key`.
+A repeated TenderPlan mark reuses the unfinished `analysis_run_id` but remains an automatic intent, so it cannot bypass the attempt budget or reopen a failed run after automatic exhaustion. A duplicate delivery of the same notification remains deduplicated by its `event_key`.
 
 ## 10. One-hour stale processing recovery
 
@@ -344,14 +345,14 @@ the run cannot reach the all-documents-completed barrier automatically
 
 The run-level `error_message` records a bounded summary of exhausted document IDs/counts. Per-document details remain in `tender_analysis_documents.error_message` and n8n executions.
 
-A mark/manual resume of a `failed` run performs an atomic reopen:
+Only `trigger_kind=manual` with `manual_override=true` may atomically reopen a `failed` run:
 
 ```text
 failed
 → processing
 ```
 
-It then dispatches only non-completed documents authorized by manual intent. Existing `completed` documents, units and facts are untouched.
+It then dispatches only non-completed documents authorized by the manual override. Existing `completed` documents, units and facts are untouched.
 
 ## 12. Retry-safe persistence gate
 
@@ -415,8 +416,8 @@ Credentials required by TenderPlan and the n8n API remain in n8n Credentials. No
 4. Worker atomic claim remains the final protection against duplicate dispatch.
 5. `completed` documents are never reverted by intake/recovery workflows.
 6. Stale recovery uses execution verification plus compare-and-set.
-7. Automatic Worker claims stop at `attempts = 2`.
-8. Manual claims preserve and increment `attempts`.
+7. Automatic `tenderplan_mark` and `recovery_scan` Worker claims stop at `attempts = 2`.
+8. Only `manual` with `manual_override=true` may bypass that limit; manual claims preserve and increment `attempts`.
 9. PostgreSQL remains the synchronization layer; no Merge or `$input.all()` barrier coordinates independent Workers.
 10. All documents remain registered before the first Worker of a new run starts.
 11. The existing 27/27 FINAL barrier and field semantics are unchanged.
@@ -428,18 +429,18 @@ The design is accepted only when implementation proves at least these cases:
 1. First mark for an unknown `tender_id` creates exactly one run and registers all documents once.
 2. Duplicate delivery of the same notification creates no run and no Worker execution.
 3. Two concurrent distinct mark events for one new tender still create one unfinished run, and the losing conflict-aware insert does not register documents.
-4. Repeated mark on a run with two completed and one failed document dispatches only the failed document with the same `analysis_run_id`.
+4. Repeated mark on a run with two completed documents and one `failed`, `attempts=1` document dispatches only that failed document with the same `analysis_run_id`.
 5. `failed`, `attempts=1` is automatically claimed once and becomes `attempts=2`.
 6. `failed`, `attempts=2` is not automatically dispatched.
 7. Manual resume of `failed`, `attempts=2` uses the same run and increments to `attempts=3`.
 8. `processing` for 59 minutes is not inspected/reclaimed.
-9. `processing` older than one hour with a running/waiting execution remains untouched.
-10. `processing` older than one hour with a terminal execution becomes `failed` only through the guarded update.
+9. `processing` at least one hour old with a running/waiting execution remains untouched.
+10. `processing` at least one hour old with a terminal execution becomes `failed` only through the guarded update.
 11. n8n API failure leaves document state unchanged and produces a visible error/alert.
 12. A concurrent newer claim makes the stale compare-and-set affect zero rows, and the guard reports a benign race rather than overwriting it.
 13. Attempt-one three units followed by attempt-two two units passes the retry-safe persistence/completion regression.
 14. Exhausted failed document plus no remaining active documents moves the run to `failed`.
-15. A repeated mark or direct manual resume reopens that same failed run.
+15. A repeated mark reuses but does not reopen an automatically exhausted failed run; only direct `manual` with `manual_override=true` reopens it.
 16. Repeated mark on a completed tender returns `already_completed` and creates no new run.
 17. All documents completed under a processing run cause the existing readiness claim and one Aggregator start.
 18. `ready_for_aggregation` resumes Aggregator without running any Worker.

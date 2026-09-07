@@ -620,7 +620,7 @@ Implement only the test oracle first in `tests/helpers/intake-resume-model.mjs`.
 
 and returns document actions plus one stage action. Cover at least:
 
-| State | Automatic action | Manual action |
+| State | Automatic `tenderplan_mark` / `recovery_scan` | `manual` with `manual_override=true` |
 |---|---|---|
 | `completed` document | skip | skip |
 | `pending`, attempts 0 | dispatch | dispatch |
@@ -645,8 +645,8 @@ and returns document actions plus one stage action. Cover at least:
 - completed duplicate events exit without stage calls;
 - new TenderPlan run calls Orchestrator;
 - existing run loads documents and FINAL count;
-- automatic dispatch predicate is exactly `pending` or `failed AND attempts < 2`;
-- manual dispatch may include failed/exhausted documents but still skips completed;
+- `tenderplan_mark` and `recovery_scan` are automatic intents whose dispatch predicate is exactly `pending` or `failed AND attempts < 2`;
+- only `manual` with `manual_override=true` may dispatch failed/exhausted documents, while still skipping completed documents;
 - stale recovery verifies the recorded n8n execution before any document update;
 - stale update uses compare-and-set on `id`, `status`, `n8n_execution_id`, and the observed timestamp;
 - API unavailability performs no stale state mutation;
@@ -672,7 +672,7 @@ trigger_kind: tenderplan_mark | recovery_scan | manual
 source_event_key: non-empty bounded string
 tender_id: required only for tenderplan_mark
 analysis_run_id: required for recovery_scan/manual
-manual_override: true only for manual
+manual_override: false for tenderplan_mark/recovery_scan; true only for manual
 observed_at: optional ISO timestamp
 ```
 
@@ -694,13 +694,15 @@ For `tenderplan_mark`, query by `(source='tenderplan', tender_id)`:
 - no run → call Orchestrator;
 - more than one unfinished run → fail loudly as invariant violation.
 
+A repeated TenderPlan mark remains automatic: it reuses the unfinished run but cannot bypass `attempts >= 2` or reopen a run failed after automatic exhaustion. A duplicate delivery with the same `source_event_key` remains a duplicate no-op.
+
 For `manual` and `recovery_scan`, load exactly `analysis_run_id`, derive `tender_id` from the run, and reject conflicting caller identity.
 
 If the Orchestrator loses the unique-index race and returns `created_new_run=false`, continue with the returned existing run and never register documents again.
 
 - [ ] **Step 6: Implement document classification and dispatch**
 
-Load all documents in one PostgreSQL query. A Code node classifies but does not mutate state. For each stale `processing` document (`started_at < now() - interval '1 hour'`), call the documented read-only n8n execution endpoint using an n8n credential; never embed an API key.
+Load all documents in one PostgreSQL query. A Code node classifies but does not mutate state. For each stale `processing` document (`started_at <= now() - interval '1 hour'`), call the documented read-only n8n execution endpoint using an n8n credential; never embed an API key.
 
 Only after the endpoint confirms terminal failure, terminal success without a document completion write, or not-found may PostgreSQL run this shape of CAS:
 
@@ -713,7 +715,7 @@ WHERE id = $1::uuid
   AND status = 'processing'
   AND n8n_execution_id = $2
   AND started_at = $3::timestamptz
-  AND started_at < $4::timestamptz
+  AND started_at <= $4::timestamptz
 RETURNING *;
 ```
 
@@ -836,7 +838,7 @@ Assert:
 - Schedule Trigger runs every 10 minutes;
 - candidate selection is PostgreSQL-backed;
 - only unfinished runs are selected;
-- documents qualify as `pending`, `failed AND attempts < 2`, or `processing` older than one hour;
+- documents qualify as `pending`, `failed AND attempts < 2`, or `processing` at least one hour old;
 - a `processing` run whose documents are all `completed`/`skipped` is selected so a missed readiness claim can be repaired;
 - stage-only candidates include `ready_for_aggregation` and `aggregating`;
 - exhausted failed documents do not enter automatic retry;
@@ -866,7 +868,7 @@ WHERE run.status <> 'completed'
     OR (document.status = 'failed' AND document.attempts < 2)
     OR (
       document.status = 'processing'
-      AND document.started_at < now() - interval '1 hour'
+      AND document.started_at <= now() - interval '1 hour'
     )
     OR run.status IN ('ready_for_aggregation', 'aggregating')
     OR (

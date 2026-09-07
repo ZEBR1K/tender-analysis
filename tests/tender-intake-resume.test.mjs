@@ -685,6 +685,31 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const worker = JSON.parse(fs.readFileSync(workerExportPath, 'utf8'));
   const finalization = JSON.parse(fs.readFileSync(finalizationExportPath, 'utf8'));
 
+  for (const node of workflow.nodes) {
+    if (node.type === 'n8n-nodes-base.if') {
+      for (const condition of node.parameters?.conditions?.conditions ?? []) {
+        assert.match(condition.leftValue, /^=\{\{/u, `${node.name} IF expression is not executable`);
+      }
+    }
+    if (node.type === 'n8n-nodes-base.postgres') {
+      assert.match(
+        node.parameters?.options?.queryReplacement ?? '',
+        /^=\{\{/u,
+        `${node.name} queryReplacement is not executable`,
+      );
+    }
+    if (node.type === 'n8n-nodes-base.httpRequest') {
+      assert.match(node.parameters.url, /^=\{\{/u, `${node.name} URL is not executable`);
+    }
+    if (node.type === 'n8n-nodes-base.executeWorkflow') {
+      for (const value of Object.values(node.parameters?.workflowInputs?.value ?? {})) {
+        if (typeof value === 'string' && value.includes('{{')) {
+          assert.match(value, /^=\{\{/u, `${node.name} input expression is not executable`);
+        }
+      }
+    }
+  }
+
   assert.equal(workflow.name, 'TENDER — Intake Resume');
   assert.equal(workflow.active, false);
   assert.equal(workflow.settings?.availableInMCP, false);
@@ -907,7 +932,15 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const loadEventSql = normalizeSql(requireNode(workflow, 'Load Intake Event').parameters.query);
   assert.match(loadEventSql, /where .*source\s*=\s*\$1/iu);
   assert.match(loadEventSql, /event_key\s*=\s*\$2/iu);
+  for (const contextField of [
+    'run_authoritative',
+    'manual_override',
+    'trigger_kind',
+    'source_event_key',
+    'analysis_run_id',
+  ]) assert.match(loadEventSql, new RegExp(contextField, 'u'));
   const classifyEvent = requireNode(workflow, 'Classify Intake Event');
+  assert.match(classifyEvent.parameters.jsCode, /current_at/iu);
   const duplicateEvent = await executeSingleCodeJson(classifyEvent, {
     source: 'tenderplan',
     event_key: 'event-completed',
@@ -1034,6 +1067,8 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(runPolicySql, /where .*status\s*=\s*'failed'/iu);
   assert.match(runPolicySql, /manual_override|\$\d+::boolean/iu);
   assert.match(runPolicySql, /trigger_kind|\$\d+\s*=\s*'manual'/iu);
+  assert.match(runPolicySql, /select[\s\S]*from (?:public\.)?tender_analysis_runs/iu);
+  assert.match(runPolicySql, /not exists|left join|coalesce/iu);
   const runPolicyCode = requireNode(workflow, 'Classify Run Entry Policy').parameters.jsCode;
   assert.match(runPolicyCode, /failed[\s\S]*manual[\s\S]*processing/iu);
   assert.match(runPolicyCode, /automatic_attempts_exhausted/iu);
@@ -1304,6 +1339,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     body: { id: 'execution-unknown', status: 'mystery', finished: true },
   };
   for (const normalizer of [eventObservationNormalizer, documentObservationNormalizer]) {
+    assert.match(normalizer.parameters.jsCode, /\$\(['"]/u);
     assert.doesNotMatch(normalizer.parameters.jsCode, /\.body(?:\?\.|\.)data|\.body\[['"]data['"]\]/u);
     for (const scenario of executionObservationCases) {
       const normalized = await executeSingleCodeJson(normalizer, scenario.input);
@@ -1334,21 +1370,46 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   }
 
   const reclaimDecision = requireNode(workflow, 'Any Reclaimable Documents?');
+  const recoveryLoop = workflow.nodes.find((node) =>
+    node.type === 'n8n-nodes-base.splitInBatches' && node.parameters.batchSize === 1);
+  assert.ok(recoveryLoop, 'stale document recovery must use a bounded one-item loop');
   assert.equal(reclaimDecision.type, 'n8n-nodes-base.if');
   assertIfGateCondition(reclaimDecision, { field: 'reclaimable', equals: true });
   assert.ok(canReach(workflow, 'Read Document Owner Execution', 'CAS Stale Document to Failed'));
   const reclaimTruePath = reachableFromOutput(workflow, reclaimDecision.name, 0);
-  const reclaimFalsePath = reachableFromOutput(workflow, reclaimDecision.name, 1);
+  const reclaimFalsePath = reachableFromOutput(
+    workflow,
+    reclaimDecision.name,
+    1,
+    [recoveryLoop.name],
+  );
   assert.ok(reclaimTruePath.has('CAS Stale Document to Failed'));
-  assert.ok(reclaimFalsePath.size > 0);
   assert.equal(
     reclaimFalsePath.has('CAS Stale Document to Failed'),
     false,
     'API-unavailable/invalid/owned route must bypass stale CAS',
   );
-  assert.ok(
-    reclaimFalsePath.has('Decide Document and Stage Action'),
-    'non-reclaimable document observations must continue without mutation',
+  assert.deepEqual(directTargets(workflow, reclaimDecision.name, 1), [recoveryLoop.name]);
+
+  const loopOutputs = workflow.connections[recoveryLoop.name]?.main ?? [];
+  assert.equal(loopOutputs.length, 2);
+  assert.ok(loopOutputs[0]?.some(({ node }) => /snapshot/i.test(node)));
+  const reloadAfterRecovery = requireNode(workflow, 'Reload Run Snapshot After Recovery');
+  assert.equal(reloadAfterRecovery.executeOnce, true);
+  assert.ok(canReach(workflow, recoveryLoop.name, 'Read Document Owner Execution'));
+  assert.ok(canReach(workflow, 'CAS Stale Document to Failed', recoveryLoop.name));
+  assert.ok(canReach(workflow, reclaimDecision.name, recoveryLoop.name));
+  assert.ok(canReach(workflow, recoveryLoop.name, 'Decide Document and Stage Action'));
+  const recoveryQueueCode = requireNode(
+    workflow,
+    'Prepare Document Recovery Queue',
+  ).parameters.jsCode;
+  assert.match(recoveryQueueCode, /run_status\s*===\s*['"]completed['"]/u);
+  assert.match(recoveryQueueCode, /Malformed processing document owner snapshot/u);
+  assert.ok(canReach(workflow, 'CAS Stale Document to Failed', 'Classify Document CAS Result'));
+  assert.match(
+    requireNode(workflow, 'Classify Document CAS Result').parameters.jsCode,
+    /benign_race/u,
   );
 
   const documentCas = requireNode(workflow, 'CAS Stale Document to Failed');
@@ -1490,7 +1551,31 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(completeEventSql, /action\s*=\s*left\s*\(/iu);
   assert.match(completeEventSql, /error_message\s*=\s*left\s*\(/iu);
   assert.match(completeEventSql, /n8n_execution_id\s*=\s*\$\d+/iu);
+  assert.match(completeEventSql, /analysis_run_id\s*=\s*coalesce/iu);
+  assert.match(completeEventSql, /completion_applied/iu);
   assert.match(completeEvent.parameters.options.queryReplacement, /\$execution\.id/u);
+
+  const structuredOutcomeCode = requireNode(
+    workflow,
+    'Return Structured Outcome',
+  ).parameters.jsCode;
+  assert.match(structuredOutcomeCode, /completion_applied[\s\S]*throw new Error/iu);
+  assert.match(structuredOutcomeCode, /allowed\.includes\([^)]+\)[\s\S]*throw new Error/iu);
+  assert.match(completeEventSql, /documents_dispatched/iu);
+  assert.match(completeEventSql, /run_status/iu);
+  assert.ok(canReach(workflow, 'Guard Exhausted Run Failure', 'Preserve Outcome After Run Guard'));
+  assert.ok(canReach(workflow, 'Preserve Outcome After Run Guard', 'Complete Intake Event'));
+
+  const reloadSnapshotSql = normalizeSql(requireNode(
+    workflow,
+    'Reload Run Snapshot After Recovery',
+  ).parameters.query);
+  assert.match(reloadSnapshotSql, /expected\s*\(\s*field_index\s*,\s*field_key\s*\)/iu);
+  for (const [index, fieldKey] of expectedFieldKeys.entries()) {
+    assert.match(reloadSnapshotSql, new RegExp(`\\(${index + 1},\\s*'${fieldKey}'\\)`, 'u'));
+  }
+  assert.ok(canReach(workflow, 'Apply Worker Readiness', 'Classify Post-Readiness Stage'));
+  assert.ok(canReach(workflow, 'Classify Post-Readiness Stage', 'Should Start Aggregator?'));
 
   const outcomeCode = workflow.nodes
     .filter((node) => node.type === 'n8n-nodes-base.code')
