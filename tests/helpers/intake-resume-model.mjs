@@ -3,8 +3,21 @@ const AUTOMATIC_TRIGGER_KINDS = new Set([
   'tenderplan_mark',
   'recovery_scan',
 ]);
-const TERMINAL_EXECUTION_STATES = new Set(['terminal', 'not_found']);
-const OWNED_EXECUTION_STATES = new Set(['running', 'waiting']);
+const RECLAIMABLE_EXECUTION_STATES = new Set([
+  'success',
+  'error',
+  'canceled',
+  'crashed',
+  'not_found',
+]);
+const OWNED_EXECUTION_STATES = new Set(['new', 'running', 'waiting']);
+const UNAVAILABLE_EXECUTION_STATES = new Set([
+  null,
+  'invalid',
+  'unavailable',
+  'network_error',
+  'credential_error',
+]);
 
 function fail(message) {
   throw new Error(`Invalid intake resume state: ${message}`);
@@ -38,18 +51,22 @@ function classifyIntent(triggerKind, manualOverride) {
   fail('triggerKind and manualOverride do not form an approved intent');
 }
 
-function classifyStage(runStatus, finalCount) {
+function classifyStage(runStatus, finalCount, finalBarrierValid, intent) {
   switch (runStatus) {
     case 'processing':
       return 'continue_document_stage';
     case 'ready_for_aggregation':
       return 'call_aggregator';
     case 'aggregating':
-      return finalCount === 27
+      return finalCount === 27 && finalBarrierValid === true
         ? 'call_finalization'
         : 'manual_attention_required';
     case 'completed':
       return 'no_op';
+    case 'failed':
+      return intent === 'manual'
+        ? 'reopen_failed_run'
+        : 'automatic_attempts_exhausted';
     default:
       fail(`unknown runStatus ${String(runStatus)}`);
   }
@@ -76,11 +93,21 @@ function classifyDocument(document, intent, now) {
   if (document.status === 'completed') {
     return { id: document.id, action: 'skip' };
   }
+  if (document.status === 'skipped') {
+    return { id: document.id, action: 'preserve_skip' };
+  }
   if (document.status === 'pending' || document.status === 'failed') {
     return directClaimAction(document, intent);
   }
   if (document.status !== 'processing') {
     fail(`document ${document.id} has unknown status ${String(document.status)}`);
+  }
+
+  if (typeof document.analysisRunId !== 'string' || document.analysisRunId.trim() === '') {
+    fail(`document ${document.id} analysisRunId must be a non-empty string`);
+  }
+  if (typeof document.executionId !== 'string' || document.executionId.trim() === '') {
+    fail(`document ${document.id} executionId must be a non-empty string`);
   }
 
   const startedAt = parseInstant(document.startedAt, `document ${document.id} startedAt`);
@@ -95,9 +122,14 @@ function classifyDocument(document, intent, now) {
   if (OWNED_EXECUTION_STATES.has(document.executionState)) {
     return { id: document.id, action: 'leave_owned' };
   }
-  if (!TERMINAL_EXECUTION_STATES.has(document.executionState)) {
-    fail(`document ${document.id} requires a known execution observation`);
+  if (UNAVAILABLE_EXECUTION_STATES.has(document.executionState)) {
+    return { id: document.id, action: 'execution_status_unavailable' };
   }
+  if (!RECLAIMABLE_EXECUTION_STATES.has(document.executionState)) {
+    fail(`document ${document.id} has unknown execution observation`);
+  }
+
+  const cutoff = new Date(observedAt - ONE_HOUR_MS).toISOString();
 
   return {
     id: document.id,
@@ -108,8 +140,11 @@ function classifyDocument(document, intent, now) {
     onNotApplied: 'benign_race',
     compareAndSet: {
       id: document.id,
+      analysisRunId: document.analysisRunId,
       status: 'processing',
+      executionId: document.executionId,
       startedAt: document.startedAt,
+      cutoff,
     },
   };
 }
@@ -122,6 +157,9 @@ export function evaluateIntakeResumeDecision(input) {
   const intent = classifyIntent(input.triggerKind, input.manualOverride);
   if (!Number.isInteger(input.finalCount) || input.finalCount < 0 || input.finalCount > 27) {
     fail('finalCount must be an integer from 0 through 27');
+  }
+  if (typeof input.finalBarrierValid !== 'boolean') {
+    fail('finalBarrierValid must be boolean');
   }
   if (!Array.isArray(input.documents)) {
     fail('documents must be an array');
@@ -136,6 +174,11 @@ export function evaluateIntakeResumeDecision(input) {
 
   return {
     documentActions,
-    stageAction: classifyStage(input.runStatus, input.finalCount),
+    stageAction: classifyStage(
+      input.runStatus,
+      input.finalCount,
+      input.finalBarrierValid,
+      intent,
+    ),
   };
 }
