@@ -258,7 +258,7 @@ failed
 
 Before creating the index, migration preflight must fail if existing data contains more than one unfinished run for the same `(source, tender_id)`; it must not choose or delete a run automatically.
 
-The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or found the concurrent unfinished run. Therefore two distinct mark events may both reach the create boundary, but only one can create the run. The other reuses the returned unfinished `analysis_run_id` and must not register documents again.
+The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or lost the conflict. Creation of the run and registration of its complete document set must occur in the same PostgreSQL statement/transaction after TenderPlan FullInfo has been normalized. A failure cannot commit an empty `created` run between those two operations. When the insert loses a concurrent conflict, the caller performs a fresh `SELECT` to load the now-visible unfinished run. Therefore two distinct mark events may both reach the create boundary, but only one can create the run and register documents; the other reuses the returned unfinished `analysis_run_id` and must not register documents again.
 
 For `manual` and `recovery_scan`, `analysis_run_id` is authoritative. The dispatcher validates that the run exists and reads `tender_id` from PostgreSQL; it does not accept conflicting tender identity from the caller.
 
