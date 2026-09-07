@@ -17,6 +17,10 @@ function loadWorkflow() {
   return JSON.parse(fs.readFileSync(workflowPath, 'utf8'));
 }
 
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n/g, '\n');
+}
+
 function nodeCode(workflow, name) {
   const node = workflow.nodes.find((candidate) => candidate.name === name);
   assert.ok(node, `Workflow node not found: ${name}`);
@@ -138,6 +142,6 @@ test('review artifacts contain the complete executable prompt-bearing sources', 
     path.join(repositoryRoot, 'prompts', 'document-worker-validator-field-profiles-v1.1-2026-09-07.txt'),
     'utf8',
   );
-  assert.equal(extractorArtifact, `${extractorSource}\n`);
-  assert.equal(validatorArtifact, `${validatorSource}\n`);
+  assert.equal(normalizeLineEndings(extractorArtifact), `${extractorSource}\n`);
+  assert.equal(normalizeLineEndings(validatorArtifact), `${validatorSource}\n`);
 });
