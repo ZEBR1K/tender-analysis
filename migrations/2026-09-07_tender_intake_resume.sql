@@ -292,6 +292,13 @@ BEGIN
       AND constraint_row.conkey = ARRAY[local_column.attnum]::smallint[]
       AND constraint_row.confkey = ARRAY[referenced_column.attnum]::smallint[]
       AND constraint_row.convalidated
+      AND COALESCE(
+        (
+          pg_catalog.to_jsonb(constraint_row)
+            ->> 'conenforced'
+        )::boolean,
+        true
+      )
       AND NOT constraint_row.condeferrable
       AND NOT constraint_row.condeferred
       AND constraint_row.confupdtype = 'a'
@@ -318,6 +325,13 @@ BEGIN
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
       AND constraint_row.convalidated
+      AND COALESCE(
+        (
+          pg_catalog.to_jsonb(constraint_row)
+            ->> 'conenforced'
+        )::boolean,
+        true
+      )
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
         ~* 'trigger_kind[[:space:]]*=[[:space:]]*ANY[[:space:]]*[(][[:space:]]*ARRAY'
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
@@ -342,6 +356,13 @@ BEGIN
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
       AND constraint_row.convalidated
+      AND COALESCE(
+        (
+          pg_catalog.to_jsonb(constraint_row)
+            ->> 'conenforced'
+        )::boolean,
+        true
+      )
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
         ~* 'status[[:space:]]*=[[:space:]]*ANY[[:space:]]*[(][[:space:]]*ARRAY'
       AND pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
@@ -366,6 +387,13 @@ BEGIN
     WHERE constraint_row.conrelid = ledger_oid
       AND constraint_row.contype = 'c'
       AND constraint_row.convalidated
+      AND COALESCE(
+        (
+          pg_catalog.to_jsonb(constraint_row)
+            ->> 'conenforced'
+        )::boolean,
+        true
+      )
       AND replace(
         pg_catalog.regexp_replace(
           lower(pg_catalog.pg_get_constraintdef(constraint_row.oid, true)),

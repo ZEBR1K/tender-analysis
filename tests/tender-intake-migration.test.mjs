@@ -216,6 +216,23 @@ test('constraint postconditions require validated immediate semantics', async ()
   }
 });
 
+test('FK and CHECK enforcement checks are portable across PostgreSQL versions', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const postconditions = getPostconditions(sql);
+  const requiredEnforcement = /AND\s+COALESCE\s*\(\s*\(\s*pg_catalog\.to_jsonb\s*\(\s*constraint_row\s*\)\s*->>\s*'conenforced'\s*\)\s*::boolean\s*,\s*true\s*\)/i;
+
+  for (const exceptionFragment of [
+    'analysis_run_id FK must reference',
+    'trigger_kind CHECK values are incompatible',
+    'status CHECK values are incompatible',
+    'attempts CHECK must enforce attempts >= 0',
+  ]) {
+    const condition = getConditionForException(postconditions, exceptionFragment);
+    assert.match(condition, requiredEnforcement);
+    assert.doesNotMatch(condition, /constraint_row\.conenforced/i);
+  }
+});
+
 test('UUID default creation and validation allow only pg_catalog semantics', async () => {
   const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
   const table = findRequired(
