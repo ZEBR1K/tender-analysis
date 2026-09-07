@@ -1,8 +1,11 @@
 # TENDER — Подготовить документацию
 
-**Тип:** reusable sub-workflow / ingestion preparation  
-**Workflow ID в n8n:** `0scTZu1aBKsMd6AM`  
-**Статус:** inactive draft; не подключён к production Orchestrator  
+**Тип:** reusable sub-workflow / ingestion preparation
+
+**Workflow ID в n8n:** `0scTZu1aBKsMd6AM`
+
+**Статус:** inactive draft; не подключён к production Orchestrator
+
 **Repository export:** `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 
 ## Назначение
@@ -123,4 +126,3 @@ MCP pin-tests на live n8n:
 5. запускать Workers только для зарегистрированных документов со статусом `pending`;
 6. на `success=false` завершать run как failed и не запускать Workers;
 7. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback.
-
