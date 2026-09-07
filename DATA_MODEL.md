@@ -43,6 +43,8 @@ migrations/2026-09-07_tender_intake_resume.sql
 
 Наличие этого файла в repository не подтверждает применение migration. Live PostgreSQL для этих объектов в рамках Task 1 не проверялся и не изменялся. Поэтому приведённый ниже snapshot пяти основных таблиц остаётся последним verified live state, а planned objects документируются отдельно.
 
+Migration сохраняет `IF NOT EXISTS` для повторяемого применения, но в той же transaction выполняет fail-closed postcondition validation через PostgreSQL catalogs и `information_schema`. Несовместимые pre-existing index/table/constraints/columns/defaults или secondary indexes вызывают `RAISE EXCEPTION` и откат всей migration transaction.
+
 Текущая verified модель данных состоит из пяти основных таблиц:
 
 ```text

@@ -7,32 +7,98 @@ const migrationUrl = new URL(
   import.meta.url,
 );
 
-test('migration rejects duplicate unfinished runs before adding uniqueness', async () => {
-  const sql = await readFile(migrationUrl, 'utf8');
+function stripSqlComments(sql) {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\r\n]*/g, ' ');
+}
 
-  assert.match(sql, /FROM\s+public\.tender_analysis_runs/i);
-  assert.match(sql, /WHERE\s+status\s*<>\s*'completed'/i);
-  assert.match(sql, /GROUP BY\s+source\s*,\s*tender_id/i);
-  assert.match(sql, /HAVING\s+count\(\*\)\s*>\s*1/i);
-  assert.match(sql, /RAISE EXCEPTION/i);
+function findRequired(sql, pattern, label) {
+  const match = pattern.exec(sql);
+  assert.ok(match, `missing ${label}`);
+  return match;
+}
+
+function getDoBlocks(sql) {
+  const pattern = /\bDO\s+(\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$)([\s\S]*?)\1\s*;/gi;
+  return [...sql.matchAll(pattern)].map((match) => ({
+    body: match[2],
+    index: match.index,
+    tag: match[1],
+  }));
+}
+
+test('SQL comment stripping removes statement decoys', () => {
+  const stripped = stripSqlComments(`
+    -- BEGIN;
+    /* CREATE UNIQUE INDEX fake_index ON fake_table (fake_column); */
+    SELECT 1;
+    -- COMMIT;
+  `);
+
+  assert.doesNotMatch(stripped, /\bBEGIN\b/i);
+  assert.doesNotMatch(stripped, /\bCREATE\s+UNIQUE\s+INDEX\b/i);
+  assert.doesNotMatch(stripped, /\bCOMMIT\b/i);
+});
+
+test('migration has ordered transaction and validation boundaries', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8')).trim();
+  const doBlocks = getDoBlocks(sql);
+
+  const begin = findRequired(sql, /^BEGIN\s*;/i, 'leading BEGIN');
+  const preflight = doBlocks.find((block) => block.tag === '$$');
+  assert.ok(preflight, 'missing duplicate preflight DO block');
+
+  const uniqueIndex = findRequired(
+    sql,
+    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s*<>\s*'completed'\s*;/i,
+    'unfinished-run unique index statement',
+  );
+  const ledger = findRequired(
+    sql,
+    /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.tender_analysis_intake_events\s*\(/i,
+    'intake ledger statement',
+  );
+  const postconditions = doBlocks.find(
+    (block) => block.tag.toLowerCase() === '$postconditions$',
+  );
+  assert.ok(postconditions, 'missing postcondition validation DO block');
+  const commit = findRequired(sql, /COMMIT\s*;\s*$/i, 'trailing COMMIT');
+
+  assert.ok(begin.index < preflight.index, 'BEGIN must precede duplicate preflight');
+  assert.ok(preflight.index < uniqueIndex.index, 'preflight must precede unique index');
+  assert.ok(uniqueIndex.index < ledger.index, 'unique index must precede ledger creation');
+  assert.ok(ledger.index < postconditions.index, 'ledger creation must precede postconditions');
+  assert.ok(postconditions.index < commit.index, 'postconditions must precede COMMIT');
+});
+
+test('migration rejects duplicate unfinished runs before adding uniqueness', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const [preflight] = getDoBlocks(sql);
+  assert.ok(preflight, 'missing duplicate preflight DO block');
+
+  assert.match(
+    preflight.body,
+    /IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tender_analysis_runs\s+WHERE\s+status\s*<>\s*'completed'\s+GROUP\s+BY\s+source\s*,\s*tender_id\s+HAVING\s+count\(\*\)\s*>\s*1\s*\)\s+THEN[\s\S]*?RAISE\s+EXCEPTION/i,
+  );
 });
 
 test('migration enforces one unfinished run', async () => {
-  const sql = await readFile(migrationUrl, 'utf8');
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
 
   assert.match(
     sql,
-    /CREATE UNIQUE INDEX[\s\S]+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)[\s\S]+WHERE\s+status\s*<>\s*'completed'/i,
+    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s*<>\s*'completed'\s*;/i,
   );
 });
 
 test('migration creates the durable intake event ledger', async () => {
-  const sql = await readFile(migrationUrl, 'utf8');
-
-  assert.match(
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const table = findRequired(
     sql,
-    /CREATE TABLE(?:\s+IF NOT EXISTS)?\s+public\.tender_analysis_intake_events/i,
-  );
+    /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+public\.tender_analysis_intake_events\s*\([\s\S]*?\n\s*\);/i,
+    'bounded intake ledger definition',
+  )[0];
 
   for (const column of [
     'event_key',
@@ -42,8 +108,61 @@ test('migration creates the durable intake event ledger', async () => {
     'n8n_execution_id',
     'processing_started_at',
   ]) {
-    assert.match(sql, new RegExp(`\\b${column}\\b`, 'i'));
+    assert.match(table, new RegExp(`\\b${column}\\b`, 'i'));
   }
 
-  assert.match(sql, /UNIQUE\s*\(\s*source\s*,\s*event_key\s*\)/i);
+  assert.match(table, /UNIQUE\s*\(\s*source\s*,\s*event_key\s*\)/i);
+});
+
+test('migration validates created or pre-existing schema objects fail closed', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const postconditions = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$postconditions$',
+  );
+  assert.ok(postconditions, 'missing postcondition validation DO block');
+
+  for (const catalogContract of [
+    /pg_catalog\.pg_class/i,
+    /pg_catalog\.pg_namespace/i,
+    /pg_catalog\.pg_index/i,
+    /pg_catalog\.pg_attribute/i,
+    /pg_catalog\.pg_constraint/i,
+    /information_schema\.columns/i,
+    /pg_catalog\.pg_get_indexdef/i,
+    /pg_catalog\.pg_get_expr/i,
+    /pg_catalog\.pg_get_constraintdef/i,
+    /\bindisunique\b/i,
+    /\bindnkeyatts\b/i,
+    /\brelkind\b/i,
+    /\brelpersistence\b/i,
+    /\bconkey\b/i,
+    /\bconfkey\b/i,
+    /\bconfdeltype\b/i,
+  ]) {
+    assert.match(postconditions.body, catalogContract);
+  }
+
+  for (const objectName of [
+    'uq_tender_analysis_runs_one_unfinished',
+    'tender_analysis_intake_events',
+    'idx_tender_analysis_intake_events_run',
+    'idx_tender_analysis_intake_events_status_started',
+  ]) {
+    assert.match(postconditions.body, new RegExp(`\\b${objectName}\\b`, 'i'));
+  }
+
+  for (const checkLiteral of [
+    'tenderplan_mark',
+    'recovery_scan',
+    'manual',
+    'processing',
+    'completed',
+    'failed',
+  ]) {
+    assert.match(postconditions.body, new RegExp(`'${checkLiteral}'`, 'i'));
+  }
+
+  assert.match(postconditions.body, /count\(\*\)[\s\S]*?<>\s*17/i);
+  assert.match(postconditions.body, /attempts[\s\S]*?>=\s*0/i);
+  assert.match(postconditions.body, /RAISE\s+EXCEPTION/i);
 });
