@@ -38,6 +38,10 @@
 | `DATA_MODEL.md` | Документированная PostgreSQL schema. |
 | `REPORT_FIELD_MAPPING.md` | Маппинг FINAL fields в отчёт. |
 
+## Database migrations
+
+`migrations/*.sql` и `migrations/README.md` — versioned repository artifacts для изменений PostgreSQL schema и правил их применения; наличие migration в repository не доказывает её применение в production.
+
 ## Workflow documentation
 
 `workflows/orchestrator.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
