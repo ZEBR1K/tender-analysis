@@ -365,21 +365,25 @@ vs
 
 # 11. Orchestrator
 
-Текущий путь:
+Текущий canonical repository candidate — inactive 14-node reusable sub-workflow с ответственностью только за создание нового run:
 
 ```text
-Manual Trigger
-→ hardcoded tender_id
+typed tender_id / source / source_event_key / trigger_kind
+→ validate input
 → TenderPlan FullInfo
-→ normalize
-→ create run
-→ register all documents
-→ split
-→ temporary extension filter
-→ Execute Document Worker
+→ require response tender._id === requested tender_id
+→ one snapshot-safe SQL:
+   insert run directly as processing
+   + register all documents as pending
+→ created_new_run?
+   ├─ true: async Worker dispatch for pdf/docx/xlsx
+   └─ false: fresh unfinished-run SELECT + exactly-one guard
+→ one structured result
 ```
 
-На текущем MVP Orchestrator поддерживает запуск Worker только для:
+PostgreSQL partial uniqueness по `(source, tender_id) WHERE status <> 'completed'` является concurrency boundary. Проигравший `ON CONFLICT DO NOTHING` путь не регистрирует документы повторно и не запускает Worker.
+
+Worker по-прежнему запускается только для:
 
 ```text
 pdf
@@ -387,38 +391,34 @@ docx
 xlsx
 ```
 
-Это временное ограничение.
+Это временное ограничение. Unsupported и zero-document lifecycle не закрыты: structured output возвращается, но run всё ещё может остаться `processing` (`OR-0`, `OR-1`). Export и offline tests не доказывают import, live wiring или production runtime.
 
 ---
 
 # 12. Orchestrator input / production boundary
 
-Сейчас точка входа:
+Точка входа canonical candidate:
 
 ```text
-Manual Trigger
-+
-hardcoded tender_id
+Execute Sub-workflow Trigger v1.2
 ```
 
-Это development-only.
+Typed contract:
 
-В будущем можно заменить trigger на:
-
-```text
-Webhook
-Telegram
-Bitrix
-Scheduler
-API
-another workflow
+```json
+{
+  "tender_id": "string",
+  "source": "tenderplan",
+  "source_event_key": "string",
+  "trigger_kind": "tenderplan_mark | recovery_scan | manual"
+}
 ```
 
-без изменения downstream architecture, если сохраняется контракт:
+Все поля валидируются до HTTP/DB. FullInfo response обязан вернуть string `tender._id`, точно равный validated `tender_id`.
 
-```text
-tender_id
-```
+Orchestrator не является владельцем resume policy. Будущий `TENDER — Intake Resume` выбирает новый или существующий `analysis_run_id`, обрабатывает repeated mark/manual/recovery и вызывает этот workflow только для new-run boundary. Conflict result Orchestrator имеет `action='concurrent_existing_run'` и не означает, что существующий run уже возобновлён.
+
+Manual/hardcoded boundary устранён только в inactive repository candidate. Production import, migration application, dispatcher wiring и runtime validation остаются отдельными gates.
 
 ---
 

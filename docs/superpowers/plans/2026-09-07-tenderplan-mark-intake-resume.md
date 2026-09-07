@@ -302,13 +302,15 @@ git commit -m "fix: make document retries persistence safe"
 
 ### Task 3: Convert Orchestrator into a typed new-run-only sub-workflow
 
+**Checkpoint 2026-09-07:** implementation and structural review complete in the feature branch. The canonical export is an inactive 14-node repository candidate. Evidence is offline tests only; non-production import/read-back, migration runtime verification, wiring and promotion remain pending.
+
 **Files:**
 
 - Modify: `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
 - Create: `tests/tender-orchestrator-input.test.mjs`
 - Modify: `workflows/orchestrator.md`
 
-- [ ] **Step 1: Verify n8n sub-workflow syntax from local official docs**
+- [x] **Step 1: Verify n8n sub-workflow syntax from local official docs**
 
 Run:
 
@@ -318,7 +320,7 @@ rg -n "Execute Sub-workflow Trigger|Execute Workflow Trigger|workflowInputs|wait
 
 Read the matching trigger and Execute Sub-workflow pages completely enough to confirm the installed-version JSON fields. Record the exact source path in the implementation notes; do not change `n8n-docs`.
 
-- [ ] **Step 2: Write the failing Orchestrator contract test**
+- [x] **Step 2: Write the failing Orchestrator contract test**
 
 The test must assert:
 
@@ -332,7 +334,7 @@ The test must assert:
 
 Use structural JSON assertions rather than whole-file snapshots.
 
-- [ ] **Step 3: Run the test and confirm the current export fails**
+- [x] **Step 3: Run the test and confirm the current export fails**
 
 ```powershell
 node --test tests/tender-orchestrator-input.test.mjs
@@ -340,7 +342,7 @@ node --test tests/tender-orchestrator-input.test.mjs
 
 Expected: FAIL because the export still has a Manual Trigger and hardcoded tender input.
 
-- [ ] **Step 4: Replace only the Orchestrator entry and run-creation boundary**
+- [x] **Step 4: Replace only the Orchestrator entry and run-creation boundary**
 
 Use the typed input syntax verified in Step 1. Validate non-empty `tender_id`, fixed/allowed `source`, and bounded strings before the TenderPlan FullInfo request.
 
@@ -368,7 +370,7 @@ inserted_run AS (
     documents_total,
     tender_meta
   )
-  VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), 'created', $5::integer, $6::jsonb)
+  VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), 'processing', $5::integer, $6::jsonb)
   ON CONFLICT (source, tender_id) WHERE status <> 'completed'
   DO NOTHING
   RETURNING *
@@ -438,15 +440,12 @@ document_stats AS (
   FROM registered_documents
 ),
 activated_run AS (
-  UPDATE tender_analysis_runs AS run
-  SET
-    status = 'processing',
-    documents_total = stats.registered_documents_count,
-    updated_at = now()
+  SELECT
+    inserted.*,
+    stats.registered_documents_count,
+    stats.attachments
   FROM inserted_run AS inserted
   CROSS JOIN document_stats AS stats
-  WHERE run.id = inserted.id
-  RETURNING run.*
 )
 SELECT
   run.id AS analysis_run_id,
@@ -456,14 +455,13 @@ SELECT
   run.tender_external_id,
   run.status,
   run.documents_total,
-  stats.registered_documents_count,
+  run.registered_documents_count,
   run.tender_meta,
-  stats.attachments,
+  run.attachments,
   run.created_at,
   run.updated_at,
   true AS created_new_run
 FROM activated_run AS run
-CROSS JOIN document_stats AS stats
 
 UNION ALL
 
@@ -484,7 +482,9 @@ SELECT
 WHERE NOT EXISTS (SELECT 1 FROM inserted_run);
 ```
 
-PostgreSQL data-modifying CTEs keep run creation and registration in one statement, so an error rolls both back. A conflict returns the sentinel row with `created_new_run=false`. In that branch, run a new PostgreSQL statement selecting the one unfinished row by `(source, tender_id)`; the fresh statement is required so it can see a concurrent transaction that caused `ON CONFLICT DO NOTHING`. Assert exactly one result and return it without registering or dispatching documents.
+PostgreSQL data-modifying CTEs keep run creation and registration in one statement, so an error rolls both back. All CTEs in the statement use one snapshot: a sibling `UPDATE` cannot see the row inserted by `inserted_run`. Therefore insert the run directly with `status='processing'`; `activated_run` must be a read-only `SELECT` from `inserted_run` joined with `document_stats`, not an `UPDATE` of `tender_analysis_runs`.
+
+A conflict returns the sentinel row with `created_new_run=false`. In that branch, run a new PostgreSQL statement selecting all unfinished rows by `(source, tender_id)` without `LIMIT 1`; the fresh statement is required so it can see a concurrent transaction that caused `ON CONFLICT DO NOTHING`. Assert exactly one result and return it without registering or dispatching documents.
 
 Branch immediately on `created_new_run`:
 
@@ -493,7 +493,7 @@ Branch immediately on `created_new_run`:
 
 Preserve the invariant that every document is registered before the first Worker starts. Replace hardcoded workflow IDs with the selected production-candidate Worker ID only at packaging time; repository tests must assert that every call points to the same declared Worker and carries its input contract.
 
-- [ ] **Step 5: Run Orchestrator and relevant Worker contract tests**
+- [x] **Step 5: Run Orchestrator and relevant Worker contract tests**
 
 ```powershell
 node --test tests/tender-orchestrator-input.test.mjs tests/document-worker-live-test-overlay.test.mjs
@@ -501,11 +501,11 @@ node --test tests/tender-orchestrator-input.test.mjs tests/document-worker-live-
 
 Expected: PASS.
 
-- [ ] **Step 6: Update Orchestrator documentation**
+- [x] **Step 6: Update Orchestrator documentation**
 
 Document upstream typed inputs, the conflict result, the new-run-only responsibility, and downstream Worker contract. Explicitly state that resume logic belongs to `TENDER — Intake Resume`.
 
-- [ ] **Step 7: Commit Task 3**
+- [x] **Step 7: Commit Task 3**
 
 ```powershell
 git add -- "workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json" workflows/orchestrator.md tests/tender-orchestrator-input.test.mjs

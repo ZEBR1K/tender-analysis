@@ -201,9 +201,9 @@ Extractor model-selection checkpoint 2026-08-29:
 
 |ID|Проблема|Компонент|
 |-|-|-|
-|`OR-2`|manual trigger + hardcoded tender\_id|Orchestrator|
+|`OR-2`|⚠ Local Task 3 implementation complete; inactive 14-node repository candidate использует typed sub-workflow input без Manual Trigger/hardcoded tender ID. Import/runtime/promotion не выполнены.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|policy повторных runs одного tender не зафиксирована|Orchestrator|
+|`OR-7`|⚠ Local new-run conflict boundary implemented; unfinished-run partial uniqueness и conflict return задокументированы. Полный repeated-mark/resume policy остаётся за будущим `TENDER — Intake Resume`; migration/runtime/promotion pending.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|
@@ -1992,7 +1992,21 @@ P2
 
 ## `OR-2` — manual trigger
 
-Текущий hardcoded input допустим для разработки.
+**Status:** Local implementation complete; runtime/promotion open.
+
+Inactive canonical repository candidate больше не содержит Manual Trigger или hardcoded `tender_id`. Он принимает typed `tender_id`, `source`, `source_event_key`, `trigger_kind` через Execute Sub-workflow Trigger и валидирует их до HTTP/DB.
+
+Это не доказывает import, live wiring или production runtime.
+
+\---
+
+## `OR-7` — repeated-run policy
+
+**Status:** Local Orchestrator boundary implemented; dispatcher incomplete.
+
+Task 3 добавил conflict-aware new-run INSERT и fresh SELECT существующего unfinished run без Worker dispatch. Partial unique index/migration существует как repository candidate.
+
+Политика repeated mark, completed tender, same-run document resume и manual/recovery routing остаётся в scope будущего `TENDER — Intake Resume`. Production migration, runtime concurrency test и promotion не выполнены.
 
 \---
 
