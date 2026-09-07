@@ -15,7 +15,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const rawId = $json.execution?.id;\n\nif (typeof rawId !== 'string') {\n  throw new Error('[Intake Resume error] execution.id must be a string.');\n}\n\nconst normalizedId = rawId.trim();\nif (!normalizedId || normalizedId.length > 4096) {\n  throw new Error('[Intake Resume error] execution.id must be non-empty and at most 4096 characters.');\n}\n\nconst primaryMessage = typeof $json.execution?.error?.message === 'string'\n  ? $json.execution.error.message.trim()\n  : '';\nconst secondaryMessage = typeof $json.execution?.error?.description === 'string'\n  ? $json.execution.error.description.trim()\n  : '';\nconst selectedMessage = primaryMessage || secondaryMessage || 'Unknown Intake Resume error';\nconst boundedMessage = selectedMessage.trim().slice(0, 2000);\n\nreturn [{\n  json: {\n    n8n_execution_id: normalizedId,\n    error_message: boundedMessage,\n  },\n}];"
+        "jsCode": "const rawId = $json.execution?.id;\n\nif (typeof rawId !== 'string') {\n  throw new Error('[Intake Resume error] execution.id must be a string.');\n}\n\nconst normalizedId = rawId.trim();\nif (!normalizedId || normalizedId.length > 4096) {\n  throw new Error('[Intake Resume error] execution.id must be non-empty and at most 4096 characters.');\n}\n\nconst primaryMessage = typeof $json.execution?.error?.message === 'string'\n  ? $json.execution.error.message.trim()\n  : '';\nconst secondaryMessage = typeof $json.execution?.error?.description === 'string'\n  ? $json.execution.error.description.trim()\n  : '';\nconst selectedMessage = primaryMessage || secondaryMessage || 'Unknown Intake Resume error';\nconst boundedMessage = selectedMessage.trim().slice(0, 2000);\n\nreturn {\n  json: {\n    n8n_execution_id: normalizedId,\n    error_message: boundedMessage,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -29,7 +29,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE tender_analysis_intake_events\nSET status = 'failed',\n    error_message = left($2, 2000),\n    updated_at = now()\nWHERE n8n_execution_id = $1\n  AND status = 'processing'\nRETURNING\n    id,\n    event_key,\n    analysis_run_id,\n    status;",
+        "query": "UPDATE tender_analysis_intake_events AS event\nSET status = 'failed',\n    error_message = left($2, 2000),\n    updated_at = now()\nWHERE event.id = (\n  SELECT owned.id\n  FROM tender_analysis_intake_events AS owned\n  WHERE owned.n8n_execution_id = $1\n    AND owned.status = 'processing'\n)\nRETURNING\n    event.id,\n    event.event_key,\n    event.analysis_run_id,\n    event.status;",
         "options": {
           "queryReplacement": "={{ [$json.n8n_execution_id, $json.error_message] }}"
         }
