@@ -68,7 +68,7 @@ function normalizeFormat(value) {
 
 export async function detectArchive({ archivePath, actualArchivePath, signal, allowUnknown = false }) {
   const target = actualArchivePath || archivePath;
-  const result = await capture(['l', '-slt', '-ba', '--', target], { signal, allowFailure: allowUnknown });
+  const result = await capture(['l', '-slt', '--', target], { signal, allowFailure: allowUnknown });
   if (result.code !== 0) return null;
   const records = parseSlt(result.stdout);
   const formatRecord = records.find((record) => record.Type || record.Physical_Size || record['Headers Size']);
@@ -77,7 +77,7 @@ export async function detectArchive({ archivePath, actualArchivePath, signal, al
 
 export async function listArchive({ archivePath, actualArchivePath, signal }) {
   const target = actualArchivePath || archivePath;
-  const result = await capture(['l', '-slt', '-ba', '--', target], { signal });
+  const result = await capture(['l', '-slt', '--', target], { signal });
   const records = parseSlt(result.stdout);
   const entries = [];
   for (const record of records) {
@@ -111,6 +111,7 @@ export async function streamEntry({
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const output = createWriteStream(outputPath, { flags: 'wx', mode: 0o600 });
+  output.on('error', () => {});
   let bytesWritten = 0;
   let stderr = '';
   const abort = () => child.kill('SIGKILL');

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import test from 'node:test';
 
-import { ArchiveError, toSafeError } from '../deploy/archive-extractor/src/errors.mjs';
+import { ArchiveError, asArchiveError, toSafeError } from '../deploy/archive-extractor/src/errors.mjs';
 import {
   assertSafeLogicalPath,
   collisionKey,
@@ -79,6 +79,10 @@ test('safe errors expose typed audit data without stack traces', () => {
   const unknown = toSafeError(new Error('secret stack'));
   assert.equal(unknown.error.code, 'ARTIFACT_STORE_ERROR');
   assert.equal('stack' in unknown.error, false);
+
+  const corrupt = asArchiveError(new Error('adapter details'), 'ARCHIVE_CORRUPT');
+  assert.equal(corrupt.code, 'ARCHIVE_CORRUPT');
+  assert.equal(corrupt.httpStatus, 422);
 });
 
 test('store uses validated opaque identifiers, atomic manifest commit and exact artifact lookup', async () => {

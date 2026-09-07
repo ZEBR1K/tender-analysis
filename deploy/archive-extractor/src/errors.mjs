@@ -42,5 +42,6 @@ export function toSafeError(error) {
 
 export function asArchiveError(error, fallbackCode = 'ARTIFACT_STORE_ERROR') {
   if (error instanceof ArchiveError) return error;
-  return new ArchiveError(fallbackCode, 'Archive extractor failed', 500);
+  const httpStatus = fallbackCode.startsWith('ARCHIVE_') ? 422 : 500;
+  return new ArchiveError(fallbackCode, 'Archive extractor failed', httpStatus);
 }

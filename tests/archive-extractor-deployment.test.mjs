@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const dockerfileUrl = new URL('../deploy/archive-extractor/Dockerfile', import.meta.url);
 const composeUrl = new URL('../deploy/archive-extractor/compose.yaml', import.meta.url);
+const sevenZipUrl = new URL('../deploy/archive-extractor/src/sevenzip.mjs', import.meta.url);
 
 test('Dockerfile pins Node and verifies the exact 7-Zip artifact checksum', async () => {
   const dockerfile = await readFile(dockerfileUrl, 'utf8');
@@ -27,4 +28,10 @@ test('Compose keeps extractor internal-only and resource bounded', async () => {
   assert.match(compose, /cpus:\s*0\.50/u);
   assert.match(compose, /pids_limit:\s*64/u);
   assert.match(compose, /external:\s*true/u);
+});
+
+test('7-Zip listing keeps technical archive metadata for format detection', async () => {
+  const source = await readFile(sevenZipUrl, 'utf8');
+  assert.match(source, /capture\(\['l', '-slt', '--', target\]/u);
+  assert.doesNotMatch(source, /capture\(\['l', '-slt', '-ba'/u);
 });
