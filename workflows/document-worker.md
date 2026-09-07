@@ -1,7 +1,7 @@
 # TENDER — Обработать документ
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-06
+**Последнее обновление:** 2026-09-07
 **Тип:** child workflow / Document Worker  
 **Точное имя workflow:** `TENDER — Обработать документ`  
 
@@ -1035,6 +1035,26 @@ FIELD_CATALOG.md
 ```
 
 Extractor — первый runtime AI layer, который определяет, какой fragment является candidate конкретного поля.
+
+Локальный canonical candidate синхронизирует клиентскую трактовку одновременно в
+`Подготовить запрос для AI` и `Развернуть units для AI Validator`. Версии audit
+контрактов: `tender_extractor_prompt_v2_1` и
+`validator_field_profiles_v1_1`; deterministic checker принимает только эту
+версию профилей. Уточнены восемь полей: `results_date`, `customer`,
+`customer_contacts`, `delivery_term`, `government_contract`, `national_regime`,
+`licenses_certificates`, `similar_supply_experience`.
+
+Для `delivery_term` Worker извлекает прямой срок и отдельно помеченный общий срок
+исполнения договора. Он не выбирает fallback по одной analysis unit: приоритет
+между этими кандидатами должен определяться Aggregator по всем документам.
+`national_regime = Не применяется` допустим только при прямом evidence, а
+декларации/разрешения не становятся лицензиями или сертификатами, но сохраняются
+как `application_documents`, если обязательны для заявки.
+
+Полные review-копии prompt-bearing исходников находятся в `prompts/` и
+byte-for-byte сверяются с workflow regression-тестом. Это local/offline change;
+live n8n не изменён, runtime canary и последующая Aggregator alignment остаются
+отдельными gates.
 
 ---
 

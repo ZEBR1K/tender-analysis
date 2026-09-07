@@ -1,0 +1,352 @@
+const VALIDATOR_PROMPT_VERSION = 'ai_validator_prompt_v1_2';
+const VALIDATOR_FIELD_PROFILES_VERSION = 'validator_field_profiles_v1_1';
+
+const CANONICAL_FIELD_KEYS = Object.freeze([
+  'procurement_subject',
+  'nm_price_with_vat',
+  'platform',
+  'procedure_type',
+  'application_deadline',
+  'application_review_date',
+  'results_date',
+  'customer',
+  'customer_contacts',
+  'participation_cost',
+  'participation_guarantee',
+  'evaluation_criteria',
+  'delivery_term',
+  'payment_terms',
+  'special_account_or_treasury',
+  'bank_support',
+  'government_contract',
+  'rebidding',
+  'national_regime',
+  'advance_contract_guarantee',
+  'warranty_obligations_guarantee',
+  'licenses_certificates',
+  'required_official_certificates',
+  'similar_supply_experience',
+  'analog_allowed',
+  'analog_definition',
+  'application_documents',
+]);
+
+const VALIDATOR_FIELD_PROFILES = {
+  procurement_subject: Object.freeze({
+    title: 'Предмет закупки',
+    definition: 'Основной объект обязательства по текущей закупке: что должно быть поставлено, выполнено или оказано.',
+    confirmation_criteria: ['Evidence прямо описывает основной товар, работу или услугу текущей закупки.', 'Все существенные части value_text относятся к этому основному обязательству.'],
+    semantic_exclusions: ['Внутренние процессы организации, аудит и квалификация.', 'Вспомогательные соглашения, формы, приложения, документооборот и отдельные сопутствующие действия.'],
+    rejected_when: ['Evidence описывает другой semantic object или связанный объект, перенесённый на предмет текущей закупки.', 'Информационный или вспомогательный текст выдан за основной предмет.'],
+    requires_review_when: ['Текст потенциально описывает предмет, но основной и вспомогательный объекты нельзя разделить однозначно.', 'Fact evidence подтверждает только часть составного предмета.'],
+  }),
+  nm_price_with_vat: Object.freeze({
+    title: 'Начальная цена и НДС',
+    definition: 'НМЦ или НМЦК текущей закупки и статус НДС только в прямо указанном объёме.',
+    confirmation_criteria: ['Evidence прямо связывает сумму с НМЦ или НМЦК текущей закупки.', 'Сведения «с НДС» или «без НДС» подтверждены отдельно, если включены в value_text.'],
+    semantic_exclusions: ['Цена позиции, договора или другого объекта.', 'Аванс, обеспечение, стоимость участия и иные денежные обязательства.'],
+    rejected_when: ['Сумма относится не к НМЦ текущей закупки.', 'Extractor добавил статус НДС, отсутствующий в evidence.'],
+    requires_review_when: ['Сумма релевантна, но её назначение неоднозначно.', 'НМЦ подтверждена, но существенная часть value_text о НДС не подтверждена.'],
+  }),
+  platform: Object.freeze({
+    title: 'Площадка проведения процедуры',
+    definition: 'Электронная площадка или информационная система, на которой проводится текущая закупочная процедура.',
+    confirmation_criteria: ['Evidence прямо называет систему местом проведения или подачи предложений по текущей процедуре.'],
+    semantic_exclusions: ['Системы электронного документооборота, приёмки, оплаты или внутренние ИТ-системы.', 'Банк, сайт организации и справочные ссылки.'],
+    rejected_when: ['Названная система выполняет другую функцию или относится к другому процессу.'],
+    requires_review_when: ['Система названа, но её роль в текущей процедуре не установлена однозначно.'],
+  }),
+  procedure_type: Object.freeze({
+    title: 'Тип процедуры',
+    definition: 'Прямо установленный тип конкретной закупочной процедуры.',
+    confirmation_criteria: ['Evidence прямо классифицирует текущую процедуру допустимым типом.'],
+    semantic_exclusions: ['Общие слова «закупка», «торги», «тендер».', 'Название формы, шаблона, раздела или общий порядок.'],
+    rejected_when: ['Тип выведен только из заголовка, шаблона или справочного описания.'],
+    requires_review_when: ['Формулировка похожа на тип процедуры, но scope текущей закупки не подтверждён.'],
+  }),
+  application_deadline: Object.freeze({
+    title: 'Срок подачи заявок',
+    definition: 'Дата и время окончания приёма заявок участников по текущей закупке.',
+    confirmation_criteria: ['Evidence прямо связывает дату или время с окончанием подачи заявок.'],
+    semantic_exclusions: ['Начало подачи, рассмотрение, подведение итогов, заключение договора, поставка и оплата.'],
+    rejected_when: ['Дата относится к другой стадии или другому объекту.'],
+    requires_review_when: ['Стадия подачи установлена, но дата, время или часовой пояс подтверждены не полностью.'],
+  }),
+  application_review_date: Object.freeze({
+    title: 'Дата рассмотрения заявок',
+    definition: 'Дата рассмотрения, оценки или допуска заявок в текущей процедуре.',
+    confirmation_criteria: ['Evidence прямо связывает дату с рассмотрением или оценкой заявок.'],
+    semantic_exclusions: ['Окончание подачи, окончательные итоги, заключение договора и исполнение.'],
+    rejected_when: ['Дата относится к другой стадии процесса.'],
+    requires_review_when: ['Дата релевантна, но рассмотрение и окончательные итоги нельзя различить однозначно.'],
+  }),
+  results_date: Object.freeze({
+    title: 'События выбора победителя',
+    definition: 'Все прямо подтверждённые события выбора победителя текущей закупки, включая подведение итогов, определение победителя и оформление итогового протокола или решения.',
+    confirmation_criteria: ['Evidence прямо связывает дату и название события с выбором победителя текущей процедуры.', 'Каждое самостоятельное событие сохранено отдельным fact без молчаливого выбора одной даты.'],
+    semantic_exclusions: ['Подача или допуск заявок без связи с выбором победителя, договорные и поставочные сроки.', 'Произвольное завершение этапа, не связанное с определением победителя.'],
+    rejected_when: ['Дата описывает другой process stage или не относится к выбору победителя текущей процедуры.'],
+    requires_review_when: ['Связь события с выбором победителя либо его дата подтверждены не полностью.'],
+  }),
+  customer: Object.freeze({
+    title: 'Заказчик — сторона договора',
+    definition: 'Юридическое лицо, с которым участник заключает договор по результатам текущей закупки.',
+    confirmation_criteria: ['Evidence прямо устанавливает юридическое лицо как сторону заключаемого договора текущей закупки.'],
+    semantic_exclusions: ['Поставщик, участник, оператор площадки, контактное лицо, физическое лицо-подписант, грузополучатель, банк и иное третье лицо.', 'Организатор закупки не является заказчиком для этого поля, если он не является стороной заключаемого договора.'],
+    rejected_when: ['Организация отнесена к заказчику только по адресу, реквизитам, роли организатора или упоминанию в другом качестве.'],
+    requires_review_when: ['Юридическое лицо названо, но его роль стороны заключаемого договора неоднозначна.'],
+  }),
+  customer_contacts: Object.freeze({
+    title: 'Контакты заказчика по ролям',
+    definition: 'Контакты заказчика с различимой ролью: контакт по организации процедуры / закупщик и контакт по техническим вопросам / технический специалист.',
+    confirmation_criteria: ['Evidence прямо связывает контакт с заказчиком, текущей процедурой и одной из подтверждённых ролей.', 'Если один человек выполняет обе роли, обе роли подтверждены evidence и человек не дублируется искусственно.'],
+    semantic_exclusions: ['Контакты участника, поставщика, банка, гаранта, грузополучателя и случайно упомянутого сотрудника.'],
+    rejected_when: ['Контакт относится к другому actor или процессу либо ему приписана неподтверждённая роль.'],
+    requires_review_when: ['Контакт указан, но его связь с заказчиком, текущей закупкой или конкретной ролью неясна.'],
+  }),
+  participation_cost: Object.freeze({
+    title: 'Стоимость участия',
+    definition: 'Плата, тариф или расходы, обязательные именно для участия в текущей процедуре.',
+    confirmation_criteria: ['Evidence прямо устанавливает денежную обязанность участника за участие.'],
+    semantic_exclusions: ['НМЦ, цена договора, аванс, обеспечение заявки или договора, банковские комиссии без связи с участием.'],
+    rejected_when: ['Денежная сумма относится к иному обязательству или actor.'],
+    requires_review_when: ['Платёж потенциально связан с участием, но его назначение или обязательность неясны.'],
+  }),
+  participation_guarantee: Object.freeze({
+    title: 'Обеспечение заявки',
+    definition: 'Обеспечение заявки или участия, действующее на стадии подачи и рассмотрения заявки.',
+    confirmation_criteria: ['Evidence прямо устанавливает форму, сумму, размер или обязанность обеспечения заявки.'],
+    semantic_exclusions: ['Обеспечение исполнения договора, аванса или гарантийных обязательств.', 'Стоимость участия и обычная банковская гарантия другого назначения.'],
+    rejected_when: ['Обеспечение относится к другой стадии, обязанности или semantic object.'],
+    requires_review_when: ['Связь обеспечения именно с заявкой либо его существенные параметры не установлены полностью.'],
+  }),
+  evaluation_criteria: Object.freeze({
+    title: 'Критерии оценки',
+    definition: 'Критерии, веса, баллы и порядок сравнения заявок в текущей процедуре.',
+    confirmation_criteria: ['Evidence прямо устанавливает критерий или метод оценки заявок.'],
+    semantic_exclusions: ['Требования допуска, технические характеристики и квалификационные условия сами по себе.'],
+    rejected_when: ['Требование ошибочно выдано за критерий оценки без сравнительной или балльной функции.'],
+    requires_review_when: ['Нельзя однозначно различить критерий оценки и обязательное условие допуска.'],
+  }),
+  delivery_term: Object.freeze({
+    title: 'Прямой и общий срок исполнения',
+    definition: 'Прямой срок поставки товара, выполнения работ или оказания услуг либо отдельно маркированный общий срок исполнения договора как fallback-кандидат.',
+    confirmation_criteria: ['Evidence прямо задаёт срок и однозначно связывает его либо с основным обязательством, либо с общим сроком текущего договора.', 'Тип срока явно сохранён в value_text; приоритет и выбор fallback выполняются только при агрегации всех фактов закупки.'],
+    semantic_exclusions: ['Место и адрес, грузополучатель, уведомления, гарантии, согласование.', 'Графики передачи технической, эксплуатационной или иной документации, если это не срок исполнения основного предмета.'],
+    rejected_when: ['Срок относится к другому объекту, actor или process stage либо общий договорный срок выдан за прямой срок поставки.'],
+    requires_review_when: ['Срок потенциально относится к исполнению, но его тип, основной предмет или существенная временная часть подтверждены не полностью.'],
+  }),
+  payment_terms: Object.freeze({
+    title: 'Условия оплаты',
+    definition: 'Условия аванса, окончательной оплаты, сроков и порядка расчётов по текущему договору.',
+    confirmation_criteria: ['Evidence прямо устанавливает денежное обязательство и условие оплаты по текущему договору.', 'Все части составного value_text об авансе, сроках и условиях имеют fact-local evidence.'],
+    semantic_exclusions: ['Стоимость участия, НМЦ, обеспечения, штрафы и банковские реквизиты сами по себе.'],
+    rejected_when: ['Денежное условие относится к другому обязательству, actor или договору.'],
+    requires_review_when: ['Назначение платежа релевантно, но условие, срок или составная часть value_text подтверждены не полностью.'],
+  }),
+  special_account_or_treasury: Object.freeze({
+    title: 'Специальный счёт или казначейское сопровождение',
+    definition: 'Обязательный специальный режим расчётов по текущей закупке или заключаемому договору.',
+    confirmation_criteria: ['Evidence прямо устанавливает обязательность специального счёта или казначейского сопровождения для текущего договора.'],
+    semantic_exclusions: ['Банковские реквизиты, название банка, вид счёта или упоминание казначейского органа сами по себе.', 'Банковское сопровождение и банковская гарантия.'],
+    rejected_when: ['Из реквизитов или справочного упоминания выведен неустановленный специальный режим.'],
+    requires_review_when: ['Специальный режим потенциально применим, но его обязательность или scope текущего договора неясны.'],
+  }),
+  bank_support: Object.freeze({
+    title: 'Банковское сопровождение',
+    definition: 'Прямо установленное банковское сопровождение текущего договора.',
+    confirmation_criteria: ['Evidence прямо требует банковского сопровождения и связывает его с текущим договором.'],
+    semantic_exclusions: ['Банковская гарантия, банковские реквизиты, безналичная оплата, специальный счёт и казначейское сопровождение.'],
+    rejected_when: ['Любое упоминание банка ошибочно классифицировано как банковское сопровождение.'],
+    requires_review_when: ['Функция банка или обязательность сопровождения не установлены однозначно.'],
+  }),
+  government_contract: Object.freeze({
+    title: 'Категория государственного договора',
+    definition: 'Прямо подтверждённая категория заключаемого договора: государственный контракт, муниципальный контракт, государственный оборонный заказ (ГОЗ), договор во исполнение одной из этих категорий либо обычный договор.',
+    confirmation_criteria: ['Evidence прямо устанавливает точную категорию для договора текущей закупки.', 'Для категории «во исполнение» evidence связывает текущий договор с конкретным государственным, муниципальным контрактом или ГОЗ.'],
+    semantic_exclusions: ['Статус заказчика, государственное финансирование или проект без статуса договора.', 'Упоминание внешнего контракта без доказанной связи с исполнением текущего договора.'],
+    rejected_when: ['Характеристика внешнего договора перенесена на текущий договор без прямой связи «во исполнение».'],
+    requires_review_when: ['Упоминание релевантно, но точная категория или связь с текущим договором неясны.'],
+  }),
+  rebidding: Object.freeze({
+    title: 'Переторжка',
+    definition: 'Прямо предусмотренная возможность или порядок повторного улучшения предложения.',
+    confirmation_criteria: ['Evidence прямо разрешает, требует или описывает условия переторжки в текущей процедуре.'],
+    semantic_exclusions: ['Обычное снижение цены, подача первоначального предложения и тип процедуры сами по себе.'],
+    rejected_when: ['Переторжка выведена из общего механизма торгов без прямого утверждения.'],
+    requires_review_when: ['Возможность упомянута условно, но применимость или обязательные условия неясны.'],
+  }),
+  national_regime: Object.freeze({
+    title: 'Национальный режим — четыре категории',
+    definition: 'Одна прямо подтверждённая категория для текущей закупки: Запрет, Ограничение, Преимущество или Не применяется.',
+    confirmation_criteria: ['Evidence прямо устанавливает выбранную категорию и её применимость к текущей закупке.', '«Не применяется» подтверждается только прямым утверждением источника; отсутствие evidence о мере не доказывает «Не применяется».'],
+    semantic_exclusions: ['Голая ссылка на нормативный акт, стандарт товара, справочное описание законодательства и иные меры вне четырёх клиентских категорий.'],
+    rejected_when: ['Информационная или нормативная ссылка выдана за применимое условие закупки.', 'Категория «Не применяется» выведена только из отсутствия найденной информации.'],
+    requires_review_when: ['Категория потенциально применима, но её scope, условие или обязательность не установлены.'],
+  }),
+  advance_contract_guarantee: Object.freeze({
+    title: 'Обеспечение аванса или исполнения договора',
+    definition: 'Обеспечение, связанное с возвратом аванса и/или исполнением договора текущей закупки.',
+    confirmation_criteria: ['Evidence прямо устанавливает обеспечение и связывает его с авансом или исполнением текущего договора.'],
+    semantic_exclusions: ['Обеспечение заявки, гарантийных обязательств и сам факт аванса без требования обеспечения.'],
+    rejected_when: ['Обеспечение относится к другой стадии или имеет другое назначение.'],
+    requires_review_when: ['Назначение обеспечения либо существенные условия его применения установлены не полностью.'],
+  }),
+  warranty_obligations_guarantee: Object.freeze({
+    title: 'Обеспечение гарантийных обязательств',
+    definition: 'Специальное обеспечение исполнения обязательств поставщика в гарантийный период.',
+    confirmation_criteria: ['Evidence прямо требует обеспечение именно гарантийных обязательств по текущему договору.'],
+    semantic_exclusions: ['Гарантийный срок, ремонт, качество товара, штрафы и обеспечение исполнения договора другого назначения.'],
+    rejected_when: ['Обычная гарантия на товар ошибочно выдана за обеспечение гарантийных обязательств.'],
+    requires_review_when: ['Гарантийный контекст есть, но наличие или назначение обеспечения неясно.'],
+  }),
+  licenses_certificates: Object.freeze({
+    title: 'Лицензии и сертификаты',
+    definition: 'Только обязательные документы, которые источник прямо называет лицензией или сертификатом.',
+    confirmation_criteria: ['Evidence буквально называет требуемый документ лицензией или сертификатом.', 'Actor, обязательность и стадия предоставления соответствуют value_text.'],
+    semantic_exclusions: ['Декларации соответствия не относятся к этому полю, если не названы сертификатами.', 'Разрешения, регистрационные удостоверения и иные документы соответствия также исключены.', 'Официальные справки о статусе участника и документы другого actor или стадии.', 'Исключённый здесь обязательный документ остаётся кандидатом application_documents, если источник требует его в составе заявки.'],
+    rejected_when: ['Документ не назван лицензией или сертификатом либо относится к другому actor, объекту или стадии.'],
+    requires_review_when: ['Буквальный тип документа, actor, стадия или обязательность неоднозначны.'],
+  }),
+  required_official_certificates: Object.freeze({
+    title: 'Обязательные официальные справки',
+    definition: 'Требуемые справки, выписки и подтверждения из государственных или иных официальных органов.',
+    confirmation_criteria: ['Evidence прямо требует официальный документ и определяет обязанного actor или стадию.'],
+    semantic_exclusions: ['Лицензии и документы соответствия товара, частные документы и голые ссылки на реестры.'],
+    rejected_when: ['Документ не является официальной справкой либо относится к другому actor или процессу.'],
+    requires_review_when: ['Источник документа, actor или стадия предоставления подтверждены не полностью.'],
+  }),
+  similar_supply_experience: Object.freeze({
+    title: 'Обязательный и оценочный опыт аналогичных поставок',
+    definition: 'Обязательные требования и оценочные критерии к опыту участника по аналогичным поставкам, работам или услугам.',
+    confirmation_criteria: ['Evidence прямо устанавливает аналогичный опыт и его предметные или количественные условия.', 'Каждый fact отдельно классифицирован как обязательный либо оценочный, включая баллы или вес при наличии.'],
+    semantic_exclusions: ['Общий стаж, опыт персонала и опыт другого actor.', 'Смешение обязательного и оценочного опыта без явной классификации.'],
+    rejected_when: ['Информационный текст или опыт другого actor выдан за требование либо оценочный критерий текущего участника.'],
+    requires_review_when: ['Нельзя однозначно установить аналогичность, обязательную или оценочную роль либо существенные параметры опыта.'],
+  }),
+  analog_allowed: Object.freeze({
+    title: 'Допуск аналога',
+    definition: 'Прямое разрешение или запрет предложить аналог или эквивалент основного предмета.',
+    confirmation_criteria: ['Evidence прямо сообщает, допускается ли аналог или эквивалент.'],
+    semantic_exclusions: ['Упоминание бренда или модели и отсутствие слова «аналог».', 'Технические характеристики сами по себе.'],
+    rejected_when: ['Допуск или запрет выведен по умолчанию без прямого утверждения.'],
+    requires_review_when: ['Разрешение условно либо его применимость к предмету неясна.'],
+  }),
+  analog_definition: Object.freeze({
+    title: 'Определение аналога',
+    definition: 'Критерии и условия, по которым предложение признаётся аналогом или эквивалентом.',
+    confirmation_criteria: ['Evidence прямо задаёт критерии эквивалентности и подтверждает все существенные части value_text.'],
+    semantic_exclusions: ['Сам факт допуска аналога без критериев.', 'Все технические характеристики, если источник не связывает их с эквивалентностью.'],
+    rejected_when: ['Extractor придумал критерии, допуски или перенёс обычные характеристики в определение аналога.'],
+    requires_review_when: ['Критерии потенциально релевантны, но их состав или связь с аналогом подтверждены частично.'],
+  }),
+  application_documents: Object.freeze({
+    title: 'Документы заявки',
+    definition: 'Документы или сведения, которые именно участник должен предоставить именно на стадии подачи заявки.',
+    confirmation_criteria: ['Evidence прямо устанавливает обязанность участника включить документ или сведения в заявку.'],
+    semantic_exclusions: ['Документы гаранта или банка, заключения и исполнения договора.', 'Документы поставки, приёмки, эксплуатации, передаваемые с товаром или после определения победителя.'],
+    rejected_when: ['Документ относится к другому actor, process stage или semantic object.'],
+    requires_review_when: ['Документ потенциально относится к заявке, но actor, стадия, обязательность или существенный placeholder не установлены.'],
+  }),
+};
+
+function hard(message) {
+  throw new Error('[Expand AI Validator units] ' + message);
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function renderList(values) {
+  return values.map((value) => '- ' + value).join('\n');
+}
+
+function renderProfile(fieldKey, profile) {
+  return [
+    'FIELD PROFILE: ' + fieldKey,
+    'TITLE: ' + profile.title,
+    'DEFINITION: ' + profile.definition,
+    'CONFIRM ONLY WHEN:',
+    renderList(profile.confirmation_criteria),
+    'SEMANTIC EXCLUSIONS:',
+    renderList(profile.semantic_exclusions),
+    'REJECT WHEN:',
+    renderList(profile.rejected_when),
+    'REQUIRES REVIEW WHEN:',
+    renderList(profile.requires_review_when),
+  ].join('\n');
+}
+
+const items = $input.all();
+if (items.length !== 1) hard('Expected exactly one dispatch envelope.');
+
+const canonicalSet = new Set(CANONICAL_FIELD_KEYS);
+const catalogKeys = Object.keys(VALIDATOR_FIELD_PROFILES);
+for (const fieldKey of CANONICAL_FIELD_KEYS) {
+  if (!isObject(VALIDATOR_FIELD_PROFILES[fieldKey])) {
+    hard('Missing profile for known field_key "' + fieldKey + '".');
+  }
+}
+for (const fieldKey of catalogKeys) {
+  if (!canonicalSet.has(fieldKey)) {
+    hard('Unexpected profile for non-canonical field_key "' + fieldKey + '".');
+  }
+}
+if (catalogKeys.length !== CANONICAL_FIELD_KEYS.length) {
+  hard('Profile catalog cardinality mismatch: ' + catalogKeys.length + '/' + CANONICAL_FIELD_KEYS.length + '.');
+}
+
+const envelope = items[0]?.json;
+if (
+  envelope?.dispatch_version !== 'ai_validator_dispatch_v1' ||
+  !Array.isArray(envelope.units_for_ai) ||
+  envelope.units_for_ai.length === 0
+) {
+  hard('Invalid or empty units_for_ai.');
+}
+
+return envelope.units_for_ai.map((unit) => {
+  if (!isObject(unit) || !Array.isArray(unit.verified_facts) || unit.verified_facts.length === 0) {
+    hard('AI unit must contain non-empty verified_facts.');
+  }
+
+  const requested = new Set();
+  for (let factIndex = 0; factIndex < unit.verified_facts.length; factIndex++) {
+    const fact = unit.verified_facts[factIndex];
+    const fieldKey = fact?.field_key;
+    if (typeof fieldKey !== 'string' || fieldKey.length === 0) {
+      hard('verified_facts[' + factIndex + '].field_key is missing.');
+    }
+    if (!canonicalSet.has(fieldKey)) {
+      hard('Unknown field_key "' + fieldKey + '".');
+    }
+    if (!isObject(VALIDATOR_FIELD_PROFILES[fieldKey])) {
+      hard('Missing profile for known field_key "' + fieldKey + '".');
+    }
+    requested.add(fieldKey);
+  }
+
+  const fieldKeys = CANONICAL_FIELD_KEYS.filter((fieldKey) => requested.has(fieldKey));
+  const fieldProfilesText = fieldKeys
+    .map((fieldKey) => renderProfile(fieldKey, VALIDATOR_FIELD_PROFILES[fieldKey]))
+    .join('\n\n');
+  const fieldProfilesByKey = Object.fromEntries(
+    fieldKeys.map((fieldKey) => [fieldKey, renderProfile(fieldKey, VALIDATOR_FIELD_PROFILES[fieldKey])])
+  );
+
+  return {
+    json: {
+      ...unit,
+      validator_field_keys: fieldKeys,
+      validator_prompt_context: {
+        prompt_version: VALIDATOR_PROMPT_VERSION,
+        field_profiles_version: VALIDATOR_FIELD_PROFILES_VERSION,
+        field_keys: fieldKeys,
+        field_profiles_text: fieldProfilesText,
+        field_profiles_by_key: fieldProfilesByKey,
+      },
+    },
+    pairedItem: { item: 0 },
+  };
+});

@@ -3695,7 +3695,7 @@ test('Evidence Repair v2 rejects source provenance and scope mismatch before pro
   );
 });
 
-test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte-stable', () => {
+test('client-confirmed semantics leave the remaining Primary Extractor contract and Evidence Repair HTTP node byte-stable', () => {
   const workflow = loadWorkflow();
   const parameterHashes = Object.fromEntries([
     'Подготовить запрос для AI',
@@ -3709,7 +3709,7 @@ test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte
       .digest('hex'),
   ]));
   assert.deepEqual(parameterHashes, {
-    'Подготовить запрос для AI': 'd7fadf8133a06e3faca1fcbe564c18fbe2715aa8277d6b9138bbecda36248cc2',
+    'Подготовить запрос для AI': '383d1606703354838f3240e97cd5b4c056aae9e83005a2997c7008358b7da2b1',
     'AI Extractor v1.0': 'f08f1c27ffb0969694b923718964515b58edfca69fd46edfc6a3b054a3ef6059',
     'Связать primary Extractor response с source': 'e42b9b2c4d0e2dc00bd2387702c53b39732c529456c9fbb1839c770775271176',
     'Проверить и привязать evidence': '22195356bcece450952479fcb473fa5e37ac121b101464aae7d313e3284be34d',
@@ -3726,12 +3726,12 @@ test('DW-17 leaves Primary Extractor contract and Evidence Repair HTTP node byte
   );
 });
 
-test('DW-23 Validator preparation parameters retain the reviewed exact hash', () => {
+test('client-confirmed Validator preparation parameters retain the reviewed exact hash', () => {
   const workflow = loadWorkflow();
   const parameters = findNode(workflow, 'Развернуть units для AI Validator').parameters;
   assert.equal(
     crypto.createHash('sha256').update(JSON.stringify(parameters)).digest('hex'),
-    'e3633fc11feff560badad97d47cdccae65992a16f4d05a159b9cdac7db075b11',
+    '38bb11c3d55b62c7a9917f701a786f5d07eaeb7c9c2a80fb66f74b1d3e96e6ca',
   );
 });
 
@@ -4754,6 +4754,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-1
   ].sort();
   const expectedAddedNodes = [...expectedDw18Nodes, ...expectedDw23Nodes].sort();
   const expectedChangedSharedNodes = new Set([
+    'Подготовить запрос для AI',
     'AI Extractor v1.0',
     'связать результат Docling и метаданные',
     'Нормализовать документ Docling',

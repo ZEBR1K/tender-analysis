@@ -318,7 +318,7 @@ function validatorSourceWithOptionFacts() {
     extractor: { prompt_version: 'sanitized' },
     validator_prompt_context: {
       prompt_version: 'ai_validator_prompt_v1_2',
-      field_profiles_version: 'validator_field_profiles_v1',
+      field_profiles_version: 'validator_field_profiles_v1_1',
       field_keys: ['advance_contract_guarantee', 'participation_guarantee'],
       field_profiles_text: 'SANITIZED_FIELD_PROFILES',
     },

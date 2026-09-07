@@ -167,7 +167,7 @@ function buildSource(analysisUnitId, text = 'Требуется точный д�
       },
     },
     ai_request: {
-      prompt_version: 'tender_extractor_prompt_v2',
+      prompt_version: 'tender_extractor_prompt_v2_1',
       schema_version: 'ai_extractor_v1',
       field_catalog_version: 'tender_fields_v1',
       field_catalog: [],
@@ -319,7 +319,7 @@ test('execution 14359 request contract matches both known-good GLM low controls'
   assert.equal(comparison.execution_14359_full_contract_responses, 0);
 });
 
-test('current canonical request body, system prompt, and response schema retain the compared hashes', async () => {
+test('transport and schema retain historical hashes while the current prompt has its own reviewed hash', async () => {
   const comparison = fixture.request_contract_comparison;
   const httpNode = findNode('AI Extractor v1.0');
   assert.equal(
@@ -361,8 +361,12 @@ test('current canonical request body, system prompt, and response schema retain 
     },
   });
   assert.equal(
-    sha256(prepared.json.ai_request.system_prompt),
     comparison.shared_system_prompt_sha256,
+    '91392595979e27c0e1c869fa507e7649d7e5e84a0ec617e63cb184775ccb45b3',
+  );
+  assert.equal(
+    sha256(prepared.json.ai_request.system_prompt),
+    'e15e8d76dc4aeade1c15ccfc614f01899881cffb95c73b06f2f9ce529a829ebd',
   );
   assert.equal(
     sha256(JSON.stringify(prepared.json.ai_request.response_schema)),

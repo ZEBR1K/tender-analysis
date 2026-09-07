@@ -407,7 +407,7 @@ test('analysis_unit_id, fact linking, cardinality, and prompt audit are preserve
   assert.equal(checked.ai_validator.prompt_version, 'ai_validator_prompt_v1_2');
   assert.equal(
     checked.ai_validator.field_profiles_version,
-    'validator_field_profiles_v1',
+    'validator_field_profiles_v1_1',
   );
   assert.deepEqual(checked.ai_validator.field_keys, ['customer', 'delivery_term']);
   assert.equal(checked.ai_validator_response_check.expected_facts_count, 2);
