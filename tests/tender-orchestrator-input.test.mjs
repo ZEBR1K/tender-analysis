@@ -6,9 +6,16 @@ const workflowPath = new URL(
   '../workflows/n8n-exports/%D0%A2%D0%95%D0%9D%D0%94%D0%95%D0%A0%D0%AB%20%D0%9E%D0%A0%D0%9A%D0%95%D0%A1%D0%A2%D0%A0%D0%90%D0%A2%D0%9E%D0%A0.json',
   import.meta.url,
 );
+const workerWorkflowPath = new URL(
+  '../workflows/n8n-exports/TENDER — Обработать документ.json',
+  import.meta.url,
+);
 
 const workflow = JSON.parse(
   readFileSync(workflowPath, 'utf8').replace(/^\uFEFF/, ''),
+);
+const workerWorkflow = JSON.parse(
+  readFileSync(workerWorkflowPath, 'utf8').replace(/^\uFEFF/, ''),
 );
 
 const nodes = Array.isArray(workflow.nodes) ? workflow.nodes : [];
@@ -105,6 +112,69 @@ function hasCte(sql, name) {
   return new RegExp(`(?:\\bWITH|,)\\s*"?${name}"?\\s+AS\\s*\\(`, 'i').test(sql);
 }
 
+function cteBody(sql, name) {
+  const ctePattern = new RegExp(`(?:\\bWITH|,)\\s*"?${name}"?\\s+AS\\s*\\(`, 'i');
+  const match = ctePattern.exec(sql);
+  assert.ok(match, `atomic creation SQL must define ${name}`);
+
+  const openIndex = match.index + match[0].lastIndexOf('(');
+  let depth = 0;
+  let quote = null;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let index = openIndex; index < sql.length; index += 1) {
+    const character = sql[index];
+    const next = sql[index + 1];
+
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === quote && next === quote) {
+        index += 1;
+      } else if (character === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (character === '-' && next === '-') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+      continue;
+    }
+    if (character === '(') depth += 1;
+    if (character === ')') {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          body: sql.slice(openIndex + 1, index),
+          endIndex: index + 1,
+        };
+      }
+    }
+  }
+
+  assert.fail(`could not find the closing parenthesis for ${name}`);
+}
+
 function isUnfinishedRunSelect(node) {
   if (node.type !== 'n8n-nodes-base.postgres') return false;
 
@@ -163,13 +233,15 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
     'Manual Trigger must be absent',
   );
 
-  const setNodesWithLiteralTenderIds = nodesOfType('n8n-nodes-base.set').filter(
-    (node) => stringsIn(node.parameters).some((value) => /\b[0-9a-f]{24}\b/i.test(value)),
+  const nodesWithLiteralTenderIds = nodes.filter(
+    (node) => stringsIn(node.parameters).some(
+      (value) => /(?<![0-9a-z])[0-9a-f]{24}(?![0-9a-z])/i.test(value),
+    ),
   );
   assert.deepEqual(
-    setNodesWithLiteralTenderIds.map((node) => node.name),
+    nodesWithLiteralTenderIds.map((node) => node.name),
     [],
-    'Set nodes must not contain literal 24-hex tender IDs',
+    'node parameters must not contain literal standalone 24-hex tender IDs',
   );
 
   const fullInfoHttpNodes = nodesOfType('n8n-nodes-base.httpRequest').filter((node) =>
@@ -226,6 +298,66 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
   ]) {
     assert.ok(hasCte(creationSql, cteName), `atomic creation SQL must define ${cteName}`);
   }
+
+  assert.doesNotMatch(
+    creationSql,
+    /\bUPDATE\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i,
+    'same-snapshot atomic creation SQL must not UPDATE tender_analysis_runs',
+  );
+
+  const insertedRun = cteBody(creationSql, 'inserted_run');
+  assert.match(
+    insertedRun.body,
+    /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i,
+    'inserted_run must insert the analysis run',
+  );
+  assert.match(
+    insertedRun.body,
+    /'processing'/i,
+    "inserted_run must insert status 'processing' directly",
+  );
+  assert.doesNotMatch(
+    insertedRun.body,
+    /'created'/i,
+    "inserted_run must not insert the intermediate status 'created'",
+  );
+
+  const activatedRun = cteBody(creationSql, 'activated_run');
+  assert.match(
+    activatedRun.body,
+    /^\s*SELECT\b/i,
+    'activated_run must be a read-only SELECT',
+  );
+  assert.doesNotMatch(
+    activatedRun.body,
+    /\b(?:INSERT|UPDATE|DELETE)\b/i,
+    'activated_run must not be data-modifying',
+  );
+  assert.match(
+    activatedRun.body,
+    /\bFROM\s+"?inserted_run"?\b/i,
+    'activated_run must select from inserted_run',
+  );
+  assert.match(
+    activatedRun.body,
+    /\b(?:CROSS\s+JOIN|JOIN)\s+"?document_stats"?\b/i,
+    'activated_run must cross/join document_stats',
+  );
+
+  const finalTrueResult = creationSql
+    .slice(activatedRun.endIndex)
+    .match(/^\s*SELECT\b[\s\S]*?(?=\bUNION\s+ALL\b|$)/i)?.[0];
+  assert.ok(finalTrueResult, 'atomic creation SQL must have a final true-result SELECT');
+  assert.match(
+    finalTrueResult,
+    /\bTRUE\b\s+AS\s+"?created_new_run"?/i,
+    'final result from activated_run must emit created_new_run=true',
+  );
+  assert.match(
+    finalTrueResult,
+    /\bFROM\s+"?activated_run"?\b/i,
+    'final created_new_run=true result must select from activated_run',
+  );
 
   assert.match(
     creationSql,
@@ -335,12 +467,41 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
   );
 
   // 5. Split Out produces one document item and Worker consumes each item once.
+  const workerTriggers = (workerWorkflow.nodes ?? []).filter(
+    (node) => node.type === 'n8n-nodes-base.executeWorkflowTrigger',
+  );
+  assert.equal(
+    workerTriggers.length,
+    1,
+    'canonical Worker must have exactly one Execute Workflow Trigger',
+  );
+  assert.equal(
+    workerTriggers[0].parameters?.inputSource,
+    'passthrough',
+    'canonical Worker trigger must accept all input data via passthrough',
+  );
+
   assert.equal(worker.parameters?.mode, 'each', 'Worker Execute Workflow must use mode=each');
   assert.ok(configuredWorkflowId(worker), 'Worker Execute Workflow must configure one workflowId');
   assert.equal(
     Array.isArray(worker.parameters?.workflowId),
     false,
     'Worker Execute Workflow must not configure multiple workflowIds',
+  );
+  assert.equal(
+    worker.parameters?.workflowInputs?.mappingMode,
+    'defineBelow',
+    'Worker caller must use the established empty defineBelow mapping form',
+  );
+  assert.deepEqual(
+    worker.parameters?.workflowInputs?.value,
+    {},
+    'Worker caller mapping value must be empty for passthrough',
+  );
+  assert.deepEqual(
+    worker.parameters?.workflowInputs?.schema,
+    [],
+    'Worker caller mapping schema must be empty for passthrough',
   );
 
   const splitIncludeMode = attachmentSplit.parameters?.include;
@@ -349,8 +510,9 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
     .map((field) => field.trim())
     .filter(Boolean);
   assert.ok(
-    splitIncludeMode === 'allOtherFields' || retainedFields.includes('analysis_run_id'),
-    'each split attachments item must retain analysis_run_id',
+    splitIncludeMode === 'allOtherFields' ||
+      ['analysis_run_id', 'tender_meta'].every((field) => retainedFields.includes(field)),
+    'each split attachments item must explicitly retain analysis_run_id and tender_meta',
   );
   assert.ok(
     everyPathPassesThrough(trigger.name, worker.name, [attachmentSplit.name]),
