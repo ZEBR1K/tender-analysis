@@ -18,6 +18,13 @@ const UNAVAILABLE_EXECUTION_STATES = new Set([
   'network_error',
   'credential_error',
 ]);
+const DOCUMENT_STATUSES = new Set([
+  'completed',
+  'skipped',
+  'pending',
+  'failed',
+  'processing',
+]);
 
 function fail(message) {
   throw new Error(`Invalid intake resume state: ${message}`);
@@ -79,7 +86,7 @@ function directClaimAction(document, intent) {
   return { id: document.id, action: 'exhausted' };
 }
 
-function classifyDocument(document, intent, now) {
+function classifyDocument(document, intent, now, runStatus) {
   if (document === null || typeof document !== 'object' || Array.isArray(document)) {
     fail('each document must be an object');
   }
@@ -88,6 +95,12 @@ function classifyDocument(document, intent, now) {
   }
   if (!Number.isInteger(document.attempts) || document.attempts < 0) {
     fail(`document ${document.id} attempts must be a non-negative integer`);
+  }
+  if (!DOCUMENT_STATUSES.has(document.status)) {
+    fail(`document ${document.id} has unknown status ${String(document.status)}`);
+  }
+  if (runStatus === 'completed') {
+    return { id: document.id, action: 'skip_run_completed' };
   }
 
   if (document.status === 'completed') {
@@ -99,10 +112,6 @@ function classifyDocument(document, intent, now) {
   if (document.status === 'pending' || document.status === 'failed') {
     return directClaimAction(document, intent);
   }
-  if (document.status !== 'processing') {
-    fail(`document ${document.id} has unknown status ${String(document.status)}`);
-  }
-
   if (typeof document.analysisRunId !== 'string' || document.analysisRunId.trim() === '') {
     fail(`document ${document.id} analysisRunId must be a non-empty string`);
   }
@@ -166,7 +175,7 @@ export function evaluateIntakeResumeDecision(input) {
   }
 
   const documentActions = input.documents.map((document) =>
-    classifyDocument(document, intent, input.now));
+    classifyDocument(document, intent, input.now, input.runStatus));
   const documentIds = documentActions.map(({ id }) => id);
   if (new Set(documentIds).size !== documentIds.length) {
     fail('document ids must be unique');

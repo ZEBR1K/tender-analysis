@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 import { evaluateIntakeResumeDecision } from './helpers/intake-resume-model.mjs';
 
@@ -98,6 +99,65 @@ function canReach(workflow, startName, targetName) {
     }
   }
   return false;
+}
+
+function reachableFromOutput(workflow, startName, outputIndex, blockedNames = []) {
+  const blocked = new Set(blockedNames);
+  const visited = new Set();
+  const queue = [...directTargets(workflow, startName, outputIndex)];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (visited.has(current) || blocked.has(current)) continue;
+    visited.add(current);
+    for (const output of workflow.connections[current]?.main ?? []) {
+      for (const connection of output ?? []) queue.push(connection.node);
+    }
+  }
+  return visited;
+}
+
+function assertGateReads(gate, ...fieldNames) {
+  const parameters = JSON.stringify(gate.parameters ?? {});
+  for (const fieldName of fieldNames) {
+    assert.match(parameters, new RegExp(`\\b${fieldName}\\b`, 'u'), `${gate.name} must read ${fieldName}`);
+  }
+}
+
+async function executeCodeNode(node, inputJson, globals = {}) {
+  assert.equal(node.type, 'n8n-nodes-base.code', `${node.name} must be a Code node`);
+  const inputItems = inputJson.map((json) => ({ json: structuredClone(json) }));
+  const cloneItems = () => structuredClone(inputItems);
+  const context = vm.createContext({
+    $input: {
+      all: cloneItems,
+      first: () => structuredClone(inputItems[0]),
+      item: structuredClone(inputItems[0]),
+    },
+    $json: structuredClone(inputItems[0]?.json ?? {}),
+    $execution: { id: 'structural-contract-test-execution' },
+    structuredClone,
+    console,
+    ...globals,
+  });
+  const script = new vm.Script(
+    `(async () => {\n${node.parameters.jsCode}\n})()`,
+    { filename: `${node.name}.code-node.js` },
+  );
+  const rawResult = await script.runInContext(context, { timeout: 1_000 });
+  assert.notEqual(rawResult, undefined, `${node.name} returned no data`);
+  const rawItems = Array.isArray(rawResult) ? rawResult : [rawResult];
+  const normalized = rawItems.map((item) =>
+    (item && typeof item === 'object' && Object.hasOwn(item, 'json'))
+      ? item
+      : { json: item });
+  return structuredClone(normalized);
+}
+
+async function executeSingleCodeJson(node, inputJson, globals) {
+  const items = await executeCodeNode(node, [inputJson], globals);
+  assert.equal(items.length, 1, `${node.name} must emit exactly one normalized item`);
+  assert.ok(items[0]?.json && typeof items[0].json === 'object');
+  return items[0].json;
 }
 
 function evaluate({
@@ -322,6 +382,28 @@ test('decision model: failed runs reopen only for explicit manual intent', () =>
   );
 });
 
+test('decision model: completed runs suppress document dispatch and stage mutation', () => {
+  const result = evaluate({
+    intent: automaticIntents[0],
+    runStatus: 'completed',
+    finalCount: 27,
+    finalBarrierValid: true,
+    document: {
+      id: 'doc-pending-under-completed-run',
+      status: 'pending',
+      attempts: 0,
+      startedAt: null,
+      executionState: null,
+    },
+  });
+
+  assert.deepEqual(result.documentActions, [{
+    id: 'doc-pending-under-completed-run',
+    action: 'skip_run_completed',
+  }]);
+  assert.equal(result.stageAction, 'no_op');
+});
+
 test('decision model: raw count 27 is insufficient without the full FINAL barrier', () => {
   assert.equal(
     evaluate({
@@ -404,7 +486,7 @@ test('decision model: malformed intent, state, attempts, counts, and timestamps 
   );
 });
 
-test('workflow export implements the complete typed Intake Resume dispatcher contract', () => {
+test('workflow export implements the complete typed Intake Resume dispatcher contract', async () => {
   assert.equal(
     fs.existsSync(workflowExportPath),
     true,
@@ -440,46 +522,176 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
 
   const validator = requireNode(workflow, 'Validate Intake Input');
   assert.equal(validator.type, 'n8n-nodes-base.code');
-  const validatorCode = validator.parameters.jsCode;
-  for (const literal of [
-    'tenderplan_mark',
-    'recovery_scan',
-    'manual',
-    'source_event_key',
-    'tender_id',
-    'analysis_run_id',
-    'manual_override',
-    'observed_at',
-  ]) assert.match(validatorCode, new RegExp(literal));
-  assert.match(validatorCode, /source_event_key[^\n]{0,160}(?:non-empty|required|trim)/iu);
-  assert.match(validatorCode, /source_event_key[^\n]{0,220}(?:512|bounded)/iu);
-  assert.match(validatorCode, /tenderplan_mark[\s\S]*tender_id[\s\S]*analysis_run_id/iu);
-  assert.match(validatorCode, /recovery_scan[\s\S]*analysis_run_id/iu);
-  assert.match(validatorCode, /manual[\s\S]*manual_override/iu);
-  assert.match(validatorCode, /manual_override\s*!==?\s*(?:true|false)|typeof\s+.*manual_override/iu);
-  assert.match(validatorCode, /Date\.parse|toISO|fromISO/iu);
-  assert.match(validatorCode, /(?:Z|timezone|offset|[+-]\\d\{2\})/u);
-  assert.ok(
-    validatorCode.lastIndexOf('new Date') > validatorCode.indexOf('trigger_kind'),
-    'current-time observed_at default must occur only after input validation logic starts',
-  );
+  const validInvocationCases = [
+    {
+      input: {
+        trigger_kind: 'tenderplan_mark',
+        source_event_key: 'tenderplan:event:123',
+        tender_id: '123',
+        manual_override: false,
+        observed_at: fixture.now,
+      },
+      expected: { intent: 'automatic', run_authoritative: false },
+    },
+    {
+      input: {
+        trigger_kind: 'recovery_scan',
+        source_event_key: 'recovery:run-1:execution-1',
+        analysis_run_id: '11111111-1111-4111-8111-111111111111',
+        manual_override: false,
+        observed_at: fixture.now,
+      },
+      expected: { intent: 'automatic', run_authoritative: true },
+    },
+    {
+      input: {
+        trigger_kind: 'manual',
+        source_event_key: 'manual:run-1:execution-1',
+        analysis_run_id: '11111111-1111-4111-8111-111111111111',
+        manual_override: true,
+        observed_at: fixture.now,
+      },
+      expected: { intent: 'manual', run_authoritative: true },
+    },
+  ];
+  for (const scenario of validInvocationCases) {
+    const normalized = await executeSingleCodeJson(validator, scenario.input);
+    assert.equal(normalized.trigger_kind, scenario.input.trigger_kind);
+    assert.equal(normalized.source_event_key, scenario.input.source_event_key);
+    assert.equal(normalized.observed_at, fixture.now);
+    assert.equal(normalized.intent, scenario.expected.intent);
+    assert.equal(normalized.run_authoritative, scenario.expected.run_authoritative);
+  }
 
+  const invalidInvocationCases = [
+    {
+      trigger_kind: 'tenderplan_mark',
+      source_event_key: 'event',
+      tender_id: '123',
+      analysis_run_id: '11111111-1111-4111-8111-111111111111',
+      manual_override: false,
+    },
+    {
+      trigger_kind: 'tenderplan_mark',
+      source_event_key: 'event',
+      tender_id: '123',
+      manual_override: true,
+    },
+    {
+      trigger_kind: 'recovery_scan',
+      source_event_key: 'event',
+      manual_override: false,
+    },
+    {
+      trigger_kind: 'recovery_scan',
+      source_event_key: 'event',
+      analysis_run_id: '11111111-1111-4111-8111-111111111111',
+      manual_override: true,
+    },
+    {
+      trigger_kind: 'manual',
+      source_event_key: 'event',
+      analysis_run_id: '11111111-1111-4111-8111-111111111111',
+      manual_override: false,
+    },
+    {
+      trigger_kind: 'unknown',
+      source_event_key: 'event',
+      manual_override: false,
+    },
+  ];
+  let invalidClockReads = 0;
+  class InvalidInputDate extends Date {
+    constructor(...args) {
+      if (args.length === 0) invalidClockReads += 1;
+      super(...args);
+    }
+
+    static now() {
+      invalidClockReads += 1;
+      return Date.parse(fixture.now);
+    }
+  }
+  for (const input of invalidInvocationCases) {
+    await assert.rejects(
+      () => executeSingleCodeJson(validator, input, { Date: InvalidInputDate }),
+      /invalid|requires|must|unknown|conflict|forbidden/iu,
+    );
+  }
+  assert.equal(invalidClockReads, 0, 'malformed input must fail before reading the current clock');
+
+  let defaultClockReads = 0;
+  class FixedDate extends Date {
+    constructor(...args) {
+      if (args.length === 0) {
+        defaultClockReads += 1;
+        super(fixture.now);
+      } else {
+        super(...args);
+      }
+    }
+
+    static now() {
+      defaultClockReads += 1;
+      return Date.parse(fixture.now);
+    }
+  }
+  const defaultedObservation = await executeSingleCodeJson(validator, {
+    trigger_kind: 'tenderplan_mark',
+    source_event_key: 'tenderplan:event:default-clock',
+    tender_id: '123',
+    manual_override: false,
+  }, { Date: FixedDate });
+  assert.equal(defaultedObservation.observed_at, fixture.now);
+  assert.ok(defaultClockReads > 0, 'valid input without observed_at must read the clock');
+
+  const runEntryGate = requireNode(workflow, 'Is Run-authoritative Invocation?');
+  assert.equal(runEntryGate.type, 'n8n-nodes-base.if');
+  assertGateReads(runEntryGate, 'run_authoritative');
   assert.deepEqual(
-    directTargets(workflow, 'Is Run-authoritative Invocation?', 0),
+    directTargets(workflow, runEntryGate.name, 0),
     ['Load Authoritative Run'],
   );
   assert.deepEqual(
-    directTargets(workflow, 'Is Run-authoritative Invocation?', 1),
+    directTargets(workflow, runEntryGate.name, 1),
     ['Prepare Event Identity'],
   );
-  assert.ok(canReach(workflow, 'Load Authoritative Run', 'Claim New or Failed Intake Event'));
-  assert.ok(canReach(workflow, 'Bind Authoritative Run Identity', 'Claim New or Failed Intake Event'));
-  assert.ok(canReach(workflow, 'Claim New or Failed Intake Event', 'Resolve TenderPlan Runs'));
+  assert.ok(reachableFromOutput(workflow, runEntryGate.name, 0)
+    .has('Claim New or Failed Intake Event'));
+  const tenderplanEntryPath = reachableFromOutput(workflow, runEntryGate.name, 1);
+  assert.ok(tenderplanEntryPath.has('Claim New or Failed Intake Event'));
+  assert.ok(tenderplanEntryPath.has('Resolve TenderPlan Runs'));
   assert.equal(
-    canReach(workflow, 'Resolve TenderPlan Runs', 'Claim New or Failed Intake Event'),
+    reachableFromOutput(
+      workflow,
+      runEntryGate.name,
+      1,
+      ['Claim New or Failed Intake Event'],
+    ).has('Resolve TenderPlan Runs'),
     false,
-    'TenderPlan event claim must precede run resolution',
+    'TenderPlan run resolution must not be reachable without first passing the event claim',
   );
+
+  const runResolutionGate = requireNode(workflow, 'Route Run Resolution');
+  assert.equal(runResolutionGate.type, 'n8n-nodes-base.if');
+  assertGateReads(runResolutionGate, 'run_authoritative');
+  assert.deepEqual(
+    directTargets(workflow, runResolutionGate.name, 0),
+    ['Apply Run Entry Policy'],
+  );
+  assert.deepEqual(
+    directTargets(workflow, runResolutionGate.name, 1),
+    ['Resolve TenderPlan Runs'],
+  );
+  const authoritativeResolutionPath = reachableFromOutput(
+    workflow,
+    runResolutionGate.name,
+    0,
+  );
+  assert.equal(authoritativeResolutionPath.has('Resolve TenderPlan Runs'), false);
+  assert.equal(authoritativeResolutionPath.has('Call Orchestrator'), false);
+  assert.ok(reachableFromOutput(workflow, runResolutionGate.name, 1)
+    .has('Resolve TenderPlan Runs'));
 
   const authoritativeQuery = normalizeSql(
     requireNode(workflow, 'Load Authoritative Run').parameters.query,
@@ -508,10 +720,56 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const loadEventSql = normalizeSql(requireNode(workflow, 'Load Intake Event').parameters.query);
   assert.match(loadEventSql, /where .*source\s*=\s*\$1/iu);
   assert.match(loadEventSql, /event_key\s*=\s*\$2/iu);
-  const classifyEventCode = requireNode(workflow, 'Classify Intake Event').parameters.jsCode;
-  assert.match(classifyEventCode, /completed[\s\S]*processed_at[\s\S]*duplicate_event/iu);
-  assert.match(classifyEventCode, /processing[\s\S]*(?:fresh|owned|already_active)/iu);
-  assert.match(classifyEventCode, /(?:60\s*\*\s*60\s*\*\s*1000|one.hour)/iu);
+  const classifyEvent = requireNode(workflow, 'Classify Intake Event');
+  const duplicateEvent = await executeSingleCodeJson(classifyEvent, {
+    source: 'tenderplan',
+    event_key: 'event-completed',
+    status: 'completed',
+    processed_at: '2026-09-07T11:30:00.000Z',
+    processing_started_at: '2026-09-07T11:00:00.000Z',
+    n8n_execution_id: 'prior-event-owner',
+    observed_at: fixture.now,
+  });
+  assert.equal(duplicateEvent.action, 'duplicate_event');
+  assert.equal(duplicateEvent.event_route, 'no_op');
+  assert.equal(duplicateEvent.reclaimable, false);
+
+  const freshOwnedEvent = await executeSingleCodeJson(classifyEvent, {
+    source: 'tenderplan',
+    event_key: 'event-fresh-owned',
+    status: 'processing',
+    processed_at: null,
+    processing_started_at: '2026-09-07T11:30:00.000Z',
+    n8n_execution_id: 'active-event-owner',
+    observed_at: fixture.now,
+  });
+  assert.equal(freshOwnedEvent.action, 'already_active');
+  assert.equal(freshOwnedEvent.event_route, 'no_op');
+  assert.equal(freshOwnedEvent.reclaimable, false);
+
+  const eventNoopGate = requireNode(workflow, 'Event Outcome Is No-op?');
+  assert.equal(eventNoopGate.type, 'n8n-nodes-base.if');
+  assertGateReads(eventNoopGate, 'event_route');
+  assert.deepEqual(
+    directTargets(workflow, eventNoopGate.name, 0),
+    ['Return Event No-op'],
+  );
+  const eventNoopReachable = reachableFromOutput(workflow, eventNoopGate.name, 0);
+  assert.deepEqual([...eventNoopReachable], ['Return Event No-op']);
+  for (const forbiddenNode of [
+    'Resolve TenderPlan Runs',
+    'Call Orchestrator',
+    'Apply Run Entry Policy',
+    'Reclaim Stale Intake Event',
+    'Load Run Snapshot',
+    'Apply Worker Readiness',
+    'Guard Exhausted Run Failure',
+    'Dispatch Document Workers',
+    'Call Aggregator',
+    'Call Finalization',
+  ]) {
+    assert.equal(eventNoopReachable.has(forbiddenNode), false, `${forbiddenNode} follows event no-op`);
+  }
 
   const eventReclaim = requireNode(workflow, 'Reclaim Stale Intake Event');
   const eventReclaimSql = normalizeSql(eventReclaim.parameters.query);
@@ -523,7 +781,14 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(eventReclaimSql, /attempts\s*=\s*[^,]+attempts\s*\+\s*1/iu);
   assert.match(eventReclaim.parameters.options.queryReplacement, /\$execution\.id/u);
   assert.ok(canReach(workflow, 'Read Intake Event Owner Execution', 'Reclaim Stale Intake Event'));
-  assert.ok(canReach(workflow, 'Classify Intake Event Owner Execution', 'Return Event No-op'));
+  const eventReclaimGate = requireNode(workflow, 'Is Intake Event Owner Reclaimable?');
+  assert.equal(eventReclaimGate.type, 'n8n-nodes-base.if');
+  assertGateReads(eventReclaimGate, 'reclaimable');
+  const eventReclaimTruePath = reachableFromOutput(workflow, eventReclaimGate.name, 0);
+  const eventReclaimFalsePath = reachableFromOutput(workflow, eventReclaimGate.name, 1);
+  assert.ok(eventReclaimTruePath.has('Reclaim Stale Intake Event'));
+  assert.equal(eventReclaimFalsePath.has('Reclaim Stale Intake Event'), false);
+  assert.ok(eventReclaimFalsePath.has('Return Event No-op'));
 
   const tenderRunQuery = normalizeSql(requireNode(workflow, 'Resolve TenderPlan Runs').parameters.query);
   assert.match(tenderRunQuery, /from (?:public\.)?tender_analysis_runs/iu);
@@ -589,6 +854,18 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
       name: 'KITATEH Tenders',
     }, `PostgreSQL credential drift in ${node.name}`);
   }
+  const forbiddenAfterEventNoop = postgresNodes.filter((node) => {
+    const sql = normalizeSql(node.parameters.query ?? '');
+    return /tender_analysis_documents|tender_analysis_field_results/iu.test(sql) ||
+      (/tender_analysis_runs/iu.test(sql) && /\b(?:insert|update|delete)\b/iu.test(sql));
+  });
+  for (const node of forbiddenAfterEventNoop) {
+    assert.equal(
+      eventNoopReachable.has(node.name),
+      false,
+      `${node.name} database work follows a duplicate/fresh-owned event no-op`,
+    );
+  }
 
   const snapshotNodes = postgresNodes.filter((node) =>
     /tender_analysis_documents/iu.test(node.parameters.query ?? '') &&
@@ -617,18 +894,114 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     assert.ok(snapshotSql.includes(token) && finalizationBarrierSql.includes(token));
   }
 
-  const documentDecisionCode = requireNode(
+  const documentDecision = requireNode(
     workflow,
     'Decide Document and Stage Action',
-  ).parameters.jsCode;
-  assert.match(documentDecisionCode, /completed[\s\S]*(?:skip|skipped)/iu);
-  assert.match(documentDecisionCode, /skipped[\s\S]*(?:preserve|skip)/iu);
-  assert.match(documentDecisionCode, /pending[\s\S]*failed[\s\S]*attempts\s*<\s*2/iu);
-  assert.match(documentDecisionCode, /manual[\s\S]*manual_override/iu);
-  assert.match(documentDecisionCode, /tenderplan_mark[\s\S]*(?:automatic|attempts)/iu);
-  assert.match(documentDecisionCode, /execution_status_unavailable/iu);
-  assert.match(documentDecisionCode, /automatic_attempts_exhausted/iu);
-  assert.doesNotMatch(documentDecisionCode, /attempts\s*(?:\+\+|\+=|=\s*[^=;]+\+\s*1)/u);
+  );
+  const analysisRunId = '11111111-1111-4111-8111-111111111111';
+  const baseDocument = {
+    id: '22222222-2222-4222-8222-222222222222',
+    analysis_run_id: analysisRunId,
+    document_index: 3,
+    file_name: 'terms.pdf',
+    file_extension: 'pdf',
+    display_name: 'Terms',
+    download_url: 'https://files.invalid/terms.pdf',
+    publication_at: '2026-09-07T09:00:00.000Z',
+    source_size: 1234,
+    mime_type: 'application/pdf',
+    file_size: 1234,
+    status: 'pending',
+    attempts: 0,
+    started_at: null,
+    n8n_execution_id: null,
+  };
+  const decisionInput = (overrides = {}) => ({
+    trigger_kind: 'tenderplan_mark',
+    manual_override: false,
+    analysis_run_id: analysisRunId,
+    run_status: 'processing',
+    final_count: 0,
+    final_barrier_valid: false,
+    documents: [],
+    ...overrides,
+  });
+  const expectedAttachment = {
+    document_id: baseDocument.id,
+    document_index: baseDocument.document_index,
+    file_name: baseDocument.file_name,
+    file_extension: baseDocument.file_extension,
+    display_name: baseDocument.display_name,
+    download_url: baseDocument.download_url,
+    publication_at: baseDocument.publication_at,
+    source_size: baseDocument.source_size,
+    mime_type: baseDocument.mime_type,
+    file_size: baseDocument.file_size,
+    status: baseDocument.status,
+  };
+
+  const mixedDocumentDecision = await executeSingleCodeJson(documentDecision, decisionInput({
+    documents: [
+      { ...baseDocument, id: '33333333-3333-4333-8333-333333333333', status: 'completed' },
+      { ...baseDocument, id: '44444444-4444-4444-8444-444444444444', status: 'skipped' },
+      baseDocument,
+    ],
+  }));
+  assert.deepEqual(mixedDocumentDecision.attachments, [expectedAttachment]);
+  assert.deepEqual(
+    mixedDocumentDecision.document_actions.map(({ id, action }) => ({ id, action })),
+    [
+      { id: '33333333-3333-4333-8333-333333333333', action: 'skip' },
+      { id: '44444444-4444-4444-8444-444444444444', action: 'preserve_skip' },
+      { id: baseDocument.id, action: 'dispatch' },
+    ],
+  );
+
+  const exhaustedAutomatic = await executeSingleCodeJson(documentDecision, decisionInput({
+    documents: [{ ...baseDocument, status: 'failed', attempts: 2 }],
+  }));
+  assert.deepEqual(exhaustedAutomatic.attachments, []);
+  assert.equal(exhaustedAutomatic.document_actions[0].action, 'exhausted');
+  const exhaustedManual = await executeSingleCodeJson(documentDecision, decisionInput({
+    trigger_kind: 'manual',
+    manual_override: true,
+    documents: [{ ...baseDocument, status: 'failed', attempts: 2 }],
+  }));
+  assert.deepEqual(exhaustedManual.attachments, [
+    { ...expectedAttachment, status: 'failed' },
+  ]);
+  assert.equal(exhaustedManual.document_actions[0].action, 'dispatch');
+
+  const completedRunDecision = await executeSingleCodeJson(documentDecision, decisionInput({
+    run_status: 'completed',
+    final_count: 27,
+    final_barrier_valid: true,
+    documents: [baseDocument],
+  }));
+  assert.deepEqual(completedRunDecision.attachments, []);
+  assert.equal(completedRunDecision.document_actions[0].action, 'skip_run_completed');
+  assert.equal(completedRunDecision.stage_action, 'already_completed');
+
+  const invalidFinalBarrierDecision = await executeSingleCodeJson(documentDecision, decisionInput({
+    run_status: 'aggregating',
+    final_count: 27,
+    final_barrier_valid: false,
+  }));
+  assert.equal(invalidFinalBarrierDecision.final_count, 27);
+  assert.equal(invalidFinalBarrierDecision.final_barrier_valid, false);
+  assert.equal(invalidFinalBarrierDecision.stage_action, 'manual_attention_required');
+  const validFinalBarrierDecision = await executeSingleCodeJson(documentDecision, decisionInput({
+    run_status: 'aggregating',
+    final_count: 27,
+    final_barrier_valid: true,
+  }));
+  assert.equal(validFinalBarrierDecision.final_barrier_valid, true);
+  assert.equal(validFinalBarrierDecision.stage_action, 'call_finalization');
+
+  assert.doesNotMatch(
+    documentDecision.parameters.jsCode,
+    /attempts\s*(?:\+\+|\+=|=\s*[^=;]+\+\s*1)/u,
+  );
 
   const documentExecutionHttp = requireNode(workflow, 'Read Document Owner Execution');
   const eventExecutionHttp = requireNode(workflow, 'Read Intake Event Owner Execution');
@@ -649,32 +1022,126 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     assert.equal(node.onError, 'continueRegularOutput');
   }
 
-  const observationCode = requireNode(
+  const eventObservationNormalizer = requireNode(
+    workflow,
+    'Classify Intake Event Owner Execution',
+  );
+  const documentObservationNormalizer = requireNode(
     workflow,
     'Classify Document Execution Observations',
-  ).parameters.jsCode;
-  assert.match(observationCode, /statusCode/iu);
-  assert.match(observationCode, /\.body|body\s*=/iu);
-  assert.match(observationCode, /finished/iu);
-  for (const state of ['new', 'running', 'waiting', 'success', 'error', 'canceled', 'crashed']) {
-    assert.match(observationCode, new RegExp(`['"]${state}['"]`, 'u'));
-  }
-  assert.match(observationCode, /404[\s\S]*not_found/iu);
-  assert.match(observationCode, /(?:network|credential|invalid|unavailable)/iu);
-  assert.doesNotMatch(
-    observationCode,
-    /\.data(?:\?\.|\.)status|\.data\[['"]status['"]\]/u,
   );
+  const executionObservationCases = [
+    ...['new', 'running', 'waiting'].map((status) => ({
+      name: status,
+      input: {
+        owner_id: `owner-${status}`,
+        statusCode: 200,
+        body: { id: `execution-${status}`, status, finished: false },
+      },
+      expected: { execution_state: status, execution_observation: 'owned', reclaimable: false },
+    })),
+    ...['success', 'error', 'canceled', 'crashed'].map((status) => ({
+      name: status,
+      input: {
+        owner_id: `owner-${status}`,
+        statusCode: 200,
+        body: { id: `execution-${status}`, status, finished: true },
+      },
+      expected: { execution_state: status, execution_observation: 'reclaimable', reclaimable: true },
+    })),
+    {
+      name: 'confirmed HTTP 404',
+      input: {
+        owner_id: 'owner-not-found',
+        statusCode: 404,
+        body: { message: 'execution not found' },
+      },
+      expected: {
+        execution_state: 'not_found',
+        execution_observation: 'reclaimable',
+        reclaimable: true,
+      },
+    },
+    {
+      name: 'API unavailable',
+      input: {
+        owner_id: 'owner-api-unavailable',
+        statusCode: 503,
+        body: { message: 'service unavailable' },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
+    {
+      name: 'network failure',
+      input: {
+        owner_id: 'owner-network-failure',
+        error: { message: 'ECONNREFUSED' },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
+    {
+      name: 'credential failure',
+      input: {
+        owner_id: 'owner-credential-failure',
+        statusCode: 401,
+        body: { message: 'unauthorized' },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
+    {
+      name: 'invalid response',
+      input: {
+        owner_id: 'owner-invalid-response',
+        statusCode: 200,
+        body: { id: 123, status: 'success', finished: 'true' },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
+    {
+      name: 'unknown execution status',
+      input: {
+        owner_id: 'owner-unknown-status',
+        statusCode: 200,
+        body: { id: 'execution-unknown', status: 'mystery', finished: true },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
+  ];
+  for (const normalizer of [eventObservationNormalizer, documentObservationNormalizer]) {
+    assert.doesNotMatch(normalizer.parameters.jsCode, /\.body(?:\?\.)?\.data|\.body\[['"]data['"]\]/u);
+    for (const scenario of executionObservationCases) {
+      const normalized = await executeSingleCodeJson(normalizer, scenario.input);
+      assert.equal(normalized.owner_id, scenario.input.owner_id, `${normalizer.name}: ${scenario.name}`);
+      assert.equal(
+        normalized.execution_observation,
+        scenario.expected.execution_observation,
+        `${normalizer.name}: ${scenario.name}`,
+      );
+      assert.equal(
+        normalized.reclaimable,
+        scenario.expected.reclaimable,
+        `${normalizer.name}: ${scenario.name}`,
+      );
+      if (scenario.expected.execution_state !== undefined) {
+        assert.equal(
+          normalized.execution_state,
+          scenario.expected.execution_state,
+          `${normalizer.name}: ${scenario.name}`,
+        );
+      }
+    }
+  }
 
   const reclaimDecision = requireNode(workflow, 'Any Reclaimable Documents?');
   assert.equal(reclaimDecision.type, 'n8n-nodes-base.if');
+  assertGateReads(reclaimDecision, 'reclaimable');
   assert.ok(canReach(workflow, 'Read Document Owner Execution', 'CAS Stale Document to Failed'));
-  const reclaimTrueTargets = directTargets(workflow, reclaimDecision.name, 0);
-  const reclaimFalseTargets = directTargets(workflow, reclaimDecision.name, 1);
-  assert.ok(reclaimTrueTargets.some((name) => canReach(workflow, name, 'CAS Stale Document to Failed')));
-  assert.ok(reclaimFalseTargets.length > 0);
+  const reclaimTruePath = reachableFromOutput(workflow, reclaimDecision.name, 0);
+  const reclaimFalsePath = reachableFromOutput(workflow, reclaimDecision.name, 1);
+  assert.ok(reclaimTruePath.has('CAS Stale Document to Failed'));
+  assert.ok(reclaimFalsePath.size > 0);
   assert.equal(
-    reclaimFalseTargets.some((name) => canReach(workflow, name, 'CAS Stale Document to Failed')),
+    reclaimFalsePath.has('CAS Stale Document to Failed'),
     false,
     'API-unavailable/invalid/owned route must bypass stale CAS',
   );
@@ -722,19 +1189,6 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.equal(splitDispatch.type, 'n8n-nodes-base.splitOut');
   assert.equal(splitDispatch.parameters.fieldToSplitOut, 'attachments');
   assert.match(splitDispatch.parameters.fieldsToInclude, /analysis_run_id/u);
-  for (const field of [
-    'document_id',
-    'document_index',
-    'file_name',
-    'file_extension',
-    'display_name',
-    'download_url',
-    'publication_at',
-    'source_size',
-    'mime_type',
-    'file_size',
-    'status',
-  ]) assert.match(documentDecisionCode, new RegExp(field, 'u'));
 
   const workerCall = requireNode(workflow, 'Dispatch Document Workers');
   assert.equal(workerCall.type, 'n8n-nodes-base.executeWorkflow');
@@ -743,6 +1197,17 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.equal(workerCall.parameters.mode, 'each');
   assert.equal(workerCall.parameters.options.waitForSubWorkflow, false);
   assert.deepEqual(workerCall.parameters.workflowInputs.value, {});
+  assert.ok(canReach(workflow, splitDispatch.name, workerCall.name));
+
+  const dispatchGate = requireNode(workflow, 'Has Documents to Dispatch?');
+  assert.equal(dispatchGate.type, 'n8n-nodes-base.if');
+  assertGateReads(dispatchGate, 'attachments');
+  const dispatchTruePath = reachableFromOutput(workflow, dispatchGate.name, 0);
+  const dispatchFalsePath = reachableFromOutput(workflow, dispatchGate.name, 1);
+  assert.ok(dispatchTruePath.has(splitDispatch.name));
+  assert.ok(dispatchTruePath.has(workerCall.name));
+  assert.equal(dispatchFalsePath.has(splitDispatch.name), false);
+  assert.equal(dispatchFalsePath.has(workerCall.name), false);
 
   const aggregatorCall = requireNode(workflow, 'Call Aggregator');
   assert.equal(aggregatorCall.parameters.workflowId.value, 'ftvmrEHoMbPOAqZG');
@@ -750,9 +1215,43 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const finalizationCall = requireNode(workflow, 'Call Finalization');
   assert.equal(finalizationCall.parameters.workflowId.value, 'cSsh9yjpS7t5p0OO');
   assert.equal(finalizationCall.parameters.options.waitForSubWorkflow, false);
-  assert.ok(canReach(workflow, 'Decide Document and Stage Action', 'Apply Worker Readiness'));
-  assert.ok(canReach(workflow, 'Decide Document and Stage Action', 'Call Aggregator'));
-  assert.ok(canReach(workflow, 'Decide Document and Stage Action', 'Call Finalization'));
+
+  const completedRunGate = requireNode(workflow, 'Is Run Already Completed?');
+  assert.equal(completedRunGate.type, 'n8n-nodes-base.if');
+  assertGateReads(completedRunGate, 'stage_action');
+  assert.ok(canReach(workflow, documentDecision.name, completedRunGate.name));
+  assert.deepEqual(
+    directTargets(workflow, completedRunGate.name, 0),
+    ['Complete Intake Event'],
+  );
+  const completedRunPath = reachableFromOutput(workflow, completedRunGate.name, 0);
+  for (const forbiddenNode of [
+    'Apply Worker Readiness',
+    'Guard Exhausted Run Failure',
+    splitDispatch.name,
+    workerCall.name,
+    aggregatorCall.name,
+    finalizationCall.name,
+  ]) {
+    assert.equal(completedRunPath.has(forbiddenNode), false, `${forbiddenNode} follows completed run`);
+  }
+
+  const finalizationGate = requireNode(workflow, 'Should Start Finalization?');
+  assert.equal(finalizationGate.type, 'n8n-nodes-base.if');
+  assertGateReads(
+    finalizationGate,
+    'run_status',
+    'final_count',
+    'final_barrier_valid',
+  );
+  const finalizationTruePath = reachableFromOutput(workflow, finalizationGate.name, 0);
+  const finalizationFalsePath = reachableFromOutput(workflow, finalizationGate.name, 1);
+  assert.ok(finalizationTruePath.has(finalizationCall.name));
+  assert.equal(
+    finalizationFalsePath.has(finalizationCall.name),
+    false,
+    '27 raw rows with an invalid FINAL barrier must not reach Finalization',
+  );
 
   const runFailureSql = normalizeSql(requireNode(
     workflow,
@@ -832,17 +1331,18 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     }
   }
 
-  const dispatchBranchTargets = directTargets(workflow, 'Has Documents to Dispatch?', 0);
-  assert.ok(dispatchBranchTargets.includes('Split Dispatch Documents'));
-  assert.ok(dispatchBranchTargets.includes('Complete Intake Event'));
-  const aggregatorBranchTargets = directTargets(workflow, 'Should Start Aggregator?', 0);
-  assert.ok(aggregatorBranchTargets.includes('Call Aggregator'));
-  assert.ok(aggregatorBranchTargets.includes('Complete Intake Event'));
-  const finalizationBranchTargets = directTargets(workflow, 'Should Start Finalization?', 0);
-  assert.ok(finalizationBranchTargets.includes('Call Finalization'));
-  assert.ok(finalizationBranchTargets.includes('Complete Intake Event'));
+  assert.ok(directTargets(workflow, dispatchGate.name, 0).includes('Complete Intake Event'));
+  const aggregatorGate = requireNode(workflow, 'Should Start Aggregator?');
+  assertGateReads(aggregatorGate, 'stage_action');
+  const aggregatorTruePath = reachableFromOutput(workflow, aggregatorGate.name, 0);
+  const aggregatorFalsePath = reachableFromOutput(workflow, aggregatorGate.name, 1);
+  assert.ok(aggregatorTruePath.has('Call Aggregator'));
+  assert.ok(aggregatorTruePath.has('Complete Intake Event'));
+  assert.equal(aggregatorFalsePath.has('Call Aggregator'), false);
+  assert.ok(directTargets(workflow, finalizationGate.name, 0).includes('Call Finalization'));
+  assert.ok(directTargets(workflow, finalizationGate.name, 0).includes('Complete Intake Event'));
   assert.ok(canReach(workflow, 'Complete Intake Event', 'Return Structured Outcome'));
-  assert.ok(canReach(workflow, 'Classify Intake Event', 'Return Event No-op'));
+  assert.ok(canReach(workflow, classifyEvent.name, 'Return Event No-op'));
 
   const nonStickyNodes = workflow.nodes.filter((node) =>
     node.type !== 'n8n-nodes-base.stickyNote');
