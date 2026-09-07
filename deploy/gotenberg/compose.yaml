@@ -1,0 +1,47 @@
+services:
+  gotenberg:
+    image: gotenberg/gotenberg:8.36.0-chromium
+    container_name: tender-pdf-gotenberg
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --api-body-limit=5MB
+      - --api-disable-download-from=true
+      - --webhook-disable=true
+      - --chromium-max-concurrency=1
+      - --chromium-max-queue-size=1
+      - --chromium-auto-start=false
+      - --chromium-start-timeout=30s
+      - --chromium-idle-shutdown-timeout=30s
+      - --chromium-deny-public-ips=true
+      - --chromium-deny-private-ips=true
+      - --chromium-disable-javascript=true
+      - --chromium-clear-cache=true
+      - --chromium-clear-cookies=true
+      - --chromium-clear-storage=true
+    environment:
+      TZ: Europe/Moscow
+    networks:
+      - n8n_default
+    shm_size: 128m
+    pids_limit: 128
+    oom_score_adj: 500
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 512M
+          pids: 128
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  n8n_default:
+    external: true

@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-07
 
-**Status:** approved for implementation planning
+**Status:** implemented and runtime-tested in inactive workflow `[PDF TEST] TENDER — Генерация отчета`; not promoted to production
+
+**Runtime evidence:** `evaluations/report-generation-pdf-execution-14649.md`
 
 **Scope:** convert the existing validated tender report HTML artifact to PDF without regenerating or reinterpreting report content.
 
@@ -72,7 +74,7 @@ The Compose project name is `tender-pdf`. It contains one service and connects o
 Use:
 
 ```text
-gotenberg/gotenberg:8-chromium
+gotenberg/gotenberg:8.36.0-chromium
 ```
 
 The Chromium-only variant is sufficient for HTML-to-PDF and avoids the unused LibreOffice component.

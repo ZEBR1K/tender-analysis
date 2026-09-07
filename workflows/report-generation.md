@@ -47,7 +47,9 @@ When Executed by Another Workflow (input от Finalization)
 → Создать HTML artifact
 ```
 
-`Создать HTML artifact` — terminal node текущего export. Он создаёт скачиваемый binary property `report_html`; delivery, DOCX и PDF в этот workflow не входят.
+`Создать HTML artifact` — terminal node текущего production export. Он создаёт скачиваемый binary property `report_html`; delivery, DOCX и PDF в production workflow пока не входят.
+
+Отдельный неактивный candidate `[PDF TEST] TENDER — Генерация отчета` документирован в разделе 9. Он не меняет приведённый выше production graph.
 
 ## 3. Report Snapshot
 
@@ -263,11 +265,64 @@ size = 30592 UTF-8 bytes
 decoded binary = Renderer HTML
 ```
 
-## 9. Limitations and future work
+## 9. Isolated HTML-to-PDF candidate
 
-Текущая реализация **не** включает:
+Неактивная MCP-доступная копия:
 
-- PDF generation;
+```text
+workflow = [PDF TEST] TENDER — Генерация отчета
+workflow_id = 1dQTcUnE5JIcrEfI
+repository snapshot = workflows/n8n-exports/beta/[PDF TEST] TENDER — Генерация отчета.json
+```
+
+Копия сохраняет параметры всех девяти production nodes и добавляет после валидированного HTML ровно одну последовательную ветку:
+
+```text
+Создать HTML artifact
+→ Подготовить HTML для Gotenberg
+→ Конвертировать HTML в PDF
+→ Проверить PDF artifact
+```
+
+`Подготовить HTML для Gotenberg` требует `artifact_validation.valid=true`, сохраняет `binary.report_html` и создаёт alias `binary.gotenberg_html` с обязательным именем `index.html`.
+
+`Конвертировать HTML в PDF` отправляет этот alias как multipart-поле `files` во внутренний endpoint:
+
+```text
+POST http://tender-pdf-gotenberg:3000/forms/chromium/convert/html
+```
+
+Параметры конвертации: A4 portrait, поля 0.39 дюйма, print media, background printing, timeout 120 секунд, без automatic retry и без `Never Error`.
+
+`Проверить PDF artifact` читает фактические bytes через `getBinaryDataBuffer`, требует сигнатуру `%PDF-` и MIME `application/pdf`, восстанавливает исходный `report_html` из exact linked item и возвращает:
+
+```text
+binary.report_html
+binary.report_pdf
+json.artifact_validation.valid = true
+json.pdf_artifact_validation.valid = true
+```
+
+Runtime gate 2026-09-07:
+
+| Проверка | Результат |
+|---|---:|
+| n8n execution | 14649 |
+| mode / status | manual / success |
+| input HTML | 598452 bytes |
+| Gotenberg request | 200 / application/pdf |
+| conversion time | 17686 ms |
+| PDF | 909642 bytes |
+| signature | `%PDF-` |
+| HTML preserved | yes |
+
+Candidate остался inactive и не имеет published version. Его runtime evidence находится в `evaluations/report-generation-pdf-execution-14649.md`; инфраструктурный Compose/runbook — в `deploy/gotenberg/`.
+
+## 10. Limitations and future work
+
+Текущий production workflow **не** включает:
+
+- promoted PDF generation (реализован только isolated candidate);
 - DOCX generation;
 - automatic delivery, Telegram или email;
 - manual upload workflow;
@@ -277,6 +332,6 @@ decoded binary = Renderer HTML
 
 Эти возможности являются future work/technical debt, а не частью текущего completed HTML workflow.
 
-## 10. Legacy documentation
+## 11. Legacy documentation
 
 Файлы `REPORT_GENERATION_V2_ARCHITECTURE.md`, `REPORT_GENERATION_V2_IMPLEMENTATION_PLAN.md` и `REPORT_GENERATION_V2_EXECUTOR_PROMPT.md` описывают согласование и поэтапную реализацию beta export. Они не являются описанием текущего runtime workflow. Актуальный источник документирования — этот файл и основной JSON export.
