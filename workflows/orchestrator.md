@@ -1,7 +1,7 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
-**Статус:** inactive repository candidate / Task 3 offline reviewed
-**Последнее обновление:** 2026-09-07
+**Статус:** inactive repository candidate / offline-tested / pre-DB runtime smoke GREEN
+**Последнее обновление:** 2026-09-08
 **Тип:** reusable new-run-only sub-workflow
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`
 **Canonical export:** `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
@@ -40,7 +40,10 @@ Orchestrator не владеет повторным запуском сущес�
 - повторно запускает Aggregator или Finalization;
 - анализирует документы или агрегирует 27 полей.
 
-Эти resume-решения принадлежат будущему workflow `TENDER — Intake Resume`. При конфликте создания Orchestrator только возвращает уже существующий незавершённый run и не запускает его документы.
+Эти resume-решения принадлежат реализованному и offline-tested inactive
+repository candidate `TENDER — Intake Resume`. При конфликте создания
+Orchestrator только возвращает уже существующий незавершённый run и не запускает
+его документы. Deployment и runtime promotion dispatcher остаются pending.
 
 ---
 
@@ -360,7 +363,18 @@ FullInfo HTTP не имеет явной retry/backoff policy. Retry долже�
 
 Manual/hardcoded entry удалён из canonical repository candidate, а concurrent new-run conflict теперь fail-closed и возвращает существующий unfinished run без повторного dispatch. Это только локальная Task 3 boundary.
 
-Полная политика repeated mark, completed tender, same-run document resume и manual/recovery routing ещё не реализована: её владельцем будет `TENDER — Intake Resume`. Production import, migration application, wiring и runtime verification также не выполнены.
+Политика repeated mark, completed tender, same-run document resume и
+manual/recovery routing реализована и offline-tested в inactive repository
+candidate `TENDER — Intake Resume`. Dispatcher сохраняет исходный
+`analysis_run_id`, не повторяет `completed`/`skipped` documents, ограничивает
+automatic path двумя Worker claims total и разрешает повтор exhausted failed
+только через manual override. Stale `processing` после одного часа reclaim-ится
+только после read-only n8n execution observation и guarded CAS; недоступность API
+ничего не мутирует.
+
+Production import, migration application, wiring и runtime verification всё ещё
+не выполнены. TenderPlan type-5 contract не установлен, поэтому poller не
+реализован и остаётся заблокированным до реального type-5 event.
 
 ---
 
@@ -385,6 +399,12 @@ tests/tender-orchestrator-input.test.mjs
 - `mode=each`, passthrough Worker input и `waitForSubWorkflow=false`;
 - единый structured terminal result;
 - прямой terminal path при zero supported documents.
+
+Read-only execution `14678` отдельно подтвердил exact input validation,
+TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke был
+намеренно остановлен до PostgreSQL registration: DB writes и Worker calls
+отсутствовали. Evidence:
+`evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
 
 До production нужны отдельные runtime gates:
 

@@ -1,8 +1,68 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-06
+**Snapshot date:** 2026-09-08
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw23-three-way-integration`
+**Branch at snapshot:** `codex/tenderplan-intake-resume`
+
+## TenderPlan intake/resume checkpoint — repository GREEN, production pending
+
+Starting feature commit before documentation integration: `4c32d0b`. `main` is
+not changed.
+
+### Verified
+
+- Inactive repository candidates `TENDER — Intake Resume`, `TENDER — Manual
+  Resume`, `TENDER — Recovery Scan` and `TENDER — Ошибка Intake Resume` are
+  implemented and offline-tested.
+- Dispatcher preserves the same `analysis_run_id`, never repeats
+  `completed`/`skipped` documents, and caps automatic dispatch at exactly two
+  Worker claims total. `manual_override=true` may retry an exhausted failed
+  document.
+- A `processing` document becomes stale after one hour. Reclaim requires
+  read-only n8n execution observation plus guarded CAS; unavailable API,
+  malformed observation and unknown status do not mutate state.
+- Read-only pre-DB smoke execution `14678` in workflow
+  `yocBDh0nCvPPxItn` verified exact Orchestrator input validation, TenderPlan
+  FullInfo identity and normalization for both test tender IDs. It stopped before
+  DB registration, contained no PostgreSQL/Execute Workflow node, performed no
+  DB writes and invoked no Worker. Evidence:
+  `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
+- Full offline suite after this checkpoint:
+  `node --test tests/*.test.mjs` → `518/518 PASS` on local date 2026-09-08.
+- Read-only local/live audit found Orchestrator and Worker differences. Document
+  Error Workflow, Aggregator and Finalization structurally match their local
+  snapshots.
+
+### Not verified / blocked
+
+- Live DB preflight execution `14676` found the intake migration absent:
+  intake table and required partial unique/helper indexes were all `false`.
+- Task 8 real TenderPlan type-5 contract is not complete. Probe workflow
+  `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
+  FullInfo returned `marks=[]` for both test tender IDs. No event paths or fixture
+  were fabricated.
+- Task 9 TenderPlan poller is not implemented and remains blocked on a real
+  type-5 event.
+- Existing live workflows were not changed. New workflows are inactive and
+  unpublished; production promotion and the runtime matrix remain pending.
+- MCP ignored requested folder placement for created test workflows and returned
+  `parentFolderId=null`; this is recorded as tooling/packaging drift. The safe
+  no-worker Orchestrator `thE9gLyNTvxLWt8I` remains unexecuted.
+
+Controlled activation order remains:
+
+```text
+migration
+→ error workflow
+→ Worker
+→ Orchestrator
+→ Dispatcher
+→ Manual Resume
+→ Recovery Scan
+→ TenderPlan poller
+```
+
+This checkpoint is not production-complete.
 
 ## DW-24 ActiveX GroupName NUL containment — runtime GREEN
 

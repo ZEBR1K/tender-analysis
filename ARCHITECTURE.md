@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-29
+**Последнее обновление:** 2026-09-08
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -71,7 +71,7 @@ Company matching — отдельный будущий слой.
 
 # 3. Основные компоненты
 
-Система состоит из семи n8n workflow:
+Production baseline описывается семью n8n workflow:
 
 ```text
 1. ТЕНДЕРЫ ОРКЕСТРАТОР
@@ -82,6 +82,20 @@ Company matching — отдельный будущий слой.
 6. TENDER — Финализация анализа
 7. TENDER — Генерация отчета (Report Generation V2)
 ```
+
+Дополнительно реализованы и offline-tested четыре inactive repository candidate;
+их deployment и runtime promotion ещё не выполнены:
+
+```text
+8. TENDER — Intake Resume
+9. TENDER — Manual Resume
+10. TENDER — Recovery Scan
+11. TENDER — Ошибка Intake Resume
+```
+
+TenderPlan type-5 poller отсутствует: Task 9 заблокирован до получения реального
+type-5 event contract. Пустой type-5 ответ и `marks=[]` не являются основанием
+придумывать event paths или fixture.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -177,6 +191,10 @@ tender_analysis_field_results
 | Workflow | Главная ответственность | Что не делает |
 |---|---|---|
 | `ТЕНДЕРЫ ОРКЕСТРАТОР` | Создать run, зарегистрировать документы, запустить Workers | Не анализирует содержимое документов |
+| `TENDER — Intake Resume` *(inactive candidate)* | Выбрать new/existing run и идемпотентно продолжить его lifecycle | Не является TenderPlan poller и не создаёт новый event contract |
+| `TENDER — Manual Resume` *(inactive candidate)* | Передать operator-selected `analysis_run_id` в dispatcher с manual override | Не выбирает run по `tender_id` и не дублирует dispatch policy |
+| `TENDER — Recovery Scan` *(inactive candidate)* | Read-only выбрать незавершённые runs для повторной передачи dispatcher | Не мутирует run/documents и не решает retry policy |
+| `TENDER — Ошибка Intake Resume` *(inactive candidate)* | Зафиксировать failure принадлежащего execution intake event | Не изменяет run/documents и не заменяет document Error Workflow |
 | `TENDER — Обработать документ` | Полностью обработать один документ и сохранить facts | Не агрегирует факты между документами |
 | `TENDER — Ошибка обработки документа` | Пометить упавший processing-document как failed | Не решает retry policy всего run |
 | `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
@@ -416,9 +434,24 @@ Typed contract:
 
 Все поля валидируются до HTTP/DB. FullInfo response обязан вернуть string `tender._id`, точно равный validated `tender_id`.
 
-Orchestrator не является владельцем resume policy. Будущий `TENDER — Intake Resume` выбирает новый или существующий `analysis_run_id`, обрабатывает repeated mark/manual/recovery и вызывает этот workflow только для new-run boundary. Conflict result Orchestrator имеет `action='concurrent_existing_run'` и не означает, что существующий run уже возобновлён.
+Orchestrator не является владельцем resume policy. Inactive repository candidate
+`TENDER — Intake Resume` уже реализован и offline-tested: он выбирает новый или
+существующий `analysis_run_id`, обрабатывает repeated mark/manual/recovery и
+вызывает Orchestrator только для new-run boundary. Conflict result Orchestrator
+имеет `action='concurrent_existing_run'` и не означает, что существующий run уже
+возобновлён.
 
-Manual/hardcoded boundary устранён только в inactive repository candidate. Production import, migration application, dispatcher wiring и runtime validation остаются отдельными gates.
+Dispatcher сохраняет тот же `analysis_run_id`, никогда не повторяет
+`completed`/`skipped` documents и ограничивает automatic path ровно двумя Worker
+claims total. Только `manual_override=true` может повторить exhausted failed
+document. `processing` считается stale после одного часа, но reclaim разрешён
+только после read-only observation соответствующего n8n execution и guarded CAS;
+недоступность execution API ничего не мутирует.
+
+Manual/hardcoded boundary устранён только в inactive repository candidate.
+Production import, migration application, dispatcher/error/manual/recovery wiring
+и runtime validation остаются отдельными gates. TenderPlan poller не реализован и
+заблокирован реальным type-5 event contract.
 
 ---
 

@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-03
+**Последнее обновление:** 2026-09-08
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -165,6 +165,40 @@ tender_id
 ```text
 workflows/orchestrator.md
 ```
+
+---
+
+## `TENDER — Intake Resume` — inactive repository candidate
+
+Typed dispatcher для new/existing run: сохраняет тот же `analysis_run_id`, не
+повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
+два Worker claims total. Manual override может повторно запустить exhausted
+failed document. Candidate реализован и offline-tested; deployment/runtime
+promotion pending.
+
+---
+
+## `TENDER — Manual Resume` — inactive repository candidate
+
+Operator-only adapter, который принимает существующий `analysis_run_id` и
+вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
+Candidate реализован и offline-tested; deployment pending.
+
+---
+
+## `TENDER — Recovery Scan` — inactive repository candidate
+
+Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
+Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
+Candidate реализован и offline-tested; deployment pending.
+
+---
+
+## `TENDER — Ошибка Intake Resume` — inactive repository candidate
+
+Workflow-level handler, который guarded update переводит только принадлежащий
+текущему execution intake event из `processing` в `failed`, сохраняя audit.
+Candidate реализован и offline-tested; wiring/runtime promotion pending.
 
 ---
 

@@ -5748,3 +5748,74 @@ new failure signatures: 0
 ```
 
 The seven full-suite signatures remain the exact local recovery baseline: procurement-subject current-scope RED; two execution-14104 A/B artifact/harness gates; source-derived DOCX ActiveX fixture-byte mismatch; immutable beta Worker hash; Validator prompt CRLF/LF equality; Targeted Recheck evidence-coordinate prompt. Cross-run `analog_allowed`, `application_documents` and `delivery_term` drift was not changed. Production n8n, PostgreSQL, credentials, publish/activation and runtime executions were not touched. A bounded isolated runtime canary remains pending a separate review checkpoint.
+
+---
+
+## 2026-09-08 — TenderPlan intake/resume documentation integration checkpoint
+
+Documentation integration started from feature commit `4c32d0b` on
+`codex/tenderplan-intake-resume`; `main` was not changed.
+
+Repository implementation/offline evidence is GREEN for four inactive
+candidates:
+
+```text
+TENDER — Intake Resume
+TENDER — Manual Resume
+TENDER — Recovery Scan
+TENDER — Ошибка Intake Resume
+```
+
+Dispatcher preserves the existing `analysis_run_id`, excludes
+`completed`/`skipped` documents, limits automatic dispatch to exactly two Worker
+claims total, and allows `manual_override=true` to retry exhausted failed.
+`processing` is stale after one hour, but reclaim requires read-only observation
+of the recorded n8n execution followed by guarded CAS; unavailable API performs
+no mutation.
+
+Read-only production evidence remains deliberately bounded:
+
+- execution `14676`: intake migration is absent; intake table and required
+  partial unique/helper indexes are all `false`;
+- type-5 probe `oCXpDbO3Xz1qrCBf`, execution `14677`: type-5 list empty and
+  FullInfo `marks=[]` for both supplied IDs, so Task 8 contract is incomplete and
+  no event paths/fixture were fabricated;
+- pre-DB smoke `yocBDh0nCvPPxItn`, execution `14678`: exact Orchestrator input
+  validation, FullInfo identity and normalization succeeded for both tender IDs,
+  then stopped before registration; no DB write and no Worker call occurred;
+- safe no-worker Orchestrator `thE9gLyNTvxLWt8I` was validated/read back but not
+  executed.
+
+The pre-DB evidence is stored in
+`evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
+Task 9 poller is not implemented and remains blocked on a representative real
+type-5 event.
+
+Full offline suite after the runtime probes:
+
+```text
+node --test tests/*.test.mjs
+518/518 PASS
+local date: 2026-09-08
+```
+
+Read-only local/live audit found Orchestrator and Worker drift; Document Error
+Workflow, Aggregator and Finalization structurally match. Existing live workflows
+were not changed. All new workflows remain inactive/unpublished, and production
+promotion/runtime matrix are pending. MCP ignored requested folder placement and
+returned `parentFolderId=null`; this remains tooling/packaging drift.
+
+Controlled activation order remains:
+
+```text
+migration
+→ error workflow
+→ Worker
+→ Orchestrator
+→ Dispatcher
+→ Manual Resume
+→ Recovery Scan
+→ TenderPlan poller
+```
+
+This is not a production-complete integration checkpoint.

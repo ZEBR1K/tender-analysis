@@ -203,7 +203,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |-|-|-|
 |`OR-2`|⚠ Local Task 3 implementation complete; inactive 14-node repository candidate использует typed sub-workflow input без Manual Trigger/hardcoded tender ID. Import/runtime/promotion не выполнены.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|⚠ Local new-run conflict boundary implemented; unfinished-run partial uniqueness и conflict return задокументированы. Полный repeated-mark/resume policy остаётся за будущим `TENDER — Intake Resume`; migration/runtime/promotion pending.|Orchestrator / Intake Resume|
+|`OR-7`|⚠ Inactive Intake Resume, Manual Resume, Recovery Scan и Intake Error repository candidates реализованы и offline-tested. Deployment/runtime promotion, production migration и реальный TenderPlan type-5 poller остаются pending; poller заблокирован отсутствующим real type-5 event contract.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|
@@ -2002,11 +2002,21 @@ Inactive canonical repository candidate больше не содержит Manua
 
 ## `OR-7` — repeated-run policy
 
-**Status:** Local Orchestrator boundary implemented; dispatcher incomplete.
+**Status:** Inactive dispatcher family implemented/offline-tested; deployment and runtime gates open.
 
 Task 3 добавил conflict-aware new-run INSERT и fresh SELECT существующего unfinished run без Worker dispatch. Partial unique index/migration существует как repository candidate.
 
-Политика repeated mark, completed tender, same-run document resume и manual/recovery routing остаётся в scope будущего `TENDER — Intake Resume`. Production migration, runtime concurrency test и promotion не выполнены.
+Inactive repository candidates `TENDER — Intake Resume`, `TENDER — Manual Resume`,
+`TENDER — Recovery Scan` и `TENDER — Ошибка Intake Resume` реализуют и
+offline-test repeated-event/resume boundary. Dispatcher сохраняет тот же
+`analysis_run_id`, не dispatch-ит `completed`/`skipped`, применяет automatic cap
+ровно в два Worker claims total и разрешает manual override для exhausted failed.
+Stale `processing` после одного часа требует read-only observation execution и
+guarded CAS; unavailable API не мутирует state.
+
+Debt не закрыт: production migration отсутствует, inactive candidates не
+promoted и не прошли runtime matrix. Task 8 не получил real type-5 event contract,
+поэтому Task 9 TenderPlan poller не реализован и остаётся заблокированным.
 
 \---
 

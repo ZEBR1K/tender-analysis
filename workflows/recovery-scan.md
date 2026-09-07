@@ -1,7 +1,7 @@
 # TENDER — Recovery Scan
 
-**Статус:** repository candidate / inactive  
-**Тип:** scheduled recovery workflow  
+- **Статус:** repository candidate / inactive
+- **Тип:** scheduled recovery workflow
 **Интервал:** каждые 10 минут
 
 ## Назначение
