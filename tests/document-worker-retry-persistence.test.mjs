@@ -79,9 +79,22 @@ test('Document Worker retry persistence removes only facts and units stale for t
   );
 
   const currentUnitIds = cteBody(canonicalSql, 'current_unit_ids');
+  assert.doesNotMatch(
+    currentUnitIds,
+    /\bCOALESCE\s*\(/iu,
+    'current_unit_ids must fail closed instead of treating missing input as an empty array',
+  );
   assert.match(
     currentUnitIds,
-    /SELECT\s+jsonb_array_elements_text\s*\(\s*COALESCE\s*\(\s*\$6::jsonb\s*->\s*'analysis_unit_ids'\s*,\s*'\[\]'::jsonb\s*\)\s*\)\s+AS\s+analysis_unit_id/iu,
+    /SELECT\s+jsonb_array_elements_text\s*\(\s*CASE\b[\s\S]*?\bEND\s*\)\s+AS\s+analysis_unit_id/iu,
+  );
+  assert.match(
+    currentUnitIds,
+    /WHEN\s+jsonb_typeof\s*\(\s*\$6::jsonb\s*->\s*'analysis_unit_ids'\s*\)\s*=\s*'array'\s+AND\s+\(?\s*\$6::jsonb\s*->\s*'analysis_unit_ids'\s*\)?\s*<>\s*'\[\]'::jsonb\s+THEN\s+\$6::jsonb\s*->\s*'analysis_unit_ids'/iu,
+  );
+  assert.match(
+    currentUnitIds,
+    /ELSE\s+jsonb_build_object\s*\(\s*'[^']+'\s*,[\s\S]+?\)\s+END/iu,
   );
 
   const deletedStaleFacts = cteBody(canonicalSql, 'deleted_stale_facts');
