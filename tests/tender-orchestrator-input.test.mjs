@@ -211,6 +211,10 @@ function structuredTerminalCodeNodes() {
     'trigger_kind',
     'created_new_run',
     'action',
+    'next_state',
+    'documents_total',
+    'registered_documents_count',
+    'documents_dispatched',
   ];
 
   return nodesOfType('n8n-nodes-base.code').filter((node) => {
@@ -613,10 +617,18 @@ test('normalization rejects a mismatched TenderPlan identity', () => {
     ),
   )?.[1];
   const responseIdVariable = normalizationCode.match(
-    /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:String\(\s*)?tender\._id\b/,
+    /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*typeof\s+tender\._id\s*===\s*['"]string['"]\s*\?\s*tender\._id\.trim\s*\(\s*\)\s*:\s*['"]{2}\s*;/,
   )?.[1];
   assert.ok(requestedIdVariable, 'normalization must bind the validated requested tender_id');
-  assert.ok(responseIdVariable, 'normalization must bind TenderPlan tender._id');
+  assert.ok(
+    responseIdVariable,
+    'normalization must bind TenderPlan tender._id only when it is a string',
+  );
+  assert.doesNotMatch(
+    normalizationCode,
+    /\bString\s*\(\s*tender\._id\b/,
+    'normalization must not coerce a non-string TenderPlan tender._id',
+  );
   assert.ok(
     codeThrowsOnMismatch(normalizationCode, responseIdVariable, requestedIdVariable),
     'normalization must fail closed when TenderPlan tender._id differs from requested tender_id',
@@ -780,6 +792,16 @@ test('created and concurrent paths return one symmetric structured result', () =
       `terminal result must preserve validated ${field}`,
     );
   }
+  assert.match(
+    codeSource(terminal),
+    /\bnext_state\s*:\s*row\.status\b/,
+    'terminal next_state must expose the lifecycle run status',
+  );
+  assert.doesNotMatch(
+    codeSource(terminal),
+    /\bconst\s+nextState\b/,
+    'terminal action outcome must not be stored in next_state',
+  );
   assert.match(
     codeSource(terminal),
     /\breturn\s*\[\s*\{\s*json\s*:/i,
