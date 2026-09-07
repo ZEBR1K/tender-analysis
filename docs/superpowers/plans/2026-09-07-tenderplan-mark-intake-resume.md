@@ -522,7 +522,7 @@ git commit -m "refactor: make orchestrator a typed new-run workflow"
 - Create: `workflows/intake-error-workflow.md`
 - Create: `tests/tender-intake-error-workflow.test.mjs`
 
-- [ ] **Step 1: Verify Error Trigger and error-workflow settings in official docs**
+- [x] **Step 1: Verify Error Trigger and error-workflow settings in official docs**
 
 ```powershell
 rg -n "Error Trigger|error workflow|Save execution progress|execution.id" "F:/Vibe-projects/n8n/references/n8n-docs"
@@ -530,7 +530,7 @@ rg -n "Error Trigger|error workflow|Save execution progress|execution.id" "F:/Vi
 
 Use only documented payload fields for the installed n8n version.
 
-- [ ] **Step 2: Write the failing error-workflow test**
+- [x] **Step 2: Write the failing error-workflow test**
 
 Assert that the new export:
 
@@ -540,7 +540,7 @@ Assert that the new export:
 - sets `status='failed'`, clears no audit fields, and updates `updated_at`;
 - has no document-status update and cannot accidentally behave like the existing document error workflow.
 
-- [ ] **Step 3: Create the minimal workflow**
+- [x] **Step 3: Create the minimal workflow**
 
 Topology:
 
@@ -554,18 +554,24 @@ Error Trigger
 The PostgreSQL update must be guarded:
 
 ```sql
-UPDATE tender_analysis_intake_events
+UPDATE tender_analysis_intake_events AS event
 SET status = 'failed',
     error_message = left($2, 2000),
     updated_at = now()
-WHERE n8n_execution_id = $1
-  AND status = 'processing'
-RETURNING id, event_key, analysis_run_id, status;
+WHERE event.id = (
+  SELECT owned.id
+  FROM tender_analysis_intake_events AS owned
+  WHERE owned.n8n_execution_id = $1
+    AND owned.status = 'processing'
+)
+RETURNING event.id, event.event_key, event.analysis_run_id, event.status;
 ```
+
+The scalar subquery intentionally has no `LIMIT`: duplicate processing owners must raise a PostgreSQL cardinality error before mutation.
 
 If failure occurred before an event was claimed, leave the failed n8n execution visible and return `event_updated=false`; do not invent an event row without a tender identity.
 
-- [ ] **Step 4: Validate and test**
+- [x] **Step 4: Validate and test**
 
 Run the repository workflow validator used by existing tests, then:
 
@@ -575,7 +581,7 @@ node --test tests/tender-intake-error-workflow.test.mjs
 
 Expected: PASS.
 
-- [ ] **Step 5: Document and commit**
+- [x] **Step 5: Document and commit**
 
 Document the ownership guard and the limitation for pre-claim failures.
 
@@ -583,6 +589,8 @@ Document the ownership guard and the limitation for pre-claim failures.
 git add -- "workflows/n8n-exports/TENDER — Ошибка Intake Resume.json" workflows/intake-error-workflow.md tests/tender-intake-error-workflow.test.mjs
 git commit -m "feat: add intake error audit workflow"
 ```
+
+**Checkpoint (2026-09-07):** offline repository suite `502/502` PASS and technical review PASS. This checkpoint is not runtime evidence; migration application, workflow import/read-back, target workflow Error Workflow setting, wiring, and runtime verification remain pending.
 
 ---
 
