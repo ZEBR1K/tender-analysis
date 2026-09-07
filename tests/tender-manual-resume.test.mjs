@@ -20,11 +20,6 @@ function requireNode(workflow, name) {
   return node;
 }
 
-function directTargets(workflow, name) {
-  return (workflow.connections[name]?.main?.[0] ?? [])
-    .map((connection) => connection.node);
-}
-
 async function executePreparation(node, analysisRunId, executionId) {
   assert.equal(node.type, 'n8n-nodes-base.code');
   const defaultDeclaration = /const ANALYSIS_RUN_ID = '';/u;
@@ -113,10 +108,12 @@ test('manual resume is a strict three-node adapter to Intake Resume', async () =
   const dispatcher = dispatcherCalls[0];
   assert.equal(dispatcher.name, 'Execute TENDER — Intake Resume');
   assert.equal(dispatcher.typeVersion, 1.3);
-  assert.equal(
-    dispatcher.parameters.workflowId.cachedResultName,
-    'TENDER — Intake Resume',
-  );
+  assert.deepEqual(dispatcher.parameters.workflowId, {
+    __rl: true,
+    value: '',
+    mode: 'list',
+    cachedResultName: 'TENDER — Intake Resume',
+  });
   assert.equal(dispatcher.parameters.options.waitForSubWorkflow, true);
   assert.deepEqual(
     Object.keys(dispatcher.parameters.workflowInputs.value).sort(),
@@ -153,9 +150,22 @@ test('manual resume is a strict three-node adapter to Intake Resume', async () =
     false,
   );
 
-  assert.deepEqual(directTargets(workflow, trigger.name), [preparation.name]);
-  assert.deepEqual(directTargets(workflow, preparation.name), [dispatcher.name]);
-  assert.deepEqual(directTargets(workflow, dispatcher.name), []);
+  assert.deepEqual(workflow.connections, {
+    [trigger.name]: {
+      main: [[{
+        node: preparation.name,
+        type: 'main',
+        index: 0,
+      }]],
+    },
+    [preparation.name]: {
+      main: [[{
+        node: dispatcher.name,
+        type: 'main',
+        index: 0,
+      }]],
+    },
+  });
   assert.deepEqual(
     workflow.nodes.map((node) => node.type),
     [
