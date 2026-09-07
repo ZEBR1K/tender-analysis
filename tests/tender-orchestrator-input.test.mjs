@@ -834,16 +834,18 @@ test('zero supported documents bypass Split Out and return the shared structured
   const splitOutputs = [0, 1].filter((index) =>
     outputTargets(gate.name, index).some((target) => canReach(target, attachmentSplit.name)),
   );
-  const emptyOutputs = [0, 1].filter((index) =>
-    outputTargets(gate.name, index).some((target) =>
-      canReach(target, terminal.name, new Set([attachmentSplit.name])),
-    ),
-  );
   assert.equal(splitOutputs.length, 1, 'supported-document gate must have one dispatch output');
-  assert.equal(emptyOutputs.length, 1, 'supported-document gate must have one no-document output');
-  assert.notEqual(
-    splitOutputs[0],
-    emptyOutputs[0],
-    'empty/unsupported documents must use the non-dispatch gate output',
+  const supportedOutput = splitOutputs[0];
+  assert.deepEqual(
+    outputTargets(gate.name, supportedOutput),
+    [attachmentSplit.name, terminal.name],
+    'supported-document output must fan out directly to Split Out first and terminal result second',
+  );
+
+  const noDocumentOutput = supportedOutput === 0 ? 1 : 0;
+  assert.deepEqual(
+    outputTargets(gate.name, noDocumentOutput),
+    [terminal.name],
+    'empty/unsupported-document output must go directly to the shared terminal result',
   );
 });
