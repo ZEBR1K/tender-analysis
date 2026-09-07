@@ -165,6 +165,10 @@ Required logical fields:
 | `observed_at` | Source event time when available |
 | `trigger_kind` | `tenderplan_mark`, `recovery_scan` or `manual` |
 | `analysis_run_id` | Run selected or created by the dispatcher |
+| `status` | `processing`, `completed` or `failed` |
+| `attempts` | Number of event-processing claims |
+| `n8n_execution_id` | Current event-processing owner |
+| `processing_started_at` | Start time of the current event claim |
 | `action` | Dispatcher outcome |
 | `error_message` | Bounded failure detail |
 | `created_at` | First persistence time |
@@ -172,7 +176,7 @@ Required logical fields:
 
 `event_key` must be unique per source. Prefer the stable notification identifier supplied by TenderPlan. If the runtime payload has no stable notification ID, derive a deterministic key from the normalized event type, `tender_id`, source timestamp and other immutable notification coordinates confirmed by the runtime payload. Manual and recovery invocations use synthetic keys containing their n8n execution ID and selected `analysis_run_id`.
 
-An existing ledger row is terminally duplicate only when `processed_at` is set. If the previous intake attempt failed before successful dispatch, a later poll may reclaim the unprocessed event and continue it; persistence of the event must not turn a transient downstream failure into permanent data loss.
+An existing ledger row is terminally duplicate only when `status='completed'` and `processed_at` is set. Insert/retry uses an atomic event claim that records `n8n_execution_id`, increments `attempts` and sets `processing_started_at`. A fresh `processing` owner cannot be replaced. A `failed` event or a stale `processing` event whose recorded execution is confirmed terminal may be reclaimed. This prevents concurrent dispatch of the same event while allowing recovery after a transient downstream failure.
 
 The event ledger is not the source of truth for analysis completion. `tender_analysis_runs` and its child tables remain the source of truth. The ledger answers only whether an external event was seen and what action it caused.
 
@@ -231,7 +235,7 @@ Expected business outcomes return a structured result. Unknown states, malformed
 
 ## 8. Run resolution and tender deduplication
 
-For `tenderplan_mark`, the dispatcher resolves by `(source='tenderplan', tender_id)` inside a PostgreSQL transaction-level advisory lock for that key.
+For `tenderplan_mark`, the dispatcher resolves by `(source='tenderplan', tender_id)`. PostgreSQL enforces at most one unfinished run with a partial unique index on `(source, tender_id)` for statuses other than `completed`.
 
 Resolution policy:
 
@@ -252,7 +256,9 @@ aggregating
 failed
 ```
 
-The advisory lock prevents two distinct mark events processed concurrently from both deciding that no run exists. The same lock must be used by any future explicit new-run command.
+Before creating the index, migration preflight must fail if existing data contains more than one unfinished run for the same `(source, tender_id)`; it must not choose or delete a run automatically.
+
+The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or found the concurrent unfinished run. Therefore two distinct mark events may both reach the create boundary, but only one can create the run. The other reuses the returned unfinished `analysis_run_id` and must not register documents again.
 
 For `manual` and `recovery_scan`, `analysis_run_id` is authoritative. The dispatcher validates that the run exists and reads `tender_id` from PostgreSQL; it does not accept conflicting tender identity from the caller.
 
@@ -403,7 +409,7 @@ Credentials required by TenderPlan and the n8n API remain in n8n Credentials. No
 
 ## 15. Concurrency and idempotency invariants
 
-1. One procurement may have historical completed runs, but at most one unfinished run may be selected by automatic intake.
+1. One procurement may have historical completed runs, but PostgreSQL enforces at most one unfinished run per `(source, tender_id)`.
 2. One unique TenderPlan notification causes at most one dispatcher action.
 3. One Document Worker execution processes exactly one document.
 4. Worker atomic claim remains the final protection against duplicate dispatch.
@@ -421,7 +427,7 @@ The design is accepted only when implementation proves at least these cases:
 
 1. First mark for an unknown `tender_id` creates exactly one run and registers all documents once.
 2. Duplicate delivery of the same notification creates no run and no Worker execution.
-3. Two concurrent distinct mark events for one new tender still create one unfinished run.
+3. Two concurrent distinct mark events for one new tender still create one unfinished run, and the losing conflict-aware insert does not register documents.
 4. Repeated mark on a run with two completed and one failed document dispatches only the failed document with the same `analysis_run_id`.
 5. `failed`, `attempts=1` is automatically claimed once and becomes `attempts=2`.
 6. `failed`, `attempts=2` is not automatically dispatched.
@@ -446,7 +452,7 @@ Verification must include offline workflow/SQL contract tests, workflow validati
 
 1. Add offline fixtures/tests for run resolution, retry budget and stale compare-and-set.
 2. Resolve `DW-8` retry persistence correctness in the selected Worker package.
-3. Add and document the intake event table migration.
+3. Add and document the intake event table and unfinished-run partial unique index migration, including duplicate-data preflight.
 4. Convert Orchestrator to a typed new-run sub-workflow without changing its downstream contracts.
 5. Build and test `TENDER — Intake / Resume` against non-production data.
 6. Add Manual Resume and verify exhausted-run reopening.
