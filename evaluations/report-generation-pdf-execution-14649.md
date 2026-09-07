@@ -66,8 +66,19 @@ Execution `14650` pinned only the HTTP node output to `not-a-pdf` bytes while re
 
 This confirms that a present binary and nominal MIME type cannot produce silent PDF success when the payload does not have the `%PDF-` signature.
 
-## Remaining promotion gate
+## Visual acceptance
 
-The MCP read-only interface exposes binary metadata but has no binary-download operation. The PDF must still be downloaded from execution `14649` in the n8n UI and visually checked for page count, Russian text, clipping, overlaps, table pagination and print colors before promotion to production.
+The PDF was downloaded from execution `14649` as `0293b5c1-4ba7-4228-a596-406d7f0de562.pdf`. Local `pdfinfo` verification confirmed:
+
+```text
+pages = 153
+page size = A4 (595.92 x 842.88 pt)
+file size = 909642 bytes
+encrypted = no
+JavaScript = no
+PDF version = 1.4
+```
+
+On 2026-09-07 the workflow owner visually reviewed the downloaded artifact and explicitly confirmed that the content transferred correctly and looked good. An exhaustive independent page-by-page visual inspection was stopped at the owner's request; this evidence therefore records owner visual acceptance rather than a separate 153-page Codex visual audit.
 
 The successful conversion proves that the real 598452-byte HTML fits within the configured converter limits for this run. It does not record peak host RAM/swap; repeat host-level resource observation if the 512 MiB or 128 PID limits are changed.

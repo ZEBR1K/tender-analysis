@@ -315,6 +315,8 @@ Runtime gate 2026-09-07:
 | PDF | 909642 bytes |
 | signature | `%PDF-` |
 | HTML preserved | yes |
+| PDF technical check | 153 pages, A4, unencrypted, no JavaScript |
+| Visual review | accepted by workflow owner |
 
 Candidate остался inactive и не имеет published version. Его runtime evidence находится в `evaluations/report-generation-pdf-execution-14649.md`; инфраструктурный Compose/runbook — в `deploy/gotenberg/`.
 
