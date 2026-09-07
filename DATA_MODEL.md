@@ -1219,8 +1219,8 @@ tender_analysis_field_results_unique
 ### Читают / будут читать
 
 - Finalization workflow для 27/27 completion barrier;
-- Report Generation V2 для immutable snapshot и Report Model;
-- будущие PDF/DOCX/XLSX builders;
+- Report Generation V2 для immutable snapshot, Report Model, HTML и производного PDF artifact;
+- будущие DOCX/XLSX builders;
 - будущая delivery-интеграция;
 - future audit/frontend.
 
@@ -1399,7 +1399,7 @@ facts
 units
 ```
 
-Workflow читает эти таблицы одним read-only snapshot query. PDF/DOCX/XLSX и delivery остаются future consumers.
+Workflow читает эти таблицы одним read-only snapshot query, строит HTML и конвертирует exact HTML artifact в PDF без дополнительных DB reads. DOCX/XLSX и delivery остаются future consumers.
 
 ---
 

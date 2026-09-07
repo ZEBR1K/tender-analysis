@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-07
 
-**Status:** implemented and runtime-tested in inactive workflow `[PDF TEST] TENDER — Генерация отчета`; not promoted to production
+**Status:** implemented and runtime-tested in inactive workflow `[PDF TEST] TENDER — Генерация отчета`; promoted and published in production version `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b`; post-promotion production execution pending
 
 **Runtime evidence:** `evaluations/report-generation-pdf-execution-14649.md`
 
@@ -12,7 +12,7 @@
 
 Production `TENDER — Финализация анализа` calls `TENDER — Генерация отчета` only after the PostgreSQL-backed 27/27 FINAL barrier is complete and the completion claim succeeds.
 
-`TENDER — Генерация отчета` currently performs:
+Before promotion, `TENDER — Генерация отчета` performed:
 
 ```text
 Finalization event
@@ -25,9 +25,11 @@ Finalization event
 → binary.report_html
 ```
 
-The report workflow does not call AI, extract new facts, change FINAL results, or write report data to PostgreSQL. The live workflows and canonical local exports were checked on 2026-09-07 and matched in node configuration and connections. The latest inspected successful Report execution was `14631`; it produced a `598452` byte `report_html` artifact.
+The report workflow does not call AI, extract new facts, change FINAL results, or write report data to PostgreSQL. The original live workflows and canonical local exports were checked on 2026-09-07 and matched in node configuration and connections. The latest inspected pre-promotion successful Report execution was `14631`; it produced a `598452` byte `report_html` artifact.
 
 The built-in n8n Convert to File node does not support PDF output. A browser-based converter is therefore required.
+
+The workflow owner later copied the three tested PDF nodes into the existing production workflow and published version `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b`. Read-only verification confirmed 12 nodes, the exact sequential connections and active/draft parity. A post-promotion production execution was deliberately deferred; isolated execution `14649` remains the current runtime evidence.
 
 ## 2. Selected approach
 

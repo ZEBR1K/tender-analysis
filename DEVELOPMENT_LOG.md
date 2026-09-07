@@ -5748,3 +5748,31 @@ new failure signatures: 0
 ```
 
 The seven full-suite signatures remain the exact local recovery baseline: procurement-subject current-scope RED; two execution-14104 A/B artifact/harness gates; source-derived DOCX ActiveX fixture-byte mismatch; immutable beta Worker hash; Validator prompt CRLF/LF equality; Targeted Recheck evidence-coordinate prompt. Cross-run `analog_allowed`, `application_documents` and `delivery_term` drift was not changed. Production n8n, PostgreSQL, credentials, publish/activation and runtime executions were not touched. A bounded isolated runtime canary remains pending a separate review checkpoint.
+
+---
+
+## 2026-09-07 — Gotenberg PDF path promoted and repository synchronized
+
+The workflow owner manually transferred the three tested PDF nodes from inactive `[PDF TEST] TENDER — Генерация отчета` into the existing production workflow `TENDER — Генерация отчета` (`ckPnP3hRhKu4Mf9u`) and published version `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b`.
+
+Read-only verification confirmed:
+
+```text
+active = true
+versionId = activeVersionId = a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b
+nodes = 12
+Создать HTML artifact
+→ Подготовить HTML для Gotenberg
+→ Конвертировать HTML в PDF
+→ Проверить PDF artifact
+```
+
+The published node logic and connections are semantically equal to the tested candidate. The production UI export omits optional default fields (`mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`, `fullResponse=false`, `neverError=false`); current official node type definitions confirm those defaults. Production MCP access remains disabled.
+
+Repository synchronization added a guarded read-only production export script and refreshed canonical `workflows/n8n-exports/TENDER — Генерация отчета.json` from the published live version. Report workflow, architecture, status, data-model and technical-debt documentation now distinguish three separate claims:
+
+- published production topology is verified;
+- isolated execution `14649` and owner visual review are verified;
+- post-promotion runtime of production version `a6fbb0f6-…` is intentionally not verified yet.
+
+No production execution, DB query/write, workflow write, credential change or infrastructure mutation was performed by Codex during this synchronization.

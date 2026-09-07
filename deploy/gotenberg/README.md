@@ -1,6 +1,6 @@
 # Internal Gotenberg service
 
-This compose project runs the HTML-to-PDF converter used by the isolated report workflow candidate.
+This compose project runs the internal HTML-to-PDF converter used by production `TENDER — Генерация отчета` (`ckPnP3hRhKu4Mf9u`). The inactive `[PDF TEST]` workflow remains the runtime/visual promotion evidence.
 
 ## Boundaries
 

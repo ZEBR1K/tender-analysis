@@ -127,6 +127,110 @@
       ],
       "id": "369a8202-ec25-404c-b455-0506c002b76c",
       "name": "Сгенерировать HTML1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first();\nconst reportHtml = input.binary?.report_html;\n\nif (input.json?.artifact_validation?.valid !== true) {\n  throw new Error('[Подготовить HTML для Gotenberg] REPORT_HTML_NOT_VALIDATED');\n}\nif (!reportHtml || reportHtml.mimeType !== 'text/html') {\n  throw new Error('[Подготовить HTML для Gotenberg] REPORT_HTML_BINARY_INVALID');\n}\nif (typeof reportHtml.fileName !== 'string' || !/\\.html$/i.test(reportHtml.fileName)) {\n  throw new Error('[Подготовить HTML для Gotenberg] REPORT_HTML_FILENAME_INVALID');\n}\n\nreturn [{\n  json: input.json,\n  binary: {\n    ...input.binary,\n    gotenberg_html: {\n      ...reportHtml,\n      fileName: 'index.html',\n      fileExtension: 'html',\n      mimeType: 'text/html',\n    },\n  },\n}];"
+      },
+      "id": "20faecc4-430b-4cb5-8725-7afb8dcdf78c",
+      "name": "Подготовить HTML для Gotenberg",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://tender-pdf-gotenberg:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "gotenberg_html"
+            },
+            {
+              "name": "paperWidth",
+              "value": "8.27"
+            },
+            {
+              "name": "paperHeight",
+              "value": "11.7"
+            },
+            {
+              "name": "marginTop",
+              "value": "0.39"
+            },
+            {
+              "name": "marginBottom",
+              "value": "0.39"
+            },
+            {
+              "name": "marginLeft",
+              "value": "0.39"
+            },
+            {
+              "name": "marginRight",
+              "value": "0.39"
+            },
+            {
+              "name": "landscape",
+              "value": "false"
+            },
+            {
+              "name": "emulatedMediaType",
+              "value": "print"
+            },
+            {
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "name": "singlePage",
+              "value": "false"
+            },
+            {
+              "name": "preferCssPageSize",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "report_pdf"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "f80b7b76-9709-44b9-8d8e-9e23674fd058",
+      "name": "Конвертировать HTML в PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1760,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first();\nconst source = $('Создать HTML artifact').item;\nconst reportHtml = source.binary?.report_html;\nconst reportPdf = response.binary?.report_pdf;\n\nif (source.json?.artifact_validation?.valid !== true) {\n  throw new Error('[Проверить PDF artifact] REPORT_HTML_NOT_VALIDATED');\n}\nif (!reportHtml || reportHtml.mimeType !== 'text/html') {\n  throw new Error('[Проверить PDF artifact] REPORT_HTML_BINARY_LOST');\n}\nif (!reportPdf) {\n  throw new Error('[Проверить PDF artifact] REPORT_PDF_BINARY_MISSING');\n}\n\nconst pdfBuffer = await this.helpers.getBinaryDataBuffer(0, 'report_pdf');\nconst signature = pdfBuffer.subarray(0, 5).toString('ascii');\n\nif (pdfBuffer.length <= 5 || signature !== '%PDF-') {\n  throw new Error('[Проверить PDF artifact] REPORT_PDF_SIGNATURE_INVALID');\n}\nif (reportPdf.mimeType !== 'application/pdf') {\n  throw new Error('[Проверить PDF artifact] REPORT_PDF_MIME_INVALID');\n}\nif (typeof reportHtml.fileName !== 'string' || !/\\.html$/i.test(reportHtml.fileName)) {\n  throw new Error('[Проверить PDF artifact] REPORT_HTML_FILENAME_INVALID');\n}\n\nconst pdfFilename = reportHtml.fileName.replace(/\\.html$/i, '.pdf');\n\nreturn [{\n  json: {\n    ...source.json,\n    pdf_artifact_validation: {\n      valid: true,\n      property: 'report_pdf',\n      size_bytes: pdfBuffer.length,\n      signature,\n      source_property: 'report_html',\n    },\n  },\n  binary: {\n    report_html: reportHtml,\n    report_pdf: {\n      ...reportPdf,\n      mimeType: 'application/pdf',\n      fileName: pdfFilename,\n      fileExtension: 'pdf',\n    },\n  },\n}];"
+      },
+      "id": "9b532e37-b46e-4fea-a384-65371e0d0708",
+      "name": "Проверить PDF artifact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1984,
+        512
+      ]
     }
   ],
   "pinData": {},
@@ -218,6 +322,39 @@
           }
         ]
       ]
+    },
+    "Подготовить HTML для Gotenberg": {
+      "main": [
+        [
+          {
+            "node": "Конвертировать HTML в PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Конвертировать HTML в PDF": {
+      "main": [
+        [
+          {
+            "node": "Проверить PDF artifact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать HTML artifact": {
+      "main": [
+        [
+          {
+            "node": "Подготовить HTML для Gotenberg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,
@@ -226,10 +363,9 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "9d095af6-b60d-4ad9-8061-432201ec0e8e",
+  "versionId": "a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b",
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "3e6aed5223ad0dff30e883ae576e523ce84b72220d1e6049aae86bceaa9cfa44"
+    "templateCredsSetupCompleted": true
   },
   "nodeGroups": [],
   "id": "ckPnP3hRhKu4Mf9u",

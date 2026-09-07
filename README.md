@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-03
+**Последнее обновление:** 2026-09-07
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -140,7 +140,9 @@ TENDER — Генерация отчета V2
     ↓
 self-contained HTML + binary report_html
     ↓
-будущие PDF / DOCX / XLSX / delivery
+internal Gotenberg conversion + binary report_pdf
+    ↓
+будущие DOCX / XLSX / delivery
 ```
 
 ---
@@ -278,7 +280,7 @@ Workflow ID: `cSsh9yjpS7t5p0OO`.
 
 ## `TENDER — Генерация отчета`
 
-Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Он не отправляет файл наружу и не создаёт PDF, DOCX, XLSX или Telegram delivery.
+Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` конвертирует этот же HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены, post-promotion production execution намеренно отложен.
 
 Workflow ID: `ckPnP3hRhKu4Mf9u`.
 

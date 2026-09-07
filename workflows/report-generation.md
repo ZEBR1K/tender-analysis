@@ -2,7 +2,7 @@
 
 **Workflow ID:** `ckPnP3hRhKu4Mf9u`
 **Фактический export:** `workflows/n8n-exports/TENDER — Генерация отчета.json`
-**Назначение:** детерминированно построить client-facing HTML artifact из уже завершённого FINAL-анализа закупки.
+**Назначение:** детерминированно построить client-facing HTML artifact из уже завершённого FINAL-анализа закупки и конвертировать exact HTML bytes в PDF без повторной генерации содержания.
 
 ## 1. Место в системе
 
@@ -45,11 +45,14 @@ When Executed by Another Workflow (input от Finalization)
 → Проверить Report Model                   (Проверить Report Model2)
 → Сгенерировать HTML                       (Сгенерировать HTML1)
 → Создать HTML artifact
+→ Подготовить HTML для Gotenberg
+→ Конвертировать HTML в PDF
+→ Проверить PDF artifact
 ```
 
-`Создать HTML artifact` — terminal node текущего production export. Он создаёт скачиваемый binary property `report_html`; delivery, DOCX и PDF в production workflow пока не входят.
+`Проверить PDF artifact` — terminal node текущего production export. Workflow возвращает оба скачиваемых binary properties: исходный `report_html` и производный `report_pdf`. Delivery, DOCX и XLSX в production workflow пока не входят.
 
-Отдельный неактивный candidate `[PDF TEST] TENDER — Генерация отчета` документирован в разделе 9. Он не меняет приведённый выше production graph.
+Отдельный неактивный `[PDF TEST] TENDER — Генерация отчета` документирован в разделе 9 как executed promotion evidence. Production Finalization продолжает вызывать прежний production workflow ID `ckPnP3hRhKu4Mf9u`; caller rewiring не потребовался.
 
 ## 3. Report Snapshot
 
@@ -265,9 +268,9 @@ size = 30592 UTF-8 bytes
 decoded binary = Renderer HTML
 ```
 
-## 9. Isolated HTML-to-PDF candidate
+## 9. Production HTML-to-PDF stage and promotion evidence
 
-Неактивная MCP-доступная копия:
+Первичная реализация и runtime gate выполнены в неактивной MCP-доступной копии:
 
 ```text
 workflow = [PDF TEST] TENDER — Генерация отчета
@@ -275,7 +278,7 @@ workflow_id = 1dQTcUnE5JIcrEfI
 repository snapshot = workflows/n8n-exports/beta/[PDF TEST] TENDER — Генерация отчета.json
 ```
 
-Копия сохраняет параметры всех девяти production nodes и добавляет после валидированного HTML ровно одну последовательную ветку:
+Копия сохранила параметры всех девяти исходных production nodes и добавила после валидированного HTML ровно одну последовательную ветку. Та же логика теперь опубликована в production workflow:
 
 ```text
 Создать HTML artifact
@@ -318,13 +321,27 @@ Runtime gate 2026-09-07:
 | PDF technical check | 153 pages, A4, unencrypted, no JavaScript |
 | Visual review | accepted by workflow owner |
 
-Candidate остался inactive и не имеет published version. Его runtime evidence находится в `evaluations/report-generation-pdf-execution-14649.md`; инфраструктурный Compose/runbook — в `deploy/gotenberg/`.
+Test candidate остался inactive и не имеет published version. Его runtime evidence находится в `evaluations/report-generation-pdf-execution-14649.md`; инфраструктурный Compose/runbook — в `deploy/gotenberg/`.
+
+Production promotion checkpoint 2026-09-07:
+
+| Проверка | Результат |
+|---|---:|
+| Production workflow | `ckPnP3hRhKu4Mf9u` |
+| Published version | `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` |
+| Active / draft parity | `versionId = activeVersionId` |
+| Nodes | 12 |
+| PDF connections | exact sequential chain verified read-only |
+| Production MCP access | disabled |
+| Post-promotion execution | intentionally not run; pending |
+
+Live production parameters совпадают с tested candidate по исполняемой семантике. UI export production version опускает optional default fields `mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`, `fullResponse=false` и `neverError=false`; official n8n node definitions подтверждают эти defaults. Canonical repository export сохраняет exact live representation.
 
 ## 10. Limitations and future work
 
 Текущий production workflow **не** включает:
 
-- promoted PDF generation (реализован только isolated candidate);
+- runtime evidence именно для опубликованной production version после promotion;
 - DOCX generation;
 - automatic delivery, Telegram или email;
 - manual upload workflow;
@@ -332,7 +349,7 @@ Candidate остался inactive и не имеет published version. Его r
 - client-safe projection of internal `review_note`;
 - XLSX artifact.
 
-Эти возможности являются future work/technical debt, а не частью текущего completed HTML workflow.
+PDF topology опубликована, но production runtime gate остаётся открытым как `RG-1`. Остальные возможности являются future work/technical debt, а не частью текущего report workflow.
 
 ## 11. Legacy documentation
 

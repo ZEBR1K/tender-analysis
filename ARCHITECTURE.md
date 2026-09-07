@@ -37,7 +37,7 @@ tender_id
 → Report Generation V2 HTML artifact
 ```
 
-Текущий Report Generation V2 строит self-contained HTML и binary `report_html`. PDF, DOCX, XLSX и external delivery остаются будущими этапами. Детальный актуальный контракт: `workflows/report-generation.md`.
+Текущий Report Generation V2 строит self-contained HTML и binary `report_html`, затем конвертирует ровно этот artifact во внутреннем Gotenberg и возвращает binary `report_pdf`. Опубликованный 12-node production graph подтверждён read-only snapshot 2026-09-07; isolated runtime/visual gate пройден, post-promotion production execution намеренно ещё не выполнялся. DOCX, XLSX и external delivery остаются будущими этапами. Детальный актуальный контракт: `workflows/report-generation.md`.
 
 AI transport в актуальном production execution — Polza AI. Используемая модель:
 
@@ -182,7 +182,7 @@ tender_analysis_field_results
 | `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
 | `TENDER - Targeted Recheck` | Повторно проверить проблемное поле | Не является глобальным Aggregator |
 | `TENDER — Финализация анализа` | Проверить 27/27 и атомарно перевести run в `completed` | Не формирует содержимое отчёта |
-| `TENDER — Генерация отчета` | Построить validated Report Model, self-contained HTML и binary `report_html` | Не создаёт PDF/DOCX/XLSX и не отправляет файл наружу |
+| `TENDER — Генерация отчета` | Построить validated Report Model, self-contained HTML, binary `report_html` и производный binary `report_pdf` | Не переинтерпретирует FINAL, не создаёт DOCX/XLSX и не отправляет файл наружу |
 
 ---
 
@@ -286,7 +286,7 @@ ready_for_aggregation → aggregating
 → completed_at установлен
 ```
 
-Таким образом, `AG-0` закрыт для текущего MVP. После successful completion вызывается Report Generation V2; текущий продуктовый artifact — HTML, без PDF/DOCX/XLSX/delivery.
+Таким образом, `AG-0` закрыт для текущего MVP. После successful completion вызывается Report Generation V2; текущая опубликованная topology создаёт HTML и производный PDF без повторной генерации содержания. Post-promotion production canary ещё не выполнен; DOCX/XLSX/delivery отсутствуют.
 
 ---
 
@@ -1651,9 +1651,11 @@ load immutable Report Snapshot
 → validated Report Model
 → self-contained HTML
 → binary report_html
+→ internal Gotenberg HTML conversion
+→ binary report_pdf
 ```
 
-Report generator не повторно интерпретирует документы AI-моделью. PDF, DOCX, XLSX и delivery не реализованы.
+Report generator не повторно интерпретирует документы AI-моделью. PDF является производным artifact из exact `report_html`; DOCX, XLSX и delivery не реализованы. Изолированный execution `14649` и visual review подтвердили PDF path, а первый execution опубликованной production-версии остаётся отдельным runtime gate.
 
 Он должен использовать уже финальные:
 
@@ -2279,12 +2281,13 @@ single completion claimant
 run.status = completed
         ↓
 single report generation
-В результате lifecycle замкнут до HTML artifact:
+В результате опубликованный lifecycle замкнут до HTML и PDF artifacts:
 tender_id
 → analysis
 → 27 FINAL
 → completed
 → report_html
+→ report_pdf
 
 AG-8 GREEN подтверждён только в test Aggregator. Document Worker production candidate упакован только локально и ещё не promoted. Перед клиентским отчётом текущий milestone:
 
@@ -2295,7 +2298,7 @@ test workflow promotion / wiring clean Document Worker candidate
 → client report
 ```
 
-Остаются future work: PDF, DOCX, XLSX, manual upload и automatic delivery.
+Остаются future work: post-promotion PDF runtime canary, DOCX, XLSX, manual upload и automatic delivery.
 ---
 
 # 81. Краткая схема будущего завершённого MVP

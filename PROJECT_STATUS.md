@@ -450,15 +450,15 @@ side-effect-free bounded canary be considered.
 
 ### Production workflows
 
-| Workflow | ID | Active | Read-only snapshot 2026-08-28 |
+| Workflow | ID | Active | Latest verified/read-only checkpoint |
 |---|---|---:|---|
 | `TENDER — Обработать документ` | `1Pw61ZY3HgBSvcUr` | yes | API вернул 37 nodes, version `f3d9fdb3-…`; test hardening ниже не promoted |
 | `TENDER — Агрегация закупки` | `iLt7wLLfueg8qffZ` | yes | owner-supplied read-only checkpoint 2026-09-03: active=draft, 24 nodes/version `89b33d04-…`; local canonical остаётся 38-node snapshot `1c9019de-…` |
 | `TENDER - Targeted Recheck` | `9uDOU31DGo30fGXX` | yes | owner-supplied read-only checkpoint 2026-09-03: active 64 nodes/version `4e0858c9-…`; live/local drift и node-count convention описаны ниже |
 | `TENDER — Финализация анализа` | `cSsh9yjpS7t5p0OO` | yes | 5 nodes; protected workflow, не менялся в текущем цикле |
-| `TENDER — Генерация отчета` | `ckPnP3hRhKu4Mf9u` | yes | 9 nodes; protected workflow, не менялся в текущем цикле |
+| `TENDER — Генерация отчета` | `ckPnP3hRhKu4Mf9u` | yes | 2026-09-07: published active version `a6fbb0f6-…`, 12 nodes; exact HTML → Gotenberg → PDF chain присутствует, `versionId=activeVersionId`; post-promotion production execution не выполнялся по решению owner |
 
-Production PostgreSQL и published production workflows в текущем локальном цикле Codex не изменялись намеренно. Более раннее утверждение, что 24-node Aggregator оставался unpublished draft, устарело: owner-supplied read-back для цепочки `14389–14391` фиксирует его как active и `sameAsDraft=true`.
+Production PostgreSQL Codex не изменял. Workflow owner вручную перенёс проверенные PDF nodes в production Report Generation и опубликовал version `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b`; Codex выполнил только read-only сверку и repository sync. Более раннее утверждение, что 24-node Aggregator оставался unpublished draft, устарело: owner-supplied read-back для цепочки `14389–14391` фиксирует его как active и `sameAsDraft=true`.
 
 ### MCP-enabled test workflows
 
@@ -469,8 +469,27 @@ Production PostgreSQL и published production workflows в текущем лок
 | `[DW-17 MANUAL REVIEW — INACTIVE] TENDER — Обработать документ` | `8dEt6A8IwTybFuIq` | no | inactive/unpublished 71-node audit contour; current observed draft `62041fec-…`; executions `14374/14376` technical GREEN through readiness, semantic gate FAIL; Aggregator disabled |
 | `[TEST CODEX] TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | published active `f11906df-…`; current unpublished draft `3654ec40-…` содержит 30 nodes и bounded recovery для exact-one omission; execution `14398` относится к прежнему active graph и завершился fail-closed на `9/10 candidate_decisions`; новый draft runtime не запускался |
 | `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | published active `13b3c124-…`; current unpublished draft `cf0f67f6-…` содержит только stitched-quote prompt hardening; execution `14398` до Targeted Recheck не дошёл |
+| `[PDF TEST] TENDER — Генерация отчета` | `1dQTcUnE5JIcrEfI` | no | inactive 12-node source candidate; execution `14649` GREEN, `%PDF-`, 909642 bytes, 153 A4 pages, HTML preserved; visual review accepted; retained as promotion evidence |
 
 MCP доступ включён только для тестового контура. Это не является разрешением менять production workflows.
+
+### Report Generation PDF promotion checkpoint — 2026-09-07
+
+```text
+production Finalization cSsh9yjpS7t5p0OO
+→ production Report Generation ckPnP3hRhKu4Mf9u
+→ published version a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b
+→ 12 nodes
+→ report_html + report_pdf topology
+```
+
+Read-only live comparison подтвердил те же 12 node names, Code/HTTP logic и connections, что в tested candidate. Production UI export опускает только default values `mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`, `fullResponse=false`, `neverError=false`; official node definitions подтверждают эти defaults. Это configuration-equivalent representation, не semantic drift. Production MCP access остаётся выключен.
+
+Post-promotion execution намеренно не запускался. Поэтому статус разделён явно:
+
+- published production topology — verified;
+- isolated execution `14649` и visual PDF QA — verified;
+- runtime конкретной production version `a6fbb0f6-…` — not verified yet.
 
 Repository также содержит inactive local-only export `[TEMP] TENDER — Ручная загрузка файлов` (`tmpManual16726ZO`, 8 nodes). Несмотря на имя, его текущая роль — сформировать calibration fixture, зарегистрировать test run/documents и вызвать test Worker; это не production manual-upload feature.
 
