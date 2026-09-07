@@ -2,15 +2,37 @@
   "name": "ТЕНДЕРЫ ОРКЕСТРАТОР",
   "nodes": [
     {
-      "parameters": {},
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tender_id",
+              "type": "string"
+            },
+            {
+              "name": "source",
+              "type": "string"
+            },
+            {
+              "name": "source_event_key",
+              "type": "string"
+            },
+            {
+              "name": "trigger_kind",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
       "position": [
         -1008,
         -176
       ],
       "id": "3a8b1d0d-90f0-4b5b-b44e-ca6416e006dd",
-      "name": "When clicking ‘Execute workflow’"
+      "name": "When Executed by Another Workflow"
     },
     {
       "parameters": {
@@ -158,54 +180,46 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "02a8026a-991d-474e-9257-9d2d71d42fbc",
-              "name": "tender_id",
-              "value": "6a7ef6ac3951804ff32da751",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "mode": "runOnceForEachItem",
+        "jsCode": "const tenderId = typeof $json.tender_id === 'string' ? $json.tender_id.trim() : '';\nconst source = typeof $json.source === 'string' ? $json.source.trim().toLowerCase() : '';\nconst sourceEventKey = typeof $json.source_event_key === 'string' ? $json.source_event_key.trim() : '';\nconst triggerKind = typeof $json.trigger_kind === 'string' ? $json.trigger_kind.trim() : '';\n\nif (!tenderId || tenderId.length > 128) {\n  throw new Error('[Orchestrator input] tender_id must be a non-empty string up to 128 characters.');\n}\nif (!source || source.length > 64 || source !== 'tenderplan') {\n  throw new Error('[Orchestrator input] source must be tenderplan.');\n}\nif (!sourceEventKey || sourceEventKey.length > 512) {\n  throw new Error('[Orchestrator input] source_event_key must be a non-empty string up to 512 characters.');\n}\nconst allowedTriggerKinds = new Set(['tenderplan_mark', 'recovery_scan', 'manual']);\nif (!triggerKind || triggerKind.length > 64 || !allowedTriggerKinds.has(triggerKind)) {\n  throw new Error('[Orchestrator input] trigger_kind is invalid.');\n}\n\nreturn {\n  json: {\n    tender_id: tenderId,\n    source,\n    source_event_key: sourceEventKey,\n    trigger_kind: triggerKind,\n  },\n};"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -576,
         -176
       ],
       "id": "b5834b87-8800-4184-ade8-835567175ecd",
-      "name": "id тендера 2"
+      "name": "Проверить вход Orchestrator"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "02a8026a-991d-474e-9257-9d2d71d42fbc",
-              "name": "tender_id",
-              "value": "6a7af04c3951804ff31b66a6",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT\n    id AS analysis_run_id,\n    source,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    status,\n    documents_total,\n    tender_meta,\n    created_at,\n    updated_at,\n    false AS created_new_run\nFROM tender_analysis_runs\nWHERE source = $1\n  AND tender_id = $2\n  AND status <> 'completed'\nORDER BY created_at DESC\nLIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ [ $json.source, $json.tender_id ] }}"
+        }
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
       "position": [
         -576,
         -384
       ],
       "id": "8e2d0991-d7b7-435e-97c5-ba2d46896d42",
-      "name": "id тендера 1"
+      "name": "Загрузить существующий незавершённый запуск",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH inserted AS (\n    INSERT INTO tender_analysis_runs (\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta\n    )\n    VALUES (\n        $1,\n        $2,\n        NULLIF($3, ''),\n        NULLIF($4, ''),\n        'created',\n        $5::integer,\n        $6::jsonb\n    )\n    RETURNING\n        id,\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta,\n        created_at,\n        updated_at\n)\n\nSELECT\n    id AS analysis_run_id,\n    source,\n    tender_id,\n    tender_number,\n    tender_external_id,\n    status,\n    documents_total,\n    tender_meta,\n\n    -- Возвращаем attachments дальше в workflow,\n    -- чтобы следующая Split Out нода продолжила работать.\n    $7::jsonb AS attachments,\n\n    created_at,\n    updated_at\nFROM inserted;",
+        "query": "WITH input_documents AS (\n    SELECT\n        (document->>'document_index')::integer AS document_index,\n        NULLIF(document->>'file_name', '') AS file_name,\n        NULLIF(document->>'file_extension', '') AS file_extension,\n        NULLIF(document->>'display_name', '') AS display_name,\n        NULLIF(document->>'download_url', '') AS download_url,\n        NULLIF(document->>'publication_at', '')::timestamptz AS publication_at,\n        NULLIF(document->>'source_size', '')::bigint AS source_size\n    FROM jsonb_array_elements($7::jsonb) AS document\n),\ninserted_run AS (\n    INSERT INTO tender_analysis_runs (\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta\n    )\n    VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), 'created', $5::integer, $6::jsonb)\n    ON CONFLICT (source, tender_id) WHERE status <> 'completed'\n    DO NOTHING\n    RETURNING *\n),\nregistered_documents AS (\n    INSERT INTO tender_analysis_documents (\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n    )\n    SELECT\n        run.id,\n        document.document_index,\n        document.file_name,\n        document.file_extension,\n        document.display_name,\n        document.download_url,\n        document.publication_at,\n        document.source_size,\n        'pending'\n    FROM inserted_run AS run\n    CROSS JOIN input_documents AS document\n    ON CONFLICT (analysis_run_id, document_index) DO UPDATE SET\n        file_name = EXCLUDED.file_name,\n        file_extension = EXCLUDED.file_extension,\n        display_name = EXCLUDED.display_name,\n        download_url = EXCLUDED.download_url,\n        publication_at = EXCLUDED.publication_at,\n        source_size = EXCLUDED.source_size\n    RETURNING\n        id AS document_id,\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n),\ndocument_stats AS (\n    SELECT\n        count(*)::integer AS registered_documents_count,\n        COALESCE(\n            jsonb_agg(\n                jsonb_build_object(\n                    'document_id', document_id,\n                    'document_index', document_index,\n                    'file_name', file_name,\n                    'file_extension', file_extension,\n                    'display_name', display_name,\n                    'download_url', download_url,\n                    'publication_at', publication_at,\n                    'source_size', source_size,\n                    'status', status\n                ) ORDER BY document_index\n            ),\n            '[]'::jsonb\n        ) AS attachments\n    FROM registered_documents\n),\nactivated_run AS (\n    UPDATE tender_analysis_runs AS run\n    SET\n        status = 'processing',\n        documents_total = stats.registered_documents_count,\n        updated_at = now()\n    FROM inserted_run AS inserted\n    CROSS JOIN document_stats AS stats\n    WHERE run.id = inserted.id\n    RETURNING run.*\n)\nSELECT\n    run.id AS analysis_run_id,\n    run.source,\n    run.tender_id,\n    run.tender_number,\n    run.tender_external_id,\n    run.status,\n    run.documents_total,\n    stats.registered_documents_count,\n    run.tender_meta,\n    stats.attachments,\n    run.created_at,\n    run.updated_at,\n    true AS created_new_run\nFROM activated_run AS run\nCROSS JOIN document_stats AS stats\n\nUNION ALL\n\nSELECT\n    NULL::uuid AS analysis_run_id,\n    $1::text AS source,\n    $2::text AS tender_id,\n    NULL::text AS tender_number,\n    NULL::text AS tender_external_id,\n    NULL::text AS status,\n    0::integer AS documents_total,\n    0::integer AS registered_documents_count,\n    $6::jsonb AS tender_meta,\n    '[]'::jsonb AS attachments,\n    NULL::timestamptz AS created_at,\n    NULL::timestamptz AS updated_at,\n    false AS created_new_run\nWHERE NOT EXISTS (SELECT 1 FROM inserted_run);",
         "options": {
           "queryReplacement": "={{[  $json.tender_meta.source ?? 'tenderplan',  $json.tender_meta.tender_id,  $json.tender_meta.tender_number ?? '',  $json.tender_meta.tender_external_id ?? '',  $json.attachments.length,  JSON.stringify($json.tender_meta),  JSON.stringify($json.attachments)]}}"
         }
@@ -217,7 +231,7 @@
         -176
       ],
       "id": "77b81029-3f13-4615-933c-58b2791554dd",
-      "name": "Создать запуск анализа",
+      "name": "Создать запуск и зарегистрировать документы",
       "credentials": {
         "postgres": {
           "id": "RFpUr3McElcwyoxy",
@@ -227,26 +241,37 @@
     },
     {
       "parameters": {
-        "operation": "executeQuery",
-        "query": "WITH input_documents AS (\n    SELECT\n        (doc->>'document_index')::integer AS document_index,\n        NULLIF(doc->>'file_name', '') AS file_name,\n        NULLIF(doc->>'file_extension', '') AS file_extension,\n        NULLIF(doc->>'display_name', '') AS display_name,\n        NULLIF(doc->>'download_url', '') AS download_url,\n        NULLIF(doc->>'publication_at', '')::timestamptz AS publication_at,\n        NULLIF(doc->>'source_size', '')::bigint AS source_size\n    FROM jsonb_array_elements($2::jsonb) AS doc\n),\n\nupserted_documents AS (\n    INSERT INTO tender_analysis_documents (\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n    )\n    SELECT\n        $1::uuid,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        'pending'\n    FROM input_documents\n\n    ON CONFLICT (\n        analysis_run_id,\n        document_index\n    )\n    DO UPDATE SET\n        file_name = EXCLUDED.file_name,\n        file_extension = EXCLUDED.file_extension,\n        display_name = EXCLUDED.display_name,\n        download_url = EXCLUDED.download_url,\n        publication_at = EXCLUDED.publication_at,\n        source_size = EXCLUDED.source_size\n\n    RETURNING\n        id,\n        analysis_run_id,\n        document_index,\n        file_name,\n        file_extension,\n        display_name,\n        download_url,\n        publication_at,\n        source_size,\n        status\n),\n\ndocuments_json AS (\n    SELECT\n        COUNT(*)::integer AS registered_documents_count,\n\n        jsonb_agg(\n            jsonb_build_object(\n                'document_id', id,\n                'document_index', document_index,\n                'file_name', file_name,\n                'file_extension', file_extension,\n                'display_name', display_name,\n                'download_url', download_url,\n                'publication_at', publication_at,\n                'source_size', source_size,\n                'status', status\n            )\n            ORDER BY document_index\n        ) AS attachments\n    FROM upserted_documents\n),\n\nupdated_run AS (\n    UPDATE tender_analysis_runs\n    SET\n        status = 'processing',\n        documents_total = (\n            SELECT registered_documents_count\n            FROM documents_json\n        )\n    WHERE id = $1::uuid\n\n    RETURNING\n        id,\n        source,\n        tender_id,\n        tender_number,\n        tender_external_id,\n        status,\n        documents_total,\n        tender_meta,\n        created_at,\n        updated_at\n)\n\nSELECT\n    r.id AS analysis_run_id,\n    r.source,\n    r.tender_id,\n    r.tender_number,\n    r.tender_external_id,\n    r.status,\n    r.documents_total,\n    d.registered_documents_count,\n    r.tender_meta,\n    d.attachments,\n    r.created_at,\n    r.updated_at\nFROM updated_run r\nCROSS JOIN documents_json d;",
-        "options": {
-          "queryReplacement": "={{[  $json.analysis_run_id,  JSON.stringify($json.attachments)]}}"
-        }
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f140774a-e51a-4d82-8ae3-4f0292b889f8",
+              "leftValue": "={{ $json.created_new_run === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "type": "n8n-nodes-base.postgres",
-      "typeVersion": 2.6,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
         416,
         -192
       ],
       "id": "1c23971d-94df-42dd-a03a-a223b24af368",
-      "name": "Зарегистрировать документы",
-      "credentials": {
-        "postgres": {
-          "id": "RFpUr3McElcwyoxy",
-          "name": "KITATEH Tenders"
-        }
-      }
+      "name": "Создан новый запуск?"
     },
     {
       "parameters": {
@@ -281,62 +306,37 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "02a8026a-991d-474e-9257-9d2d71d42fbc",
-              "name": "tender_id",
-              "value": "6a7af04c3951804ff31b66a6",
-              "type": "string"
-            }
-          ]
-        },
-        "options": {}
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nif (items.length !== 1) {\n  throw new Error(`[Orchestrator conflict] Expected exactly one unfinished run, received ${items.length}.`);\n}\n\nconst row = items[0]?.json ?? {};\nconst request = $('Создать запуск и зарегистрировать документы').item.json;\n\nif (!row.analysis_run_id || !row.source || !row.tender_id || !row.status) {\n  throw new Error('[Orchestrator conflict] Unfinished run was not found after insert conflict.');\n}\nif (row.status === 'completed') {\n  throw new Error('[Orchestrator conflict] Completed run cannot own an unfinished-run conflict.');\n}\nif (row.source !== request.source || row.tender_id !== request.tender_id) {\n  throw new Error('[Orchestrator conflict] Loaded run identity does not match the conflict sentinel.');\n}\n\nreturn [{\n  json: {\n    ...row,\n    created_new_run: false,\n    action: 'concurrent_existing_run',\n  },\n}];"
       },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -560,
         -512
       ],
       "id": "73f55e3c-45fc-4fb9-865a-5bed6f5c20f0",
-      "name": "id тендера "
+      "name": "Проверить существующий запуск"
     }
   ],
   "pinData": {},
   "connections": {
-    "When clicking ‘Execute workflow’": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "id тендера 2",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "id тендера 1",
+            "node": "Проверить вход Orchestrator",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "разделить документы": {
+    "Проверить вход Orchestrator": {
       "main": [
         [
           {
-            "node": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "нормализовать карточку": {
-      "main": [
-        [
-          {
-            "node": "Создать запуск анализа",
+            "node": "получить полную информацию о тендере",
             "type": "main",
             "index": 0
           }
@@ -354,6 +354,57 @@
         ]
       ]
     },
+    "нормализовать карточку": {
+      "main": [
+        [
+          {
+            "node": "Создать запуск и зарегистрировать документы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать запуск и зарегистрировать документы": {
+      "main": [
+        [
+          {
+            "node": "Создан новый запуск?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создан новый запуск?": {
+      "main": [
+        [
+          {
+            "node": "разделить документы",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Загрузить существующий незавершённый запуск",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "разделить документы": {
+      "main": [
+        [
+          {
+            "node": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ": {
       "main": [
         [
@@ -365,50 +416,23 @@
         ]
       ]
     },
-    "id тендера 2": {
-      "main": [
-        [
-          {
-            "node": "получить полную информацию о тендере",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "id тендера 1": {
-      "main": [
-        []
-      ]
-    },
-    "Создать запуск анализа": {
-      "main": [
-        [
-          {
-            "node": "Зарегистрировать документы",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Зарегистрировать документы": {
-      "main": [
-        [
-          {
-            "node": "разделить документы",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Запустить обработку документа": {
       "main": [
         []
       ]
     },
-    "id тендера ": {
+    "Загрузить существующий незавершённый запуск": {
+      "main": [
+        [
+          {
+            "node": "Проверить существующий запуск",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить существующий запуск": {
       "main": [
         []
       ]
