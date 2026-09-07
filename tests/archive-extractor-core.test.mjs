@@ -73,7 +73,7 @@ test('path policy rejects absolute, UNC, drive, URI, dot, parent and NUL paths',
 test('safe errors expose typed audit data without stack traces', () => {
   const safe = toSafeError(new ArchiveError('ARCHIVE_CORRUPT', 'broken', 422, { entry: 'a.zip' }));
   assert.deepEqual(safe, {
-    ok: false,
+    success: false,
     error: { code: 'ARCHIVE_CORRUPT', message: 'broken', details: { entry: 'a.zip' } },
   });
   const unknown = toSafeError(new Error('secret stack'));

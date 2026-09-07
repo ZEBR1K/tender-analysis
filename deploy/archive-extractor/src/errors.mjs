@@ -31,7 +31,7 @@ export function toSafeError(error) {
     ? error
     : new ArchiveError('ARTIFACT_STORE_ERROR', 'Archive extractor failed', 500);
   return {
-    ok: false,
+    success: false,
     error: {
       code: typed.code,
       message: String(typed.message || 'Archive extractor failed').slice(0, 500),

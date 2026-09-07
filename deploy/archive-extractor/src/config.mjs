@@ -33,6 +33,7 @@ export const SUPPORTED_ARCHIVE_EXTENSIONS = new Set([
 export const config = Object.freeze({
   host: process.env.ARCHIVE_EXTRACTOR_HOST || '127.0.0.1',
   port: positiveInteger('ARCHIVE_EXTRACTOR_PORT', 8080),
+  publicBaseUrl: process.env.ARCHIVE_EXTRACTOR_PUBLIC_BASE_URL || 'http://tender-archive-extractor:8080',
   rootDirectory: path.resolve(
     process.env.ARCHIVE_EXTRACTOR_ROOT || path.join(process.cwd(), '.archive-extractor'),
   ),
