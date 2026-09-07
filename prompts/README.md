@@ -23,6 +23,6 @@ For Targeted Recheck, v1.1 is the historical template review copy. V1.2 is the e
 
 Workflow JSON remains the executable source of truth; this directory exists for review, audit and prompt-drift tests.
 
-The two 2026-09-07 Document Worker artifacts intentionally preserve the complete executable Code-node sources, not shortened prose excerpts. A regression test requires byte-for-byte equality with their corresponding workflow parameters.
+The two 2026-09-07 Document Worker artifacts intentionally preserve the complete executable Code-node sources, not shortened prose excerpts. A regression test requires exact content equality with their corresponding workflow parameters after normalizing only platform line endings.
 
 These artifacts contain no execution-specific IDs or tender-specific regression literals. Changes require the Validator regression suite and a runtime canary in `[3 TEST]` before production promotion.
