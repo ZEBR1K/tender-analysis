@@ -132,14 +132,22 @@ function assertIfGateCondition(gate, { field, equals }) {
   assert.equal(gate.type, 'n8n-nodes-base.if');
   const conditions = gate.parameters?.conditions;
   assert.equal(conditions?.combinator, 'and', `${gate.name} must use AND conditions`);
-  assert.equal(
-    conditions?.conditions?.length,
-    1,
-    `${gate.name} must have exactly one auditable predicate`,
-  );
-  const condition = conditions.conditions[0];
-  const expression = unwrapN8nExpression(condition.leftValue);
   const fieldExpression = `$json.${field}`;
+  const configuredConditions = conditions?.conditions ?? [];
+  assert.ok(configuredConditions.length > 0, `${gate.name} must have conditions`);
+  const targetConditions = configuredConditions.filter((condition) => {
+    const expression = unwrapN8nExpression(condition.leftValue);
+    return expression === fieldExpression ||
+      expression.startsWith(`${fieldExpression}===`) ||
+      expression.startsWith(`${fieldExpression}!==`);
+  });
+  assert.equal(
+    targetConditions.length,
+    1,
+    `${gate.name} must have exactly one auditable ${field} predicate`,
+  );
+  const condition = targetConditions[0];
+  const expression = unwrapN8nExpression(condition.leftValue);
   const operator = condition.operator ?? {};
 
   if (expression === fieldExpression) {
@@ -172,33 +180,54 @@ function assertIfGateCondition(gate, { field, equals }) {
   assert.equal(operator.singleValue, true, `${gate.name} must use a unary boolean operator`);
 }
 
-async function executeCodeNode(node, inputJson, globals = {}) {
-  assert.equal(node.type, 'n8n-nodes-base.code', `${node.name} must be a Code node`);
-  const inputItems = inputJson.map((json) => ({ json: structuredClone(json) }));
-  const cloneItems = () => structuredClone(inputItems);
-  const context = vm.createContext({
-    $input: {
-      all: cloneItems,
-      first: () => structuredClone(inputItems[0]),
-      item: structuredClone(inputItems[0]),
-    },
-    $json: structuredClone(inputItems[0]?.json ?? {}),
-    $execution: { id: 'structural-contract-test-execution' },
-    structuredClone,
-    console,
-    ...globals,
-  });
-  const script = new vm.Script(
-    `(async () => {\n${node.parameters.jsCode}\n})()`,
-    { filename: `${node.name}.code-node.js` },
-  );
-  const rawResult = await script.runInContext(context, { timeout: 1_000 });
-  assert.notEqual(rawResult, undefined, `${node.name} returned no data`);
+function normalizeCodeNodeResult(rawResult, nodeName) {
+  assert.notEqual(rawResult, undefined, `${nodeName} returned no data`);
   const rawItems = Array.isArray(rawResult) ? rawResult : [rawResult];
-  const normalized = rawItems.map((item) =>
+  return rawItems.map((item) =>
     (item && typeof item === 'object' && Object.hasOwn(item, 'json'))
       ? item
       : { json: item });
+}
+
+async function executeCodeNode(node, inputJson, globals = {}) {
+  assert.equal(node.type, 'n8n-nodes-base.code', `${node.name} must be a Code node`);
+  const inputItems = inputJson.map((json) => ({ json: structuredClone(json) }));
+  // Canonical exports omit `mode` on all-items Code nodes, matching n8n's default.
+  const mode = node.parameters.mode ?? 'runOnceForAllItems';
+  if (!['runOnceForAllItems', 'runOnceForEachItem'].includes(mode)) {
+    throw new Error(`unknown Code node mode: ${String(mode)}`);
+  }
+
+  const executeOnce = async (currentItem) => {
+    const cloneItems = () => structuredClone(inputItems);
+    const context = vm.createContext({
+      $input: {
+        all: cloneItems,
+        first: () => structuredClone(inputItems[0]),
+        item: structuredClone(currentItem),
+      },
+      $json: structuredClone(currentItem?.json ?? {}),
+      $execution: { id: 'structural-contract-test-execution' },
+      structuredClone,
+      console,
+      ...globals,
+    });
+    const script = new vm.Script(
+      `(async () => {\n${node.parameters.jsCode}\n})()`,
+      { filename: `${node.name}.code-node.js` },
+    );
+    const rawResult = await script.runInContext(context, { timeout: 1_000 });
+    return normalizeCodeNodeResult(rawResult, node.name);
+  };
+
+  if (mode === 'runOnceForAllItems') {
+    return structuredClone(await executeOnce(inputItems[0]));
+  }
+
+  const normalized = [];
+  for (const inputItem of inputItems) {
+    normalized.push(...await executeOnce(inputItem));
+  }
   return structuredClone(normalized);
 }
 
@@ -399,6 +428,20 @@ test('decision model: exactly one hour is stale and carries the inclusive cutoff
 
   assert.equal(action.action, 'cas_to_failed');
   assert.equal(action.compareAndSet.startedAt, action.compareAndSet.cutoff);
+
+  const validOffsetAction = evaluate({
+    intent: automaticIntents[0],
+    document: {
+      id: 'doc-valid-offset-time',
+      analysisRunId: 'run-1',
+      status: 'processing',
+      attempts: 1,
+      startedAt: '2026-09-07T14:30:00.000+03:00',
+      executionId: 'execution-valid-offset',
+      executionState: null,
+    },
+  }).documentActions[0];
+  assert.equal(validOffsetAction.action, 'leave_owned');
 });
 
 test('decision model: stage routing follows the approved ready, aggregating, and completed table', () => {
@@ -516,6 +559,20 @@ test('decision model: malformed intent, state, attempts, counts, and timestamps 
         },
       },
     },
+    {
+      name: 'impossible normalized calendar date',
+      input: {
+        intent: automaticIntents[0],
+        document: {
+          ...validDocument,
+          analysisRunId: 'run-1',
+          status: 'processing',
+          startedAt: '2026-02-30T10:00:00.000Z',
+          executionId: 'execution-impossible-date',
+          executionState: 'running',
+        },
+      },
+    },
   ];
 
   for (const scenario of invalidCases) {
@@ -533,6 +590,87 @@ test('decision model: malformed intent, state, attempts, counts, and timestamps 
     /finalBarrierValid must be boolean/u,
     'missing FINAL barrier validity',
   );
+});
+
+test('test harness: Code execution honors all-items, each-item, default, and unknown modes', async () => {
+  const inputs = [{ id: 'one' }, { id: 'two' }, { id: 'three' }];
+  const allItemsNode = {
+    name: 'All Items Probe',
+    type: 'n8n-nodes-base.code',
+    parameters: {
+      mode: 'runOnceForAllItems',
+      jsCode: 'return [{ json: { count: $input.all().length } }];',
+    },
+  };
+  assert.deepEqual(await executeCodeNode(allItemsNode, inputs), [
+    { json: { count: 3 } },
+  ]);
+
+  const eachItemNode = {
+    name: 'Each Item Probe',
+    type: 'n8n-nodes-base.code',
+    parameters: {
+      mode: 'runOnceForEachItem',
+      jsCode: 'return { json: { json_id: $json.id, item_id: $input.item.json.id } };',
+    },
+  };
+  assert.deepEqual(await executeCodeNode(eachItemNode, inputs), [
+    { json: { json_id: 'one', item_id: 'one' } },
+    { json: { json_id: 'two', item_id: 'two' } },
+    { json: { json_id: 'three', item_id: 'three' } },
+  ]);
+
+  const worker = JSON.parse(fs.readFileSync(workerExportPath, 'utf8'));
+  assert.ok(worker.nodes.some((node) =>
+    node.type === 'n8n-nodes-base.code' &&
+    !Object.hasOwn(node.parameters, 'mode') &&
+    /\$input\.all\(\)/u.test(node.parameters.jsCode ?? '')),
+  'canonical export evidence must continue to justify omitted mode as all-items');
+  const defaultModeNode = {
+    ...allItemsNode,
+    name: 'Default All Items Probe',
+    parameters: { jsCode: allItemsNode.parameters.jsCode },
+  };
+  assert.deepEqual(await executeCodeNode(defaultModeNode, inputs), [
+    { json: { count: 3 } },
+  ]);
+
+  await assert.rejects(
+    () => executeCodeNode({
+      ...allItemsNode,
+      name: 'Unknown Mode Probe',
+      parameters: { ...allItemsNode.parameters, mode: 'sometimes' },
+    }, inputs),
+    /unknown Code node mode/u,
+  );
+});
+
+test('test harness: IF gate audit allows defenses but rejects target predicate ambiguity or reversal', () => {
+  const condition = ({ field, operation = 'true' }) => ({
+    leftValue: `={{ $json.${field} }}`,
+    rightValue: '',
+    operator: { type: 'boolean', operation, singleValue: true },
+  });
+  const gate = (conditions) => ({
+    name: 'Gate Probe',
+    type: 'n8n-nodes-base.if',
+    parameters: {
+      conditions: { combinator: 'and', conditions },
+    },
+  });
+
+  assert.doesNotThrow(() => assertIfGateCondition(gate([
+    condition({ field: 'reclaimable' }),
+    condition({ field: 'contract_valid' }),
+  ]), { field: 'reclaimable', equals: true }));
+  assert.throws(() => assertIfGateCondition(gate([
+    condition({ field: 'reclaimable', operation: 'false' }),
+    condition({ field: 'contract_valid' }),
+  ]), { field: 'reclaimable', equals: true }), /polarity/u);
+  assert.throws(() => assertIfGateCondition(gate([
+    condition({ field: 'reclaimable' }),
+    condition({ field: 'reclaimable', operation: 'false' }),
+  ]), { field: 'reclaimable', equals: true }), /exactly one/u);
 });
 
 test('workflow export implements the complete typed Intake Resume dispatcher contract', async () => {

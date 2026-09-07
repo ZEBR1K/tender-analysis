@@ -34,6 +34,18 @@ function parseInstant(value, fieldName) {
   if (typeof value !== 'string' || value.trim() === '') {
     fail(`${fieldName} must be a non-empty ISO timestamp`);
   }
+  const calendar = /^(\d{4})-(\d{2})-(\d{2})T/u.exec(value);
+  if (!calendar) {
+    fail(`${fieldName} must be a valid ISO timestamp`);
+  }
+  const year = Number(calendar[1]);
+  const month = Number(calendar[2]);
+  const day = Number(calendar[3]);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) {
+    fail(`${fieldName} must be a valid ISO calendar date`);
+  }
   if (!/(?:Z|[+-]\d{2}:\d{2})$/u.test(value)) {
     fail(`${fieldName} must include an explicit timezone`);
   }
