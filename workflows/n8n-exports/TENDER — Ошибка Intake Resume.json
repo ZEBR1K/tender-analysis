@@ -1,0 +1,112 @@
+{
+  "name": "TENDER — Ошибка Intake Resume",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3615e675-31ed-4b29-93b4-ce239d083146",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rawId = $json.execution?.id;\n\nif (typeof rawId !== 'string') {\n  throw new Error('[Intake Resume error] execution.id must be a string.');\n}\n\nconst normalizedId = rawId.trim();\nif (!normalizedId || normalizedId.length > 4096) {\n  throw new Error('[Intake Resume error] execution.id must be non-empty and at most 4096 characters.');\n}\n\nconst primaryMessage = typeof $json.execution?.error?.message === 'string'\n  ? $json.execution.error.message.trim()\n  : '';\nconst secondaryMessage = typeof $json.execution?.error?.description === 'string'\n  ? $json.execution.error.description.trim()\n  : '';\nconst selectedMessage = primaryMessage || secondaryMessage || 'Unknown Intake Resume error';\nconst boundedMessage = selectedMessage.trim().slice(0, 2000);\n\nreturn [{\n  json: {\n    n8n_execution_id: normalizedId,\n    error_message: boundedMessage,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "3eac720a-a5a3-46f3-b579-e468543ea424",
+      "name": "Normalize Intake Error"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_intake_events\nSET status = 'failed',\n    error_message = left($2, 2000),\n    updated_at = now()\nWHERE n8n_execution_id = $1\n  AND status = 'processing'\nRETURNING\n    id,\n    event_key,\n    analysis_run_id,\n    status;",
+        "options": {
+          "queryReplacement": "={{ [$json.n8n_execution_id, $json.error_message] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        0
+      ],
+      "id": "86e2584e-8b27-488a-a1cc-e3bb58398319",
+      "name": "Mark Owned Intake Event Failed",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const normalized = $('Normalize Intake Error').first().json;\nconst rows = $input.all()\n  .map(item => item.json ?? {})\n  .filter(row => typeof row.id === 'string' && row.id.trim());\n\nif (rows.length > 1) {\n  throw new Error(`[Intake Resume error] Ownership invariant violation: updated ${rows.length} events.`);\n}\n\nconst normalizedId = typeof normalized.n8n_execution_id === 'string'\n  ? normalized.n8n_execution_id.trim()\n  : '';\nif (!normalizedId || normalizedId.length > 4096) {\n  throw new Error('[Intake Resume error] Normalized execution identity is invalid.');\n}\n\nif (rows.length === 0) {\n  return [{\n    json: {\n      event_updated: false,\n      event_id: null,\n      event_key: null,\n      analysis_run_id: null,\n      status: null,\n      n8n_execution_id: normalizedId,\n    },\n  }];\n}\n\nconst row = rows[0];\nif (row.status !== 'failed') {\n  throw new Error('[Intake Resume error] Updated event must have failed status.');\n}\n\nfunction boundedRequired(value, maxLength, fieldName) {\n  if (typeof value !== 'string' || !value.trim()) {\n    throw new Error(`[Intake Resume error] ${fieldName} is required.`);\n  }\n  return value.trim().slice(0, maxLength);\n}\n\nfunction boundedNullable(value, maxLength, fieldName) {\n  if (value === null || value === undefined || value === '') {\n    return null;\n  }\n  if (typeof value !== 'string') {\n    throw new Error(`[Intake Resume error] ${fieldName} must be a string or null.`);\n  }\n  const normalizedValue = value.trim();\n  return normalizedValue ? normalizedValue.slice(0, maxLength) : null;\n}\n\nreturn [{\n  json: {\n    event_updated: true,\n    event_id: boundedRequired(row.id, 128, 'event_id'),\n    event_key: boundedRequired(row.event_key, 512, 'event_key'),\n    analysis_run_id: boundedNullable(row.analysis_run_id, 128, 'analysis_run_id'),\n    status: 'failed',\n    n8n_execution_id: normalizedId,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "id": "66df61c6-c316-477f-b9ba-74f569f8345a",
+      "name": "Return Error Audit Result"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intake Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intake Error": {
+      "main": [
+        [
+          {
+            "node": "Mark Owned Intake Event Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Owned Intake Event Failed": {
+      "main": [
+        [
+          {
+            "node": "Return Error Audit Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}
