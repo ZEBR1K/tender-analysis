@@ -195,7 +195,7 @@ test('AI Validator catalog includes the five universal field boundaries', () => 
     'Развернуть units для AI Validator',
   ).parameters.jsCode;
   const boundaries = {
-    government_contract: /связанный или упомянутый договор/i,
+    government_contract: /внешнего контракта без доказанной связи с исполнением текущего договора/i,
     procurement_subject: /внутренние процессы организации/i,
     delivery_term: /графики передачи технической.*документации/i,
     application_documents: /документы гаранта или банка/i,

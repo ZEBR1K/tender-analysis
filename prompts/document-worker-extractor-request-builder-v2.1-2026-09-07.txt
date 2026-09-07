@@ -1,0 +1,1371 @@
+const CONFIG = {
+  promptVersion: 'tender_extractor_prompt_v2_1',
+  schemaVersion: 'ai_extractor_v1',
+  fieldCatalogVersion: 'tender_fields_v1',
+
+  // Используем тот же приближённый расчёт,
+  // что и в подготовке analysis units.
+  approxCharsPerToken: 3.0,
+
+  maxFactsPerUnit: 100,
+  maxEvidencePerFact: 25,
+  maxQuoteLength: 1500,
+  maxTotalQuoteCharsPerFact: 5000,
+};
+
+
+// ============================================================
+// 1. КАТАЛОГ ПОЛЕЙ tender_fields_v1
+// ============================================================
+
+const FIELD_CATALOG = [
+  {
+    key: 'procurement_subject',
+    title: 'Предмет закупки',
+    description:
+      'Что именно закупается, поставляется, выполняется или оказывается. Извлекай предмет закупки в формулировке документа.',
+  },
+  {
+    key: 'nm_price_with_vat',
+    title: 'НМЦ (с НДС)',
+    description:
+      'Начальная максимальная цена / НМЦ / НМЦК и информация об НДС, если она прямо указана. Не предполагай, что НДС включён, если документ этого не говорит.',
+  },
+  {
+    key: 'platform',
+    title: 'Площадка',
+    description:
+      'Электронная торговая площадка, информационная система или иной портал, на котором проводится процедура.',
+  },
+  {
+    key: 'procedure_type',
+    title: 'Тип процедуры',
+    description:
+      'Тип закупочной процедуры: конкурс, аукцион, запрос котировок, запрос предложений, закупка у единственного поставщика и другие прямо указанные варианты.',
+  },
+  {
+    key: 'application_deadline',
+    title: 'Срок окончания приема заявок',
+    description:
+      'Дата и время окончания приема или подачи заявок.',
+  },
+  {
+    key: 'application_review_date',
+    title: 'Дата рассмотрения заявок',
+    description:
+      'Дата и, если указано, время рассмотрения заявок.',
+  },
+  {
+    key: 'results_date',
+    title: 'Дата подведения итогов',
+    description:
+      'Все прямо подтверждённые события выбора победителя текущей закупки: подведение итогов, определение победителя, оформление итогового протокола или решения. Если событий несколько, извлекай каждое отдельным fact с понятным названием события. Не включай произвольное завершение этапа, не связанное с выбором победителя.',
+  },
+  {
+    key: 'customer',
+    title: 'Заказчик',
+    description:
+      'Юридическое лицо, с которым участник заключает договор по результатам текущей закупки. Организатор закупки не является заказчиком для этого поля, если он не является стороной заключаемого договора. Не путай юридическое лицо с физическим лицом-подписантом.',
+  },
+  {
+    key: 'customer_contacts',
+    title: 'Контактная информация Заказчика',
+    description:
+      'Контакты заказчика по двум различимым ролям: контакт по организации процедуры / закупщик и контакт по техническим вопросам / технический специалист. Сохраняй роль, ФИО, телефон, email и иные прямо указанные сведения. Если подтверждена одна роль, не выдумывай вторую.',
+  },
+  {
+    key: 'participation_cost',
+    title: 'Стоимость участия',
+    description:
+      'Плата, тариф или иные расходы именно за участие в процедуре. Не путай со стоимостью обеспечения заявки.',
+  },
+  {
+    key: 'participation_guarantee',
+    title: 'БГ на участие',
+    description:
+      'Банковская гарантия или иное обеспечение участия / заявки: требуется ли, размер или процент, форма, срок и иные прямо указанные условия. Не путай с обеспечением исполнения договора.',
+  },
+  {
+    key: 'evaluation_criteria',
+    title: 'Критерии оценки',
+    description:
+      'Критерии оценки заявок, показатели, веса, значимость критериев и порядок оценки.',
+  },
+  {
+    key: 'delivery_term',
+    title: 'Срок поставки (исполнения)',
+    description:
+      'Извлекай прямой срок поставки товара, выполнения работ или оказания услуг и отдельно, с явной меткой «общий срок исполнения договора», подтверждённый общий договорный срок. Не подменяй один тип другим: приоритет и выбор fallback выполняются только при агрегации всех фактов закупки.',
+  },
+  {
+    key: 'payment_terms',
+    title: 'Условия оплаты: аванс и остаток',
+    description:
+      'Наличие или отсутствие аванса, его размер или процент, а также сроки и условия оплаты оставшейся части.',
+  },
+  {
+    key: 'special_account_or_treasury',
+    title: 'Спецсчет/казна',
+    description:
+      'Требование специального счёта, казначейского счёта или казначейского сопровождения. Извлекай только явно указанные условия.',
+  },
+  {
+    key: 'bank_support',
+    title: 'Банковское сопровождение',
+    description:
+      'Требуется ли банковское сопровождение договора/контракта и какой банк указан, если он указан.',
+  },
+  {
+    key: 'government_contract',
+    title: 'Госконтракт',
+    description:
+      'Прямо подтверждённая категория заключаемого договора: государственный контракт, муниципальный контракт, государственный оборонный заказ (ГОЗ), договор во исполнение государственного или муниципального контракта либо ГОЗ, или обычный договор. Не делай вывод только по типу заказчика.',
+  },
+  {
+    key: 'rebidding',
+    title: 'Предусмотрена ли переторжка',
+    description:
+      'Наличие, отсутствие и условия переторжки или повторного улучшения ценовых предложений.',
+  },
+  {
+    key: 'national_regime',
+    title: 'Национальный режим',
+    description:
+      'Верни прямо подтверждённую категорию национального режима для текущей закупки: Запрет, Ограничение, Преимущество или Не применяется. Значение «Не применяется» допустимо только при прямом подтверждении неприменимости; отсутствие evidence о мере не означает «Не применяется». Нормативный акт и условия сохраняй в evidence, но не превращай голую ссылку на акт в применимую меру.',
+  },
+  {
+    key: 'advance_contract_guarantee',
+    title: 'БГ аванс (исполнение договора)',
+    description:
+      'Банковская гарантия или обеспечение, связанное с авансом и/или исполнением договора. Сохраняй буквальную формулировку документа и не смешивай с БГ на участие или обеспечением гарантийных обязательств.',
+  },
+  {
+    key: 'warranty_obligations_guarantee',
+    title: 'БГ гарантийные обязательства',
+    description:
+      'Обеспечение гарантийных обязательств: требуется ли, размер, форма, срок и другие условия. Не путай с самим гарантийным сроком товара.',
+  },
+  {
+    key: 'licenses_certificates',
+    title: 'Необходимые лицензии/сертификаты',
+    description:
+      'Только документы, которые источник прямо называет лицензией или сертификатом. Декларации соответствия не относить к этому полю, если они не названы сертификатами. Разрешения и иные документы соответствия также не относить к этому полю. Если исключённый документ обязателен в составе заявки, он остаётся отдельным кандидатом application_documents.',
+  },
+  {
+    key: 'required_official_certificates',
+    title: 'Необходимые справки',
+    description:
+      'Справки, выписки и подтверждения от налоговой, органов статистики, государственных органов и иных организаций.',
+  },
+  {
+    key: 'similar_supply_experience',
+    title: 'Требование по опыту аналогичных поставок',
+    description:
+      'Обязательные требования и оценочные критерии об опыте аналогичных поставок, работ или услуг: период, количество договоров, стоимость, предмет и подтверждающие документы. Каждый fact классифицируй отдельно как обязательный или оценочный; не смешивай эти роли.',
+  },
+  {
+    key: 'analog_allowed',
+    title: 'Допускается ли к поставке аналог',
+    description:
+      'Прямое указание, допускаются ли аналоги, эквиваленты или альтернативные товары и при каких условиях.',
+  },
+  {
+    key: 'analog_definition',
+    title: 'Что считается аналогом',
+    description:
+      'Прямо указанные критерии, характеристики или условия, по которым товар признаётся аналогом или эквивалентом.',
+  },
+  {
+    key: 'application_documents',
+    title: 'Что входит в состав заявки',
+    description:
+      'Документы, сведения, формы, декларации и иные материалы, которые участник обязан включить или предоставить в составе заявки.',
+  },
+];
+
+
+const FIELD_KEYS =
+  FIELD_CATALOG.map(field => field.key);
+
+const REVIEW_REASON_CODES = [
+  'ambiguous_wording',
+  'conflicting_evidence',
+  'incomplete_value',
+  'unclear_reference',
+  'source_quality_issue',
+  'other',
+];
+
+
+// ============================================================
+// 2. JSON SCHEMA ОТВЕТА AI EXTRACTOR v1
+// ============================================================
+
+const RESPONSE_SCHEMA = {
+  $schema:
+    'https://json-schema.org/draft/2020-12/schema',
+
+  title:
+    'AIExtractorV1',
+
+  type:
+    'object',
+
+  additionalProperties:
+    false,
+
+  required: [
+    'schema_version',
+    'field_catalog_version',
+    'analysis_unit_id',
+    'facts',
+  ],
+
+  properties: {
+    schema_version: {
+      type: 'string',
+      const: CONFIG.schemaVersion,
+    },
+
+    field_catalog_version: {
+      type: 'string',
+      const: CONFIG.fieldCatalogVersion,
+    },
+
+    analysis_unit_id: {
+      type: 'string',
+      minLength: 1,
+    },
+
+    facts: {
+      type: 'array',
+      maxItems: CONFIG.maxFactsPerUnit,
+
+      items: {
+        type: 'object',
+        additionalProperties: false,
+
+        required: [
+          'field_key',
+          'value_text',
+          'status',
+          'confidence',
+          'evidence',
+          'review_reason_code',
+          'review_note',
+        ],
+
+        properties: {
+          field_key: {
+            type: 'string',
+
+            // Теперь каталог зафиксирован:
+            // AI не имеет права придумывать новые field_key.
+            enum: FIELD_KEYS,
+          },
+
+          value_text: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 3000,
+          },
+
+          status: {
+            type: 'string',
+            enum: [
+              'found',
+              'requires_review',
+            ],
+          },
+
+          confidence: {
+            type: 'number',
+            minimum: 0,
+            maximum: 1,
+          },
+
+          evidence: {
+            type: 'array',
+            minItems: 1,
+            maxItems: CONFIG.maxEvidencePerFact,
+            uniqueItems: true,
+            description:
+              'Суммарная длина всех quote одного fact не должна превышать 5000 символов.',
+
+            items: {
+              type: 'object',
+              additionalProperties: false,
+
+              required: [
+                'semantic_block_id',
+                'quote',
+              ],
+
+              properties: {
+                semantic_block_id: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: 120,
+                  pattern:
+                    '^sb_[A-Za-z0-9_-]+$',
+                },
+
+                quote: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: CONFIG.maxQuoteLength,
+                },
+              },
+            },
+          },
+
+          review_reason_code: {
+            type: [
+              'string',
+              'null',
+            ],
+
+            enum: [
+              null,
+              ...REVIEW_REASON_CODES,
+            ],
+          },
+
+          review_note: {
+            type: [
+              'string',
+              'null',
+            ],
+
+            maxLength: 500,
+          },
+        },
+
+        allOf: [
+          {
+            if: {
+              properties: {
+                status: {
+                  const: 'found',
+                },
+              },
+              required: [
+                'status',
+              ],
+            },
+
+            then: {
+              properties: {
+                review_reason_code: {
+                  type: 'null',
+                },
+
+                review_note: {
+                  type: 'null',
+                },
+              },
+            },
+          },
+
+          {
+            if: {
+              properties: {
+                status: {
+                  const: 'requires_review',
+                },
+              },
+              required: [
+                'status',
+              ],
+            },
+
+            then: {
+              properties: {
+                review_reason_code: {
+                  type: 'string',
+                  enum: REVIEW_REASON_CODES,
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+};
+
+
+// ============================================================
+// 3. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+// ============================================================
+
+function fail(
+  itemIndex,
+  message
+) {
+  throw new Error(
+    `[Подготовить запрос для AI] Item ${
+      itemIndex + 1
+    }: ${message}`
+  );
+}
+
+
+function isObject(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value)
+  );
+}
+
+
+function uniqueStrings(values) {
+  return [
+    ...new Set(
+      values.filter(
+        value =>
+          typeof value === 'string' &&
+          value.length > 0
+      )
+    ),
+  ];
+}
+
+
+function arraysEqual(
+  left,
+  right
+) {
+  if (
+    left.length !==
+    right.length
+  ) {
+    return false;
+  }
+
+  for (
+    let index = 0;
+    index < left.length;
+    index++
+  ) {
+    if (
+      left[index] !==
+      right[index]
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
+function sameStringSet(
+  left,
+  right
+) {
+  if (
+    left.length !==
+    right.length
+  ) {
+    return false;
+  }
+
+  const rightSet =
+    new Set(right);
+
+  return left.every(
+    value =>
+      rightSet.has(value)
+  );
+}
+
+
+function renderFieldCatalog() {
+  return FIELD_CATALOG
+    .map(
+      (
+        field,
+        index
+      ) =>
+        `${
+          index + 1
+        }. ${field.key} — ${field.title}\n` +
+        `   ${field.description}`
+    )
+    .join('\n\n');
+}
+
+
+function renderAiSegment(segment) {
+  return [
+    `[SEMANTIC_BLOCK id="${segment.semantic_block_id}" scope="${segment.scope}" type="${segment.type}" role="${segment.role}"]`,
+    segment.text,
+    '[/SEMANTIC_BLOCK]',
+  ].join('\n');
+}
+
+
+// ============================================================
+// 4. SYSTEM PROMPT
+// ============================================================
+
+const SYSTEM_PROMPT = `
+Ты — AI Extractor для анализа тендерной документации.
+
+Твоя задача — извлекать из предоставленной части документа только факты, которые относятся к разрешённому каталогу tender_fields_v1.
+
+Ты не формируешь финальный отчёт и не делаешь вывод по закупке в целом.
+Ты работаешь только с одной analysis unit за один вызов.
+
+
+ОСНОВНЫЕ ПРАВИЛА
+
+1. Используй только содержимое блоков SEMANTIC_BLOCK, переданных пользователем.
+
+2. Не используй внешние знания, предположения, типичные условия закупок или сведения, которых нет в предоставленных блоках.
+
+3. Метаданные документа и раздела используются только как контекст. Они не являются доказательством факта.
+
+4. Не делай вывод об отсутствии требования только потому, что оно не встретилось в этой части документа.
+
+5. Никогда не возвращай not_found.
+
+Если в этой части нет целевых фактов, верни:
+"facts": []
+
+6. Не вычисляй значения, которых документ явно не сообщает.
+
+Например:
+если документ содержит несколько исходных цен, но не содержит итоговой НМЦК, не рассчитывай НМЦК самостоятельно.
+
+7. Не достраивай пропущенный текст и не исправляй сомнительное OCR-содержимое по смыслу.
+
+Если текст повреждён настолько, что факт нельзя надёжно интерпретировать, используй:
+status = "requires_review"
+review_reason_code = "source_quality_issue"
+
+8. Шаблонные переменные, пустые поля, подчёркивания и незаполненные значения не считай установленными фактами.
+
+Например:
+{Цена_4}
+____________________
+не являются реальными значениями.
+
+9. field_key разрешено выбирать только из каталога tender_fields_v1.
+
+Не создавай собственные field_key.
+
+10. Один и тот же field_key разрешено вернуть несколько раз, если документ содержит несколько самостоятельных требований или значений этого типа.
+
+11. Если один логический факт продолжается в нескольких semantic blocks, верни один fact и укажи несколько элементов evidence.
+
+12. Если это действительно разные самостоятельные требования, возвращай их как разные facts.
+
+13. Каждый fact обязан содержать минимум один evidence и не более 20 evidence.
+
+Суммарная длина всех quote одного fact не должна превышать 4500 символов.
+Каждая отдельная quote не должна превышать 1200 символов.
+Не повторяй одинаковую пару semantic_block_id + quote.
+Эти лимиты являются техническим resource contract. Нельзя обрезать evidence или терять существенные условия ради лимита.
+
+Перед возвратом каждого fact проверь resource contract.
+
+Если один composite/list fact требует более 20 evidence или более 4500 символов quote, НЕ обрезай evidence и НЕ объединяй независимые условия. Раздели содержание на несколько самостоятельных facts с тем же field_key.
+
+Для application_documents разделяй как минимум по независимо применимым категориям участников, условиям применимости или самостоятельным группам документов. Условие применимости обязательно сохраняй в value_text того же fact.
+
+Каждый resulting fact должен быть самостоятельно понятен и полностью подтверждён собственным evidence в пределах 20 / 1200 / 4500.
+
+14. semantic_block_id в evidence должен в точности совпадать с ID одного из переданных SEMANTIC_BLOCK.
+
+Не придумывай semantic_block_id.
+
+15. quote должен быть дословным фрагментом соответствующего semantic block.
+
+Не пересказывай текст своими словами внутри quote.
+
+Если части одного факта находятся в разных местах одного semantic block
+и между ними присутствует другой текст, подписи, метки, переносы или пояснения,
+НЕ объединяй эти части в одну искусственную quote.
+
+Вместо этого верни несколько элементов evidence с тем же semantic_block_id,
+где каждый quote является отдельной непрерывной дословной подстрокой
+соответствующего SEMANTIC_BLOCK.
+
+Нельзя удалять слова, подписи или промежуточный текст внутри quote.
+Нельзя склеивать две непоследовательные части текста в одну quote.
+
+Например, если блок содержит:
+
+Специалист по закупкам
+(должность)
+/ Оленева С.А.
+
+НЕПРАВИЛЬНО:
+"quote": "Специалист по закупкам / Оленева С.А."
+
+ПРАВИЛЬНО:
+"evidence": [
+  {
+    "semantic_block_id": "sb_0004",
+    "quote": "Специалист по закупкам"
+  },
+  {
+    "semantic_block_id": "sb_0004",
+    "quote": "/ Оленева С.А."
+  }
+]
+
+КРИТИЧЕСКОЕ ПРАВИЛО ДЛЯ QUOTE:
+
+Поле quote должно быть непрерывной подстрокой исходного semantic block.
+
+Запрещено:
+- сокращать начало или конец предложения;
+- заменять слова близкими по смыслу;
+- удалять вводные части предложения;
+- изменять грамматическую форму.
+
+Например:
+
+SEMANTIC_BLOCK:
+"Договор вступает в силу с момента подписания и действует до 31 декабря 2026 года"
+
+НЕЛЬЗЯ:
+"Договор действует до 31 декабря 2026 года"
+
+МОЖНО:
+"действует до 31 декабря 2026 года"
+
+или
+
+"Договор вступает в силу с момента подписания и действует до 31 декабря 2026 года"
+
+16. Каждый найденный fact должен иметь хотя бы один evidence из блока:
+scope = "primary"
+
+Блоки scope = "overlap" разрешено использовать только как дополнительный контекст или дополнительное доказательство.
+
+Факт, подтверждённый только overlap-блоками, возвращать нельзя.
+
+17. status = "found" используй только если значение прямо и однозначно подтверждается предоставленными блоками.
+
+Для status = "found":
+review_reason_code = null
+review_note = null
+
+КРИТИЧЕСКОЕ ПРАВИЛО О STATUS
+
+Если status = "found":
+- review_reason_code ОБЯЗАТЕЛЬНО должен быть null;
+- review_note ОБЯЗАТЕЛЬНО должен быть null;
+- факт должен быть прямо и однозначно подтверждён текстом.
+
+Если для факта требуется review_reason_code или review_note,
+status ОБЯЗАТЕЛЬНО должен быть "requires_review".
+
+Никогда не возвращай сочетание:
+status = "found"
+и одновременно непустой review_reason_code или review_note.
+
+
+КРИТИЧЕСКОЕ ПРАВИЛО ОБ ОТСУТСТВУЮЩЕМ ЗНАЧЕНИИ
+
+Если конкретное значение field_key прямо не указано в текущих SEMANTIC_BLOCK,
+НЕ создавай fact для этого field_key.
+
+Не используй status = "requires_review" только для сообщения,
+что значение отсутствует.
+
+requires_review используется только тогда, когда в тексте действительно
+есть кандидат на значение, но сам кандидат неоднозначен, конфликтует,
+неполон или повреждён.
+
+Например:
+
+Поле customer означает наименование организации-заказчика.
+
+ФИО сотрудника, контрактного управляющего, специалиста по закупкам,
+подписанта или контактного лица НЕ является значением customer.
+
+Если наименование организации-заказчика отсутствует,
+не возвращай customer вообще.
+
+ФИО сотрудника может относиться к customer_contacts только если текст
+действительно позволяет считать его контактным лицом заказчика.
+Не превращай ФИО сотрудника в наименование customer.
+
+18. status = "requires_review" используй, если факт релевантен, но есть существенная неоднозначность, конфликт, неполное значение, неясная ссылка или проблема качества источника.
+
+Разрешённые review_reason_code:
+- ambiguous_wording
+- conflicting_evidence
+- incomplete_value
+- unclear_reference
+- source_quality_issue
+- other
+
+19. confidence — число от 0 до 1, отражающее уверенность в том, что именно заявленный fact корректно подтверждается предоставленным текстом.
+
+Высокий confidence не заменяет evidence.
+
+20. value_text должен передавать содержание факта максимально близко к формулировке документа.
+
+На этом этапе не выполняй машинную нормализацию значений.
+
+Например:
+"не менее 12 месяцев с момента подписания акта"
+нужно сохранить как текст,
+а не преобразовывать в объект с value=12 и unit=months.
+
+21. Не добавляй page_no, bbox, source_block_id или другие сведения о provenance.
+
+Они будут восстановлены системой автоматически по semantic_block_id.
+
+22. Возвращай только JSON.
+Никакого Markdown, комментариев до JSON или текста после JSON.
+
+
+РАЗРЕШЁННЫЙ КАТАЛОГ ПОЛЕЙ tender_fields_v1
+
+${renderFieldCatalog()}
+
+
+ФОРМАТ РЕЗУЛЬТАТА
+
+{
+  "schema_version": "${CONFIG.schemaVersion}",
+  "field_catalog_version": "${CONFIG.fieldCatalogVersion}",
+  "analysis_unit_id": "<ID текущей analysis unit>",
+  "facts": [
+    {
+      "field_key": "<один из разрешённых field_key>",
+      "value_text": "<факт как он сформулирован в документе>",
+      "status": "found | requires_review",
+      "confidence": 0.0,
+      "evidence": [
+        {
+          "semantic_block_id": "sb_XXXX",
+          "quote": "<дословная цитата>"
+        }
+      ],
+      "review_reason_code": null,
+      "review_note": null
+    }
+  ]
+}
+`.trim();
+
+
+// ============================================================
+// 5. ОБРАБОТКА INPUT ITEMS
+// ============================================================
+
+const items =
+  $input.all();
+
+if (
+  items.length === 0
+) {
+  throw new Error(
+    '[Подготовить запрос для AI] Нет входных items.'
+  );
+}
+
+
+return items.map(
+  (
+    item,
+    itemIndex
+  ) => {
+    const input =
+      item?.json;
+
+    if (
+      !isObject(input)
+    ) {
+      fail(
+        itemIndex,
+        'Input JSON отсутствует или имеет неверный формат.'
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // analysis_unit
+    // --------------------------------------------------------
+
+    const unit =
+      input.analysis_unit;
+
+    if (
+      !isObject(unit)
+    ) {
+      fail(
+        itemIndex,
+        'Отсутствует analysis_unit.'
+      );
+    }
+
+
+    const analysisUnitId =
+      unit.analysis_unit_id;
+
+    if (
+      typeof analysisUnitId !== 'string' ||
+      analysisUnitId.length === 0
+    ) {
+      fail(
+        itemIndex,
+        'analysis_unit.analysis_unit_id отсутствует.'
+      );
+    }
+
+
+    if (
+      !Array.isArray(
+        unit.primary_semantic_block_ids
+      )
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: отсутствует primary_semantic_block_ids.`
+      );
+    }
+
+
+    if (
+      !Array.isArray(
+        unit.overlap_semantic_block_ids
+      )
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: отсутствует overlap_semantic_block_ids.`
+      );
+    }
+
+
+    const primaryIds =
+      uniqueStrings(
+        unit.primary_semantic_block_ids
+      );
+
+    const overlapIds =
+      uniqueStrings(
+        unit.overlap_semantic_block_ids
+      );
+
+
+    if (
+      primaryIds.length === 0
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: нет ни одного primary semantic block.`
+      );
+    }
+
+
+    if (
+      primaryIds.length !==
+      unit.primary_semantic_block_ids.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: primary_semantic_block_ids содержит пустые или дублирующиеся ID.`
+      );
+    }
+
+
+    if (
+      overlapIds.length !==
+      unit.overlap_semantic_block_ids.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: overlap_semantic_block_ids содержит пустые или дублирующиеся ID.`
+      );
+    }
+
+
+    const primarySet =
+      new Set(primaryIds);
+
+    for (
+      const overlapId
+      of overlapIds
+    ) {
+      if (
+        primarySet.has(
+          overlapId
+        )
+      ) {
+        fail(
+          itemIndex,
+          `${analysisUnitId}: ${overlapId} одновременно primary и overlap.`
+        );
+      }
+    }
+
+
+    const expectedIds = [
+      ...primaryIds,
+      ...overlapIds,
+    ];
+
+
+    // --------------------------------------------------------
+    // ai_segments
+    // --------------------------------------------------------
+
+    const aiSegments =
+      input.ai_segments;
+
+    if (
+      !Array.isArray(
+        aiSegments
+      ) ||
+      aiSegments.length === 0
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: ai_segments отсутствует или пуст.`
+      );
+    }
+
+
+    const segmentIds =
+      aiSegments.map(
+        segment =>
+          segment?.semantic_block_id
+      );
+
+
+    if (
+      !arraysEqual(
+        segmentIds,
+        expectedIds
+      )
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: порядок или состав ai_segments не совпадает с primary + overlap semantic IDs.`
+      );
+    }
+
+
+    const uniqueSegmentIds =
+      uniqueStrings(
+        segmentIds
+      );
+
+    if (
+      uniqueSegmentIds.length !==
+      segmentIds.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: ai_segments содержит повторяющиеся semantic_block_id.`
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // provenance
+    // --------------------------------------------------------
+
+    const provenance =
+      input.provenance;
+
+    if (
+      !isObject(
+        provenance
+      ) ||
+      !isObject(
+        provenance.index
+      )
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: provenance.index отсутствует.`
+      );
+    }
+
+
+    const provenanceIndex =
+      provenance.index;
+
+    const provenanceIds =
+      Object.keys(
+        provenanceIndex
+      );
+
+
+    if (
+      !sameStringSet(
+        provenanceIds,
+        expectedIds
+      )
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: provenance.index не совпадает с semantic blocks текущей unit.`
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // Валидация каждого semantic segment
+    // --------------------------------------------------------
+
+    for (
+      const segment
+      of aiSegments
+    ) {
+      const id =
+        segment.semantic_block_id;
+
+      if (
+        segment.scope !== 'primary' &&
+        segment.scope !== 'overlap'
+      ) {
+        fail(
+          itemIndex,
+          `${analysisUnitId}: ${id} имеет недопустимый scope "${segment.scope}".`
+        );
+      }
+
+
+      if (
+        typeof segment.text !== 'string' ||
+        segment.text.trim().length === 0
+      ) {
+        fail(
+          itemIndex,
+          `${analysisUnitId}: ${id} содержит пустой text.`
+        );
+      }
+
+
+      const provenanceEntry =
+        provenanceIndex[id];
+
+      if (
+        !isObject(
+          provenanceEntry
+        )
+      ) {
+        fail(
+          itemIndex,
+          `${analysisUnitId}: отсутствует provenance для ${id}.`
+        );
+      }
+
+
+      if (
+        provenanceEntry.scope !==
+        segment.scope
+      ) {
+        fail(
+          itemIndex,
+          `${analysisUnitId}: scope ${id} не совпадает между ai_segments и provenance.`
+        );
+      }
+    }
+
+
+    // --------------------------------------------------------
+    // Дополнительная проверка счетчиков provenance
+    // --------------------------------------------------------
+
+    if (
+      provenance.primary_semantic_blocks_count !==
+      primaryIds.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: неверный primary_semantic_blocks_count в provenance.`
+      );
+    }
+
+
+    if (
+      provenance.overlap_semantic_blocks_count !==
+      overlapIds.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: неверный overlap_semantic_blocks_count в provenance.`
+      );
+    }
+
+
+    if (
+      provenance.total_semantic_blocks_count !==
+      expectedIds.length
+    ) {
+      fail(
+        itemIndex,
+        `${analysisUnitId}: неверный total_semantic_blocks_count в provenance.`
+      );
+    }
+
+
+    // --------------------------------------------------------
+    // USER PROMPT
+    // --------------------------------------------------------
+
+    const contextLines = [
+      `analysis_unit_id: ${analysisUnitId}`,
+    ];
+
+
+    if (
+      input.document?.file_name
+    ) {
+      contextLines.push(
+        `Файл документа: ${input.document.file_name}`
+      );
+    }
+
+
+    if (
+      unit.section_title
+    ) {
+      contextLines.push(
+        `Раздел: ${unit.section_title}`
+      );
+    }
+
+
+    if (
+      unit.part_index !== undefined &&
+      unit.parts_total !== undefined
+    ) {
+      contextLines.push(
+        `Часть раздела: ${unit.part_index} из ${unit.parts_total}`
+      );
+    }
+
+
+    if (
+      unit.context?.sheet_name
+    ) {
+      contextLines.push(
+        `Excel-лист: ${unit.context.sheet_name}`
+      );
+    }
+
+
+    if (
+      unit.context?.sheet_title
+    ) {
+      contextLines.push(
+        `Название Excel-листа: ${unit.context.sheet_title}`
+      );
+    }
+
+
+    const renderedSegments =
+      aiSegments
+        .map(
+          renderAiSegment
+        )
+        .join('\n\n');
+
+
+    const userPrompt = `
+Проанализируй только приведённую ниже часть тендерного документа.
+
+Найди все факты из каталога tender_fields_v1, которые явно подтверждаются содержимым SEMANTIC_BLOCK.
+
+Метаданные ниже предоставлены только для навигации и понимания контекста.
+Не используй их как evidence.
+
+
+КОНТЕКСТ
+
+${contextLines.join('\n')}
+
+
+SEMANTIC BLOCKS
+
+${renderedSegments}
+
+
+Верни результат строго по схеме ${CONFIG.schemaVersion}.
+
+Если в этой analysis unit нет ни одного целевого факта, верни пустой массив facts.
+`.trim();
+
+
+    // --------------------------------------------------------
+    // Оценка размера будущего AI-вызова
+    // --------------------------------------------------------
+
+    const systemCharacters =
+      SYSTEM_PROMPT.length;
+
+    const userCharacters =
+      userPrompt.length;
+
+    const totalCharacters =
+      systemCharacters +
+      userCharacters;
+
+    const estimatedInputTokens =
+      Math.ceil(
+        totalCharacters /
+        CONFIG.approxCharsPerToken
+      );
+
+
+    // --------------------------------------------------------
+    // Минимальная metadata analysis unit для следующих этапов
+    // --------------------------------------------------------
+
+    const analysisUnitMeta = {
+      analysis_unit_id:
+        analysisUnitId,
+
+      section_id:
+        unit.section_id ??
+        null,
+
+      section_title:
+        unit.section_title ??
+        null,
+
+      section_kind:
+        unit.section_kind ??
+        null,
+
+      part_index:
+        unit.part_index ??
+        null,
+
+      parts_total:
+        unit.parts_total ??
+        null,
+
+      context:
+        unit.context ??
+        {},
+
+      source_pages:
+        unit.source_pages ??
+        [],
+
+      flags:
+        unit.flags ??
+        {},
+
+      primary_semantic_block_ids:
+        primaryIds,
+
+      overlap_semantic_block_ids:
+        overlapIds,
+    };
+
+
+    // --------------------------------------------------------
+    // OUTPUT
+    // --------------------------------------------------------
+
+    return {
+      json: {
+        // Эти данные сохраняем рядом,
+        // но НЕ отправляем модели целиком.
+        tender:
+          input.tender ??
+          null,
+
+        document:
+          input.document ??
+          null,
+
+        analysis_batch:
+          input.analysis_batch ??
+          null,
+
+        analysis_unit_meta:
+          analysisUnitMeta,
+
+        // Нужны после AI для проверки evidence.
+        ai_segments:
+          aiSegments,
+
+        // Нужен после AI для восстановления
+        // настоящего source/page/bbox.
+        provenance,
+
+        ai_request: {
+          prompt_version:
+            CONFIG.promptVersion,
+
+          schema_version:
+            CONFIG.schemaVersion,
+
+          field_catalog_version:
+            CONFIG.fieldCatalogVersion,
+
+          system_prompt:
+            SYSTEM_PROMPT,
+
+          user_prompt:
+            userPrompt,
+
+          response_schema:
+            RESPONSE_SCHEMA,
+
+          field_catalog:
+            FIELD_CATALOG,
+
+          evidence_resource_contract: {
+            max_evidence_per_fact:
+              CONFIG.maxEvidencePerFact,
+            max_quote_length:
+              CONFIG.maxQuoteLength,
+            max_total_quote_chars_per_fact:
+              CONFIG.maxTotalQuoteCharsPerFact,
+            exact_duplicates_allowed:
+              false,
+            primary_grounded_evidence_required:
+              true,
+          },
+
+          stats: {
+            system_characters:
+              systemCharacters,
+
+            user_characters:
+              userCharacters,
+
+            total_characters:
+              totalCharacters,
+
+            estimated_input_tokens:
+              estimatedInputTokens,
+
+            semantic_blocks_count:
+              aiSegments.length,
+
+            primary_blocks_count:
+              primaryIds.length,
+
+            overlap_blocks_count:
+              overlapIds.length,
+          },
+        },
+      },
+
+      // Сохраняем связь с конкретным входным item.
+      pairedItem: {
+        item: itemIndex,
+      },
+    };
+  }
+);

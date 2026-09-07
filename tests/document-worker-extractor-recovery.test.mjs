@@ -396,7 +396,7 @@ function buildStrictSource(unitId) {
       },
     },
     ai_request: {
-      prompt_version: 'tender_extractor_prompt_v2',
+      prompt_version: 'tender_extractor_prompt_v2_1',
       schema_version: 'ai_extractor_v1',
       field_catalog_version: 'tender_fields_v1',
       field_catalog: [],

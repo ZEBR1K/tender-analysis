@@ -102,6 +102,12 @@ function checkerSource() {
   ).parameters.jsCode;
 }
 
+function sourceForCurrentProfileContract(recordedSource) {
+  const source = structuredClone(recordedSource);
+  source.validator_prompt_context.field_profiles_version = 'validator_field_profiles_v1_1';
+  return source;
+}
+
 async function assessFacts(facts) {
   const marker = 'const validatorItems =\n  $input.all();';
   const source = checkerSource();
@@ -193,7 +199,7 @@ test('confirmed target is downgraded to requires_review with fact-local guard au
     code: checkerSource(),
     inputJsons: [fixture.target_recorded_model_output],
     sources: {
-      'Развернуть units для AI Validator': [fixture.target_checker_source],
+      'Развернуть units для AI Validator': [sourceForCurrentProfileContract(fixture.target_checker_source)],
     },
   });
   const guarded = checked.validated_facts.find(
@@ -241,7 +247,7 @@ test('fact-local guard is inert for non-confirmed AI verdicts', async () => {
       code: checkerSource(),
       inputJsons: [modelOutput],
       sources: {
-        'Развернуть units для AI Validator': [fixture.target_checker_source],
+        'Развернуть units для AI Validator': [sourceForCurrentProfileContract(fixture.target_checker_source)],
       },
     });
     const guarded = checked.validated_facts.find(
