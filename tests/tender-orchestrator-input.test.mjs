@@ -185,9 +185,53 @@ function isUnfinishedRunSelect(node) {
     /\bsource\b/i.test(sql) &&
     /\btender_id\b/i.test(sql) &&
     /\bstatus\b\s*<>\s*'completed'/i.test(sql) &&
-    /\bLIMIT\s+1\b/i.test(sql) &&
     !/\b(?:INSERT|UPDATE|DELETE)\b/i.test(sql)
   );
+}
+
+function regexEscape(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function validatedInputVariable(code, validationNodeName) {
+  const escapedName = regexEscape(validationNodeName);
+  return code.match(
+    new RegExp(
+      `\\bconst\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*\\$\\(\\s*['"]${escapedName}['"]\\s*\\)\\.(?:item|first\\(\\))\\.json\\b`,
+    ),
+  )?.[1];
+}
+
+function structuredTerminalCodeNodes() {
+  const requiredFields = [
+    'analysis_run_id',
+    'source',
+    'tender_id',
+    'source_event_key',
+    'trigger_kind',
+    'created_new_run',
+    'action',
+  ];
+
+  return nodesOfType('n8n-nodes-base.code').filter((node) => {
+    const code = codeSource(node);
+    return (
+      requiredFields.every((field) => new RegExp(`\\b${field}\\b`).test(code)) &&
+      /\breturn\s*\[\s*\{\s*json\s*:/i.test(code)
+    );
+  });
+}
+
+function codeThrowsOnMismatch(code, leftVariable, rightVariable) {
+  const left = regexEscape(leftVariable);
+  const right = regexEscape(rightVariable);
+  const comparisons = [
+    new RegExp(`\\b${left}\\s*!==\\s*${right}\\b`),
+    new RegExp(`\\b${right}\\s*!==\\s*${left}\\b`),
+  ];
+
+  return [...code.matchAll(/\bif\s*\(([\s\S]{1,400}?)\)\s*\{?([\s\S]{0,200}?)\bthrow\s+new\s+Error\b/gi)]
+    .some((match) => comparisons.some((comparison) => comparison.test(match[1])));
 }
 
 function configuredWorkflowId(node) {
@@ -531,5 +575,275 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
   assert.ok(
     everyPathPassesThrough(trigger.name, worker.name, [creation.name]),
     'atomic document registration must complete before Worker can run',
+  );
+});
+
+test('normalization rejects a mismatched TenderPlan identity', () => {
+  const trigger = nodesOfType('n8n-nodes-base.executeWorkflowTrigger')[0];
+  const fullInfoHttp = nodesOfType('n8n-nodes-base.httpRequest').find((node) =>
+    /\/fullinfo\b/i.test(String(node.parameters?.url ?? '')),
+  );
+  const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
+    /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
+  );
+  assert.ok(trigger && fullInfoHttp && creation, 'expected trigger, FullInfo, and run creation nodes');
+
+  const validationNodes = nodesOfType('n8n-nodes-base.code').filter((node) =>
+    canReach(trigger.name, node.name) &&
+    canReach(node.name, fullInfoHttp.name) &&
+    codeChecksTypedInput(codeSource(node)),
+  );
+  assert.equal(validationNodes.length, 1, 'expected exactly one typed-input validation node');
+  const validation = validationNodes[0];
+
+  const normalizationNodes = nodesOfType('n8n-nodes-base.code').filter((node) =>
+    canReach(fullInfoHttp.name, node.name) && canReach(node.name, creation.name),
+  );
+  assert.equal(normalizationNodes.length, 1, 'expected exactly one FullInfo normalization node');
+  const normalizationCode = codeSource(normalizationNodes[0]);
+  const requestVariable = validatedInputVariable(normalizationCode, validation.name);
+  assert.ok(
+    requestVariable,
+    'normalization must read the validated request from the typed-input validation node',
+  );
+
+  const requestedIdVariable = normalizationCode.match(
+    new RegExp(
+      `\\bconst\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:String\\(\\s*)?${regexEscape(requestVariable)}\\.tender_id\\b`,
+    ),
+  )?.[1];
+  const responseIdVariable = normalizationCode.match(
+    /\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*(?:String\(\s*)?tender\._id\b/,
+  )?.[1];
+  assert.ok(requestedIdVariable, 'normalization must bind the validated requested tender_id');
+  assert.ok(responseIdVariable, 'normalization must bind TenderPlan tender._id');
+  assert.ok(
+    codeThrowsOnMismatch(normalizationCode, responseIdVariable, requestedIdVariable),
+    'normalization must fail closed when TenderPlan tender._id differs from requested tender_id',
+  );
+});
+
+test('normalization preserves validated intake provenance through run creation', () => {
+  const trigger = nodesOfType('n8n-nodes-base.executeWorkflowTrigger')[0];
+  const fullInfoHttp = nodesOfType('n8n-nodes-base.httpRequest').find((node) =>
+    /\/fullinfo\b/i.test(String(node.parameters?.url ?? '')),
+  );
+  const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
+    /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
+  );
+  assert.ok(trigger && fullInfoHttp && creation, 'expected trigger, FullInfo, and run creation nodes');
+
+  const validation = nodesOfType('n8n-nodes-base.code').find((node) =>
+    canReach(trigger.name, node.name) &&
+    canReach(node.name, fullInfoHttp.name) &&
+    codeChecksTypedInput(codeSource(node)),
+  );
+  const normalization = nodesOfType('n8n-nodes-base.code').find((node) =>
+    canReach(fullInfoHttp.name, node.name) && canReach(node.name, creation.name),
+  );
+  assert.ok(validation && normalization, 'expected validation and normalization nodes');
+  const normalizationCode = codeSource(normalization);
+  const requestVariable = validatedInputVariable(normalizationCode, validation.name);
+  assert.ok(
+    requestVariable,
+    'normalization must read the validated request before preserving provenance',
+  );
+
+  for (const field of ['source', 'source_event_key', 'trigger_kind']) {
+    assert.match(
+      normalizationCode,
+      new RegExp(`\\b${field}\\s*:\\s*${regexEscape(requestVariable)}\\.${field}\\b`),
+      `normalization output must preserve validated ${field}`,
+    );
+  }
+  assert.match(
+    String(creation.parameters?.options?.queryReplacement ?? ''),
+    /\$json\.source\b/,
+    'run creation must bind source from the preserved validated input',
+  );
+});
+
+test('unfinished-run lookup exposes duplicate invariant violations to the count guard', () => {
+  const resumeSelectNodes = nodes.filter(isUnfinishedRunSelect);
+  assert.equal(resumeSelectNodes.length, 1, 'expected exactly one unfinished-run SELECT');
+  assert.doesNotMatch(
+    sqlSource(resumeSelectNodes[0]),
+    /\bLIMIT\s+1\b/i,
+    'unfinished-run SELECT must not mask duplicates with LIMIT 1',
+  );
+
+  const countGuards = nodesOfType('n8n-nodes-base.code').filter((node) => {
+    const code = codeSource(node);
+    return (
+      canReach(resumeSelectNodes[0].name, node.name) &&
+      /\$input\.all\s*\(\s*\)/.test(code) &&
+      /\.length\s*!==\s*1\b/.test(code) &&
+      /throw\s+new\s+Error\b/i.test(code)
+    );
+  });
+  assert.equal(
+    countGuards.length,
+    1,
+    'all unfinished rows must reach the existing exactly-one count guard',
+  );
+});
+
+test('orchestrator dispatches Workers asynchronously', () => {
+  const attachmentSplit = nodesOfType('n8n-nodes-base.splitOut').find(
+    (node) => String(node.parameters?.fieldToSplitOut ?? '').trim() === 'attachments',
+  );
+  assert.ok(attachmentSplit, 'expected attachments Split Out');
+  const workerNodes = nodesOfType('n8n-nodes-base.executeWorkflow').filter((node) =>
+    canReach(attachmentSplit.name, node.name),
+  );
+  assert.equal(workerNodes.length, 1, 'expected one Worker dispatch');
+  assert.equal(
+    workerNodes[0].parameters?.options?.waitForSubWorkflow,
+    false,
+    'Worker dispatch must be fire-and-forget with waitForSubWorkflow=false',
+  );
+});
+
+test('created and concurrent paths return one symmetric structured result', () => {
+  const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
+    /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
+  );
+  assert.ok(creation, 'expected run creation node');
+  const createdNewRunIf = nodesByName.get(outputTargets(creation.name, 0)[0]);
+  assert.equal(createdNewRunIf?.type, 'n8n-nodes-base.if', 'creation must feed created-new-run IF');
+
+  const attachmentSplit = nodesOfType('n8n-nodes-base.splitOut').find(
+    (node) => String(node.parameters?.fieldToSplitOut ?? '').trim() === 'attachments',
+  );
+  assert.ok(attachmentSplit, 'expected attachments Split Out');
+  const workerNodes = nodesOfType('n8n-nodes-base.executeWorkflow').filter((node) =>
+    canReach(attachmentSplit.name, node.name),
+  );
+  assert.equal(workerNodes.length, 1, 'expected one Worker dispatch');
+  const worker = workerNodes[0];
+
+  const concurrentGuards = nodesOfType('n8n-nodes-base.code').filter((node) =>
+    /\baction\b\s*:\s*['"]concurrent_existing_run['"]/i.test(codeSource(node)),
+  );
+  assert.equal(concurrentGuards.length, 1, 'expected one concurrent-run guard');
+
+  const terminalNodes = structuredTerminalCodeNodes();
+  assert.equal(
+    terminalNodes.length,
+    1,
+    'created and concurrent paths must share exactly one structured terminal-result Code node',
+  );
+  const terminal = terminalNodes[0];
+  assert.equal(
+    terminal.parameters?.mode,
+    'runOnceForAllItems',
+    'terminal-result Code node must run once for all incoming items',
+  );
+  assert.ok(
+    outputTargets(createdNewRunIf.name, 0).some((target) => canReach(target, terminal.name)),
+    'created_new_run=true must reach the shared terminal result',
+  );
+  assert.ok(
+    canReach(concurrentGuards[0].name, terminal.name),
+    'concurrent existing-run path must reach the same terminal result',
+  );
+  assert.ok(
+    outputTargets(createdNewRunIf.name, 0).some((target) =>
+      canReach(target, terminal.name, new Set([worker.name])),
+    ),
+    'new-run result must reach the terminal without depending on Worker child output',
+  );
+  assert.equal(
+    canReach(worker.name, terminal.name),
+    false,
+    'structured new-run result must not be derived from Worker child output',
+  );
+  assert.match(
+    codeSource(terminal),
+    new RegExp(`\\$\\(\\s*['"]${regexEscape(creation.name)}['"]\\s*\\)`),
+    'terminal result must explicitly read the created run from the atomic creation node',
+  );
+  const trigger = nodesOfType('n8n-nodes-base.executeWorkflowTrigger')[0];
+  const validation = nodesOfType('n8n-nodes-base.code').find((node) =>
+    canReach(trigger.name, node.name) && codeChecksTypedInput(codeSource(node)),
+  );
+  assert.ok(validation, 'expected typed-input validation node');
+  const terminalRequestVariable = validatedInputVariable(codeSource(terminal), validation.name);
+  assert.ok(
+    terminalRequestVariable,
+    'terminal result must read validated intake provenance directly',
+  );
+  for (const field of ['source', 'source_event_key', 'trigger_kind']) {
+    assert.match(
+      codeSource(terminal),
+      new RegExp(`\\b${field}\\s*:\\s*${regexEscape(terminalRequestVariable)}\\.${field}\\b`),
+      `terminal result must preserve validated ${field}`,
+    );
+  }
+  assert.match(
+    codeSource(terminal),
+    /\breturn\s*\[\s*\{\s*json\s*:/i,
+    'terminal result must return one explicit n8n item',
+  );
+});
+
+test('zero supported documents bypass Split Out and return the shared structured result', () => {
+  const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
+    /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
+  );
+  assert.ok(creation, 'expected run creation node');
+  const createdNewRunIf = nodesByName.get(outputTargets(creation.name, 0)[0]);
+  assert.equal(createdNewRunIf?.type, 'n8n-nodes-base.if', 'creation must feed created-new-run IF');
+
+  const attachmentSplit = nodesOfType('n8n-nodes-base.splitOut').find(
+    (node) => String(node.parameters?.fieldToSplitOut ?? '').trim() === 'attachments',
+  );
+  assert.ok(attachmentSplit, 'expected attachments Split Out');
+
+  const extensionFilter = nodes.find(
+    (node) => node.type === 'n8n-nodes-base.filter' && canReach(attachmentSplit.name, node.name),
+  );
+  assert.ok(extensionFilter, 'expected supported-extension filter downstream of Split Out');
+  const supportedExtensions = (extensionFilter.parameters?.conditions?.conditions ?? [])
+    .map((condition) => String(condition.rightValue ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index);
+  assert.ok(supportedExtensions.length > 0, 'extension filter must declare supported extensions');
+
+  const supportedDocumentGates = nodesOfType('n8n-nodes-base.if').filter((node) => {
+    if (node.name === createdNewRunIf.name) return false;
+    const parameterStrings = stringsIn(node.parameters);
+    return (
+      outputTargets(createdNewRunIf.name, 0).some((target) => canReach(target, node.name)) &&
+      canReach(node.name, attachmentSplit.name) &&
+      parameterStrings.some((value) => /attachments/i.test(value)) &&
+      supportedExtensions.every((extension) =>
+        parameterStrings.some((value) => value.toLowerCase().includes(extension.toLowerCase())),
+      )
+    );
+  });
+  assert.equal(
+    supportedDocumentGates.length,
+    1,
+    'new runs must pass through one pre-Split gate that checks for supported attachments',
+  );
+  const gate = supportedDocumentGates[0];
+  const terminalNodes = structuredTerminalCodeNodes();
+  assert.equal(terminalNodes.length, 1, 'expected one shared structured terminal result');
+  const terminal = terminalNodes[0];
+  const splitOutputs = [0, 1].filter((index) =>
+    outputTargets(gate.name, index).some((target) => canReach(target, attachmentSplit.name)),
+  );
+  const emptyOutputs = [0, 1].filter((index) =>
+    outputTargets(gate.name, index).some((target) =>
+      canReach(target, terminal.name, new Set([attachmentSplit.name])),
+    ),
+  );
+  assert.equal(splitOutputs.length, 1, 'supported-document gate must have one dispatch output');
+  assert.equal(emptyOutputs.length, 1, 'supported-document gate must have one no-document output');
+  assert.notEqual(
+    splitOutputs[0],
+    emptyOutputs[0],
+    'empty/unsupported documents must use the non-dispatch gate output',
   );
 });
