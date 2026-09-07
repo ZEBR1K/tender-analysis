@@ -449,11 +449,6 @@
             "node": "ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Вернуть результат Orchestrator",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -501,6 +496,11 @@
         [
           {
             "node": "разделить документы",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Вернуть результат Orchestrator",
             "type": "main",
             "index": 0
           }
