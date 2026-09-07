@@ -29,9 +29,11 @@ not changed.
   `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
 - Full offline suite after this checkpoint:
   `node --test tests/*.test.mjs` → `518/518 PASS` on local date 2026-09-08.
-- Read-only local/live audit found Orchestrator and Worker differences. Document
-  Error Workflow, Aggregator and Finalization structurally match their local
-  snapshots.
+- Read-only local/live audit found that Orchestrator and both plausible Worker
+  targets differ. Document Error Workflow, Aggregator and Finalization have exact
+  normalized config and connections parity under the documented comparison
+  boundary. Sanitized evidence:
+  `evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`.
 
 ### Not verified / blocked
 

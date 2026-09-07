@@ -2,7 +2,7 @@
 
 - **Статус:** repository candidate / inactive
 - **Тип:** scheduled recovery workflow
-**Интервал:** каждые 10 минут
+- **Интервал:** каждые 10 минут
 
 ## Назначение
 

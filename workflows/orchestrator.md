@@ -12,7 +12,12 @@
 
 Этот документ описывает текущий canonical JSON в repository. Export содержит 14 нод, включая Sticky Note, имеет `active=false`, `availableInMCP=false` и `executionOrder=v1`.
 
-Он не доказывает состояние live n8n, импорт, публикацию, корректность credentials или production runtime. Task 3 подтверждён только структурными offline-тестами; runtime validation и promotion остаются отдельными gates.
+Canonical export сам по себе не доказывает live installation, публикацию,
+корректность credentials или production runtime. Task 3 подтверждён offline
+tests и bounded pre-DB runtime smoke: exact input validation, TenderPlan FullInfo
+identity и normalization выполнены, после чего execution остановлен до DB
+registration. DB registration, Worker dispatch, complete runtime и promotion
+остаются непроверенными.
 
 ---
 

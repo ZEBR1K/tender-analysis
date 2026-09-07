@@ -5799,11 +5799,15 @@ node --test tests/*.test.mjs
 local date: 2026-09-08
 ```
 
-Read-only local/live audit found Orchestrator and Worker drift; Document Error
-Workflow, Aggregator and Finalization structurally match. Existing live workflows
-were not changed. All new workflows remain inactive/unpublished, and production
-promotion/runtime matrix are pending. MCP ignored requested folder placement and
-returned `parentFolderId=null`; this remains tooling/packaging drift.
+Read-only local/live audit found that Orchestrator and both plausible Worker
+targets differ; Document Error Workflow, Aggregator and Finalization have exact
+normalized config and connections parity under the defined comparison boundary.
+Method, exact node counts/IDs and sanitized results are recorded in
+`evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`. Existing live
+workflows were not changed. All new workflows remain inactive/unpublished, and
+production promotion/runtime matrix are pending. MCP ignored requested folder
+placement and returned `parentFolderId=null`; this remains tooling/packaging
+drift.
 
 Controlled activation order remains:
 
