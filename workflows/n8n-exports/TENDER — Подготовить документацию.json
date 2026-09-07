@@ -1,0 +1,540 @@
+{
+  "name": "TENDER — Подготовить документацию",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "analysis_run_id",
+              "type": "string"
+            },
+            {
+              "name": "attachments",
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        80
+      ],
+      "id": "da000001-0001-4000-8000-000000000001",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const input = $input.first().json;\nconst analysisRunId = String(input.analysis_run_id ?? '').trim();\nconst sourceAttachments = Array.isArray(input.attachments) ? input.attachments : null;\nconst supportedDocuments = new Set(['pdf', 'docx', 'xlsx']);\nconst supportedArchives = new Set(['zip', '7z', 'rar', 'tar', 'gz', 'tar.gz', 'tgz']);\nconst maxArchiveBytes = 100 * 1024 * 1024;\n\nfunction extensionOf(attachment) {\n  const explicit = String(attachment.file_extension ?? '')\n    .trim().toLowerCase().replace(/^\\./u, '');\n  const name = String(attachment.file_name ?? '').trim().toLowerCase();\n  if (explicit === 'tar.gz' || name.endsWith('.tar.gz')) return 'tar.gz';\n  if (explicit) return explicit;\n  const dot = name.lastIndexOf('.');\n  return dot >= 0 ? name.slice(dot + 1) : '';\n}\n\nfunction failure(errorCode, errorMessage, sourceAttachmentIndex = null, extractorJobId = null) {\n  return [{ json: {\n    schema_version: 'tender_document_ingestion_v1',\n    analysis_run_id: analysisRunId || null,\n    source_attachments: sourceAttachments ?? [],\n    base_documents: [],\n    archive_jobs: [],\n    preliminary_failure: {\n      error_code: errorCode,\n      error_message: String(errorMessage).slice(0, 500),\n      source_attachment_index: sourceAttachmentIndex,\n      extractor_job_id: extractorJobId,\n    },\n  } }];\n}\n\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(analysisRunId)) {\n  return failure('INGESTION_CONTRACT_INVALID', 'analysis_run_id must be a UUID');\n}\nif (!sourceAttachments) {\n  return failure('INGESTION_CONTRACT_INVALID', 'attachments must be an array');\n}\n\nconst normalized = sourceAttachments.map((attachment) => {\n  const sourceAttachmentIndex = Number(attachment.document_index);\n  const fileName = String(attachment.file_name ?? '').trim();\n  return {\n    document_index: sourceAttachmentIndex,\n    file_name: fileName || null,\n    file_extension: extensionOf(attachment),\n    display_name: String(attachment.display_name ?? fileName).trim() || fileName || null,\n    download_url: String(attachment.download_url ?? '').trim() || null,\n    publication_at: attachment.publication_at ?? null,\n    source_size: Number.isFinite(Number(attachment.source_size))\n      ? Number(attachment.source_size)\n      : null,\n  };\n}).sort((left, right) => left.document_index - right.document_index);\n\nconst indexes = normalized.map((attachment) => attachment.document_index);\nif (indexes.some((value) => !Number.isInteger(value) || value < 1)) {\n  return failure('INGESTION_CONTRACT_INVALID', 'Every source document_index must be a positive integer');\n}\nif (new Set(indexes).size !== indexes.length) {\n  return failure('INGESTION_CONTRACT_INVALID', 'Source document_index values must be unique');\n}\n\nconst baseDocuments = [];\nconst archiveJobs = [];\n\nfor (const attachment of normalized) {\n  const index = attachment.document_index;\n  const extension = attachment.file_extension;\n\n  if (supportedArchives.has(extension)) {\n    const extractorJobId = `${analysisRunId}--source-${String(index).padStart(6, '0')}`;\n    if (!attachment.download_url) {\n      return failure('SOURCE_ARCHIVE_DOWNLOAD_FAILED', 'Archive download URL is missing', index, extractorJobId);\n    }\n    if (attachment.source_size !== null && attachment.source_size > maxArchiveBytes) {\n      return failure('ARCHIVE_TOO_LARGE', 'Declared source archive size exceeds 100 MiB', index, extractorJobId);\n    }\n    archiveJobs.push({\n      analysis_run_id: analysisRunId,\n      source_attachment_index: index,\n      extractor_job_id: extractorJobId,\n      declared_extension: extension,\n      source_attachment: attachment,\n      download_url: attachment.download_url,\n    });\n    continue;\n  }\n\n  const processable = supportedDocuments.has(extension);\n  baseDocuments.push({\n    source_attachment_index: index,\n    sort_path: '',\n    file_name: attachment.file_name,\n    file_extension: extension || null,\n    display_name: attachment.display_name,\n    download_url: attachment.download_url,\n    publication_at: attachment.publication_at,\n    source_size: attachment.source_size,\n    mime_type: null,\n    file_size: null,\n    status: processable ? 'pending' : 'skipped',\n    error_message: null,\n    ingestion_metadata: {\n      source_attachment_index: index,\n      artifact_kind: processable ? 'direct_document' : 'unsupported_file',\n      archive_chain: [],\n      entry_path: null,\n      archive_depth: 0,\n      content_sha256: null,\n      extractor_job_id: null,\n      skip_reason: processable ? null : 'unsupported_file_type',\n    },\n  });\n}\n\nreturn [{ json: {\n  schema_version: 'tender_document_ingestion_v1',\n  analysis_run_id: analysisRunId,\n  source_attachments: normalized,\n  source_attachment_count: normalized.length,\n  base_documents: baseDocuments,\n  archive_jobs: archiveJobs,\n  preliminary_failure: null,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        80
+      ],
+      "id": "da000001-0002-4000-8000-000000000002",
+      "name": "Проверить и классифицировать вход"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "da000001-1003-4000-8000-000000000003",
+              "leftValue": "={{ $json.archive_jobs.length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -640,
+        80
+      ],
+      "id": "da000001-0003-4000-8000-000000000003",
+      "name": "Есть архивы?"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "archive_jobs",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "analysis_run_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -80
+      ],
+      "id": "da000001-0004-4000-8000-000000000004",
+      "name": "Развернуть очередь архивов"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -160,
+        -80
+      ],
+      "id": "da000001-0005-4000-8000-000000000005",
+      "name": "Обработать архивы по одному"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const archiveJob = $input.first().json.archive_jobs;\nif (!archiveJob?.extractor_job_id) {\n  throw new Error('[Начать обработку архива] Archive loop item has no extractor job');\n}\n\nreturn [{ json: {\n  job: {\n    ...archiveJob,\n    deadline_epoch_ms: Date.now() + (5 * 60 * 1000),\n  },\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        80
+      ],
+      "id": "da000001-0006-4000-8000-000000000006",
+      "name": "Начать обработку архива",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.job.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "archive"
+            }
+          },
+          "timeout": "={{ Math.max(1000, $json.job.deadline_epoch_ms - Date.now()) }}"
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        80
+      ],
+      "id": "da000001-0007-4000-8000-000000000007",
+      "name": "Скачать архив",
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response = $input.first();\nconst job = $('Начать обработку архива').item.json.job ?? null;\n\nfunction failed(errorCode, errorMessage) {\n  return [{ json: {\n    archive_ok: false,\n    job,\n    failure: {\n      error_code: errorCode,\n      error_message: String(errorMessage).slice(0, 500),\n      source_attachment_index: job?.source_attachment_index ?? null,\n      extractor_job_id: job?.extractor_job_id ?? null,\n    },\n  } }];\n}\n\nif (!job) {\n  return failed('INGESTION_CONTRACT_INVALID', 'Archive loop item has no job');\n}\nif (Date.now() >= Number(job.deadline_epoch_ms)) {\n  return failed('ARCHIVE_TIMEOUT', 'Archive preparation deadline expired during download');\n}\nif (response.json?.error) {\n  return failed('SOURCE_ARCHIVE_DOWNLOAD_FAILED', 'Source archive download failed');\n}\nif (!response.binary?.archive) {\n  return failed('SOURCE_ARCHIVE_DOWNLOAD_FAILED', 'Source archive binary is missing');\n}\n\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'archive');\nif (buffer.length > 100 * 1024 * 1024) {\n  return failed('ARCHIVE_TOO_LARGE', 'Downloaded source archive exceeds 100 MiB');\n}\n\nreturn [{\n  json: {\n    archive_ok: true,\n    job,\n    downloaded_size_bytes: buffer.length,\n  },\n  binary: {\n    archive: response.binary.archive,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        80
+      ],
+      "id": "da000001-0008-4000-8000-000000000008",
+      "name": "Нормализовать скачивание архива"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "da000001-1009-4000-8000-000000000009",
+              "leftValue": "={{ $json.archive_ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        80
+      ],
+      "id": "da000001-0009-4000-8000-000000000009",
+      "name": "Архив скачан?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-archive-extractor:8080/v1/extractions/' + encodeURIComponent($json.job.extractor_job_id) }}",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "run_id",
+              "value": "={{ $json.job.analysis_run_id }}"
+            },
+            {
+              "name": "source_attachment_index",
+              "value": "={{ $json.job.source_attachment_index }}"
+            },
+            {
+              "name": "declared_extension",
+              "value": "={{ $json.job.declared_extension }}"
+            },
+            {
+              "name": "deadline_epoch_ms",
+              "value": "={{ $json.job.deadline_epoch_ms }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "archive",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": "={{ Math.max(1000, $json.job.deadline_epoch_ms - Date.now() + 5000) }}"
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "da000001-0010-4000-8000-000000000010",
+      "name": "Распаковать архив",
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response = $input.first().json;\nconst job = $('Нормализовать скачивание архива').item.json.job;\n\nfunction failed(errorCode, errorMessage) {\n  return [{ json: {\n    archive_ok: false,\n    job,\n    failure: {\n      error_code: errorCode,\n      error_message: String(errorMessage).slice(0, 500),\n      source_attachment_index: job.source_attachment_index,\n      extractor_job_id: job.extractor_job_id,\n    },\n  } }];\n}\n\nif (response.error) {\n  const message = String(response.error.message ?? response.error);\n  return failed(\n    /timed?\\s*out|timeout/iu.test(message) ? 'ARCHIVE_TIMEOUT' : 'EXTRACTOR_UNAVAILABLE',\n    /timed?\\s*out|timeout/iu.test(message)\n      ? 'Archive extractor request timed out'\n      : 'Archive extractor is unavailable',\n  );\n}\n\nconst statusCode = Number(response.statusCode ?? 200);\nconst body = response.body ?? response;\nif (statusCode < 200 || statusCode >= 300 || body.success !== true) {\n  return failed(\n    String(body.error?.code ?? (statusCode === 408 ? 'ARCHIVE_TIMEOUT' : 'EXTRACTOR_UNAVAILABLE')),\n    String(body.error?.message ?? 'Archive extractor rejected the job'),\n  );\n}\n\nif (\n  body.schema_version !== 'tender_archive_extraction_v1'\n  || body.job_id !== job.extractor_job_id\n  || body.analysis_run_id !== job.analysis_run_id\n  || Number(body.source_attachment_index) !== job.source_attachment_index\n  || !Array.isArray(body.entries)\n) {\n  return failed('INGESTION_CONTRACT_INVALID', 'Archive extractor response contract mismatch');\n}\n\nreturn [{ json: {\n  archive_ok: true,\n  job,\n  extractor_result: body,\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "id": "da000001-0011-4000-8000-000000000011",
+      "name": "Нормализовать распаковку"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "da000001-1012-4000-8000-000000000012",
+              "leftValue": "={{ $json.archive_ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1520,
+        0
+      ],
+      "id": "da000001-0012-4000-8000-000000000012",
+      "name": "Архив обработан?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context = $('Проверить и классифицировать вход').first().json;\nconst supportedDocuments = new Set(['pdf', 'docx', 'xlsx']);\n\nfunction failure(errorCode, errorMessage, sourceAttachmentIndex = null, extractorJobId = null) {\n  return [{ json: {\n    success: false,\n    schema_version: 'tender_document_ingestion_v1',\n    analysis_run_id: context.analysis_run_id,\n    source_attachments: context.source_attachments,\n    failure: {\n      error_code: errorCode,\n      error_message: String(errorMessage).slice(0, 500),\n      source_attachment_index: sourceAttachmentIndex,\n      extractor_job_id: extractorJobId,\n    },\n  } }];\n}\n\nif (context.preliminary_failure) {\n  const current = context.preliminary_failure;\n  return failure(\n    current.error_code,\n    current.error_message,\n    current.source_attachment_index,\n    current.extractor_job_id,\n  );\n}\n\nconst archiveResults = $input.all()\n  .map((item) => item.json)\n  .filter((item) => item.extractor_result)\n  .sort((left, right) => left.job.source_attachment_index - right.job.source_attachment_index);\n\nif (archiveResults.length !== context.archive_jobs.length) {\n  return failure(\n    'INGESTION_CONTRACT_INVALID',\n    `Expected ${context.archive_jobs.length} archive results, received ${archiveResults.length}`,\n  );\n}\n\nconst documents = structuredClone(context.base_documents);\n\nfor (const archiveItem of archiveResults) {\n  const job = archiveItem.job;\n  const result = archiveItem.extractor_result;\n  const source = job.source_attachment;\n\n  if (!result.source?.sha256 || !Number.isInteger(Number(result.source?.size_bytes))) {\n    return failure(\n      'INGESTION_CONTRACT_INVALID',\n      'Extractor source metadata is invalid',\n      job.source_attachment_index,\n      job.extractor_job_id,\n    );\n  }\n\n  documents.push({\n    source_attachment_index: source.document_index,\n    sort_path: '',\n    file_name: source.file_name,\n    file_extension: source.file_extension,\n    display_name: source.display_name,\n    download_url: source.download_url,\n    publication_at: source.publication_at,\n    source_size: source.source_size,\n    mime_type: null,\n    file_size: Number(result.source.size_bytes),\n    status: 'skipped',\n    error_message: null,\n    ingestion_metadata: {\n      source_attachment_index: source.document_index,\n      artifact_kind: 'archive_container',\n      archive_chain: [source.file_name],\n      entry_path: null,\n      archive_depth: 1,\n      content_sha256: result.source.sha256,\n      extractor_job_id: result.job_id,\n      skip_reason: 'archive_container_expanded',\n    },\n  });\n\n  for (const entry of result.entries) {\n    if (!['file', 'archive_container'].includes(entry.kind)) {\n      return failure(\n        'INGESTION_CONTRACT_INVALID',\n        `Unsupported extractor entry kind: ${String(entry.kind)}`,\n        job.source_attachment_index,\n        job.extractor_job_id,\n      );\n    }\n\n    const extension = String(entry.file_extension ?? '').toLowerCase();\n    const isContainer = entry.kind === 'archive_container';\n    const processable = !isContainer && supportedDocuments.has(extension);\n    const logicalPath = String(entry.logical_path ?? '');\n    if (!logicalPath || !entry.file_name || !Number.isInteger(Number(entry.archive_depth))) {\n      return failure(\n        'INGESTION_CONTRACT_INVALID',\n        'Extractor entry metadata is incomplete',\n        job.source_attachment_index,\n        job.extractor_job_id,\n      );\n    }\n    if (processable && !entry.download_url) {\n      return failure(\n        'INGESTION_CONTRACT_INVALID',\n        'Processable extracted file has no artifact URL',\n        job.source_attachment_index,\n        job.extractor_job_id,\n      );\n    }\n\n    documents.push({\n      source_attachment_index: source.document_index,\n      sort_path: logicalPath,\n      file_name: String(entry.file_name),\n      file_extension: extension || null,\n      display_name: `${source.display_name ?? source.file_name} :: ${logicalPath}`,\n      download_url: processable ? String(entry.download_url) : null,\n      publication_at: source.publication_at,\n      source_size: source.source_size,\n      mime_type: entry.mime_type ?? null,\n      file_size: Number(entry.size_bytes ?? 0),\n      status: processable ? 'pending' : 'skipped',\n      error_message: null,\n      ingestion_metadata: {\n        source_attachment_index: source.document_index,\n        artifact_kind: isContainer\n          ? 'archive_container'\n          : processable ? 'extracted_document' : 'unsupported_file',\n        archive_chain: [source.file_name, ...(Array.isArray(entry.archive_chain) ? entry.archive_chain : [])],\n        entry_path: logicalPath,\n        archive_depth: Number(entry.archive_depth),\n        content_sha256: entry.sha256 ?? null,\n        extractor_job_id: result.job_id,\n        skip_reason: processable\n          ? null\n          : isContainer ? 'archive_container_expanded' : 'unsupported_file_type',\n      },\n    });\n  }\n}\n\nfunction compareText(left, right) {\n  const leftFolded = left.normalize('NFC').toLocaleLowerCase('en-US');\n  const rightFolded = right.normalize('NFC').toLocaleLowerCase('en-US');\n  if (leftFolded < rightFolded) return -1;\n  if (leftFolded > rightFolded) return 1;\n  if (left < right) return -1;\n  if (left > right) return 1;\n  return 0;\n}\n\ndocuments.sort((left, right) => {\n  const sourceOrder = left.source_attachment_index - right.source_attachment_index;\n  return sourceOrder !== 0 ? sourceOrder : compareText(left.sort_path, right.sort_path);\n});\n\nconst finalDocuments = documents.map(({ sort_path: _sortPath, ...document }, index) => ({\n  document_index: index + 1,\n  ...document,\n}));\nconst processableCount = finalDocuments.filter((document) => document.status === 'pending').length;\nconst skippedCount = finalDocuments.filter((document) => document.status === 'skipped').length;\nconst archiveCount = finalDocuments.filter(\n  (document) => document.ingestion_metadata.artifact_kind === 'archive_container',\n).length;\n\nif (processableCount === 0) {\n  return failure('NO_PROCESSABLE_DOCUMENTS', 'No PDF, DOCX or XLSX documents were found');\n}\n\nreturn [{ json: {\n  success: true,\n  schema_version: 'tender_document_ingestion_v1',\n  analysis_run_id: context.analysis_run_id,\n  manifest: {\n    schema_version: 'tender_document_ingestion_v1',\n    analysis_run_id: context.analysis_run_id,\n    source_attachment_count: context.source_attachment_count,\n    registered_document_count: finalDocuments.length,\n    processable_document_count: processableCount,\n    skipped_document_count: skippedCount,\n    archive_count: archiveCount,\n    documents: finalDocuments,\n  },\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        -280
+      ],
+      "id": "da000001-0013-4000-8000-000000000013",
+      "name": "Сформировать полный manifest"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const context = $('Проверить и классифицировать вход').first().json;\nconst current = $input.first().json;\nconst failure = current.failure ?? context.preliminary_failure ?? (current.error ? {\n  error_code: 'INGESTION_CONTRACT_INVALID',\n  error_message: String(current.error.message ?? current.error),\n  source_attachment_index: current.job?.source_attachment_index ?? null,\n  extractor_job_id: current.job?.extractor_job_id ?? null,\n} : {\n  error_code: 'INGESTION_CONTRACT_INVALID',\n  error_message: 'Preparation workflow reached failure branch without typed error',\n  source_attachment_index: null,\n  extractor_job_id: null,\n});\n\nreturn [{ json: {\n  success: false,\n  schema_version: 'tender_document_ingestion_v1',\n  analysis_run_id: context.analysis_run_id,\n  source_attachments: context.source_attachments,\n  failure: {\n    error_code: String(failure.error_code),\n    error_message: String(failure.error_message).slice(0, 500),\n    source_attachment_index: failure.source_attachment_index ?? null,\n    extractor_job_id: failure.extractor_job_id ?? null,\n  },\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        280
+      ],
+      "id": "da000001-0014-4000-8000-000000000014",
+      "name": "Сформировать ошибку подготовки"
+    },
+    {
+      "parameters": {
+        "content": "### Подготовка документации\\nПрямые файлы проходят только как metadata; binary скачивается лишь для архивов. Лимиты: source 100 MiB, leaf 50 MiB, total 300 MiB, 500 entries, depth 3, timeout 5 minutes. Любая ошибка архива завершает preparation с typed failure до запуска Workers.",
+        "height": 420,
+        "width": 1160,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1140,
+        -180
+      ],
+      "id": "da000001-0015-4000-8000-000000000015",
+      "name": "Контракт подготовки документации"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Проверить и классифицировать вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить и классифицировать вход": {
+      "main": [
+        [
+          {
+            "node": "Есть архивы?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Есть архивы?": {
+      "main": [
+        [
+          {
+            "node": "Развернуть очередь архивов",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать полный manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Развернуть очередь архивов": {
+      "main": [
+        [
+          {
+            "node": "Обработать архивы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Обработать архивы по одному": {
+      "main": [
+        [
+          {
+            "node": "Сформировать полный manifest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Начать обработку архива",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Начать обработку архива": {
+      "main": [
+        [
+          {
+            "node": "Скачать архив",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать ошибку подготовки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скачать архив": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать скачивание архива",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Нормализовать скачивание архива",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать скачивание архива": {
+      "main": [
+        [
+          {
+            "node": "Архив скачан?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Архив скачан?": {
+      "main": [
+        [
+          {
+            "node": "Распаковать архив",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать ошибку подготовки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Распаковать архив": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать распаковку",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Нормализовать распаковку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать распаковку": {
+      "main": [
+        [
+          {
+            "node": "Архив обработан?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Архив обработан?": {
+      "main": [
+        [
+          {
+            "node": "Обработать архивы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать ошибку подготовки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "da000001-ffff-4000-8000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "tags": []
+}
+
