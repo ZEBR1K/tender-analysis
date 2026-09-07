@@ -130,7 +130,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-23`|✅ Exact pinned runtime GREEN / fresh unpinned run and production promotion pending. Execution `14589` reproduced the execution-`14491` malformed `doc_7_au_0037#1 / licenses_certificates` response with missing `confidence`. The primary Validator stayed outside retry; only that contract-invalid fact retried. Attempt 2 returned contract-valid `rejected`, `confidence=0.95`, `wrong_field_classification`; the valid sibling was retained. Reassembly and strict checker accepted `22/22` Validator units, Worker persisted `69` audited facts over `66/66` analysis units, and the document reached `completed`. Evidence: `evaluations/DOCUMENT_WORKER_DW23_RUNTIME_14589_2026-09-06.md`. Deterministic three-attempt `requires_review` exhaustion remains covered offline. Fresh full run without pinned data and live production promotion/read-back remain separate gates.|Document Worker / AI reliability and terminal containment|
 |`DW-24`|✅ Isolated Worker runtime GREEN; production/full-run promotion pending. Execution `14592` exposed malformed ActiveX GroupName with literal U+0000 while option Value `0/1` remained decodable. Canonical and DW-23 beta packages reject only GroupName to `group_context=null`, preserve state, emit bounded NUL-free `invalid_activex_group_name`, and fail fast on any residual nested NUL before `Сохранить analysis unit`. Execution `14596` persisted `8/8` units and `15` facts with zero residual NUL and completed the document. Test Aggregator was not invoked; production promotion and a fresh full run remain separate gates.|Document Worker / DOCX ActiveX JSONB safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
-|`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
+|`DW-8`|⚠ Local implementation/tests complete; controlled runtime retry verification OPEN. Fail-closed non-empty `analysis_unit_ids` guard и scoped replacement прошли Worker `293/293`, full `493/493`; quality re-review `Ready: Yes`. Production fixed/deployed не заявляется.|Document Worker|
 |`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
@@ -1338,9 +1338,12 @@ P0 local mitigation complete; runtime gate remains before another full/client-re
 
 ## D1 — `DW-8`
 
+**Status:** Local implementation/tests complete; controlled runtime retry verification OPEN
+**Quality re-review:** `Ready: Yes`
+
 ### Проблема
 
-Analysis units сохраняются UPSERT-ом, но stale units не удаляются.
+Исторически analysis units сохранялись UPSERT-ом, но stale units не удалялись.
 
 Пример:
 
@@ -1384,17 +1387,32 @@ failed → processing
 
 но persistence layer пока не полностью retry-safe.
 
-### Требуемое решение
+### Реализованный локальный контракт
 
-После сохранения текущего набора units:
+Upstream-нода `Собрать факты документа1` формирует `analysis_summary.analysis_unit_ids` как полный непустой deterministic набор units текущей попытки после проверки количества, уникальности и соответствия сохранённым units. В `Сохранить факты документа` missing, non-array или empty значение fail closed до destructive cleanup.
+
+Replacement ограничен тем же `(analysis_run_id, document_id)`:
+
+- units текущего набора сохраняются;
+- только stale units, отсутствующие в текущем наборе, удаляются;
+- facts удалённых units каскадируют через существующий FK;
+- stale facts сохранившихся units удаляются только когда отсутствуют в текущем input;
+- все текущие `confirmed`, `requires_review` и `rejected` facts UPSERT-ятся для audit;
+- diagnostic output содержит `deleted_stale_units_count`.
+
+Canonical и beta Worker содержат одинаковый SQL-контракт.
+
+### Offline evidence
 
 ```text
-DELETE stale units
-WHERE document\\\\\\\\\\\\\\\_id = ...
-AND analysis\\\\\\\\\\\\\\\_unit\\\\\\\\\\\\\\\_id NOT IN current set
+Worker suite: 293/293 PASS
+Full suite:   493/493 PASS
+Quality re-review: Ready Yes
 ```
 
-С учётом FK cascade это также может очищать stale facts.
+### Открытый gate
+
+Controlled runtime retry verification должна доказать фактический DB result до/после retry. До этого `DW-8` не считается production fixed/deployed.
 
 ### Приоритет
 
@@ -2110,7 +2128,7 @@ TR-0…TR-3 закрыты. Local `TR-10` containment не является prod
 ## Этап 4 — retry correctness
 
 ```text
-8. DW-8
+8. DW-8 — local implementation/tests complete; controlled runtime retry verification OPEN
 ```
 
 После этого:
@@ -2288,7 +2306,8 @@ don't silently stick
   |
   v
 DW-8
-retry-safe units
+local retry-safe contract GREEN
+controlled runtime retry OPEN
   |
   v
 OR-0
@@ -2319,7 +2338,7 @@ future: PDF / DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[ ] DW-14 / EW-3
 \\\\\\\\\\\\\\\[ ] DW-15
 \\\\\\\\\\\\\\\[ ] DW-3
-\\\\\\\\\\\\\\\[ ] DW-8
+\\\\\\\\\\\\\\\[ ] DW-8 — local implementation/tests complete; controlled runtime retry verification OPEN
 \\\\\\\\\\\\\\\[ ] OR-0
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
