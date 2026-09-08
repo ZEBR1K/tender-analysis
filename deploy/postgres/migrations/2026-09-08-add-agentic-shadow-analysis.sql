@@ -3,11 +3,11 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
-LOCK TABLE public.tender_analysis_runs IN ACCESS SHARE MODE;
-LOCK TABLE public.tender_analysis_documents IN ACCESS SHARE MODE;
-LOCK TABLE public.tender_analysis_units IN ACCESS SHARE MODE;
-LOCK TABLE public.tender_analysis_facts IN ACCESS SHARE MODE;
-LOCK TABLE public.tender_analysis_field_results IN ACCESS SHARE MODE;
+LOCK TABLE public.tender_analysis_runs IN SHARE UPDATE EXCLUSIVE MODE;
+LOCK TABLE public.tender_analysis_documents IN SHARE UPDATE EXCLUSIVE MODE;
+LOCK TABLE public.tender_analysis_units IN SHARE UPDATE EXCLUSIVE MODE;
+LOCK TABLE public.tender_analysis_facts IN SHARE UPDATE EXCLUSIVE MODE;
+LOCK TABLE public.tender_analysis_field_results IN SHARE UPDATE EXCLUSIVE MODE;
 
 DO $shadow_locks$
 DECLARE
@@ -51,7 +51,7 @@ BEGIN
     END IF;
 
     EXECUTE pg_catalog.format(
-      'LOCK TABLE %I.%I IN ACCESS SHARE MODE',
+      'LOCK TABLE %I.%I IN SHARE UPDATE EXCLUSIVE MODE',
       'public',
       shadow_table.table_name
     );

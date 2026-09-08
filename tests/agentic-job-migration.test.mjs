@@ -87,15 +87,15 @@ test('migration source is present and wrapped in one ordered transaction', async
   assert.match(postconditions, /RAISE\s+EXCEPTION/i);
 });
 
-test('migration locks canonical parents and pre-existing shadow tables in a fixed order', async () => {
+test('migration blocks concurrent canonical and shadow schema changes in a fixed order', async () => {
   const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
   const canonicalPreconditionIndex = sql.indexOf('DO $canonical_preconditions$');
   assert.ok(canonicalPreconditionIndex > 0, 'missing canonical precondition boundary');
 
   let priorLockIndex = -1;
   for (const table of canonicalTables) {
-    const match = new RegExp(`LOCK\\s+TABLE\\s+public\\.${table}\\s+IN\\s+ACCESS\\s+SHARE\\s+MODE\\s*;`, 'i').exec(sql);
-    assert.ok(match, `missing ACCESS SHARE lock for ${table}`);
+    const match = new RegExp(`LOCK\\s+TABLE\\s+public\\.${table}\\s+IN\\s+SHARE\\s+UPDATE\\s+EXCLUSIVE\\s+MODE\\s*;`, 'i').exec(sql);
+    assert.ok(match, `missing SHARE UPDATE EXCLUSIVE lock for ${table}`);
     assert.ok(match.index > priorLockIndex, `canonical lock order is unstable at ${table}`);
     assert.ok(match.index < canonicalPreconditionIndex, `${table} lock must precede catalog inspection`);
     priorLockIndex = match.index;
@@ -105,7 +105,8 @@ test('migration locks canonical parents and pre-existing shadow tables in a fixe
   assert.ok(sql.indexOf('DO $shadow_locks$') < canonicalPreconditionIndex);
   for (const table of shadowTables) assert.match(shadowLocks, new RegExp(`'${table}'`, 'i'));
   assert.match(shadowLocks, /existing_object_kind\s*<>\s*'r'/i);
-  assert.match(shadowLocks, /format\s*\(\s*'LOCK TABLE %I\.%I IN ACCESS SHARE MODE'/i);
+  assert.match(shadowLocks, /format\s*\(\s*'LOCK TABLE %I\.%I IN SHARE UPDATE EXCLUSIVE MODE'/i);
+  assert.doesNotMatch(sql, /LOCK\s+TABLE[\s\S]*?IN\s+ACCESS\s+SHARE\s+MODE/i);
 });
 
 test('migration fail-closes on canonical parent schema drift without mutating canonical tables', async () => {
@@ -334,6 +335,7 @@ test('field result table isolates raw and effective exact-27 projections', async
 
 test('implementation plan records same-run and field-catalog database ownership', async () => {
   const plan = await readFile(planUrl, 'utf8');
+  assert.match(plan, /fixed-order `SHARE UPDATE EXCLUSIVE` locks/i);
   assert.match(plan, /tender_agentic_documents[\s\S]*?analysis_run_id uuid NOT NULL/i);
   assert.match(plan, /UNIQUE \(id, analysis_run_id\)/i);
   assert.match(plan, /UNIQUE \(id, analysis_run_id, field_catalog_version\)/i);

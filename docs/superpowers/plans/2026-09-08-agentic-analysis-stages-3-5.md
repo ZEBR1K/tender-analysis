@@ -567,7 +567,7 @@ tests/agentic-job-migration.test.mjs
 
 - [ ] Write failing migration contract tests for all columns, FKs, unique keys, status checks, field range and idempotent reapplication.
 - [ ] Add fail-closed preconditions confirming the five canonical tables have not changed unexpectedly.
-- [ ] Acquire fixed-order `ACCESS SHARE` locks on all five canonical parents and safely lock every pre-existing ordinary shadow table before catalog inspection.
+- [ ] Acquire fixed-order `SHARE UPDATE EXCLUSIVE` locks on all five canonical parents and safely lock every pre-existing ordinary shadow table before catalog inspection. This blocks concurrent schema changes such as `ADD FOREIGN KEY` and `VALIDATE CONSTRAINT` while allowing normal `RowExclusiveLock` DML.
 - [ ] Implement the three new tables and their indexes in one transaction.
 - [ ] Enforce job/document/result ownership with composite run identity FKs, and enforce result `field_catalog_version` against its owning job in PostgreSQL.
 - [ ] Add indexes for monitor queries: `(status, heartbeat_at)`, `(poll_claimed_at)` and `(analysis_run_id)`.
