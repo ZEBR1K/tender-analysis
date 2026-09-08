@@ -31,6 +31,10 @@ export function createConfig(env = process.env) {
     host: env.TENDER_CODEX_RUNNER_HOST || '127.0.0.1',
     port: positiveInteger(env, 'TENDER_CODEX_RUNNER_PORT', 8080),
     rootDirectory: path.resolve(env.TENDER_CODEX_RUNNER_ROOT || path.join(process.cwd(), '.codex-runner')),
+    fieldCatalogPath: path.resolve(
+      env.TENDER_CODEX_RUNNER_FIELD_CATALOG_PATH
+        || path.join(process.cwd(), 'field-catalog', 'FIELD_CATALOG.md'),
+    ),
     authToken: String(env.TENDER_CODEX_RUNNER_AUTH_TOKEN || readSecretFile(authTokenFile)),
     authTokenFile,
     codexAuthFile: path.resolve(

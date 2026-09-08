@@ -14,6 +14,19 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 
 `GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions and boolean readiness flags. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
 
+## Immutable source staging
+
+The authenticated staging API is deliberately small:
+
+- `PUT /v1/jobs` creates one closed `tender_source_manifest_v1` declaration.
+- `PUT /v1/jobs/{job_id}/documents/{artifact_key}` streams one declared source file.
+- `POST /v1/jobs/{job_id}/seal` rechecks every file hash and size, copies the pinned field catalog, and freezes the input manifest.
+- `GET /v1/jobs/{job_id}` returns bounded identity, state, counts, and the sealed manifest hash.
+
+Original file names are metadata only. Physical source names are generated from the validated document index and artifact key, and no caller-supplied name is ever resolved as a path. Uploads are written to a same-filesystem temporary file, hashed while streaming, fsynced, and atomically renamed only when SHA-256 and byte size match the declaration. Exact repeated uploads are idempotent before sealing; conflicting uploads and every post-seal upload are rejected.
+
+The manifest intentionally contains only job/run/catalog identity and source-file identity (`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256). It does not extract or index pages, sheets, OOXML parts, text, or OCR. Codex chooses how to inspect each source in a later task.
+
 ## Per-job Codex permissions
 
 The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes only the exact current `workspace`, reads only that job's `input` and `source-index`, and explicitly denies the shared jobs parent, Codex auth, runner secrets, global temp paths and `/proc/*/environ`.

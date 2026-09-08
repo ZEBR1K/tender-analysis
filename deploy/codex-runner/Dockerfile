@@ -18,6 +18,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY schemas ./schemas
 COPY policies ./policies
+COPY field-catalog ./field-catalog
 COPY src ./src
 
 RUN mkdir --parents /data/jobs/.tmp \
