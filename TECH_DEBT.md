@@ -2014,9 +2014,15 @@ offline-test repeated-event/resume boundary. Dispatcher сохраняет то�
 Stale `processing` после одного часа требует read-only observation execution и
 guarded CAS; unavailable API не мутирует state.
 
-Debt не закрыт: production migration отсутствует, inactive candidates не
-promoted и не прошли runtime matrix. Task 9 relation poller реализован
-offline; его exhaustive coverage и runtime behavior остаются open gates.
+Debt не закрыт: current full DB preflight execution `14684` is migration
+`NO-GO`. It found `3` duplicate unfinished `(source, tender_id)` groups, absent
+intake ledger/indexes, and an inherited diagnostic credential running as
+`postgres` with `transaction_read_only=off` and SSL disabled. That credential
+must not be used again; a CA-verified `tender_codex_ro` preflight and an
+owner-approved duplicate reconciliation policy are required before migration.
+Inactive candidates are not promoted and have not passed the runtime matrix.
+Task 9 relation poller is implemented offline; its exhaustive coverage and
+runtime behavior remain open gates.
 
 \---
 

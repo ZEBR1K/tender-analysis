@@ -40,8 +40,16 @@ not changed.
 
 ### Not verified / blocked
 
-- Live DB preflight execution `14676` found the intake migration absent:
-  intake table and required partial unique/helper indexes were all `false`.
+- Historical DB preflight execution `14676` found the intake migration absent.
+  Current full preflight execution `14684` remains migration `NO-GO`: the
+  aggregate-only SELECT reported `97` total runs, `86` unfinished runs and `3`
+  duplicate unfinished `(source, tender_id)` groups; the intake table and all
+  three required indexes remain absent. The inherited probe credential resolved
+  to `current_user=postgres`, `transaction_read_only=off` and
+  `connection_uses_ssl=false`, so the fail-closed sanitizer terminated the
+  workflow with `status=error`. That credential is not acceptable for further
+  diagnostics or migration work. Evidence:
+  `evaluations/TENDER_INTAKE_FULL_DB_PREFLIGHT_14684_2026-09-08.md`.
 - Historical Task 8 TenderPlan type-5 event contract was not established. Probe workflow
   `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
   FullInfo returned `marks=[]` for both test tender IDs. No event paths or fixture

@@ -5853,3 +5853,35 @@ subtests and zero new failures.
 Production n8n, PostgreSQL, credentials and external state were not changed.
 The candidate itself has no runtime GREEN claim; only source contract `14683` is
 runtime GREEN.
+
+---
+
+## 2026-09-08 — Full DB deployment preflight execution 14684
+
+One explicitly authorized inactive/unpublished probe
+`fbjRXqyQ71toBhZK` (`[CODEX TEST] Tender Intake Full DB Preflight — 2026-09-08`)
+was created and executed exactly once. Its graph was Manual Trigger → one
+aggregate-only PostgreSQL `WITH … SELECT` → fail-closed sanitized Code. No retry,
+workflow update, publication, activation or database write occurred.
+
+Execution `14684` returned current aggregate evidence before the sanitizer
+stopped the workflow with `status=error`:
+
+```text
+current_user: postgres
+transaction_read_only: off
+connection_uses_ssl: false
+total_run_count: 97
+unfinished_run_count: 86
+duplicate_unfinished_group_count: 3
+intake_events_table_exists: false
+unfinished_run_unique_index_exists: false
+intake_run_index_exists: false
+intake_status_started_index_exists: false
+```
+
+The error is a correct fail-closed preflight outcome. Migration is `NO-GO`:
+three duplicate unfinished groups violate the migration precondition, and the
+inherited diagnostic credential is neither the required `tender_codex_ro` role
+nor read-only/TLS-protected. No duplicate identifiers were retrieved or recorded.
+Evidence: `evaluations/TENDER_INTAKE_FULL_DB_PREFLIGHT_14684_2026-09-08.md`.
