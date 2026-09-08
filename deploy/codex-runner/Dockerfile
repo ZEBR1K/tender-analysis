@@ -19,6 +19,8 @@ RUN npm ci --omit=dev
 COPY schemas ./schemas
 COPY policies ./policies
 COPY field-catalog ./field-catalog
+COPY agent-template ./agent-template
+COPY prompts ./prompts
 COPY src ./src
 
 RUN mkdir --parents /data/jobs/.tmp \

@@ -17,6 +17,7 @@ const skillPath = path.join(
   'SKILL.md',
 );
 const promptPath = path.join(runnerRoot, 'prompts', 'tender-analysis-v1.txt');
+const dockerfilePath = path.join(runnerRoot, 'Dockerfile');
 
 async function listRelativeFiles(root, directory = root) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -91,4 +92,10 @@ test('runtime prompt only binds job-local inputs, skill and structured output', 
   assert.doesNotMatch(prompt, /credential|password|secret|token/iu);
   assert.doesNotMatch(prompt, /TenderPlan|n8n|PostgreSQL|Telegram/iu);
   assert.doesNotMatch(prompt, /цена|НДС|лиценз|аналог|гарант/iu);
+});
+
+test('runner image contains the dedicated template and prompt', async () => {
+  const dockerfile = await readFile(dockerfilePath, 'utf8');
+  assert.match(dockerfile, /^COPY agent-template \.\/agent-template$/mu);
+  assert.match(dockerfile, /^COPY prompts \.\/prompts$/mu);
 });
