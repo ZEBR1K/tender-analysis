@@ -42,7 +42,6 @@ export function buildCodexPermissionBoundary({
   const jobRoot = path.posix.join(normalizedJobsRoot, normalizedJobId);
   const workspaceDirectory = path.posix.join(jobRoot, 'workspace');
   const inputDirectory = path.posix.join(jobRoot, 'input');
-  const sourceIndexDirectory = path.posix.join(jobRoot, 'source-index');
   const workspaceTempDirectory = path.posix.join(workspaceDirectory, '.tmp');
 
   const entries = [
@@ -55,7 +54,6 @@ export function buildCodexPermissionBoundary({
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedJobsRoot}`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem.${workspaceDirectory}`, tomlString('write')),
     override(`permissions.${PROFILE_NAME}.filesystem.${inputDirectory}`, tomlString('read')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${sourceIndexDirectory}`, tomlString('read')),
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedAuthRoot}`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedSecretsRoot}`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem./proc/*/environ`, tomlString('deny')),
@@ -75,7 +73,7 @@ export function buildCodexPermissionBoundary({
   return Object.freeze({
     profileName: PROFILE_NAME,
     workspaceDirectory,
-    readOnlyDirectories: Object.freeze([inputDirectory, sourceIndexDirectory]),
+    readOnlyDirectories: Object.freeze([inputDirectory]),
     deniedRoots: Object.freeze([
       normalizedJobsRoot,
       normalizedAuthRoot,
@@ -117,7 +115,7 @@ export function permissionBoundaryContractReady() {
     });
     return boundary.cliArgs.includes('--ignore-user-config')
       && !boundary.cliArgs.includes('--sandbox')
-      && boundary.readOnlyDirectories.length === 2;
+      && boundary.readOnlyDirectories.length === 1;
   } catch {
     return false;
   }

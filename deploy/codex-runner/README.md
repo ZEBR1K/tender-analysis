@@ -29,9 +29,13 @@ The manifest intentionally contains only job/run/catalog identity and source-fil
 
 ## Per-job Codex permissions
 
-The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes only the exact current `workspace`, reads only that job's `input` and `source-index`, and explicitly denies the shared jobs parent, Codex auth, runner secrets, global temp paths and `/proc/*/environ`.
+The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes only the exact current `workspace`, reads only that job's immutable original `input`, and explicitly denies the shared jobs parent, Codex auth, runner secrets, global temp paths and `/proc/*/environ`. No generated source-index tree is mounted or granted.
 
 Spawned shell commands inherit no process environment. The runner supplies only fixed `PATH`, job-local `HOME`/`TMPDIR`, `LANG` and `LC_ALL`; credential-like variables are not forwarded. The actual Codex service process may read the dedicated auth mount, while its sandboxed shell may not.
+
+## Agent-led analysis boundary
+
+Codex receives the immutable originals and chooses its own text, visual, OCR or OOXML inspection methods. The runner does not pre-index documents or verify business meaning. Runtime checks are restricted to security, original-file size/SHA and manifest identity, and the closed JSON contract: exact 27-key/index mapping, allowed statuses, evidence artifact membership, and a nonblank human locator for `resolved` or `requires_review`. `not_found` may have no evidence; agent-reported inspected documents, parts, methods, limitations and constraints remain audit context rather than a completeness claim.
 
 Task 4 provides a structural boundary builder and negative-canary contract only. The real execution entry point, `POST /v1/jobs/{uuid}/start`, carries explicit `requiresExecutionBoundary` route metadata and returns `503 RUNNER_ISOLATION_NOT_READY` until Task 8 runs a real sandbox canary proving that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
 

@@ -33,14 +33,8 @@ function schemaIssueCode(error) {
   if (/\/(?:reported_|effective_)?status\b|missingProperty":"(?:reported_|effective_)?status"/u.test(location)) {
     return 'STATUS_INVALID';
   }
-  if (/location|Location|cell_range|sheet|page(?:_to)?/u.test(location)) {
+  if (/locator|evidence\/minItems/u.test(location)) {
     return 'LOCATOR_INVALID';
-  }
-  if (/fragments|quote_mode|evidence\/allOf/u.test(location)) {
-    return 'ELLIPSIS_FRAGMENT_MISMATCH';
-  }
-  if (/value_text|\/evidence(?:\b|\/)|missingProperty":"(?:reported_|effective_)?value_text"/u.test(location)) {
-    return 'VALUE_REQUIRED';
   }
   if (error.instancePath === '/fields' && ['minItems', 'maxItems'].includes(error.keyword)) {
     return 'FIELD_SET_MISMATCH';
@@ -182,16 +176,16 @@ function createContractValidator(
   return (value) => {
     const schemaValid = schemaValidator(value);
     const schemaIssues = normalizeSchemaIssues(schemaValidator.errors ?? []);
-    const semanticIssues = fieldSetIssues(value?.fields, expectedFields);
+  const contractIssues = fieldSetIssues(value?.fields, expectedFields);
     const identityIssues = expectedCatalogHash
       ? catalogHashIssues(value, expectedCatalogHash)
       : [];
-    const issues = [...schemaIssues, ...semanticIssues, ...identityIssues];
+    const issues = [...schemaIssues, ...contractIssues, ...identityIssues];
 
     return {
       valid:
         schemaValid &&
-        semanticIssues.length === 0 &&
+        contractIssues.length === 0 &&
         identityIssues.length === 0,
       schema_valid: schemaValid,
       issues,

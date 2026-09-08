@@ -11,12 +11,13 @@ const runnerRoot = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const validationModuleUrl = pathToFileURL(
   path.join(runnerRoot, 'src', 'schema-validation.mjs'),
 ).href;
-const fixturesRoot = path.join(
+const fixturePath = path.join(
   repositoryRoot,
   'tests',
   'fixtures',
   'agentic',
   'results',
+  'valid-27.json',
 );
 const policyPath = path.join(
   runnerRoot,
@@ -65,6 +66,18 @@ const canonicalFields = [
   [27, 'application_documents'],
 ];
 
+const retainedIssueCodes = [
+  'SCHEMA_INVALID',
+  'FIELD_SET_MISMATCH',
+  'DUPLICATE_FIELD',
+  'STATUS_INVALID',
+  'CATALOG_HASH_MISMATCH',
+  'MANIFEST_HASH_MISMATCH',
+  'SOURCE_UNKNOWN',
+  'LOCATOR_INVALID',
+  'FILE_INTEGRITY_MISMATCH',
+];
+
 let validatorsPromise;
 
 async function getValidators() {
@@ -74,10 +87,8 @@ async function getValidators() {
   return validatorsPromise;
 }
 
-async function loadJson(relativeName) {
-  return JSON.parse(
-    await readFile(path.join(fixturesRoot, relativeName), 'utf8'),
-  );
+async function loadResult() {
+  return JSON.parse(await readFile(fixturePath, 'utf8'));
 }
 
 function clone(value) {
@@ -103,11 +114,8 @@ function buildValidationEnvelope(result) {
     fields: result.fields.map((field) => ({
       field_index: field.field_index,
       field_key: field.field_key,
-      reported_status: field.status,
-      effective_status: field.status,
-      reported_value_text: field.value_text,
-      effective_value_text: field.value_text,
-      validation_level: 'pass',
+      status: field.status,
+      value_text: field.value_text,
       issues: [],
     })),
     raw_result_sha256: 'c'.repeat(64),
@@ -119,35 +127,30 @@ function issueCodes(validation) {
   return validation.issues.map(({ code }) => code);
 }
 
-test('strict Ajv boundary compiles and accepts the closed result and validation contracts', async () => {
+test('strict Ajv boundary accepts the closed agent-led result and audit envelope', async () => {
   const [validators, result] = await Promise.all([
     getValidators(),
-    loadJson('valid-27.json'),
+    loadResult(),
   ]);
 
   assert.equal(validators.draft, '2020-12');
   assert.equal(validators.strict, true);
-
-  const resultValidation = validators.validateResult(result);
-  assert.equal(resultValidation.schema_valid, true);
-  assert.deepEqual(resultValidation.issues, []);
-  assert.equal(resultValidation.valid, true);
-
-  const envelopeValidation = validators.validateValidationEnvelope(
-    buildValidationEnvelope(result),
+  assert.deepEqual(validators.validateResult(result), {
+    valid: true,
+    schema_valid: true,
+    issues: [],
+  });
+  assert.deepEqual(
+    validators.validateValidationEnvelope(buildValidationEnvelope(result)),
+    { valid: true, schema_valid: true, issues: [] },
   );
-  assert.equal(envelopeValidation.schema_valid, true);
-  assert.deepEqual(envelopeValidation.issues, []);
-  assert.equal(envelopeValidation.valid, true);
 });
 
 test('every controlled schema enum contains unique values', async () => {
   for (const schemaPath of schemaPaths) {
     const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
     const visit = (node, pointer = '#') => {
-      if (!node || typeof node !== 'object') {
-        return;
-      }
+      if (!node || typeof node !== 'object') return;
       if (Array.isArray(node.enum)) {
         assert.equal(
           new Set(node.enum.map((value) => JSON.stringify(value))).size,
@@ -159,14 +162,13 @@ test('every controlled schema enum contains unique values', async () => {
         visit(value, `${pointer}/${key}`);
       }
     };
-
     visit(schema);
   }
 });
 
 test('result catalog hash must match the policy-pinned catalog identity', async () => {
   const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
+  const result = await loadResult();
   assert.equal(
     result.field_catalog_sha256,
     'ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',
@@ -185,277 +187,142 @@ test('result catalog hash must match the policy-pinned catalog identity', async 
   ]);
 });
 
-test('exact-quote and ordered-fragment result fixtures are both accepted', async () => {
+test('missing and duplicate fields fail the exact 27-key contract', async () => {
   const validators = await getValidators();
-  const [exact, ellipsis] = await Promise.all([
-    loadJson('valid-27.json'),
-    loadJson('ellipsis-valid.json'),
-  ]);
+  const missing = await loadResult();
+  missing.fields.pop();
+  assert.ok(
+    issueCodes(validators.validateResult(missing)).includes('FIELD_SET_MISMATCH'),
+  );
 
-  assert.equal(validators.validateResult(exact).valid, true);
-  assert.equal(validators.validateResult(ellipsis).valid, true);
-  assert.deepEqual(ellipsis.fields[0].evidence[0].fragments, [
-    'Supply',
-    'equipment',
-  ]);
-});
-
-test('missing field fails the exact 27-field semantic contract', async () => {
-  const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  result.fields.pop();
-
-  const validation = validators.validateResult(result);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('FIELD_SET_MISMATCH'));
-});
-
-test('duplicate field key and index are reported as typed deterministic issues', async () => {
-  const validators = await getValidators();
-  const result = await loadJson('duplicate-field.json');
-
-  const validation = validators.validateResult(result);
-  assert.equal(validation.schema_valid, true);
-  assert.equal(validation.valid, false);
+  const duplicate = await loadResult();
+  duplicate.fields[26] = clone(duplicate.fields[0]);
+  const duplicateValidation = validators.validateResult(duplicate);
+  assert.equal(duplicateValidation.schema_valid, true);
+  assert.equal(duplicateValidation.valid, false);
   assert.deepEqual(
-    validation.issues
+    duplicateValidation.issues
       .filter(({ code }) => code === 'DUPLICATE_FIELD')
       .map(({ dimension }) => dimension)
       .sort(),
     ['field_index', 'field_key'],
   );
-  assert.ok(issueCodes(validation).includes('FIELD_SET_MISMATCH'));
 });
 
-test('unknown status fails with STATUS_INVALID', async () => {
+test('unknown status is rejected as a syntactic contract error', async () => {
   const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
+  const result = await loadResult();
   result.fields[0].status = 'maybe';
-
   const validation = validators.validateResult(result);
   assert.equal(validation.valid, false);
   assert.ok(issueCodes(validation).includes('STATUS_INVALID'));
 });
 
-test('resolved requires both a nonblank value and at least one evidence item', async () => {
+test('resolved and requires_review require evidence with a nonblank human locator', async () => {
   const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  result.fields[0].value_text = null;
-  result.fields[0].evidence = [];
+  const noEvidence = await loadResult();
+  noEvidence.fields[0].evidence = [];
+  assert.ok(
+    issueCodes(validators.validateResult(noEvidence)).includes('LOCATOR_INVALID'),
+  );
 
-  const validation = validators.validateResult(result);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('VALUE_REQUIRED'));
+  const blankLocator = await loadResult();
+  blankLocator.fields[1].evidence[0].locator = '   ';
+  assert.ok(
+    issueCodes(validators.validateResult(blankLocator)).includes(
+      'LOCATOR_INVALID',
+    ),
+  );
 });
 
-test('not_found cannot carry a value', async () => {
+test('not_found requires no evidence and status/value meaning is not reinterpreted', async () => {
   const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  result.fields[1].value_text = 'No';
-
-  const validation = validators.validateResult(result);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('VALUE_REQUIRED'));
+  const result = await loadResult();
+  result.fields[2].value_text = 'Agent-reported provisional wording';
+  assert.deepEqual(validators.validateResult(result), {
+    valid: true,
+    schema_valid: true,
+    issues: [],
+  });
 });
 
-test('location variants reject kind-specific invalid coordinates', async () => {
+test('agent chooses inspection methods and reports parts, limitations and constraints', async () => {
   const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  result.fields[0].evidence[0].location.page = 0;
-
-  const validation = validators.validateResult(result);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('LOCATOR_INVALID'));
+  const result = await loadResult();
+  result.inspected_documents[0].methods.push(
+    'custom OOXML inspection chosen by the agent',
+  );
+  result.limitations.push('One appendix was visually dense.');
+  result.constraints.push('Read-only original files.');
+  assert.equal(validators.validateResult(result).valid, true);
 });
 
-test('ordered fragments require at least two nonblank fragments', async () => {
+test('removed parser and semantic-verifier machinery is prohibited by the closed schema', async () => {
   const validators = await getValidators();
-  const result = await loadJson('ellipsis-valid.json');
-  result.fields[0].evidence[0].fragments = ['Supply', '   '];
-
-  const validation = validators.validateResult(result);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('ELLIPSIS_FRAGMENT_MISMATCH'));
-});
-
-test('additional properties are rejected at every controlled result object level', async () => {
-  const validators = await getValidators();
-  const base = await loadJson('conflict-resolved.json');
   const mutations = [
     (value) => {
-      value.unexpected = true;
+      value.inspection_coverage = [];
     },
     (value) => {
-      value.inspection_coverage[0].unexpected = true;
+      value.inspected_documents[0].expected_pages = 2;
     },
     (value) => {
-      value.fields[18].unexpected = true;
+      value.inspected_documents[0].inspection_status = 'complete';
     },
     (value) => {
-      value.fields[18].evidence[0].unexpected = true;
+      value.fields[0].claim_basis = 'explicit_positive';
     },
     (value) => {
-      value.fields[18].evidence[0].location.unexpected = true;
+      value.fields[0].conflicts = [];
     },
     (value) => {
-      value.fields[18].conflicts[0].unexpected = true;
+      value.fields[0].evidence[0].quote_mode = 'exact';
+    },
+    (value) => {
+      value.fields[0].evidence[0].fragments = [];
+    },
+    (value) => {
+      value.fields[0].evidence[0].location = { kind: 'pdf_page', page: 1 };
     },
   ];
 
   for (const mutate of mutations) {
-    const result = clone(base);
+    const result = await loadResult();
     mutate(result);
     assert.equal(validators.validateResult(result).schema_valid, false);
   }
 });
 
-test('Task 9 semantic-risk fixtures remain structurally valid at the Task 2 boundary', async () => {
+test('additional properties are rejected at every retained controlled object level', async () => {
   const validators = await getValidators();
-  const fixtures = [
-    'conflict-resolved.json',
-    'ellipsis-material-gap.json',
-    'absence-negative.json',
-    'incomplete-not-found.json',
+  const resultMutations = [
+    (value) => {
+      value.unexpected = true;
+    },
+    (value) => {
+      value.inspected_documents[0].unexpected = true;
+    },
+    (value) => {
+      value.fields[0].unexpected = true;
+    },
+    (value) => {
+      value.fields[0].evidence[0].unexpected = true;
+    },
   ];
-
-  for (const fixture of fixtures) {
-    const result = await loadJson(fixture);
-    assert.equal(
-      validators.validateResult(result).valid,
-      true,
-      `${fixture} must be structurally valid for downgrade-only Task 9 tests`,
-    );
-  }
-});
-
-test('policy mirrors the exact key/index mapping in both catalogs and exposes the acknowledged hash conflict', async () => {
-  const [policySource, rootCatalog, blindCatalog] = await Promise.all([
-    readFile(policyPath, 'utf8'),
-    readFile(rootCatalogPath, 'utf8'),
-    readFile(blindCatalogPath, 'utf8'),
-  ]);
-  const policy = JSON.parse(policySource);
-  const policyFields = Object.entries(policy.fields)
-    .map(([fieldKey, field]) => [field.field_index, fieldKey])
-    .sort(([left], [right]) => left - right);
-
-  assert.deepEqual(parseCatalogMatrix(rootCatalog), canonicalFields);
-  assert.deepEqual(parseCatalogMatrix(blindCatalog), canonicalFields);
-  assert.deepEqual(policyFields, canonicalFields);
-
-  const blindHash = sha256(blindCatalog);
-  const rootHash = sha256(rootCatalog);
-  assert.equal(
-    blindHash,
-    'ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',
-  );
-  assert.notEqual(rootHash, blindHash);
-  assert.equal(policy.expected_catalog_sha256, blindHash);
-  assert.equal(policy.catalog_snapshot_source, blindCatalogRelativePath);
-  assert.equal(policy.root_catalog_source, 'FIELD_CATALOG.md');
-  assert.equal(policy.root_catalog_sha256_observed, rootHash);
-  assert.equal(policy.root_catalog_reconciliation_required, true);
-  assert.equal(
-    policy.deployment_gate,
-    'blocked_pending_root_catalog_reconciliation',
-  );
-});
-
-test('policy contains only mechanical guard fields and minimum containment flags', async () => {
-  const policy = JSON.parse(await readFile(policyPath, 'utf8'));
-  const valueKinds = new Set([
-    'text',
-    'date',
-    'money',
-    'composite',
-    'boolean_like',
-  ]);
-  const fieldPropertyNames = [
-    'arithmetic_checks',
-    'completeness_required',
-    'field_index',
-    'negative_result_sensitive',
-    'selected_control_required',
-    'value_kind',
-  ];
-
-  assert.equal(Object.keys(policy.fields).length, 27);
-  for (const field of Object.values(policy.fields)) {
-    assert.deepEqual(Object.keys(field).sort(), fieldPropertyNames);
-    assert.equal(typeof field.negative_result_sensitive, 'boolean');
-    assert.equal(typeof field.completeness_required, 'boolean');
-    assert.equal(typeof field.selected_control_required, 'boolean');
-    assert.ok(valueKinds.has(field.value_kind));
-    assert.ok(Array.isArray(field.arithmetic_checks));
+  for (const mutate of resultMutations) {
+    const result = await loadResult();
+    mutate(result);
+    assert.equal(validators.validateResult(result).schema_valid, false);
   }
 
-  const containmentKeys = [
-    'participation_guarantee',
-    'national_regime',
-    'advance_contract_guarantee',
-    'warranty_obligations_guarantee',
-    'licenses_certificates',
-    'required_official_certificates',
-    'application_documents',
-  ];
-  for (const fieldKey of containmentKeys) {
-    assert.equal(policy.fields[fieldKey].negative_result_sensitive, true);
-    assert.equal(policy.fields[fieldKey].completeness_required, true);
-  }
-
-  assert.equal(policy.fields.national_regime.selected_control_required, true);
-  assert.equal(policy.fields.nm_price_with_vat.negative_result_sensitive, true);
-  assert.equal(policy.fields.nm_price_with_vat.completeness_required, true);
-  assert.deepEqual(policy.fields.nm_price_with_vat.arithmetic_checks, [
-    'money_amount_consistency',
-    'vat_consistency',
-  ]);
-});
-
-test('validation envelope also enforces the exact unique 27-field mapping', async () => {
-  const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  const envelope = buildValidationEnvelope(result);
-  envelope.fields[26] = clone(envelope.fields[0]);
-
-  const validation = validators.validateValidationEnvelope(envelope);
-  assert.equal(validation.schema_valid, true);
-  assert.equal(validation.valid, false);
-  assert.ok(issueCodes(validation).includes('DUPLICATE_FIELD'));
-  assert.ok(issueCodes(validation).includes('FIELD_SET_MISMATCH'));
-});
-
-test('schema boundary issue objects round-trip through the closed validation envelope', async () => {
-  const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  const duplicate = await loadJson('duplicate-field.json');
-  const invalidStatus = clone(result);
-  invalidStatus.fields[0].status = 'maybe';
-  const catalogMismatch = clone(result);
-  catalogMismatch.field_catalog_sha256 = 'f'.repeat(64);
-  const envelope = buildValidationEnvelope(result);
-  envelope.valid = false;
-  envelope.job_issues = [
-    ...validators.validateResult(duplicate).issues,
-    ...validators.validateResult(invalidStatus).issues,
-    ...validators.validateResult(catalogMismatch).issues,
-  ];
-
-  const validation = validators.validateValidationEnvelope(envelope);
-  assert.equal(validation.schema_valid, true);
-  assert.equal(validation.valid, true);
-});
-
-test('validation envelope is closed at top-level, field and issue objects', async () => {
-  const validators = await getValidators();
-  const result = await loadJson('valid-27.json');
-  const base = buildValidationEnvelope(result);
-  base.fields[0].issues.push({
-    code: 'QUOTE_NOT_VERIFIED',
-    message: 'Fixture issue.',
-    path: '/fields/0/evidence/0',
+  const baseResult = await loadResult();
+  const envelope = buildValidationEnvelope(baseResult);
+  envelope.fields[0].issues.push({
+    code: 'SOURCE_UNKNOWN',
+    message: 'Unknown artifact key.',
+    path: '/fields/0/evidence/0/artifact_key',
   });
-  const mutations = [
+  const envelopeMutations = [
     (value) => {
       value.unexpected = true;
     },
@@ -466,13 +333,117 @@ test('validation envelope is closed at top-level, field and issue objects', asyn
       value.fields[0].issues[0].unexpected = true;
     },
   ];
-
-  for (const mutate of mutations) {
-    const envelope = clone(base);
-    mutate(envelope);
+  for (const mutate of envelopeMutations) {
+    const candidate = clone(envelope);
+    mutate(candidate);
     assert.equal(
-      validators.validateValidationEnvelope(envelope).schema_valid,
+      validators.validateValidationEnvelope(candidate).schema_valid,
       false,
     );
   }
+});
+
+test('policy is only the canonical key/index mapping plus catalog identity', async () => {
+  const policy = JSON.parse(await readFile(policyPath, 'utf8'));
+  assert.deepEqual(Object.keys(policy).sort(), [
+    'catalog_snapshot_source',
+    'expected_catalog_sha256',
+    'field_catalog_version',
+    'fields',
+    'policy_version',
+    'root_catalog_reconciliation_required',
+    'root_catalog_sha256_observed',
+    'root_catalog_source',
+  ]);
+  assert.equal(Object.keys(policy.fields).length, 27);
+  for (const field of Object.values(policy.fields)) {
+    assert.deepEqual(Object.keys(field), ['field_index']);
+  }
+  assert.deepEqual(
+    Object.entries(policy.fields)
+      .map(([fieldKey, field]) => [field.field_index, fieldKey])
+      .sort(([left], [right]) => left - right),
+    canonicalFields,
+  );
+});
+
+test('policy mirrors both catalogs and exposes the acknowledged hash conflict', async () => {
+  const [policySource, rootCatalog, blindCatalog] = await Promise.all([
+    readFile(policyPath, 'utf8'),
+    readFile(rootCatalogPath, 'utf8'),
+    readFile(blindCatalogPath, 'utf8'),
+  ]);
+  const policy = JSON.parse(policySource);
+  assert.deepEqual(parseCatalogMatrix(rootCatalog), canonicalFields);
+  assert.deepEqual(parseCatalogMatrix(blindCatalog), canonicalFields);
+  const blindHash = sha256(blindCatalog);
+  const rootHash = sha256(rootCatalog);
+  assert.notEqual(rootHash, blindHash);
+  assert.equal(policy.expected_catalog_sha256, blindHash);
+  assert.equal(policy.catalog_snapshot_source, blindCatalogRelativePath);
+  assert.equal(policy.root_catalog_sha256_observed, rootHash);
+  assert.equal(policy.root_catalog_reconciliation_required, true);
+});
+
+test('validation issue codes are limited to contract, identity, source and file integrity', async () => {
+  const validationSchema = JSON.parse(
+    await readFile(schemaPaths[1], 'utf8'),
+  );
+  assert.deepEqual(validationSchema.$defs.issueCode.enum, retainedIssueCodes);
+  const serialized = JSON.stringify(validationSchema);
+  for (const forbidden of [
+    'QUOTE_NOT_VERIFIED',
+    'ELLIPSIS_FRAGMENT_MISMATCH',
+    'ELLIPSIS_MATERIAL_GAP',
+    'CONFLICT_BLOCKS_RESOLVED',
+    'NEGATIVE_BASIS_MISSING',
+    'NOT_FOUND_WITH_INCOMPLETE_COVERAGE',
+    'COMPLETENESS_PROOF_MISSING',
+    'ARITHMETIC_MISMATCH',
+    'validation_level',
+    'reported_status',
+    'effective_status',
+  ]) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+test('retained source, locator and file-integrity issues round-trip through the envelope', async () => {
+  const validators = await getValidators();
+  const result = await loadResult();
+  const envelope = buildValidationEnvelope(result);
+  envelope.valid = false;
+  envelope.job_issues = [
+    {
+      code: 'SOURCE_UNKNOWN',
+      message: 'Unknown artifact key.',
+      path: '/fields/0/evidence/0/artifact_key',
+    },
+    {
+      code: 'LOCATOR_INVALID',
+      message: 'Locator is blank.',
+      path: '/fields/0/evidence/0/locator',
+    },
+    {
+      code: 'FILE_INTEGRITY_MISMATCH',
+      message: 'Staged bytes do not match the sealed manifest.',
+      path: '/manifest/documents/0/file_sha256',
+    },
+  ];
+  assert.equal(
+    validators.validateValidationEnvelope(envelope).schema_valid,
+    true,
+  );
+});
+
+test('validation envelope also enforces the exact unique 27-field mapping', async () => {
+  const validators = await getValidators();
+  const result = await loadResult();
+  const envelope = buildValidationEnvelope(result);
+  envelope.fields[26] = clone(envelope.fields[0]);
+  const validation = validators.validateValidationEnvelope(envelope);
+  assert.equal(validation.schema_valid, true);
+  assert.equal(validation.valid, false);
+  assert.ok(issueCodes(validation).includes('DUPLICATE_FIELD'));
+  assert.ok(issueCodes(validation).includes('FIELD_SET_MISMATCH'));
 });

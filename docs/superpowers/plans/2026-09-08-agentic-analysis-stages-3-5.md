@@ -4,9 +4,9 @@
 
 **Goal:** добавить изолированный shadow-контур, который получает полный зарегистрированный комплект документов одной закупки, запускает по нему одного Codex-агента и сохраняет детерминированно проверенные результаты ровно по 27 полям, не заменяя и не перезаписывая существующий legacy-анализ.
 
-**Architecture:** archive-aware Orchestrator сначала формирует и атомарно регистрирует полный `tender_document_ingestion_v1` manifest. После commit отдельный n8n sub-workflow последовательно копирует processable files во внутренний `tender-codex-runner`, запечатывает manifest по SHA-256 и запускает асинхронный `codex exec`. Runner создаёт механический source index, предоставляет агенту только job-local инструкции и документы, сохраняет JSONL audit и применяет downgrade-only validator. Scheduled n8n monitor забирает validated envelope и одной транзакцией сохраняет ровно 27 shadow rows. Существующие Worker, Aggregator, Targeted Recheck, Finalization и Report Generation продолжают работать без изменений.
+**Architecture:** archive-aware Orchestrator сначала формирует и атомарно регистрирует полный `tender_document_ingestion_v1` manifest. После commit отдельный n8n sub-workflow последовательно копирует processable files во внутренний `tender-codex-runner`, проверяет исходные bytes по size/SHA-256, запечатывает минимальный manifest и запускает асинхронный `codex exec`. Runner предоставляет агенту только job-local skill, manifest и неизменяемые оригиналы, сохраняет JSONL audit и проверяет закрытый JSON contract/identity. Codex сам выбирает способы чтения, визуального осмотра, OCR или OOXML. Scheduled n8n monitor забирает validation envelope и одной транзакцией сохраняет ровно 27 shadow rows. Существующие Worker, Aggregator, Targeted Recheck, Finalization и Report Generation продолжают работать без изменений.
 
-**Tech Stack:** n8n (`Execute Workflow Trigger`, `Schedule Trigger`, `Code`, `If`, `Loop Over Items`, `HTTP Request`, `Postgres`, `Error Trigger`), PostgreSQL, Node.js 24, Codex CLI 0.153.4+, JSON Schema, Docker Compose, Poppler, LibreOffice headless, Tesseract OCR (`rus` + `eng`), OOXML ZIP/XML inspection, Node.js built-in test runner.
+**Tech Stack:** n8n (`Execute Workflow Trigger`, `Schedule Trigger`, `Code`, `If`, `Loop Over Items`, `HTTP Request`, `Postgres`, `Error Trigger`), PostgreSQL, Node.js 24, Codex CLI 0.153.4+, JSON Schema, Docker Compose, job-local document tools selected by Codex and the Node.js built-in test runner.
 
 ---
 
@@ -36,7 +36,7 @@ TenderPlan mark
 → TENDER — Агентский анализ — Запуск
 → tender-codex-runner
 → one Codex run
-→ downgrade-only validation
+→ contract and source-identity validation
 → TENDER — Агентский анализ — Монитор
 → exactly 27 tender_agentic_field_results
 ```
@@ -60,13 +60,13 @@ Shadow path не пишет в `tender_analysis_field_results`, не меняе�
 1. Первый MVP использует одного агента без subagents и второго AI-reviewer.
 2. Первый model baseline — `gpt-5.6-sol`, `model_reasoning_effort=high`, чтобы повторить условия blind test. Если этот model ID недоступен в выбранном auth mode, canary завершается `CODEX_MODEL_UNAVAILABLE`; автоматической подмены модели нет.
 3. Agent не получает интернет, MCP-серверы, пользовательские skills/config или данные соседних jobs.
-4. `FIELD_CATALOG.md` копируется в job как read-only snapshot; его SHA-256 сохраняется в БД и результате.
+4. Shadow-v0 contract сохраняет подтверждённый blind-test snapshot `evaluations/codex-agentic-blind-test-2026-09-08/inputs/FIELD_CATALOG.md` как read-only input и проверяет его SHA-256. Он не подменяет repository `FIELD_CATALOG.md`: оба имеют одинаковую 27-key/index mapping, но разные hashes, поэтому production deployment остаётся закрыт до явного reconciliation.
 5. Agent ведёт `workspace/field-ledger.json` с самого начала и обновляет его по мере чтения документов. Финальный JSON формируется из ledger.
 6. Runner не использует legacy facts, units или FINAL rows как вход анализа.
-7. Механический source index применяется для навигации и проверки evidence, но не делает семантическое извлечение полей.
-8. Validator может только подтвердить reported result или понизить его до `requires_review`. Он не повышает статус и не создаёт значение.
-9. Сокращённая цитата с многоточием не считается ошибкой сама по себе. Она проверяется как последовательность точных фрагментов в одном location.
-10. `not_found` допустим только после полной подтверждённой inspection coverage всех processable documents.
+7. Runner не строит source index и не парсит PDF/DOCX/XLSX. Codex сам выбирает text extraction, visual inspection, OCR или OOXML и сообщает audit своих действий.
+8. Runtime validation ограничена security, original-file integrity и закрытым JSON contract. Она не подтверждает и не корректирует смысл результата.
+9. Ошибки понимания сначала исправляются коротким skill и повторными blind tests на нескольких закупках. Один procurement или гипотетический edge не создаёт code rule.
+10. `not_found`, достаточность evidence, полнота анализа, арифметика и конфликты оцениваются Codex и ручной/слепой evaluation, а не программным validator.
 11. Большие binary и полные тексты документов не сохраняются в PostgreSQL или n8n execution JSON.
 12. Codex runner не получает TenderPlan, n8n или PostgreSQL credentials.
 
@@ -85,10 +85,6 @@ deploy/codex-runner/src/errors.mjs
 deploy/codex-runner/src/http-auth.mjs
 deploy/codex-runner/src/job-store.mjs
 deploy/codex-runner/src/manifest.mjs
-deploy/codex-runner/src/source-index.mjs
-deploy/codex-runner/src/source-index/pdf.mjs
-deploy/codex-runner/src/source-index/docx.mjs
-deploy/codex-runner/src/source-index/xlsx.mjs
 deploy/codex-runner/src/codex-command.mjs
 deploy/codex-runner/src/codex-events.mjs
 deploy/codex-runner/src/schema-validation.mjs
@@ -111,9 +107,6 @@ scripts/evaluate-agentic-result.mjs
 tests/agentic-job-migration.test.mjs
 tests/agentic-result-schema.test.mjs
 tests/agentic-runner-manifest.test.mjs
-tests/agentic-source-index-pdf.test.mjs
-tests/agentic-source-index-docx.test.mjs
-tests/agentic-source-index-xlsx.test.mjs
 tests/agentic-codex-command.test.mjs
 tests/agentic-result-validator.test.mjs
 tests/agentic-runner-http.test.mjs
@@ -124,14 +117,7 @@ tests/agentic-error-workflow.test.mjs
 tests/intake-agentic-shadow-routing.test.mjs
 tests/agentic-eval-harness.test.mjs
 tests/fixtures/agentic/manifest-12-documents.json
-tests/fixtures/agentic/source-index-minimal.json
 tests/fixtures/agentic/results/valid-27.json
-tests/fixtures/agentic/results/duplicate-field.json
-tests/fixtures/agentic/results/conflict-resolved.json
-tests/fixtures/agentic/results/ellipsis-valid.json
-tests/fixtures/agentic/results/ellipsis-material-gap.json
-tests/fixtures/agentic/results/absence-negative.json
-tests/fixtures/agentic/results/incomplete-not-found.json
 evaluations/agentic-baseline-v0/README.md
 evaluations/agentic-baseline-v0/adjudication.json
 evaluations/agentic-baseline-v0/source-manifest.sha256
@@ -177,11 +163,6 @@ workflows/n8n-exports/TENDER — Генерация отчета.json
 │   ├── manifest.json
 │   ├── FIELD_CATALOG.md
 │   └── documents/<document_index>__<opaque_artifact_key>
-├── source-index/
-│   ├── source-index.json
-│   ├── text/
-│   ├── ooxml/
-│   └── pages/
 ├── workspace/
 │   ├── AGENTS.md
 │   ├── .agents/skills/tender-document-analysis/SKILL.md
@@ -194,7 +175,7 @@ workflows/n8n-exports/TENDER — Генерация отчета.json
     └── status.json
 ```
 
-`input/` и `source-index/` находятся вне writable Codex CWD. Codex запускается с `-C .../workspace`; после завершения runner атомарно копирует validated artifacts в `audit/` и делает job immutable.
+`input/` находится вне writable Codex CWD. Codex запускается с `-C .../workspace`, читает неизменяемые оригиналы напрямую и сам выбирает способы их исследования; после завершения runner атомарно копирует validated artifacts в `audit/` и делает job immutable.
 
 ### 4.2. Agent result
 
@@ -206,21 +187,23 @@ Top-level `tender_agent_result_v1`:
   "field_catalog_version": "tender_fields_v1",
   "field_catalog_sha256": "64-char hex",
   "input_manifest_sha256": "64-char hex",
-  "inspection_coverage": [],
+  "inspected_documents": [],
+  "limitations": [],
+  "constraints": [],
   "fields": []
 }
 ```
 
-Каждый `inspection_coverage[]` содержит:
+Каждый `inspected_documents[]` является self-reported audit агента, а не программным доказательством полноты:
 
 ```text
 artifact_key
-source_file
-inspection_status = complete | incomplete | unreadable
-methods[] = text_layer | rendered_pages | ooxml | controls | sheets
-expected_pages / inspected_pages
+inspected_parts[] = human-readable descriptions
+methods[] = human-readable methods selected by Codex
 notes
 ```
+
+`limitations[]` и `constraints[]` содержат непустые текстовые замечания Codex. Схема не содержит expected/inspected page counters и не выводит completeness автоматически.
 
 Каждый из ровно 27 `fields[]` содержит:
 
@@ -229,34 +212,19 @@ field_index
 field_key
 status = resolved | requires_review | not_found
 value_text = string | null
-claim_basis = explicit_positive | explicit_negative | selected_control |
-              aggregated_explicit | absence_only | unresolved_conflict
 evidence[]
-conflicts[]
 rationale
 ```
 
-Evidence использует stable `artifact_key`, а не свободное имя файла:
+Для `resolved` и `requires_review` требуется хотя бы один evidence с stable `artifact_key` и непустым human locator. `quote` необязателен и хранится только для audit; runtime не проверяет его истинность. Для `not_found` evidence не обязателен.
 
 ```json
 {
   "artifact_key": "doc-0007",
-  "location": {
-    "kind": "pdf_page | docx_page | docx_ooxml | xlsx_cell | metadata",
-    "page": 3,
-    "page_to": 3,
-    "section": null,
-    "structural_element": null,
-    "sheet": null,
-    "cell_range": null
-  },
-  "quote_mode": "exact | ordered_fragments",
-  "quote": "display form preserved for audit",
-  "fragments": ["first exact fragment", "second exact fragment"]
+  "locator": "page 3, section 2, price table",
+  "quote": "optional display text preserved for audit"
 }
 ```
-
-Для `quote_mode=exact` `fragments` пуст. Для `ordered_fragments` требуется минимум два непустых фрагмента; многоточие в `quote` — только presentation, проверка выполняется по `fragments`.
 
 ### 4.3. Validation envelope
 
@@ -266,17 +234,14 @@ job_id
 valid = true | false
 job_issues[]
 fields[27]
-  reported_status
-  effective_status
-  reported_value_text
-  effective_value_text
-  validation_level = pass | warning | downgraded
+  field_index / field_key
+  status / value_text
   issues[]
 raw_result_sha256
 validated_result_sha256
 ```
 
-`valid=true` означает, что envelope имеет точные 27 rows и может быть сохранён в shadow tables. Это не означает, что все 27 полей `resolved`.
+`valid=true` означает только: envelope синтаксически закрыт, имеет точные 27 rows, совпадающие hashes, известные source identities и непустые locator там, где они обязательны. Runtime не создаёт `effective_*` semantic interpretation и не меняет решение Codex.
 
 ### 4.4. Runner HTTP API
 
@@ -361,12 +326,9 @@ analysis_run_id uuid FK → tender_analysis_runs(id) ON DELETE CASCADE
 field_catalog_version text NOT NULL
 field_index smallint CHECK BETWEEN 1 AND 27
 field_key text NOT NULL
-reported_status text CHECK resolved|requires_review|not_found
-effective_status text CHECK resolved|requires_review|not_found
-reported_value_text text
-effective_value_text text
-requires_human_review boolean NOT NULL
-validation_level text CHECK pass|warning|downgraded
+status text CHECK resolved|requires_review|not_found
+value_text text
+validation_issues jsonb NOT NULL DEFAULT '[]'
 result_json jsonb NOT NULL
 created_at / updated_at timestamptz NOT NULL
 PRIMARY KEY (job_id, field_key)
@@ -378,54 +340,45 @@ The migration adds no column or constraint to the existing canonical five tables
 
 ## 5. Validation policy
 
-Validation executes in this order:
+Runtime validation executes only these checks:
 
 1. JSON Schema and immutable hash checks.
 2. Exact 27 `field_index`/`field_key` catalog mapping and uniqueness.
-3. Status/value invariants.
-4. Complete source coverage and document identity checks.
-5. Location and quote verification.
-6. Conflict and negative-conclusion safety.
-7. Field-specific completeness and arithmetic checks.
-8. Downgrade-only normalization.
-9. Atomic 27-row persistence check.
+3. Evidence `artifact_key` membership in the sealed manifest and nonblank locator for `resolved`/`requires_review`.
+4. Staged original file size/SHA-256 correspondence and atomic 27-row persistence.
 
-Exact/fragment matching normalizes only:
-
-```text
-Unicode NFC
-line endings
-repeated whitespace
-non-breaking spaces
-typographic/straight quotation marks
-hyphen/dash presentation variants
-```
-
-It does not normalize away digits, currency, percentages, signs, `не`, selected/unselected markers or option values.
-
-For ordered fragments, all fragments must occur in order inside the same indexed location. The result becomes a warning, not an error, when the skipped interval is short and contains no competing number/date/negation/control marker. It is downgraded when the gap contains such a material token or crosses a page/block boundary.
+Manifest membership is an original-file identity check. Locator nonblank is only a JSON contract check; runtime does not prove that the locator, quote, value or conclusion is true.
 
 Required issue codes:
 
 ```text
+SCHEMA_INVALID
 FIELD_SET_MISMATCH
 DUPLICATE_FIELD
 STATUS_INVALID
-VALUE_REQUIRED
-SOURCE_UNKNOWN
-INSPECTION_INCOMPLETE
-LOCATOR_INVALID
-QUOTE_NOT_VERIFIED
-ELLIPSIS_FRAGMENT_MISMATCH
-ELLIPSIS_MATERIAL_GAP
-CONFLICT_BLOCKS_RESOLVED
-NEGATIVE_BASIS_MISSING
-NOT_FOUND_WITH_INCOMPLETE_COVERAGE
-COMPLETENESS_PROOF_MISSING
-ARITHMETIC_MISMATCH
 CATALOG_HASH_MISMATCH
 MANIFEST_HASH_MISMATCH
+SOURCE_UNKNOWN
+LOCATOR_INVALID
+FILE_INTEGRITY_MISMATCH
 ```
+
+### 5.1. Retained runtime checks and single justification
+
+| Runtime check | Sole justification |
+|---|---|
+| Header auth, permission isolation, safe paths, bounded requests/processes | security |
+| Uploaded byte size/SHA-256 and sealed catalog/manifest identity | original-file integrity |
+| Evidence `artifact_key` membership in the sealed manifest | original-file integrity |
+| Closed schemas, required properties, primitive types and status enum | JSON contract |
+| Exact unique 27 key/index mapping | JSON contract |
+| At least one evidence item with nonblank human locator for `resolved`/`requires_review` | JSON contract |
+
+### 5.2. Rejected complexity inventory
+
+The unmerged `codex/agentic-task6` commit `9d83f01` contains PDF/DOCX/XLSX parsers, source-index modules, OCR/render orchestration, OOXML/control interpretation, three parser test suites and `source-index-minimal.json`. None of those artifacts may be merged into this contour; the worktree/branch is left intact for owner cleanup.
+
+Runtime must not add quote/fragment matching, value-to-quote checks, page or inspection completeness inference, arithmetic/date/VAT checks, negative-answer rules, conflict resolution, field-specific containment or semantic downgrade. The removed single-procurement fixtures are not code-rule inputs. The existing baseline v0 remains offline evaluation evidence only.
 
 ## 6. Implementation tasks
 
@@ -435,8 +388,8 @@ MANIFEST_HASH_MISMATCH
 
 ```text
 Lane A — можно начинать сейчас, независимо
-Tasks 1–10: provisional evaluation baseline, schema, shadow migration, runner, source index,
-skill, Codex execution, validator and runner lifecycle
+Tasks 1–10: provisional evaluation baseline, schema, shadow migration, runner, immutable staging,
+multi-procurement skill gate, Codex execution, contract/source validation and runner lifecycle
 
 Lane B — требует завершённого reconciliation
 Task 0: объединить актуальные intake + archive + report baselines
@@ -533,12 +486,13 @@ tests/agentic-result-schema.test.mjs
 tests/fixtures/agentic/results/*.json
 ```
 
-- [ ] Write failing schema tests for missing field, duplicate key/index, unknown status, `resolved` without value/evidence, `not_found` with value, invalid evidence location and malformed ordered fragments.
-- [ ] Add one valid exact-quote fixture and one valid ellipsized/ordered-fragment fixture.
+- [ ] Write failing schema tests for missing/duplicate field mapping, unknown status, missing evidence/nonblank locator for `resolved` and `requires_review`, closed objects and malformed hashes.
+- [ ] Keep one minimal valid 27-field fixture. `not_found` may use an empty evidence array; no fixture becomes a semantic code rule.
 - [ ] Pin `ajv@8.20.0` and `ajv-formats@3.0.1` exactly, commit the lockfile and compile both Draft 2020-12 schemas through the reusable strict Ajv boundary used later by Task 9.
 - [ ] Implement the two JSON Schemas with `additionalProperties=false` at every controlled object level.
-- [ ] Build `tender-fields-v1.json` as an executable validation-policy mirror keyed by all 27 `field_key` values. Store the expected catalog SHA and only mechanical guards: negative-result sensitivity, completeness requirement, arithmetic/date type, selected-control requirement.
-- [ ] Add a test proving exact one-to-one mapping with `FIELD_CATALOG.md`; a missing or extra policy key is a hard failure.
+- [ ] Build `tender-fields-v1.json` as only the catalog identity plus exact 27 `field_key`/`field_index` mapping. Do not encode field types, arithmetic, completeness, negative-answer or control-selection rules.
+- [ ] Pin the user-confirmed blind-test catalog SHA-256 `ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843`, record its snapshot source and retain the observed repository-catalog SHA-256 `6A480E2D32F177BEE60BB454CF85F8A6964D34E251065A71A16BF88EF3B522E9` with `root_catalog_reconciliation_required=true`.
+- [ ] Add a test proving exact one-to-one key/index mapping with both catalog files and proving their hash mismatch is explicit. A missing/extra key or an unacknowledged identity change is a hard failure; deployment stays gated until reconciliation.
 
 Run:
 
@@ -546,7 +500,7 @@ Run:
 node --test tests/agentic-result-schema.test.mjs
 ```
 
-Expected: all schema/policy cases pass and the valid ellipsis fixture remains accepted.
+Expected: the strict contract accepts the agent-led audit shape and rejects only syntax/identity defects; removed semantic machinery is absent and prohibited by closed objects.
 
 - [ ] Commit:
 
@@ -554,7 +508,7 @@ Expected: all schema/policy cases pass and the valid ellipsis fixture remains ac
 feat(agentic): define structured 27-field result contracts
 ```
 
-**Gate:** `codex exec --output-schema` can target one closed versioned schema and no presentation difference is confused with a semantic error.
+**Gate:** `codex exec --output-schema` can target one closed versioned schema without embedding a second tender-analysis engine in code.
 
 ### Task 3: Add additive shadow persistence
 
@@ -616,7 +570,7 @@ tests/agentic-runner-http.test.mjs
 ```
 
 - [ ] Write failing deployment tests asserting no host port, non-root UID/GID, read-only root filesystem, dropped capabilities, `no-new-privileges`, healthcheck, exact writable data volume and explicit CPU/memory/PID limits.
-- [ ] Pin Node, Codex CLI, Poppler, LibreOffice, Tesseract and language packages in the image.
+- [ ] Pin Node, Codex CLI and document-inspection tools in the image; these tools are available to Codex but are never invoked as a runner pre-index pipeline.
 - [ ] Expose `GET /health` with schema `tender_codex_runner_health_v1`, version, tool versions, auth readiness and writable-store readiness; never return secret values.
 - [ ] Require constant-time Header Auth on `/v1/*`; health remains non-sensitive and internal-only.
 - [ ] Configure maximum one running Codex process and bounded queued jobs for the first MVP.
@@ -651,12 +605,14 @@ tests/agentic-runner-manifest.test.mjs
 tests/fixtures/agentic/manifest-12-documents.json
 ```
 
-- [ ] Write failing tests for job path traversal, non-UUID job ID, duplicate artifact key, duplicate document index, source/hash mismatch, repeated identical upload, conflicting repeated upload, seal before full upload and mutation after seal.
+- [ ] Write failing tests for job path traversal, non-UUID job ID, duplicate artifact key, file size/SHA mismatch, repeated identical upload, conflicting repeated upload, seal before full upload and mutation after seal.
 - [ ] Implement exact job path resolution without glob or user-supplied path fragments.
 - [ ] Implement `PUT /jobs`, per-document upload to a temporary file, streamed SHA-256/size verification and atomic rename.
-- [ ] Generate physical names from `document_index + artifact_key`; store original file names only inside manifest metadata.
+- [ ] Keep the immutable manifest minimal: top-level schema/job/run/catalog identity and documents containing only `artifact_key`, original name, MIME type, byte size and file SHA-256. Do not store extracted text, page/sheet/control metadata or semantic hints.
+- [ ] Generate physical names only from validated server-controlled job/artifact identities; original file names remain manifest metadata.
 - [ ] Seal only when uploaded count and hashes exactly match the expected processable documents.
-- [ ] Copy the current `FIELD_CATALOG.md` snapshot into `input/`, compute its SHA and reject a caller-provided mismatch.
+- [ ] Copy the policy-pinned catalog snapshot into `input/`, compute its SHA and reject a caller-provided mismatch. Do not silently substitute the conflicting repository catalog before reconciliation.
+- [ ] Compute the canonical manifest SHA-256 at seal time and store it outside the manifest payload to avoid a self-referential hash.
 - [ ] Make sealed inputs immutable to all later HTTP operations.
 
 Run:
@@ -675,45 +631,37 @@ feat(agentic): stage immutable procurement job folders
 
 **Gate:** one procurement job has one complete, hashed, isolated source folder before Codex starts.
 
-### Task 6: Build the mechanical source index
+### Task 6: Prepare the multi-procurement blind skill gate
 
 **Files:**
 
 ```text
-deploy/codex-runner/src/source-index.mjs
-deploy/codex-runner/src/source-index/pdf.mjs
-deploy/codex-runner/src/source-index/docx.mjs
-deploy/codex-runner/src/source-index/xlsx.mjs
-tests/agentic-source-index-pdf.test.mjs
-tests/agentic-source-index-docx.test.mjs
-tests/agentic-source-index-xlsx.test.mjs
-tests/fixtures/agentic/source-index-minimal.json
+evaluations/agentic-blind-tests-v1/README.md
+evaluations/agentic-blind-tests-v1/cases.json
+tests/agentic-eval-harness.test.mjs
 ```
 
-- [ ] Write PDF tests for text-layer pages, scanned pages, mixed pages, exact page count, rendering of every page and OCR fallback.
-- [ ] Write DOCX tests for paragraphs, tables, headers/footers, comments/footnotes, SDT, legacy form fields and ActiveX selected/unselected controls. Include the existing sanitized control fixtures instead of new client data.
-- [ ] Write XLSX tests for visible/hidden sheets, cells, formulas, displayed values, merged ranges and stable cell coordinates.
-- [ ] Implement one versioned `tender_source_index_v1` that maps every indexed unit back to `artifact_key` and page/OOXML/sheet coordinates.
-- [ ] Render every PDF page and every DOCX page to PNG; retain page count and image hash. Run OCR only where the text layer is absent or below the configured character threshold.
-- [ ] Extract OOXML structurally without treating a label as selected unless the related control state proves it.
-- [ ] Record `complete`, `incomplete` or `unreadable` per document. Never silently omit a failed page or part.
-- [ ] Fail job start if no processable document is readable. Allow partial indexing only with explicit coverage flags that later block `not_found` and unsafe `resolved` fields.
+- [ ] Select sanitized immutable inputs from multiple procurements with materially different PDF/DOCX/XLSX layouts; record only case identity, source hashes and an adjudication reference.
+- [ ] Define repeated blind runs with identical model, effort, prompt, skill, schema and original files. Do not create parsed/indexed fixture derivatives.
+- [ ] Record Codex-reported `inspected_documents`, `inspected_parts`, `methods`, `limitations` and `constraints` for audit without claiming programmatic completeness.
+- [ ] Require skill-first remediation: when Codex can find the error during document research, shorten/clarify the skill and rerun all blind cases before proposing code.
+- [ ] Allow a new runtime check only when the same failure is reproduced across procurements, survives skill-only remediation and is not a duplicate of Codex reasoning; otherwise keep it evaluation-only.
 
 Run:
 
 ```powershell
-node --test tests/agentic-source-index-pdf.test.mjs tests/agentic-source-index-docx.test.mjs tests/agentic-source-index-xlsx.test.mjs
+node --test tests/agentic-eval-harness.test.mjs
 ```
 
-Expected: every fixture page/sheet/control has stable provenance and no missing element is reported as successful coverage.
+Expected: multiple procurement cases have immutable identities and a repeatable skill/evaluation protocol without parser output.
 
 - [ ] Commit:
 
 ```text
-feat(agentic): index complete document packages for audit
+test(agentic): prepare multi-procurement blind skill gate
 ```
 
-**Gate:** agent and validator can address the full document set without reusing legacy semantic facts.
+**Gate:** recurring analysis errors are handled through the skill/evaluation loop before any new programmatic rule is considered.
 
 ### Task 7: Create the dedicated agent workspace, skill and prompt
 
@@ -727,9 +675,10 @@ tests/agentic-codex-command.test.mjs
 ```
 
 - [ ] Write failing tests proving the job workspace contains exactly one repository skill, no inherited project files, no user skill paths and no writable source document path.
-- [ ] Write the skill with a document-by-document pass, incremental 27-field ledger updates, full page/control coverage, conflict handling and a final cross-document review.
-- [ ] Require the agent to inspect the raw document when the mechanical index is ambiguous; the index is a navigation aid, not authoritative semantics.
-- [ ] Require `claim_basis`, evidence fragments, conflicts and inspection coverage explicitly.
+- [ ] Write the short skill with a document-by-document pass, incremental 27-field ledger updates and a final cross-document review. Codex chooses text, visual, OCR or OOXML inspection as needed.
+- [ ] Require the agent to research immutable original files directly and report `inspected_documents`, free-form inspected parts/methods, limitations and constraints without claiming machine-verified completeness.
+- [ ] Require stable evidence `artifact_key` plus a human locator for `resolved` and `requires_review`; quote text is optional audit content and is not runtime-verified.
+- [ ] When a blind evaluation exposes a research error Codex can recognize, update this skill first and rerun multiple procurement cases before considering code.
 - [ ] Require a final self-check against the exact 27 catalog keys before returning JSON.
 - [ ] Keep the runtime prompt short: identify job paths, schema and required output; put stable procedure in the skill.
 - [ ] Add no generic work skills, n8n skills, browser tools or project development instructions to the job.
@@ -782,10 +731,10 @@ codex exec
 ```
 
 - [ ] Pipe the prompt over stdin, capture stdout line-by-line to `audit/codex-events.jsonl`, and keep stderr in a bounded safe runner log.
-- [ ] Verify in an isolated canary that the sandbox can read the sibling read-only `input/` and `source-index/` trees, can inspect rendered page images, and cannot modify them.
+- [ ] Verify in an isolated canary that the sandbox can read only the current job's immutable `input/`, can write only its `workspace`, and cannot read sibling jobs, auth, secrets, shared temp or process environments.
 - [ ] Parse `thread.started`, `turn.completed`, `turn.failed` and `error`; persist input, cached-input, output and reasoning-output token counts.
 - [ ] Enforce wall-clock timeout of 90 minutes and graceful termination followed by forced termination after 30 seconds.
-- [ ] Permit one automatic second attempt only for typed transport/process failures with no valid result. Preserve attempt-1 artifacts. Schema/semantic validation never triggers a paid retry automatically.
+- [ ] Permit one automatic second attempt only for typed transport/process failures with no valid JSON result. Preserve attempt-1 artifacts. Contract validation never triggers a paid retry automatically.
 - [ ] Redact environment keys containing `KEY`, `SECRET`, `TOKEN`, `PASSWORD` and exact credentials from any subprocess tool environment and log.
 - [ ] Add a fake Codex executable fixture to test success, invalid JSONL, nonzero exit, timeout and token accounting without paid calls.
 
@@ -805,7 +754,7 @@ feat(agentic): run codex with structured audited output
 
 **Gate:** Codex can run for a long time without holding an n8n execution and every attempt has complete technical audit.
 
-### Task 9: Implement downgrade-only result validation
+### Task 9: Implement result contract and source-identity validation
 
 **Files:**
 
@@ -815,18 +764,13 @@ tests/agentic-result-validator.test.mjs
 tests/fixtures/agentic/results/*.json
 ```
 
-- [ ] Write one failing test per required issue code before implementation.
-- [ ] Validate immutable catalog and manifest hashes before reading fields.
-- [ ] Validate exact 27 keys and indexes before field-level processing; a structural mismatch fails the whole job.
-- [ ] Keep inspection-coverage artifact uniqueness, `page <= page_to` ordering and evidence-to-artifact/manifest linkage in this Task 9 validation layer; the Task 2 schema boundary validates their closed structural shapes only.
-- [ ] Resolve evidence only through `artifact_key` and indexed location; never accept a free filename match.
-- [ ] Implement exact and ordered-fragment verification with the normalization boundary in section 5.
-- [ ] Preserve shortened quotes when verified; do not require a whole source sentence or reject a harmless ellipsis.
-- [ ] Block `resolved` when `conflicts[]` contains an unresolved material conflict or `claim_basis=unresolved_conflict`.
-- [ ] Block absence-derived negative conclusions. `explicit_negative` and `selected_control` require supporting negative/control evidence at the declared location.
-- [ ] Convert `not_found` to effective `requires_review` whenever inspection coverage is incomplete or unreadable.
-- [ ] Implement field-specific containment from the policy mirror, including completeness-critical list/guarantee fields and exact arithmetic for price/VAT.
-- [ ] Keep `reported_*` intact and add only `effective_*`, issue codes and review flag.
+- [ ] Write one failing test per retained structural/identity/file-integrity issue code before implementation.
+- [ ] Validate immutable catalog and manifest hashes and re-check staged original size/SHA-256 before persistence.
+- [ ] Validate exact 27 keys/indexes and uniqueness; a mismatch fails the whole job.
+- [ ] Require every evidence `artifact_key` to exist in the sealed manifest. This is source identity, not evidence truth verification.
+- [ ] Require at least one evidence item with a nonblank human locator for `resolved` and `requires_review`; `not_found` may keep evidence empty.
+- [ ] Do not parse locator content or verify quote text, sufficiency, value correspondence, page completeness, arithmetic, negative-answer semantics, conflicts or field-specific rules.
+- [ ] Preserve the agent's `status` and `value_text` unchanged. A structural/identity/file-integrity issue makes the job invalid rather than producing a semantic downgrade.
 - [ ] Validate the generated `tender_agent_validation_v1` envelope against its own schema.
 
 Run:
@@ -835,15 +779,15 @@ Run:
 node --test tests/agentic-result-validator.test.mjs tests/agentic-result-schema.test.mjs
 ```
 
-Expected: all unsafe fixtures are downgraded or rejected at the documented level; `ellipsis-valid.json` passes and `ellipsis-material-gap.json` is downgraded.
+Expected: schema, 27-field identity, immutable hashes, source membership, locator presence and file integrity are enforced; semantic content passes through unchanged for blind evaluation.
 
 - [ ] Commit:
 
 ```text
-feat(agentic): validate evidence and downgrade unsafe fields
+feat(agentic): validate result contract and source identity
 ```
 
-**Gate:** known blind-test false-resolved patterns cannot pass straight through as effective `resolved`.
+**Gate:** only structurally valid results tied to the exact immutable source package can enter shadow persistence; semantic quality remains an agent-skill evaluation gate.
 
 ### Task 10: Complete runner job lifecycle API
 
@@ -856,7 +800,7 @@ tests/agentic-runner-http.test.mjs
 ```
 
 - [ ] Write failing state-transition tests for create→staging→ready→running→validating→completed and every invalid transition.
-- [ ] Make `/seal` build source index before marking `ready`.
+- [ ] Make `/seal` verify the minimal manifest and all staged original size/SHA-256 values before marking `ready`; it creates no derived parser artifacts.
 - [ ] Make `/start` idempotent: repeated start of running/completed returns current state; it never starts a second child.
 - [ ] After Codex exit, validate the result before marking completed.
 - [ ] Return only bounded metadata from `/jobs/{id}`; return result/validation artifacts only from `/result`.
@@ -1043,10 +987,10 @@ evaluations/agentic-shadow-v1/<run-id>/...
 PROJECT_STATUS.md
 ```
 
-- [ ] Run the complete 12-document blind corpus through the local runner four times with identical model, effort, prompt, skill, schema, tool versions and source hashes.
-- [ ] Store raw result, validation, source coverage, JSONL and token usage for every replicate.
-- [ ] Evaluate all four against provisional `agentic-baseline-v0`; keep its status metrics diagnostic rather than treating them as production truth.
-- [ ] Compare reported and effective statuses separately so validator containment is visible.
+- [ ] Run repeated blind evaluations across multiple procurement packages with identical model, effort, prompt, skill, schema, tool versions and source hashes per case.
+- [ ] Store raw result, contract validation, agent-reported inspected documents/parts/methods/limitations, JSONL and token usage for every replicate.
+- [ ] Keep the existing `agentic-baseline-v0` as diagnostic evidence for its original run only; never derive a parser or field-specific code rule from it.
+- [ ] Manually adjudicate semantic errors across procurements and try a short skill correction before considering any new runtime check.
 - [ ] Record cached input tokens but do not equate them with zero cost or subscription usage.
 - [ ] Do not tune model/effort until all four baseline runs are archived.
 
@@ -1060,18 +1004,16 @@ node scripts/evaluate-agentic-result.mjs evaluations/agentic-shadow-v1
 Expected / required acceptance:
 
 ```text
-4/4 valid structured results
-4/4 exact 27 effective fields
-0 critical false_resolved after validation
-0 absence-derived negative effective resolved
-100% source artifact identities valid
-100% resolved evidence mechanically verified or downgraded
-all incomplete-inspection not_found downgraded
-known ellipsized-but-valid quotes accepted
+all replicates have valid structured results
+all replicates have exact 27 agent-reported fields
+100% catalog/manifest/source identities valid
+100% required human locators nonblank
+semantic error rate recorded by manual blind adjudication for every procurement
+skill changes rerun across the complete multi-procurement set
 no secret/client document text in runner service logs
 ```
 
-Status agreement against baseline v0 is diagnostic, not a release gate. Validator containment and mechanical evidence checks remain the shadow gate. Any critical false-resolved returns implementation to Task 9; it does not justify adding a second agent automatically. Full source-grounded 27-field adjudication remains a separate future production-promotion gate.
+Status agreement against baseline v0 is diagnostic, not a release gate. Semantic failures return to the short skill and multi-procurement blind evaluation loop, not automatically to Task 9. A new runtime rule requires repeated cross-procurement evidence, failed skill-only remediation and proof that it protects one allowed category without duplicating Codex reasoning.
 
 **Commit:**
 
@@ -1195,8 +1137,8 @@ Do not optimize cost before the Task 15 accuracy gate. After the high-effort bas
 1. keep one agent and reduce duplicated prompt text through the dedicated skill;
 2. compare `high` with `medium` reasoning under identical inputs;
 3. compare a cheaper model only after the reasoning-effort experiment;
-4. retain the same schema, validator and provisional baseline v0 for like-for-like shadow comparison;
-5. accept an optimization only when critical false-resolved remains zero and evidence/coverage gates remain unchanged.
+4. retain the same schema, immutable inputs and per-case adjudication for like-for-like shadow comparison;
+5. accept an optimization only when the multi-procurement blind evaluation does not regress.
 
 Cached input tokens are recorded separately because they may reduce API price, but they still count as usage and do not guarantee lower ChatGPT subscription limits. Server API-key usage follows API billing; local ChatGPT-auth runs follow the applicable ChatGPT plan/workspace limits.
 
