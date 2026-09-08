@@ -16,7 +16,7 @@ A tender may be present both at `tender.id` and `tenders[].id`. Normalization va
 
 Each unique tender is asynchronously passed to `TENDER — Intake Resume` with `trigger_kind=tenderplan_mark`, `manual_override=false`, `tender_id`, and stable key `tenderplan:mark:6a732cd00c61629cf1d3c144:tender:<tender_id>`.
 
-The relation has no confirmed event timestamp, so `observed_at` is absent and the dispatcher persists it as null. Repeated polls produce the same key; the PostgreSQL intake ledger is the sole durable deduplication boundary. No workflow static data is used.
+The relation has no confirmed event timestamp, so `observed_at` is absent and the dispatcher persists it as null. Repeated polls produce the same key; the PostgreSQL intake ledger is the sole durable deduplication boundary. Removing and later reassigning the same mark does not create a new event: the stable mark+tender key remains a duplicate and does not restart analysis by itself. Automatic recovery is initiated by `TENDER — Recovery Scan`; operator retry is initiated by `TENDER — Manual Resume` with the existing `analysis_run_id`. No workflow static data is used.
 
 ## Bounded coverage and failure behavior
 

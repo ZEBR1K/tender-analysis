@@ -6,7 +6,7 @@
 
 **Scope:** automatically detect a TenderPlan procurement mark, start one analysis for a new procurement, and resume the same `analysis_run_id` after document-processing failures without reprocessing completed documents.
 
-**Task 9 contract correction (2026-09-08):** the notification type-5 adapter below is superseded. Executions `14682/14683` proved `GET /api/tenders/v2/getlist?type=1&id=6a732cd00c61629cf1d3c144`, label «Проверить», with the same tender duplicated under `tender` and `tenders`. The poller reads current membership, derives a stable mark+tender key, and supplies no invented timestamp. Notification retention/recipient/ordering and relation pagination/exhaustiveness remain undocumented.
+**Task 9 contract correction (2026-09-08):** the notification type-5 adapter below is superseded. Executions `14682/14683` proved `GET /api/tenders/v2/getlist?type=1&id=6a732cd00c61629cf1d3c144`, label «Проверить», with the same tender duplicated under `tender` and `tenders`. The poller reads current membership, derives a stable mark+tender key, and supplies no invented timestamp. Removing and later reassigning the same mark does not create a new event: the same key remains a duplicate and does not restart analysis. Automatic recovery uses Recovery Scan; operator retry uses Manual Resume with the existing `analysis_run_id`. Notification retention/recipient/ordering and relation pagination/exhaustiveness remain undocumented.
 
 ## 1. Goal
 
@@ -15,10 +15,10 @@ An employee marks a procurement in TenderPlan. The system must detect that event
 The same entry path must support:
 
 - first-time analysis of a procurement;
-- a repeated mark on an unfinished procurement;
+- duplicate current-membership observations as no-ops;
 - a direct manual resume by `analysis_run_id`;
 - periodic recovery of failed or stale document processing;
-- idempotent handling of duplicate TenderPlan notifications.
+- idempotent handling of duplicate TenderPlan mark-membership observations.
 
 The normal result is:
 
@@ -45,8 +45,8 @@ The user confirmed the following policy:
 4. A document may be moved from stale `processing` to `failed` only when the recorded execution is no longer active, is missing after the timeout, or finished without completing the document.
 5. Automatic document processing has a maximum of two total claims: one initial attempt and one automatic retry.
 6. Manual resume may retry the same run after the automatic budget is exhausted. It does not reset `attempts`.
-7. A repeated mark or manual resume reuses the existing unfinished `analysis_run_id`.
-8. A repeated mark on a completed procurement is a no-op. Starting a fresh historical reanalysis requires a separate explicit action.
+7. Repeated current-membership observations use the same stable mark+tender key; removing and later reassigning the same mark does not create a new event or restart analysis.
+8. Automatic recovery uses Recovery Scan; operator retry uses Manual Resume with the existing `analysis_run_id`. Starting a fresh historical reanalysis requires a separate explicit action.
 
 ## 3. Current state and authoritative discrepancies
 
@@ -177,9 +177,9 @@ Required logical fields:
 | `created_at` | First persistence time |
 | `processed_at` | Successful terminal intake time |
 
-`event_key` must be unique per source. The selected relation adapter uses `tenderplan:mark:<mark_id>:tender:<tender_id>` because both coordinates are confirmed and immutable for one current mark membership; repeated polls intentionally produce the same key. The source relation has no confirmed event timestamp, so it does not invent one. Manual and recovery invocations use synthetic keys containing their n8n execution ID and selected `analysis_run_id`.
+`event_key` must be unique per source. The selected relation adapter uses `tenderplan:mark:<mark_id>:tender:<tender_id>` because both coordinates are confirmed and immutable for one current mark membership; repeated polls and remove/reassign cycles intentionally produce the same key. The latter remains a duplicate rather than a new event. The source relation has no confirmed event timestamp, so it does not invent one. Manual and recovery invocations use synthetic keys containing their n8n execution ID and selected `analysis_run_id`.
 
-An existing ledger row is terminally duplicate only when `status='completed'` and `processed_at` is set. Insert/retry uses an atomic event claim that records `n8n_execution_id`, increments `attempts` and sets `processing_started_at`. A fresh `processing` owner cannot be replaced. A `failed` event or a stale `processing` event whose recorded execution is confirmed terminal may be reclaimed. This prevents concurrent dispatch of the same event while allowing recovery after a transient downstream failure.
+An existing ledger row is terminally duplicate only when `status='completed'` and `processed_at` is set. Insert/retry uses an atomic event claim that records `n8n_execution_id`, increments `attempts` and sets `processing_started_at`. A fresh `processing` owner cannot be replaced. A `failed` event or a stale `processing` event whose recorded execution is confirmed terminal may be reclaimed. This recovers processing of the same intake intent; it does not turn mark reassignment into a new event or replace Recovery Scan as the automatic analysis-run recovery path.
 
 The event ledger is not the source of truth for analysis completion. `tender_analysis_runs` and its child tables remain the source of truth. The ledger answers only whether an external event was seen and what action it caused.
 
@@ -262,7 +262,7 @@ failed
 
 Before creating the index, migration preflight must fail if existing data contains more than one unfinished run for the same `(source, tender_id)`; it must not choose or delete a run automatically.
 
-The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or lost the conflict. Creation of the run and registration of its complete document set must occur in the same PostgreSQL statement/transaction after TenderPlan FullInfo has been normalized. A failure cannot commit an empty `created` run between those two operations. When the insert loses a concurrent conflict, the caller performs a fresh `SELECT` to load the now-visible unfinished run. Therefore two distinct mark events may both reach the create boundary, but only one can create the run and register documents; the other reuses the returned unfinished `analysis_run_id` and must not register documents again.
+The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or lost the conflict. Creation of the run and registration of its complete document set must occur in the same PostgreSQL statement/transaction after TenderPlan FullInfo has been normalized. A failure cannot commit an empty `created` run between those two operations. When the insert loses a concurrent conflict, the caller performs a fresh `SELECT` to load the now-visible unfinished run. Therefore two concurrent dispatcher claims may both reach the create boundary, but only one can create the run and register documents; the other reuses the returned unfinished `analysis_run_id` and must not register documents again.
 
 For `manual` and `recovery_scan`, `analysis_run_id` is authoritative. The dispatcher validates that the run exists and reads `tender_id` from PostgreSQL; it does not accept conflicting tender identity from the caller.
 
@@ -290,7 +290,7 @@ attempts >= 2 → no further automatic Worker call
 
 Only `trigger_kind=manual` with `manual_override=true` may call the Worker when `attempts >= 2`. The Worker increments the counter normally. The counter is never reset or decremented.
 
-A repeated TenderPlan mark reuses the unfinished `analysis_run_id` but remains an automatic intent, so it cannot bypass the attempt budget or reopen a failed run after automatic exhaustion. A duplicate delivery of the same notification remains deduplicated by its `event_key`.
+Every later observation, including after remove/reassign, carries the same TenderPlan mark+tender event key rather than creating a new event. A completed ledger row is therefore a duplicate and does not invoke analysis retry policy again. Reclaim of a failed/stale ledger row only recovers processing of that same intake intent. Automatic analysis recovery is initiated by Recovery Scan; only direct Manual Resume with `manual_override=true` may reopen a run after automatic exhaustion.
 
 ## 10. One-hour stale processing recovery
 
@@ -414,7 +414,7 @@ Credentials required by TenderPlan and the n8n API remain in n8n Credentials. No
 ## 15. Concurrency and idempotency invariants
 
 1. One procurement may have historical completed runs, but PostgreSQL enforces at most one unfinished run per `(source, tender_id)`.
-2. One unique TenderPlan notification causes at most one dispatcher action.
+2. One stable TenderPlan mark+tender intent causes at most one dispatcher action.
 3. One Document Worker execution processes exactly one document.
 4. Worker atomic claim remains the final protection against duplicate dispatch.
 5. `completed` documents are never reverted by intake/recovery workflows.
@@ -429,10 +429,10 @@ Credentials required by TenderPlan and the n8n API remain in n8n Credentials. No
 
 The design is accepted only when implementation proves at least these cases:
 
-1. First mark for an unknown `tender_id` creates exactly one run and registers all documents once.
-2. Duplicate delivery of the same notification creates no run and no Worker execution.
-3. Two concurrent distinct mark events for one new tender still create one unfinished run, and the losing conflict-aware insert does not register documents.
-4. Repeated mark on a run with two completed documents and one `failed`, `attempts=1` document dispatches only that failed document with the same `analysis_run_id`.
+1. First observed membership for an unknown `tender_id` creates exactly one run and registers all documents once.
+2. A repeated poll or remove/reassign cycle emits the same key and creates no run or Worker execution.
+3. Two concurrent dispatcher claims for one new tender still create one unfinished run, and the losing conflict-aware insert does not register documents.
+4. Recovery Scan on a run with two completed documents and one `failed`, `attempts=1` document dispatches only that failed document with the same `analysis_run_id`.
 5. `failed`, `attempts=1` is automatically claimed once and becomes `attempts=2`.
 6. `failed`, `attempts=2` is not automatically dispatched.
 7. Manual resume of `failed`, `attempts=2` uses the same run and increments to `attempts=3`.
@@ -443,8 +443,8 @@ The design is accepted only when implementation proves at least these cases:
 12. A concurrent newer claim makes the stale compare-and-set affect zero rows, and the guard reports a benign race rather than overwriting it.
 13. Attempt-one three units followed by attempt-two two units passes the retry-safe persistence/completion regression.
 14. Exhausted failed document plus no remaining active documents moves the run to `failed`.
-15. A repeated mark reuses but does not reopen an automatically exhausted failed run; only direct `manual` with `manual_override=true` reopens it.
-16. Repeated mark on a completed tender returns `already_completed` and creates no new run.
+15. A remove/reassign cycle remains a duplicate and does not reopen an automatically exhausted failed run; only direct `manual` with `manual_override=true` reopens it.
+16. The stable key for a completed tender remains a duplicate and creates no new run.
 17. All documents completed under a processing run cause the existing readiness claim and one Aggregator start.
 18. `ready_for_aggregation` resumes Aggregator without running any Worker.
 19. `aggregating` plus 27 valid FINAL rows invokes Finalization safely.

@@ -368,7 +368,7 @@ FullInfo HTTP не имеет явной retry/backoff policy. Retry долже�
 
 Manual/hardcoded entry удалён из canonical repository candidate, а concurrent new-run conflict теперь fail-closed и возвращает существующий unfinished run без повторного dispatch. Это только локальная Task 3 boundary.
 
-Политика repeated mark, completed tender, same-run document resume и
+Политика stable mark-membership dedup, completed tender, same-run recovery и
 manual/recovery routing реализована и offline-tested в inactive repository
 candidate `TENDER — Intake Resume`. Dispatcher сохраняет исходный
 `analysis_run_id`, не повторяет `completed`/`skipped` documents, ограничивает
@@ -378,8 +378,9 @@ automatic path двумя Worker claims total и разрешает повтор
 ничего не мутирует.
 
 Production import, migration application, wiring и runtime verification всё ещё
-не выполнены. TenderPlan type-5 contract не установлен, поэтому poller не
-реализован и остаётся заблокированным до реального type-5 event.
+не выполнены. TenderPlan type-5 contract superseded: execution `14683`
+подтвердил mark-relation source, а poller реализован как inactive repository
+candidate. Deployment и runtime verification остаются pending.
 
 ---
 

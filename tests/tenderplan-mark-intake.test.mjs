@@ -57,7 +57,7 @@ test('TenderPlan Mark Intake is an inactive GET-only ten-minute relation poller'
   assert.equal(request.parameters.url, 'https://tenderplan.ru/api/tenders/v2/getlist');
   assert.equal(request.parameters.sendQuery, true);
   assert.deepEqual(request.parameters.queryParameters.parameters, [
-    { name: 'type', value: 1 },
+    { name: 'type', value: '1' },
     { name: 'id', value: MARK_ID },
   ]);
   assert.equal(request.parameters.authentication, 'genericCredentialType');

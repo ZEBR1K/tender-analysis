@@ -28,10 +28,7 @@ not changed.
   DB writes and invoked no Worker. Evidence:
   `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
 - Current focused intake/resume gate: `28/28 PASS` across six test files.
-  Current full suite is `521/522`; the exact detached parent `ba4edee` is
-  `517/518`. Both share the same unrelated ActiveX fixture failure
-  `word/activeX/_rels/activeX5.xml.rels: 286 !== 287`, so Task 9 adds four
-  passing subtests and zero new failures.
+  Fresh current full suite is `522/522 PASS`.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
