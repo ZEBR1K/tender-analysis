@@ -5,6 +5,7 @@ import {
   readFile,
   readdir,
   rm,
+  writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildCodexCommand,
   executeCodexCommand,
+  runCodexAttempt,
   sanitizeCodexEnvironment,
   shouldRetryCodexAttempt,
 } from '../deploy/codex-runner/src/codex-command.mjs';
@@ -209,6 +211,7 @@ test('Codex process environment is allowlisted and strips secret-like keys', () 
     HOME: '/run/codex-auth',
     LANG: 'C.UTF-8',
     TZ: 'Europe/Moscow',
+    TMPDIR: '/data/jobs/.tmp',
     OPENAI_API_KEY: 'must-not-pass',
     TENDER_CODEX_RUNNER_AUTH_TOKEN: 'must-not-pass',
     DATABASE_PASSWORD: 'must-not-pass',
@@ -220,6 +223,7 @@ test('Codex process environment is allowlisted and strips secret-like keys', () 
     HOME: '/run/codex-auth',
     LANG: 'C.UTF-8',
     TZ: 'Europe/Moscow',
+    TMPDIR: '/data/jobs/.tmp',
   });
 });
 
@@ -270,10 +274,72 @@ test('fake Codex success preserves JSONL audit, usage and parsed result without 
     assert.match(events, /"type":"thread.started"/u);
     assert.match(events, /"type":"turn.completed"/u);
     assert.equal(events.includes('must-not-reach-fake'), false);
+    assert.equal(events.includes('OPENAI_API_KEY'), false);
+    assert.equal(events.includes('TENDER_CODEX_RUNNER_AUTH_TOKEN'), false);
+    assert.equal(events.includes('DATABASE_PASSWORD'), false);
     assert.equal(stderr.includes('should-hide'), false);
     assert.ok(Buffer.byteLength(stderr) <= 64 * 1024);
+    assert.equal(
+      JSON.parse(await readFile(execution.artifacts.result, 'utf8')).schema_version,
+      'fake_result_v1',
+    );
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('a stale shared result is removed and cannot satisfy the current attempt', async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'agentic-codex-stale-'));
+  try {
+    const workspaceDirectory = path.join(temporaryRoot, 'workspace');
+    const outputDirectory = path.join(workspaceDirectory, 'output');
+    const auditDirectory = path.join(temporaryRoot, 'audit');
+    await Promise.all([
+      mkdir(outputDirectory, { recursive: true }),
+      mkdir(auditDirectory, { recursive: true }),
+    ]);
+    const resultPath = path.join(outputDirectory, 'result.json');
+    await writeFile(resultPath, '{"schema_version":"stale_previous_attempt"}\n', 'utf8');
+    const execution = await executeCodexCommand({
+      executable: process.execPath,
+      args: [fakeCodexPath, '-o', resultPath, '-'],
+      cwd: workspaceDirectory,
+      prompt: '[fake:terminal-no-result]',
+      resultPath,
+      auditDirectory,
+      attempt: 1,
+      timeoutMs: 2_000,
+      killGraceMs: 100,
+    });
+    assert.equal(execution.ok, false);
+    assert.equal(execution.code, 'CODEX_RESULT_INVALID');
+    assert.equal(execution.valid_json_result, false);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('attempt audit files are immutable and a duplicate attempt fails closed', async () => {
+  const first = await runFake('success');
+  try {
+    const workspaceDirectory = path.join(first.temporaryRoot, 'workspace');
+    const resultPath = path.join(workspaceDirectory, 'output', 'result.json');
+    await assert.rejects(
+      executeCodexCommand({
+        executable: process.execPath,
+        args: [fakeCodexPath, '-o', resultPath, '-'],
+        cwd: workspaceDirectory,
+        prompt: '[fake:success]',
+        resultPath,
+        auditDirectory: path.join(first.temporaryRoot, 'audit'),
+        attempt: 1,
+        timeoutMs: 2_000,
+        killGraceMs: 100,
+      }),
+      (error) => error?.code === 'EEXIST',
+    );
+  } finally {
+    await rm(first.temporaryRoot, { recursive: true, force: true });
   }
 });
 
@@ -306,6 +372,27 @@ test('wall-clock timeout terminates the child and returns a typed timeout', asyn
   }
 });
 
+test('wall-clock timeout terminates the spawned subprocess tree', async () => {
+  const { temporaryRoot, execution } = await runFake('child-hang', {
+    timeoutMs: 300,
+    killGraceMs: 200,
+  });
+  try {
+    assert.equal(execution.code, 'CODEX_TIMEOUT');
+    const childPid = Number((await readFile(
+      path.join(temporaryRoot, 'workspace', 'child.pid'),
+      'utf8',
+    )).trim());
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    assert.throws(
+      () => process.kill(childPid, 0),
+      (error) => error?.code === 'ESRCH',
+    );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test('automatic retry is limited to process or transport failure with no valid JSON', () => {
   for (const code of [
     'CODEX_PROCESS_FAILED',
@@ -324,4 +411,18 @@ test('automatic retry is limited to process or transport failure with no valid J
   ]) {
     assert.equal(shouldRetryCodexAttempt({ code, validJsonResult: false }), false, code);
   }
+});
+
+test('high-level run does not permit command, environment or spawn overrides', async () => {
+  await assert.rejects(
+    runCodexAttempt({
+      jobId: fixtureJobId,
+      executable: process.execPath,
+      args: [fakeCodexPath],
+      cwd: process.cwd(),
+      baseEnv: { OPENAI_API_KEY: 'unsafe' },
+      spawnProcess: () => {},
+    }),
+    /Unsupported option/iu,
+  );
 });
