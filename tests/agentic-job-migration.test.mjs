@@ -12,6 +12,10 @@ const planUrl = new URL(
   '../docs/superpowers/plans/2026-09-08-agentic-analysis-stages-3-5.md',
   import.meta.url,
 );
+const runtimeEvidenceUrl = new URL(
+  './runtime/agentic-shadow-migration-postgres17.md',
+  import.meta.url,
+);
 
 const canonicalTables = [
   'tender_analysis_runs',
@@ -342,6 +346,21 @@ test('implementation plan records same-run and field-catalog database ownership'
   assert.match(plan, /FOREIGN KEY \(job_id, analysis_run_id\)[\s\S]*?tender_agentic_jobs\(id, analysis_run_id\)/i);
   assert.match(plan, /FOREIGN KEY \(source_document_id, analysis_run_id\)[\s\S]*?tender_analysis_documents\(id, analysis_run_id\)/i);
   assert.match(plan, /FOREIGN KEY \(job_id, analysis_run_id, field_catalog_version\)[\s\S]*?tender_agentic_jobs\(id, analysis_run_id, field_catalog_version\)/i);
+});
+
+test('sanitized PostgreSQL 17.9 runtime evidence records the executable migration gate', async () => {
+  const evidence = await readFile(runtimeEvidenceUrl, 'utf8');
+  const migrationCommit = 'f1261a164fe6fd430ef0bc183930552bc03bb63a';
+
+  assert.match(evidence, /PostgreSQL 17\.9/i);
+  assert.match(evidence, new RegExp(migrationCommit, 'i'));
+  assert.match(evidence, /node --test tests\/agentic-job-migration\.test\.mjs/i);
+  assert.match(evidence, /empty[\s\S]*populated[\s\S]*documented[- ]variant/i);
+  assert.match(evidence, /double[- ]apply/i);
+  assert.match(evidence, /cross-run[\s\S]*cross-catalog/i);
+  assert.match(evidence, /drift[\s\S]*rollback/i);
+  assert.match(evidence, /no production database/i);
+  assert.doesNotMatch(evidence, /(?:postgres(?:ql)?:\/\/|password|secret|container[_ -]?id)/i);
 });
 
 test('migration creates the three monitor indexes idempotently', async () => {
