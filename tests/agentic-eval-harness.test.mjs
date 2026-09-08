@@ -28,6 +28,13 @@ const baselineRoot = path.join(
 const adjudicationPath = path.join(baselineRoot, 'adjudication.json');
 const manifestPath = path.join(baselineRoot, 'source-manifest.sha256');
 const readmePath = path.join(baselineRoot, 'README.md');
+const blindGateRoot = path.join(
+  repositoryRoot,
+  'evaluations',
+  'agentic-blind-tests-v1',
+);
+const blindGateReadmePath = path.join(blindGateRoot, 'README.md');
+const blindGateCasesPath = path.join(blindGateRoot, 'cases.json');
 const evaluatorPath = path.join(
   repositoryRoot,
   'scripts',
@@ -114,19 +121,85 @@ function buildFutureJson(adjudication) {
     field_catalog_version: 'tender_fields_v1',
     field_catalog_sha256: 'a'.repeat(64),
     input_manifest_sha256: 'b'.repeat(64),
-    inspection_coverage: [],
+    inspected_documents: [
+      {
+        artifact_key: 'doc-0001',
+        inspected_parts: ['fixture document'],
+        methods: ['fixture read'],
+        notes: 'Offline evaluator adapter fixture only.',
+      },
+    ],
+    limitations: [],
+    constraints: ['Offline evaluator fixture; no source truth is implied.'],
     fields: adjudication.fields.map((field) => ({
       field_index: field.field_index,
       field_key: field.field_key,
       status: field.accepted_statuses[0],
       value_text: field.accepted_statuses[0] === 'not_found' ? null : 'fixture',
-      claim_basis: 'explicit_positive',
       evidence: [],
-      conflicts: [],
       rationale: 'Evaluator adapter fixture only.',
     })),
   };
 }
+
+test('multi-procurement blind gate is explicit, immutable and nonblocking', async () => {
+  const [readme, casesSource] = await Promise.all([
+    readFile(blindGateReadmePath, 'utf8'),
+    readFile(blindGateCasesPath, 'utf8'),
+  ]);
+  const gate = JSON.parse(casesSource);
+
+  assert.equal(gate.schema_version, 'agentic_blind_test_cases_v1');
+  assert.equal(gate.runtime_blocking, false);
+  assert.equal(gate.runtime_semantic_rules_allowed, false);
+  assert.equal(gate.minimum_distinct_procurements, 2);
+  assert.equal(gate.current_distinct_procurements, 1);
+  assert.equal(gate.status, 'awaiting_additional_procurements');
+  assert.equal(gate.cases.length, 1);
+  assert.equal(new Set(gate.cases.map(({ procurement_key }) => procurement_key)).size, 1);
+
+  const available = gate.cases[0];
+  assert.equal(available.case_id, 'blind-2026-09-08');
+  assert.equal(available.replicates.length, 4);
+  assert.equal(available.source_manifest, 'evaluations/agentic-baseline-v0/source-manifest.sha256');
+  assert.equal(available.adjudication, 'evaluations/agentic-baseline-v0/adjudication.json');
+  assert.equal(available.source_grounded_gold, false);
+  assert.equal(available.runtime_rule_eligible, false);
+
+  for (const forbiddenKey of [
+    'source_index',
+    'parsed_pages',
+    'ooxml_parts',
+    'xlsx_sheets',
+    'expected_pages',
+    'inspected_pages',
+  ]) {
+    assert.equal(casesSource.includes(`\"${forbiddenKey}\"`), false, forbiddenKey);
+  }
+
+  assert.match(readme, /skill[- ]first/iu);
+  assert.match(readme, /does not block|не блокирует/iu);
+  assert.match(readme, /one real procurement|одна реальная закупка/iu);
+  assert.match(readme, /do not\s+fabricate|не выдум/iu);
+});
+
+test('blind gate requires repeated cross-procurement evidence before a runtime semantic rule', async () => {
+  const gate = JSON.parse(await readFile(blindGateCasesPath, 'utf8'));
+  assert.deepEqual(gate.rule_admission_criteria, [
+    'reproduced_across_distinct_procurements',
+    'survives_skill_only_remediation',
+    'does_not_duplicate_codex_reasoning',
+    'protects_security_file_integrity_or_json_contract',
+  ]);
+  assert.deepEqual(gate.repeatability_controls, [
+    'same_model',
+    'same_reasoning_effort',
+    'same_prompt',
+    'same_skill',
+    'same_schema',
+    'same_original_file_hashes',
+  ]);
+});
 
 test('provisional baseline v0 declares its limits and exact 27-field catalog contract', async () => {
   const [readme, adjudication] = await Promise.all([
@@ -332,24 +405,9 @@ test('derived procurement lid quantity is checked exactly when JSON reports it',
     path.join(os.tmpdir(), 'agentic-evaluator-'),
   );
   const inputPath = path.join(temporaryDirectory, 'wrong-derived-quantity.json');
-  const resultJson = {
-    schema_version: 'tender_agent_result_v1',
-    fields: adjudication.fields.map((field) => ({
-      field_index: field.field_index,
-      field_key: field.field_key,
-      status: field.accepted_statuses[0],
-      value_text:
-        field.field_key === 'procurement_subject'
-          ? 'Один комплект, включающий 12 крышек шести позиций.'
-          : field.accepted_statuses[0] === 'not_found'
-            ? null
-            : 'fixture',
-      claim_basis: 'explicit_positive',
-      evidence: [],
-      conflicts: [],
-      rationale: 'Evaluator derived quantity fixture.',
-    })),
-  };
+  const resultJson = buildFutureJson(adjudication);
+  resultJson.fields.find(({ field_key: key }) => key === 'procurement_subject').value_text =
+    'Один комплект, включающий 12 крышек шести позиций.';
 
   try {
     await writeFile(inputPath, `${JSON.stringify(resultJson)}\n`, 'utf8');
@@ -441,7 +499,9 @@ test('malformed controlled JSON identity and field entries fail structurally wit
   resultJson.field_catalog_version = 42;
   resultJson.field_catalog_sha256 = 'not-a-sha';
   resultJson.input_manifest_sha256 = null;
-  resultJson.inspection_coverage = {};
+  resultJson.inspected_documents = {};
+  resultJson.limitations = null;
+  resultJson.constraints = {};
   resultJson.fields[0] = {
     field_index: {},
     field_key: [],
@@ -460,7 +520,9 @@ test('malformed controlled JSON identity and field entries fail structurally wit
       'FIELD_CATALOG_VERSION_INVALID',
       'FIELD_CATALOG_SHA256_INVALID',
       'INPUT_MANIFEST_SHA256_INVALID',
-      'INSPECTION_COVERAGE_INVALID',
+      'INSPECTED_DOCUMENTS_INVALID',
+      'LIMITATIONS_INVALID',
+      'CONSTRAINTS_INVALID',
       'FIELD_ENTRY_INVALID',
     ]);
     assert.ok(

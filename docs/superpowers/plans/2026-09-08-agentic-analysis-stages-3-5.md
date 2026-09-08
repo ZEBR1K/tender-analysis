@@ -376,7 +376,7 @@ FILE_INTEGRITY_MISMATCH
 
 ### 5.2. Rejected complexity inventory
 
-The unmerged `codex/agentic-task6` commit `9d83f01` contains PDF/DOCX/XLSX parsers, source-index modules, OCR/render orchestration, OOXML/control interpretation, three parser test suites and `source-index-minimal.json`. None of those artifacts may be merged into this contour; the worktree/branch is left intact for owner cleanup.
+The rejected, unmerged `codex/agentic-task6` commit `9d83f01` contained PDF/DOCX/XLSX parsers, source-index modules, OCR/render orchestration, OOXML/control interpretation, three parser test suites and `source-index-minimal.json`. Its worktree and branch were removed; the commit may remain recoverable only through local reflog and must not be restored or merged into this contour.
 
 Runtime must not add quote/fragment matching, value-to-quote checks, page or inspection completeness inference, arithmetic/date/VAT checks, negative-answer rules, conflict resolution, field-specific containment or semantic downgrade. The removed single-procurement fixtures are not code-rule inputs. The existing baseline v0 remains offline evaluation evidence only.
 

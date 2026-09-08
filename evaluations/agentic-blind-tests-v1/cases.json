@@ -1,0 +1,39 @@
+{
+  "schema_version": "agentic_blind_test_cases_v1",
+  "runtime_blocking": false,
+  "runtime_semantic_rules_allowed": false,
+  "minimum_distinct_procurements": 2,
+  "current_distinct_procurements": 1,
+  "status": "awaiting_additional_procurements",
+  "repeatability_controls": [
+    "same_model",
+    "same_reasoning_effort",
+    "same_prompt",
+    "same_skill",
+    "same_schema",
+    "same_original_file_hashes"
+  ],
+  "rule_admission_criteria": [
+    "reproduced_across_distinct_procurements",
+    "survives_skill_only_remediation",
+    "does_not_duplicate_codex_reasoning",
+    "protects_security_file_integrity_or_json_contract"
+  ],
+  "cases": [
+    {
+      "case_id": "blind-2026-09-08",
+      "procurement_key": "sanitized-procurement-a",
+      "input_root": "evaluations/codex-agentic-blind-test-2026-09-08/inputs",
+      "source_manifest": "evaluations/agentic-baseline-v0/source-manifest.sha256",
+      "adjudication": "evaluations/agentic-baseline-v0/adjudication.json",
+      "source_grounded_gold": false,
+      "runtime_rule_eligible": false,
+      "replicates": [
+        "evaluations/codex-agentic-blind-test-2026-09-08/raw/run-1/codex-result.md",
+        "evaluations/codex-agentic-blind-test-2026-09-08/raw/run-2/codex-result.md",
+        "evaluations/codex-agentic-blind-test-2026-09-08/raw/run-3/codex-result.md",
+        "evaluations/codex-agentic-blind-test-2026-09-08/raw/exec/codex-result.md"
+      ]
+    }
+  ]
+}
