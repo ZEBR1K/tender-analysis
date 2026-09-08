@@ -93,22 +93,53 @@ function sourceMembershipIssues(result, manifest) {
   return issues;
 }
 
-function createEnvelope({ jobId, result, rawHash, validatedHash }) {
+function createEnvelope({ jobId, result, rawHash, validatedHash, issues }) {
+  const fieldIssues = new Map();
+  const jobIssues = [];
+  for (const currentIssue of issues) {
+    const pathMatch = /^\/fields\/(\d+)(?:\/|$)/u.exec(currentIssue.path);
+    const fieldPosition = pathMatch ? Number(pathMatch[1]) : -1;
+    if (Number.isSafeInteger(fieldPosition) && fieldPosition >= 0) {
+      const existing = fieldIssues.get(fieldPosition) ?? [];
+      existing.push(currentIssue);
+      fieldIssues.set(fieldPosition, existing);
+    } else {
+      jobIssues.push(currentIssue);
+    }
+  }
   return {
     schema_version: 'tender_agent_validation_v1',
     job_id: jobId,
-    valid: true,
-    job_issues: [],
-    fields: result.fields.map((field) => ({
+    valid: issues.length === 0,
+    job_issues: jobIssues,
+    fields: result.fields.map((field, index) => ({
       field_index: field.field_index,
       field_key: field.field_key,
       status: field.status,
       value_text: field.value_text,
-      issues: [],
+      issues: fieldIssues.get(index) ?? [],
     })),
     raw_result_sha256: rawHash,
     validated_result_sha256: validatedHash,
   };
+}
+
+function buildSchemaValidEnvelope({
+  validators,
+  jobId,
+  result,
+  bytes,
+  issues,
+}) {
+  if (!Array.isArray(result?.fields)) return null;
+  const envelope = createEnvelope({
+    jobId: String(jobId || '').toLowerCase(),
+    result,
+    issues,
+    rawHash: sha256(bytes),
+    validatedHash: sha256(Buffer.from(canonicalJson(result), 'utf8')),
+  });
+  return validators.validateValidationEnvelope(envelope).valid ? envelope : null;
 }
 
 export async function createAgentResultValidator({
@@ -138,14 +169,21 @@ export async function createAgentResultValidator({
         manifest = await jobStore.readVerifiedInputManifest(jobId);
       } catch (error) {
         if (!INTEGRITY_ERROR_CODES.has(error?.code)) throw error;
+        const issues = [issue(
+          'FILE_INTEGRITY_MISMATCH',
+          'Sealed input files no longer match their recorded identities.',
+          '/input',
+        )];
         return {
           valid: false,
-          issues: [issue(
-            'FILE_INTEGRITY_MISMATCH',
-            'Sealed input files no longer match their recorded identities.',
-            '/input',
-          )],
-          envelope: null,
+          issues,
+          envelope: buildSchemaValidEnvelope({
+            validators,
+            jobId,
+            result,
+            bytes,
+            issues,
+          }),
           result,
         };
       }
@@ -160,7 +198,13 @@ export async function createAgentResultValidator({
         return {
           valid: false,
           issues,
-          envelope: null,
+          envelope: buildSchemaValidEnvelope({
+            validators,
+            jobId: manifest.job_id,
+            result,
+            bytes,
+            issues,
+          }),
           result,
         };
       }
@@ -168,6 +212,7 @@ export async function createAgentResultValidator({
       const envelope = createEnvelope({
         jobId: manifest.job_id,
         result,
+        issues,
         rawHash: sha256(bytes),
         validatedHash: sha256(Buffer.from(canonicalJson(result), 'utf8')),
       });
