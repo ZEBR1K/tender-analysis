@@ -985,16 +985,13 @@ provenance
 
 Это позволяет Extractor, Targeted Recheck и audit читать контекст из DB без повторного Docling parsing.
 
-### `DW-8` — High
+### `DW-8` — High — local implementation/tests complete; runtime OPEN
 
-UPSERT не удаляет analysis units, которые существовали в прошлой попытке, но исчезли в новой. Это может вызвать:
+Для retry `Собрать факты документа1` формирует `analysis_summary.analysis_unit_ids` как полный непустой deterministic набор units текущей попытки после проверки количества, уникальности и соответствия сохранённым units. В `Сохранить факты документа` это обязательный fail-closed precondition: missing, non-array или empty `analysis_unit_ids` вызывает ошибку до destructive cleanup.
 
-```text
-units_total = 2
-stored_units_count = 3
-→ units_count_mismatch
-→ document не completed
-```
+Текущий retry использует replacement semantics только в пределах того же `(analysis_run_id, document_id)`: units из текущего набора сохраняются; отсутствующие в нём stale units удаляются; связанные с удалёнными units facts удаляются существующим FK cascade. Для сохранившихся units отдельно удаляются только stale facts, отсутствующие в текущем input. Все текущие `confirmed`, `requires_review` и `rejected` facts UPSERT-ятся для audit. Выход ноды включает `deleted_stale_units_count`.
+
+Offline evidence: Worker suite `293/293`, full suite `493/493`; quality re-review `Ready: Yes`. Controlled runtime retry verification остаётся OPEN; production fixed/deployed не заявляется.
 
 ---
 
@@ -1447,7 +1444,16 @@ UPSERT identity:
 (document_id, analysis_unit_id, fact_index)
 ```
 
-Также реализован `deleted_stale_facts`: старые facts данного document, которых больше нет в новом input, удаляются.
+Для retry `$json.analysis_summary.analysis_unit_ids` должен содержать полный непустой deterministic набор units, уже проверенный upstream-нодой `Собрать факты документа1`. `Сохранить факты документа` fail closed до destructive cleanup, если поле отсутствует, не является JSON array или массив пуст.
+
+Replacement выполняется только для текущего `(analysis_run_id, document_id)`:
+
+- текущие units сохраняются;
+- stale units, отсутствующие в `analysis_unit_ids`, удаляются, а их facts удаляются существующим FK cascade;
+- для сохранившихся units `deleted_stale_facts` удаляет только facts, отсутствующие в текущем input;
+- текущие `confirmed`, `requires_review` и `rejected` facts UPSERT-ятся без фильтрации, сохраняя audit trail.
+
+Diagnostic output дополнительно содержит `deleted_stale_units_count`.
 
 После сохранения:
 
@@ -1646,7 +1652,7 @@ TENDER — Ошибка обработки документа
 | `DW-5` | Low | stale comment про старый Limit |
 | `DW-6` | Low | stale reference на `Подготовить результат Docling` |
 | `DW-7` | Info | Docling artifact URLs временные |
-| `DW-8` | **High** | stale analysis units могут сломать retry completion |
+| `DW-8` | **High** | ⚠ Local implementation/tests complete; controlled runtime retry verification OPEN. Fail-closed non-empty `analysis_unit_ids` guard и scoped replacement покрыты offline `293/293` Worker, `493/493` full; production fixed/deployed не заявляется. |
 | `DW-9` | Low | stale comment про 600 tokens, фактически 3200 |
 | `DW-10` | Info | approximate tokenizer `chars/3` |
 | `DW-11` | Medium | visual content не анализируется |
@@ -1707,7 +1713,7 @@ completed_documents_count = documents_total
 | Validator false confirmation | ❌ observed |
 | evidence validator Error branch handling | ❌ |
 | Docling terminal failure handling | ❌ |
-| stale units retry safety | ❌ |
+| stale units retry safety | ✅ offline contract; controlled runtime retry verification OPEN |
 | execution 14104: evidence convergence | ✅ 66/66 units |
 | execution 14104: Validator dispatch | ✅ 20 AI + 46 without AI |
 | execution 14104: facts persistence output | ✅ 61 facts |
@@ -1789,7 +1795,7 @@ Retry удаляет obsolete facts.
 
 ### W14 — stale units
 
-После `DW-8` obsolete units не остаются в DB.
+Offline regression подтверждает scoped replacement и fail-closed guard. Controlled runtime retry должен отдельно доказать, что obsolete units не остаются в DB, а current units и их актуальные facts сохраняются.
 
 ### W15 — document completion
 
@@ -1854,7 +1860,7 @@ one Aggregator start
 DW-14 — handled evidence errors
 DW-15 — absence-as-fact / semantic false confirmation
 DW-3  — Docling terminal failure
-DW-8  — stale units on retry
+DW-8  — local implementation/tests complete; controlled runtime retry verification OPEN
 ```
 
 Следующий приоритет:
@@ -1915,7 +1921,8 @@ DW-15
 реальный false-confirmed fact: customer="не указан"
 
 DW-8
-stale units могут сломать retry completion
+local implementation/tests complete; controlled runtime retry verification OPEN
+production fixed/deployed не заявляется
 
 DW-3
 Docling terminal failure path отсутствует

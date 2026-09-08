@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-07
+**Последнее обновление:** 2026-09-08
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -179,6 +179,48 @@ tender_id
 ```text
 workflows/orchestrator.md
 ```
+
+---
+
+## `TENDER — Intake Resume` — inactive repository candidate
+
+Typed dispatcher для new/existing run: сохраняет тот же `analysis_run_id`, не
+повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
+два Worker claims total. Manual override может повторно запустить exhausted
+failed document. Candidate реализован и offline-tested; deployment/runtime
+promotion pending.
+
+## `TENDER — TenderPlan Mark Intake` — inactive repository candidate
+
+Каждые 10 минут читает current members метки
+`6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
+`tender.id` / `tenders[].id` и асинхронно вызывает Intake Resume со
+стабильным mark+tender key. Notification type-5 plan superseded runtime-proven
+relation contract `14683`; deployment и runtime canary candidate pending.
+
+---
+
+## `TENDER — Manual Resume` — inactive repository candidate
+
+Operator-only adapter, который принимает существующий `analysis_run_id` и
+вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
+Candidate реализован и offline-tested; deployment pending.
+
+---
+
+## `TENDER — Recovery Scan` — inactive repository candidate
+
+Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
+Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
+Candidate реализован и offline-tested; deployment pending.
+
+---
+
+## `TENDER — Ошибка Intake Resume` — inactive repository candidate
+
+Workflow-level handler, который guarded update переводит только принадлежащий
+текущему execution intake event из `processing` в `failed`, сохраняя audit.
+Candidate реализован и offline-tested; wiring/runtime promotion pending.
 
 ---
 
@@ -564,7 +606,7 @@ Gemini 3.7 Flash low оставлен резервным Extractor candidate. GL
 
 Test/calibration Worker сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` с SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`.
 
-Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 51 node, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
+Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 85 nodes, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 

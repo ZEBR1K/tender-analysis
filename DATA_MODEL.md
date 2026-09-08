@@ -1,7 +1,7 @@
 # DATA_MODEL — Tender Analysis
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-23
+**Последнее обновление:** 2026-09-07
 **База данных:** PostgreSQL  
 **Основной credential в n8n:** `KITATEH Tenders`  
 **Назначение:** зафиксировать физическую модель данных тендерного анализа, связи между таблицами, lifecycle сущностей, ограничения и индексы.
@@ -28,7 +28,25 @@ completed_at заполнен Finalization workflow
 
 Все 27 FINAL rows в проверенном run имели `field_catalog_version=tender_fields_v1`, `result_contract_version=tender_field_final_v1` и audit metadata.
 
-Текущая модель данных состоит из пяти основных таблиц:
+## Planned migration artifact — 07.09.2026 (не live verification)
+
+Repository migration:
+
+```text
+migrations/2026-09-07_tender_intake_resume.sql
+```
+
+планирует добавить:
+
+- terminal status `superseded` и nullable audit-поля `superseded_at` / `superseded_reason`;
+- partial unique index, запрещающий более одного active run для одного `(source, tender_id)`, где active означает status не `completed` и не `superseded`;
+- таблицу `tender_analysis_intake_events` для idempotency, ownership и audit входных TenderPlan/manual/recovery events.
+
+Наличие этого файла в repository не подтверждает применение migration. Live PostgreSQL для этих объектов в рамках Task 1 не проверялся и не изменялся. Поэтому приведённый ниже snapshot пяти основных таблиц остаётся последним verified live state, а planned objects документируются отдельно.
+
+Migration сохраняет `IF NOT EXISTS` для повторяемого применения, но в той же transaction выполняет fail-closed validation через PostgreSQL catalogs и `information_schema`. До reconciliation она допускает только отсутствие active-run index, его точную legacy-форму с predicate `status <> 'completed'` или точную current-форму. Точный legacy index удаляется внутри transaction до supersede update и пересоздаётся с current predicate после final duplicate preflight; неизвестный same-name object/definition не удаляется и вызывает откат. Migration допускает no-op на clean/already-reconciled DB и только точную bounded reconciliation 86 подтверждённых legacy rows; любое другое active-duplicate shape, несовместимые table/constraints/columns/defaults или secondary indexes также вызывают `RAISE EXCEPTION` и откат всей migration transaction.
+
+Текущая verified модель данных состоит из пяти основных таблиц:
 
 ```text
 tender_analysis_runs
@@ -67,6 +85,12 @@ candidate facts
 | `tender_analysis_units` | Нормализованные смысловые части документов, отправляемые в AI |
 | `tender_analysis_facts` | Candidate facts, найденные Extractor и проверенные Validator |
 | `tender_analysis_field_results` | Финальные результаты 27 полей после Aggregator / Targeted Recheck |
+
+Planned migration artifact, не подтверждённый как live schema:
+
+| Таблица | Назначение |
+|---|---|
+| `tender_analysis_intake_events` | Deduplication, ownership и audit внешних/manual/recovery intake events; не источник истины для completion анализа |
 
 ---
 
@@ -160,6 +184,8 @@ tender_analysis_runs.id
 | 13 | `ready_at` | timestamptz | YES | — |
 | 14 | `aggregation_started_at` | timestamptz | YES | — |
 | 15 | `completed_at` | timestamptz | YES | — |
+| 16 | `superseded_at` *(planned migration)* | timestamptz | YES | — |
+| 17 | `superseded_reason` *(planned migration)* | text | YES | — |
 
 ---
 
@@ -190,6 +216,7 @@ ready_for_aggregation
 aggregating
 completed
 failed
+superseded
 ```
 
 Constraint:
@@ -203,7 +230,8 @@ CHECK (
       'ready_for_aggregation',
       'aggregating',
       'completed',
-      'failed'
+      'failed',
+      'superseded'
     ]
   )
 )
@@ -235,6 +263,19 @@ created / processing / ready_for_aggregation / aggregating
 failed
 ```
 
+Administrative terminal transition in the pending migration:
+
+```text
+approved bounded legacy active run
+  ↓
+superseded
+```
+
+`superseded` is terminal. Automatic recovery and Manual Resume return an
+explicit no-op for that `analysis_run_id`; they never reopen it. The run and all
+children remain stored for audit. A new run may be created when the only prior
+history for `(source, tender_id)` is `superseded`.
+
 ### Семантика timestamps
 
 ```text
@@ -252,6 +293,12 @@ aggregation_started_at
 
 completed_at
 → полный анализ завершён
+
+superseded_at
+→ run атомарно выведен из active lifecycle утверждённой reconciliation
+
+superseded_reason
+→ фиксированная bounded audit-причина supersede
 ```
 
 `completed_at` заполняется Finalization workflow после успешной DB-backed проверки 27/27 уникальных FINAL fields и atomic completion claim.
@@ -274,6 +321,21 @@ ON tender_analysis_runs (tender_id);
 CREATE INDEX idx_tender_analysis_runs_tender_status
 ON tender_analysis_runs (tender_id, status);
 ```
+
+Planned migration artifact, не подтверждённый как live index:
+
+```sql
+CREATE UNIQUE INDEX uq_tender_analysis_runs_one_unfinished
+ON tender_analysis_runs (source, tender_id)
+WHERE status NOT IN ('completed', 'superseded');
+```
+
+Этот partial unique index допускает historical terminal `completed` и
+`superseded` runs, но должен обеспечить не более одного active run для одного
+`(source, tender_id)`. До его создания migration либо выполняет единственную
+утверждённую bounded reconciliation 86 legacy rows, либо fail-closed откатывает
+любое иное duplicate shape. Ни run, ни его children не удаляются, а исходный
+`error_message` не перезаписывается.
 
 PK index:
 
@@ -308,6 +370,104 @@ tender_analysis_runs_pkey (id)
 - Targeted Recheck;
 - Report Generation V2;
 - error handling.
+
+---
+
+# 4A. Planned `tender_analysis_intake_events`
+
+## 4A.1. Deployment status
+
+Таблица описана migration artifact:
+
+```text
+migrations/2026-09-07_tender_intake_resume.sql
+```
+
+В рамках Task 1 migration не применялась, а наличие таблицы в live PostgreSQL не проверялось. Этот раздел фиксирует planned physical contract, а не verified deployment state.
+
+## 4A.2. Назначение
+
+Одна строка = один внешний, recovery или manual intake event.
+
+Ledger хранит:
+
+- устойчивый ключ события и его источник;
+- выбранный `analysis_run_id`;
+- текущего n8n owner и время claim;
+- число event-processing claims;
+- terminal action или ошибку.
+
+`tender_analysis_intake_events` не является source of truth для completion анализа. Эту роль сохраняют `tender_analysis_runs` и дочерние analysis tables.
+
+## 4A.3. Колонки
+
+| # | Колонка | Тип | Nullable | Default |
+|---:|---|---|---:|---|
+| 1 | `id` | uuid | NO | `gen_random_uuid()` |
+| 2 | `source` | text | NO | `'tenderplan'` |
+| 3 | `event_key` | text | NO | — |
+| 4 | `event_type` | text | NO | — |
+| 5 | `tender_id` | text | NO | — |
+| 6 | `observed_at` | timestamptz | YES | — |
+| 7 | `trigger_kind` | text | NO | — |
+| 8 | `analysis_run_id` | uuid | YES | — |
+| 9 | `status` | text | NO | `'processing'` |
+| 10 | `attempts` | integer | NO | `0` |
+| 11 | `n8n_execution_id` | text | YES | — |
+| 12 | `processing_started_at` | timestamptz | YES | — |
+| 13 | `action` | text | YES | — |
+| 14 | `error_message` | text | YES | — |
+| 15 | `created_at` | timestamptz | NO | `now()` |
+| 16 | `processed_at` | timestamptz | YES | — |
+| 17 | `updated_at` | timestamptz | NO | `now()` |
+
+## 4A.4. Constraints and indexes
+
+```sql
+PRIMARY KEY (id)
+```
+
+```sql
+FOREIGN KEY (analysis_run_id)
+REFERENCES tender_analysis_runs(id)
+ON DELETE SET NULL
+```
+
+```sql
+UNIQUE (source, event_key)
+```
+
+Allowed `trigger_kind`:
+
+```text
+tenderplan_mark
+recovery_scan
+manual
+```
+
+Allowed `status`:
+
+```text
+processing
+completed
+failed
+```
+
+`attempts` ограничен `CHECK (attempts >= 0)`.
+
+Planned indexes:
+
+```sql
+CREATE INDEX idx_tender_analysis_intake_events_run
+ON tender_analysis_intake_events (analysis_run_id);
+```
+
+```sql
+CREATE INDEX idx_tender_analysis_intake_events_status_started
+ON tender_analysis_intake_events (status, processing_started_at);
+```
+
+Migration намеренно не добавляет trigger для `updated_at`: workflow должен обновлять это поле явно вместе с ownership transition.
 
 ---
 

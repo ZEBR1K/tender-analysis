@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-09-08
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/archive-ingestion`
+**Branch at snapshot:** `codex/agentic-analysis-integration`
 
 ## Archive extractor deployment — runtime GREEN
 
@@ -27,6 +27,113 @@ the production Orchestrator and its workflows were not changed. The next
 integration gate is the reviewed additive migration and minimal Orchestrator
 wiring after the concurrent Orchestrator work is reconciled, followed by one
 bounded real-archive canary before activation.
+## TenderPlan intake/resume checkpoint — superseded reconciliation candidate GREEN, production pending
+
+Starting feature commit before documentation integration: `4c32d0b`. `main` is
+not changed.
+
+### Verified
+
+- Inactive repository candidates `TENDER — Intake Resume`, `TENDER — Manual
+  Resume`, `TENDER — Recovery Scan` and `TENDER — Ошибка Intake Resume` are
+  implemented and offline-tested.
+- Dispatcher preserves the same `analysis_run_id`, never repeats
+  `completed`/`skipped` documents, and caps automatic dispatch at exactly two
+  Worker claims total. `manual_override=true` may retry an exhausted failed
+  document.
+- Terminal run status `superseded` is implemented in the repository migration
+  and dispatcher contracts. Automatic/manual/recovery requests for such an
+  `analysis_run_id` return `superseded_no_op` and cannot reach Worker,
+  Aggregator or Finalization. Runs, children and existing `error_message` remain
+  preserved; nullable `superseded_at` / `superseded_reason` provide audit.
+- Active-run uniqueness now uses
+  `status NOT IN ('completed', 'superseded')`. Only-superseded history permits
+  the first post-rollout mark to create a new run; stable mark+tender key and
+  remove/reassign no-repeat semantics are unchanged.
+- A `processing` document becomes stale after one hour. Reclaim requires
+  read-only n8n execution observation plus guarded CAS; unavailable API,
+  malformed observation and unknown status do not mutate state.
+- Read-only pre-DB smoke execution `14678` in workflow
+  `yocBDh0nCvPPxItn` verified exact Orchestrator input validation, TenderPlan
+  FullInfo identity and normalization for both test tender IDs. It stopped before
+  DB registration, contained no PostgreSQL/Execute Workflow node, performed no
+  DB writes and invoked no Worker. Evidence:
+  `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
+- Current superseded focused gate: `35/35 PASS` across migration, dispatcher,
+  Orchestrator and Recovery Scan tests. Fresh current full suite is
+  `526/526 PASS`.
+- Read-only local/live audit found that Orchestrator and both plausible Worker
+  targets differ. Document Error Workflow, Aggregator and Finalization have exact
+  normalized config and connections parity under the documented comparison
+  boundary. Sanitized evidence:
+  `evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`.
+
+### Not verified / blocked
+
+- Fresh SELECT-only preflight execution `14685` confirms the migration remains
+  unapplied: intake table/index and superseded columns are absent. The session
+  reported `current_user=postgres`, `transaction_read_only=off`; no write was
+  performed. The authoritative run-status CHECK is
+  `tender_analysis_runs_status_check` with exactly `created`, `processing`,
+  `ready_for_aggregation`, `aggregating`, `completed`, `failed`. The three
+  approved active legacy groups are exactly `24`, `50`, and `12` rows, with
+  exact maxima `2026-09-07T05:59:14.629399+00:00`,
+  `2026-08-17T18:50:41.678699+00:00`, and
+  `2026-08-23T16:29:52.779826+00:00`. The production-candidate migration
+  validates CHECK semantics without relying on its name, reconciles only those
+  bounded 86 rows atomically, leaves newer rows untouched, and fail-closes on
+  every other duplicate shape. Runtime application is still pending explicit
+  operator approval.
+- Historical Task 8 TenderPlan type-5 event contract was not established and is
+  superseded, not a current poller blocker. Probe workflow
+  `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
+  FullInfo returned `marks=[]` for both test tender IDs. No event paths or fixture
+  were fabricated.
+- Latest repeat probe execution `14680` produced the same negative result:
+  empty type-5 list, `marks=[]` and empty `notification` for both test tender IDs.
+- Execution `14682` confirmed the target tender's FullInfo mark ID while the
+  type-5 feed remained empty. Execution `14683` proved the read-only relation
+  contract for mark `6a732cd00c61629cf1d3c144` («Проверить»), including
+  duplicate `tender`/`tenders` placement and one unique tender.
+- Task 9 is implemented as an inactive offline repository candidate. Its own
+  imported/runtime behavior is not GREEN; pagination/order/cursor and
+  exhaustive-result semantics remain undocumented.
+- Existing live workflows were not changed. New workflows are inactive and
+  unpublished; production promotion and the runtime matrix remain pending.
+- Controlled migration requires quiescence, not low traffic. Immediately before
+  both the mandatory rollback dry-run and any real application, all autonomous
+  and new-run producers must be inactive/absent, system-wide n8n executions in
+  `new`/`running`/`waiting` must be zero, and no execution may target any of the
+  86 bounded runs. Any active execution aborts the operation. Entry workflows
+  must remain inactive and producers must not be run manually until migration
+  postconditions and updated candidate import/read-back are complete.
+- Read-only evidence on 2026-09-08 recorded Orchestrator
+  `Q1RWSrB0jaTA6Dmx` inactive, Intake/Recovery not live, and zero active n8n
+  executions. This is not an application-time gate result and must be repeated
+  immediately before execution.
+- The exact committed migration still requires an executable rollback dry-run
+  against the real PostgreSQL catalog, followed by proof that catalog objects,
+  all 86 run rows, their child rows and bounded counts/cutoffs are unchanged.
+  Source-regex tests are not runtime proof. Neither that dry-run nor the real
+  migration application has been performed yet.
+- MCP ignored requested folder placement for created test workflows and returned
+  `parentFolderId=null`; this is recorded as tooling/packaging drift. The safe
+  no-worker Orchestrator `thE9gLyNTvxLWt8I` remains unexecuted.
+
+Controlled activation order remains:
+
+```text
+migration
+→ error workflow
+→ Worker
+→ Orchestrator
+→ Dispatcher
+→ Manual Resume
+→ Recovery Scan
+→ TenderPlan poller
+```
+
+This checkpoint is not production-complete.
 
 ## DW-24 ActiveX GroupName NUL containment — runtime GREEN
 

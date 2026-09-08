@@ -5795,3 +5795,140 @@ container identities and start times remained unchanged. RAR/TAR/GZIP and a
 real TenderPlan archive remain runtime-pending. The n8n preparation workflow
 stays inactive/unwired; PostgreSQL and the production Orchestrator were not
 changed.
+
+---
+
+## 2026-09-08 — TenderPlan intake/resume documentation integration checkpoint
+
+Documentation integration started from feature commit `4c32d0b` on
+`codex/tenderplan-intake-resume`; `main` was not changed.
+
+Repository implementation/offline evidence is GREEN for four inactive
+candidates:
+
+```text
+TENDER — Intake Resume
+TENDER — Manual Resume
+TENDER — Recovery Scan
+TENDER — Ошибка Intake Resume
+```
+
+Dispatcher preserves the existing `analysis_run_id`, excludes
+`completed`/`skipped` documents, limits automatic dispatch to exactly two Worker
+claims total, and allows `manual_override=true` to retry exhausted failed.
+`processing` is stale after one hour, but reclaim requires read-only observation
+of the recorded n8n execution followed by guarded CAS; unavailable API performs
+no mutation.
+
+Read-only production evidence remains deliberately bounded:
+
+- execution `14676`: intake migration is absent; intake table and required
+  partial unique/helper indexes are all `false`;
+- type-5 probe `oCXpDbO3Xz1qrCBf`, execution `14677`: type-5 list empty and
+  FullInfo `marks=[]` for both supplied IDs, so Task 8 contract is incomplete and
+  no event paths/fixture were fabricated;
+- pre-DB smoke `yocBDh0nCvPPxItn`, execution `14678`: exact Orchestrator input
+  validation, FullInfo identity and normalization succeeded for both tender IDs,
+  then stopped before registration; no DB write and no Worker call occurred;
+- safe no-worker Orchestrator `thE9gLyNTvxLWt8I` was validated/read back but not
+  executed.
+
+The pre-DB evidence is stored in
+`evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
+At this checkpoint Task 9 was not implemented and remained blocked on a
+representative type-5 event. This historical blocker was later superseded by the
+execution-`14683` mark-relation contract recorded below.
+
+Full offline suite after the runtime probes:
+
+```text
+node --test tests/*.test.mjs
+518/518 PASS
+local date: 2026-09-08
+```
+
+Read-only local/live audit found that Orchestrator and both plausible Worker
+targets differ; Document Error Workflow, Aggregator and Finalization have exact
+normalized config and connections parity under the defined comparison boundary.
+Method, exact node counts/IDs and sanitized results are recorded in
+`evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`. Existing live
+workflows were not changed. All new workflows remain inactive/unpublished, and
+production promotion/runtime matrix are pending. MCP ignored requested folder
+placement and returned `parentFolderId=null`; this remains tooling/packaging
+drift.
+
+Controlled activation order remains:
+
+```text
+migration
+→ error workflow
+→ Worker
+→ Orchestrator
+→ Dispatcher
+→ Manual Resume
+→ Recovery Scan
+→ TenderPlan poller
+```
+
+This is not a production-complete integration checkpoint.
+
+---
+
+## 2026-09-08 — Task 9 TenderPlan mark-relation poller
+
+Task 9 replaces the unconfirmed notification type-5 design with the runtime-proven
+current relation contract from execution `14683`. The inactive candidate polls
+mark `6a732cd00c61629cf1d3c144` («Проверить») every 10 minutes via one
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`, deduplicates `tender.id` and
+`tenders[].id`, and asynchronously invokes Intake Resume with a stable
+mark+tender key. Missing source event time stays null.
+
+Historical negative evidence remains separate: executions `14677`, `14680` and
+`14682` did not provide a usable type-5 event. Pagination, ordering, cursor and
+exhaustive-result semantics for the relation response are undocumented, so the
+candidate invents no pagination and documents the bounded coverage limitation.
+
+TDD RED before the export: focused poller test `0 pass / 1 fail` because
+`TENDER — TenderPlan Mark Intake.json` was absent. Final GREEN plus existing
+intake/resume regression: `28/28` assertions PASS across six focused test files.
+In the same terminal environment with `--experimental-test-isolation=none`, the
+current full suite is `521/522` and the exact detached parent `ba4edee` baseline
+is `517/518`. Both have the same single ActiveX fixture failure
+`word/activeX/_rels/activeX5.xml.rels: 286 !== 287`, so Task 9 adds four passing
+subtests and zero new failures.
+
+Production n8n, PostgreSQL, credentials and external state were not changed.
+The candidate itself has no runtime GREEN claim; only source contract `14683` is
+runtime GREEN.
+
+---
+
+## 2026-09-08 — Full DB deployment preflight execution 14684
+
+One explicitly authorized inactive/unpublished probe
+`fbjRXqyQ71toBhZK` (`[CODEX TEST] Tender Intake Full DB Preflight — 2026-09-08`)
+was created and executed exactly once. Its graph was Manual Trigger → one
+aggregate-only PostgreSQL `WITH … SELECT` → fail-closed sanitized Code. No retry,
+workflow update, publication, activation or database write occurred.
+
+Execution `14684` returned current aggregate evidence before the sanitizer
+stopped the workflow with `status=error`:
+
+```text
+current_user: postgres
+transaction_read_only: off
+connection_uses_ssl: false
+total_run_count: 97
+unfinished_run_count: 86
+duplicate_unfinished_group_count: 3
+intake_events_table_exists: false
+unfinished_run_unique_index_exists: false
+intake_run_index_exists: false
+intake_status_started_index_exists: false
+```
+
+The error is a correct fail-closed preflight outcome. Migration is `NO-GO`:
+three duplicate unfinished groups violate the migration precondition, and the
+inherited diagnostic credential is neither the required `tender_codex_ro` role
+nor read-only/TLS-protected. No duplicate identifiers were retrieved or recorded.
+Evidence: `evaluations/TENDER_INTAKE_FULL_DB_PREFLIGHT_14684_2026-09-08.md`.

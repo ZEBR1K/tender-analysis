@@ -1,0 +1,1694 @@
+{
+  "name": "TENDER — Intake Resume",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "trigger_kind",
+              "type": "string"
+            },
+            {
+              "name": "source_event_key",
+              "type": "string"
+            },
+            {
+              "name": "tender_id",
+              "type": "string"
+            },
+            {
+              "name": "analysis_run_id",
+              "type": "string"
+            },
+            {
+              "name": "manual_override",
+              "type": "boolean"
+            },
+            {
+              "name": "observed_at",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1400,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000001",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const value = $json;\nconst fail = (message) => { throw new Error(`Invalid Intake Resume input: ${message}`); };\nconst text = (name, required = false) => { const raw = value[name]; if (raw == null || raw === '') { if (required) fail(`${name} is required`); return null; } if (typeof raw !== 'string') fail(`${name} must be a string`); const out = raw.trim(); if (!out || out.length > 500) fail(`${name} must be non-empty and bounded`); return out; };\nconst trigger_kind = text('trigger_kind', true);\nconst source_event_key = text('source_event_key', true);\nconst tender_id = text('tender_id');\nconst analysis_run_id = text('analysis_run_id');\nif (typeof value.manual_override !== 'boolean') fail('manual_override must be boolean');\nlet intent; let run_authoritative;\nif (trigger_kind === 'tenderplan_mark') { if (!tender_id || analysis_run_id) fail('tenderplan_mark requires tender_id and forbids analysis_run_id'); if (value.manual_override) fail('manual override forbidden for tenderplan_mark'); intent = 'automatic'; run_authoritative = false; }\nelse if (trigger_kind === 'recovery_scan') { if (!analysis_run_id || tender_id) fail('recovery_scan requires analysis_run_id and forbids tender_id'); if (value.manual_override) fail('manual override forbidden for recovery_scan'); intent = 'automatic'; run_authoritative = true; }\nelse if (trigger_kind === 'manual') { if (!analysis_run_id || tender_id) fail('manual requires analysis_run_id and forbids tender_id'); if (!value.manual_override) fail('manual requires manual_override=true'); intent = 'manual'; run_authoritative = true; }\nelse fail(`unknown trigger_kind ${trigger_kind}`);\nlet observed_at = text('observed_at');\nif (observed_at) { const parsed = Date.parse(observed_at); if (!Number.isFinite(parsed) || !/(?:Z|[+-]\\d{2}:\\d{2})$/u.test(observed_at)) fail('observed_at must be an ISO timestamp with timezone'); observed_at = new Date(parsed).toISOString(); }\nreturn { json: { trigger_kind, source_event_key, tender_id, analysis_run_id, manual_override: value.manual_override, observed_at, intent, run_authoritative, source: trigger_kind === 'tenderplan_mark' ? 'tenderplan' : trigger_kind } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1180,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000002",
+      "name": "Validate Intake Input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.run_authoritative }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -960,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000003",
+      "name": "Is Run-authoritative Invocation?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r.*, count(*) OVER () AS matches FROM tender_analysis_runs r WHERE r.id = $1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $json.analysis_run_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -740,
+        -180
+      ],
+      "id": "10000000-0000-4000-8000-000000000004",
+      "name": "Load Authoritative Run",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rows = Number($json.matches ?? 0); if (rows !== 1 || !$json.id) throw new Error('analysis_run_id must match exactly one run'); const requested = $('Validate Intake Input').first().json; if (requested.tender_id && requested.tender_id !== $json.tender_id) throw new Error('tender_id conflict: identity mismatch'); return { json: { ...requested, analysis_run_id: String($json.id), tender_id: String($json.tender_id), run_status: $json.status } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        -180
+      ],
+      "id": "10000000-0000-4000-8000-000000000005",
+      "name": "Bind Authoritative Run Identity"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const source = $json.trigger_kind === 'tenderplan_mark' ? 'tenderplan' : $json.trigger_kind; return { json: { ...$json, source, event_type: $json.trigger_kind === 'tenderplan_mark' ? 'mark_added' : $json.trigger_kind, stale_cutoff: new Date(Date.now() - 3600000).toISOString() } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000006",
+      "name": "Prepare Event Identity"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tender_analysis_intake_events (source,event_key,event_type,tender_id,observed_at,trigger_kind,analysis_run_id,status,attempts,n8n_execution_id,processing_started_at) VALUES ($1,$2,$3,$4,NULLIF($5,'')::timestamptz,$6,NULLIF($7,'')::uuid,'processing',1,$8,now()) ON CONFLICT (source,event_key) DO UPDATE SET status='processing', attempts=tender_analysis_intake_events.attempts + 1, n8n_execution_id=EXCLUDED.n8n_execution_id, processing_started_at=now(), error_message=NULL WHERE tender_analysis_intake_events.status = 'failed' RETURNING *, true AS claimed;",
+        "options": {
+          "queryReplacement": "={{ [ $json.source, $json.source_event_key, $json.event_type, $json.tender_id ?? '', $json.observed_at, $json.trigger_kind, $json.analysis_run_id ?? '', $execution.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000007",
+      "name": "Claim New or Failed Intake Event",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT e.*, $3::boolean AS run_authoritative, $4::boolean AS manual_override, $5::text AS input_trigger_kind, $2::text AS source_event_key, COALESCE(e.analysis_run_id, NULLIF($6, '')::uuid) AS input_analysis_run_id, COALESCE(e.tender_id, NULLIF($7, '')) AS input_tender_id, $8::text AS intent, now() AS current_at FROM tender_analysis_intake_events e WHERE e.source = $1 AND e.event_key = $2;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Event Identity').first().json.source, $('Prepare Event Identity').first().json.source_event_key, $('Prepare Event Identity').first().json.run_authoritative, $('Prepare Event Identity').first().json.manual_override, $('Prepare Event Identity').first().json.trigger_kind, $('Prepare Event Identity').first().json.analysis_run_id ?? '', $('Prepare Event Identity').first().json.tender_id ?? '', $('Prepare Event Identity').first().json.intent ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        140,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000008",
+      "name": "Load Intake Event",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const row = $json; const now = Date.parse(row.current_at ?? row.observed_at ?? new Date().toISOString()); const started = Date.parse(row.processing_started_at ?? ''); const base = { ...row, trigger_kind: row.input_trigger_kind ?? row.trigger_kind, analysis_run_id: row.input_analysis_run_id ?? row.analysis_run_id, tender_id: row.input_tender_id ?? row.tender_id, reclaimable: false }; if (row.status === 'completed' && row.processed_at) return { json: { ...base, action: 'duplicate_event', event_route: 'no_op' } }; if (row.claimed === true || row.n8n_execution_id === $execution.id) return { json: { ...base, action: 'claimed', event_route: 'continue' } }; if (row.status === 'processing' && Number.isFinite(started) && now - started < 3600000) return { json: { ...base, action: 'already_active', event_route: 'no_op' } }; if (row.status === 'processing' && Number.isFinite(started)) return { json: { ...base, action: 'verify_owner', event_route: 'reclaim_check', stale_cutoff: new Date(now - 3600000).toISOString(), owner_id: row.n8n_execution_id } }; throw new Error(`Unknown intake event state ${String(row.status)}`);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000009",
+      "name": "Classify Intake Event"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event_route }}",
+              "rightValue": "no_op",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        580,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000010",
+      "name": "Event Outcome Is No-op?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { success: true, action: $json.action, analysis_run_id: $json.analysis_run_id ?? null, tender_id: $json.tender_id ?? null } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -180
+      ],
+      "id": "10000000-0000-4000-8000-000000000011",
+      "name": "Return Event No-op"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event_route === 'reclaim_check' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        80
+      ],
+      "id": "10000000-0000-4000-8000-000000000012",
+      "name": "Route Event Continuation"
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.N8N_TENDER_BASE_URL + '/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1020,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000013",
+      "name": "Read Intake Event Owner Execution",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $json; const owner = typeof $ === 'function' ? $('Classify Intake Event').item.json : {}; const base = { ...owner, ...input }; const unavailable = { ...base, action: 'execution_status_unavailable', execution_observation: 'unavailable', reclaimable: false }; if (input.error || !Number.isInteger(input.statusCode)) return { json: unavailable }; if (input.statusCode === 404) return { json: { ...base, execution_state: 'not_found', execution_observation: 'reclaimable', reclaimable: true } }; if (input.statusCode !== 200 || !input.body || typeof input.body.id !== 'string' || typeof input.body.status !== 'string' || typeof input.body.finished !== 'boolean') return { json: unavailable }; const state=input.body.status; if (['new','running','waiting'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'owned', reclaimable: false } }; if (['success','error','canceled','crashed'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'reclaimable', reclaimable: true } }; throw new Error(`Unknown execution status ${state}`);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000014",
+      "name": "Classify Intake Event Owner Execution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reclaimable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1460,
+        0
+      ],
+      "id": "10000000-0000-4000-8000-000000000015",
+      "name": "Is Intake Event Owner Reclaimable?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_intake_events SET status='processing', attempts=tender_analysis_intake_events.attempts + 1, n8n_execution_id=$5, processing_started_at=now(), error_message=NULL WHERE source=$1 AND event_key=$2 AND status='processing' AND n8n_execution_id=$3 AND processing_started_at=$4::timestamptz AND processing_started_at <= $6::timestamptz RETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [ $json.source, $json.event_key, $json.owner_id ?? $json.n8n_execution_id, $json.processing_started_at, $execution.id, $json.stale_cutoff ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1680,
+        -80
+      ],
+      "id": "10000000-0000-4000-8000-000000000016",
+      "name": "Reclaim Stale Intake Event",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.run_authoritative }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1900,
+        80
+      ],
+      "id": "10000000-0000-4000-8000-000000000017",
+      "name": "Route Run Resolution"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *, count(*) FILTER (WHERE status NOT IN ('completed', 'superseded')) OVER () AS unfinished FROM tender_analysis_runs WHERE source='tenderplan' AND tender_id=$1 ORDER BY created_at DESC;",
+        "options": {
+          "queryReplacement": "={{ [ $json.tender_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2120,
+        220
+      ],
+      "id": "10000000-0000-4000-8000-000000000018",
+      "name": "Resolve TenderPlan Runs",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const context=$('Classify Intake Event').first().json; const rows=$input.all().map(i=>i.json).filter(r=>r.id); const active=rows.filter(r=>!['completed','superseded'].includes(r.status)); if (active.length > 1) throw new Error('Invariant violation: active run count > 1'); if (active.length===1) return [{json:{...context,...active[0],analysis_run_id:active[0].id,run_resolution:'reuse_existing'}}]; const completed=rows.find(r=>r.status==='completed'); if (completed) return [{json:{...context,...completed,analysis_run_id:completed.id,run_resolution:'already_completed'}}]; return [{json:{...context,run_resolution:'call_orchestrator'}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        220
+      ],
+      "id": "10000000-0000-4000-8000-000000000019",
+      "name": "Classify TenderPlan Run Resolution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.run_resolution === 'call_orchestrator' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2560,
+        220
+      ],
+      "id": "10000000-0000-4000-8000-000000000020",
+      "name": "Needs New Run?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Q1RWSrB0jaTA6Dmx",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "source": "tenderplan",
+            "source_event_key": "={{ $json.source_event_key }}",
+            "tender_id": "={{ $json.tender_id }}",
+            "trigger_kind": "={{ $json.trigger_kind }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2780,
+        100
+      ],
+      "id": "10000000-0000-4000-8000-000000000021",
+      "name": "Call Orchestrator"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const context=$('Classify Intake Event').first().json; if (typeof $json.created_new_run !== 'boolean' || typeof $json.analysis_run_id !== 'string') throw new Error('Invalid Orchestrator result identity'); if ($json.source && $json.source !== 'tenderplan') throw new Error('Orchestrator source identity mismatch'); if (!$json.tender_id || $json.tender_id !== context.tender_id) throw new Error('Orchestrator tender_id identity mismatch'); return {json:{...context,...$json}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3000,
+        100
+      ],
+      "id": "10000000-0000-4000-8000-000000000022",
+      "name": "Validate Orchestrator Result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.created_new_run }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3220,
+        100
+      ],
+      "id": "10000000-0000-4000-8000-000000000023",
+      "name": "Orchestrator Created Run?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH selected AS (SELECT * FROM tender_analysis_runs WHERE id=$1::uuid), reopened AS (UPDATE tender_analysis_runs r SET status='processing', error_message=NULL FROM selected s WHERE r.id=s.id AND s.status='failed' AND $2::boolean AND $3='manual' RETURNING r.*) SELECT COALESCE(u.id,s.id) AS id, COALESCE(u.id,s.id) AS analysis_run_id, COALESCE(u.status,s.status) AS status, COALESCE(u.tender_id,s.tender_id) AS tender_id, COALESCE(u.source,s.source) AS source, $2::boolean AS manual_override, $3::text AS trigger_kind, $4::text AS source_event_key, $5::text AS intent, (u.id IS NOT NULL) AS reopened FROM selected s LEFT JOIN reopened u ON true WHERE NOT EXISTS (SELECT 1 FROM reopened) OR u.id IS NOT NULL;",
+        "options": {
+          "queryReplacement": "={{ [ $json.analysis_run_id ?? $json.id, $json.manual_override ?? false, $json.trigger_kind, $json.source_event_key, $json.intent ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3440,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000024",
+      "name": "Apply Run Entry Policy",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const status=$json.status ?? $json.run_status; if (status==='superseded') return {json:{...$json,action:'superseded_no_op',run_status:'superseded'}}; if (status==='failed' && $json.trigger_kind!=='manual') return {json:{...$json,action:'automatic_attempts_exhausted',run_status:'failed'}}; if (status==='failed' && $json.trigger_kind==='manual' && $json.manual_override===true) return {json:{...$json,action:'reopened',run_status:'processing'}}; if (status==='completed') return {json:{...$json,action:'already_completed',run_status:'completed'}}; return {json:{...$json,run_status:status ?? 'processing'}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3660,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000025",
+      "name": "Classify Run Entry Policy"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH expected(field_key) AS (VALUES ('procurement_subject'),('nm_price_with_vat'),('platform'),('procedure_type'),('application_deadline'),('application_review_date'),('results_date'),('customer'),('customer_contacts'),('participation_cost'),('participation_guarantee'),('evaluation_criteria'),('delivery_term'),('payment_terms'),('special_account_or_treasury'),('bank_support'),('government_contract'),('rebidding'),('national_regime'),('advance_contract_guarantee'),('warranty_obligations_guarantee'),('licenses_certificates'),('required_official_certificates'),('similar_supply_experience'),('analog_allowed'),('analog_definition'),('application_documents')), docs AS (SELECT COALESCE(jsonb_agg(d ORDER BY d.document_index),'[]'::jsonb) documents FROM tender_analysis_documents d WHERE d.analysis_run_id=$1::uuid), finals AS (SELECT count(distinct field_key)::int final_count, array_agg(field_key) FILTER (WHERE field_key NOT IN (SELECT field_key FROM expected)) unexpected_fields FROM tender_analysis_field_results WHERE analysis_run_id=$1::uuid AND status IN ('resolved','requires_review','not_found') AND field_catalog_version='tender_fields_v1' AND result_contract_version='tender_field_final_v1'), missing AS (SELECT array_agg(e.field_key) missing_fields FROM expected e WHERE NOT EXISTS (SELECT 1 FROM tender_analysis_field_results f WHERE f.analysis_run_id=$1::uuid AND f.field_key=e.field_key AND f.status IN ('resolved','requires_review','not_found') AND f.field_catalog_version='tender_fields_v1' AND f.result_contract_version='tender_field_final_v1')) SELECT r.id analysis_run_id,r.status run_status,d.documents,f.final_count,(f.final_count=27 AND m.missing_fields IS NULL AND f.unexpected_fields IS NULL) final_barrier_valid,m.missing_fields,f.unexpected_fields FROM tender_analysis_runs r CROSS JOIN docs d CROSS JOIN finals f CROSS JOIN missing m WHERE r.id=$1::uuid;",
+        "options": {
+          "queryReplacement": "={{ [ $json.analysis_run_id ?? $json.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3880,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000026",
+      "name": "Load Run Snapshot",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $vars.N8N_TENDER_BASE_URL + '/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4100,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000027",
+      "name": "Read Document Owner Execution",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input=$json; const document=typeof $==='function'?$('Loop Document Recovery').item.json:{}; const base={...document,...input}; const unavailable={...base,execution_observation:'unavailable',reclaimable:false}; if(input.error||!Number.isInteger(input.statusCode)) return {json:unavailable}; if(input.statusCode===404)return {json:{...base,execution_state:'not_found',execution_observation:'reclaimable',reclaimable:true}}; if(input.statusCode!==200||!input.body||typeof input.body.id!=='string'||typeof input.body.status!=='string'||typeof input.body.finished!=='boolean')return {json:unavailable}; const state=input.body.status; if(['new','running','waiting'].includes(state))return {json:{...base,execution_state:state,execution_observation:'owned',reclaimable:false}}; if(['success','error','canceled','crashed'].includes(state))return {json:{...base,execution_state:state,execution_observation:'reclaimable',reclaimable:true}}; throw new Error(`Unknown execution observation status ${state}`);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4320,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000028",
+      "name": "Classify Document Execution Observations"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.reclaimable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4540,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000029",
+      "name": "Any Reclaimable Documents?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_documents SET status='failed', error_message=left($6,2000), updated_at=now() WHERE id=$1::uuid AND analysis_run_id=$2::uuid AND status='processing' AND n8n_execution_id=$3 AND started_at=$4::timestamptz AND started_at <= $5::timestamptz RETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [ $json.id, $json.analysis_run_id, $json.n8n_execution_id, $json.started_at, $json.stale_cutoff, 'owner execution is terminal or missing' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4760,
+        180
+      ],
+      "id": "10000000-0000-4000-8000-000000000030",
+      "name": "CAS Stale Document to Failed",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input=$json; const docs=Array.isArray(input.documents)?input.documents:[]; const manual=input.trigger_kind==='manual'&&input.manual_override===true; const actions=[]; const attachments=[]; for(const d of docs){let action;if(input.run_status==='completed')action='skip_run_completed';else if(input.run_status==='superseded')action='skip_run_superseded';else if(d.status==='completed')action='skip';else if(d.status==='skipped')action='preserve_skip';else if((d.status==='pending'||d.status==='failed')&&(manual||Number(d.attempts)<2))action='dispatch';else if(d.status==='pending'||d.status==='failed')action='exhausted';else action='leave_owned';actions.push({id:d.id,action});if(action==='dispatch')attachments.push({document_id:d.id,document_index:d.document_index,file_name:d.file_name,file_extension:d.file_extension,display_name:d.display_name,download_url:d.download_url,publication_at:d.publication_at,source_size:d.source_size,mime_type:d.mime_type,file_size:d.file_size,status:d.status});} let stage_action='waiting_for_workers';let should_start_finalization=false;if(input.run_status==='completed')stage_action='already_completed';else if(input.run_status==='superseded')stage_action='superseded_no_op';else if(input.run_status==='ready_for_aggregation')stage_action='call_aggregator';else if(input.run_status==='aggregating'){if(input.final_count===27&&input.final_barrier_valid===true){stage_action='call_finalization';should_start_finalization=true;}else stage_action='manual_attention_required';}else if(input.run_status==='failed')stage_action=manual?'reopen_failed_run':'automatic_attempts_exhausted';const terminal_no_op=['already_completed','superseded_no_op'].includes(stage_action);const action=attachments.length>0?'resumed_documents':stage_action;return {json:{...input,attachments,document_actions:actions,has_documents_to_dispatch:attachments.length>0,stage_action,terminal_no_op,should_start_finalization,action}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4980,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000031",
+      "name": "Decide Document and Stage Action"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.terminal_no_op }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5200,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000032",
+      "name": "Is Run Already Completed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_documents_to_dispatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5420,
+        360
+      ],
+      "id": "10000000-0000-4000-8000-000000000033",
+      "name": "Has Documents to Dispatch?"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "attachments",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "analysis_run_id",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        5640,
+        240
+      ],
+      "id": "10000000-0000-4000-8000-000000000034",
+      "name": "Split Dispatch Documents"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "1Pw61ZY3HgBSvcUr",
+          "mode": "list"
+        },
+        "mode": "each",
+        "workflowInputs": {
+          "mappingMode": "passthrough",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        5860,
+        180
+      ],
+      "id": "10000000-0000-4000-8000-000000000035",
+      "name": "Dispatch Document Workers"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH run_state AS (\n    SELECT\n        r.id,\n        r.status,\n        r.documents_total,\n\n        COUNT(d.id)::integer\n            AS registered_documents_count,\n\n        COUNT(d.id) FILTER (\n            WHERE d.status = 'completed'\n        )::integer\n            AS completed_documents_count,\n\n        COUNT(d.id) FILTER (\n            WHERE d.status = 'pending'\n        )::integer\n            AS pending_documents_count,\n\n        COUNT(d.id) FILTER (\n            WHERE d.status = 'processing'\n        )::integer\n            AS processing_documents_count,\n\n        COUNT(d.id) FILTER (\n            WHERE d.status = 'failed'\n        )::integer\n            AS failed_documents_count,\n\n        COUNT(d.id) FILTER (\n            WHERE d.status = 'skipped'\n        )::integer\n            AS skipped_documents_count\n\n    FROM tender_analysis_runs AS r\n\n    LEFT JOIN tender_analysis_documents AS d\n        ON d.analysis_run_id = r.id\n\n    WHERE r.id = $1::uuid\n\n    GROUP BY\n        r.id,\n        r.status,\n        r.documents_total\n),\n\nclaimed_run AS (\n    UPDATE tender_analysis_runs AS r\n\n    SET\n        status = 'ready_for_aggregation',\n        ready_at = COALESCE(\n            r.ready_at,\n            NOW()\n        )\n\n    FROM run_state AS s\n\n    WHERE r.id = s.id\n      AND r.status = 'processing'\n\n      AND s.documents_total > 0\n\n      AND s.registered_documents_count =\n          s.documents_total\n\n      AND s.completed_documents_count =\n          s.documents_total\n\n    RETURNING\n        r.id,\n        r.status,\n        r.ready_at\n)\n\nSELECT\n    s.id AS analysis_run_id,\n\n    s.status AS previous_run_status,\n\n    COALESCE(\n        c.status,\n        s.status\n    ) AS run_status,\n\n    s.documents_total,\n    s.registered_documents_count,\n    s.completed_documents_count,\n    s.pending_documents_count,\n    s.processing_documents_count,\n    s.failed_documents_count,\n    s.skipped_documents_count,\n\n    c.ready_at,\n\n    (c.id IS NOT NULL)\n        AS should_start_aggregation,\n\n    CASE\n        WHEN c.id IS NOT NULL\n            THEN 'all_documents_completed'\n\n        WHEN s.registered_documents_count <>\n             s.documents_total\n            THEN 'documents_count_mismatch'\n\n        WHEN s.failed_documents_count > 0\n            THEN 'failed_documents_exist'\n\n        WHEN s.processing_documents_count > 0\n            THEN 'documents_still_processing'\n\n        WHEN s.pending_documents_count > 0\n            THEN 'documents_still_pending'\n\n        WHEN s.skipped_documents_count > 0\n            THEN 'skipped_documents_exist'\n\n        WHEN s.completed_documents_count <>\n             s.documents_total\n            THEN 'not_all_documents_completed'\n\n        ELSE\n            'run_not_claimed'\n    END AS readiness_reason\n\nFROM run_state AS s\n\nLEFT JOIN claimed_run AS c\n    ON c.id = s.id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.analysis_run_id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5640,
+        480
+      ],
+      "id": "10000000-0000-4000-8000-000000000036",
+      "name": "Apply Worker Readiness",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.stage_action }}",
+              "rightValue": "call_aggregator",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5860,
+        480
+      ],
+      "id": "10000000-0000-4000-8000-000000000037",
+      "name": "Should Start Aggregator?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ftvmrEHoMbPOAqZG",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $json.analysis_run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6080,
+        400
+      ],
+      "id": "10000000-0000-4000-8000-000000000038",
+      "name": "Call Aggregator"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.should_start_finalization }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        6080,
+        560
+      ],
+      "id": "10000000-0000-4000-8000-000000000039",
+      "name": "Should Start Finalization?"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "cSsh9yjpS7t5p0OO",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $json.analysis_run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6300,
+        500
+      ],
+      "id": "10000000-0000-4000-8000-000000000040",
+      "name": "Call Finalization"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_runs r SET status='failed', error_message=left($2,2000), updated_at=now() WHERE r.id=$1::uuid AND r.status='processing' AND NOT EXISTS (SELECT 1 FROM tender_analysis_documents d WHERE d.analysis_run_id=r.id AND d.status='pending') AND NOT EXISTS (SELECT 1 FROM tender_analysis_documents d WHERE d.analysis_run_id=r.id AND d.status='processing') AND EXISTS (SELECT 1 FROM tender_analysis_documents d WHERE d.analysis_run_id=r.id AND d.status='failed' AND d.attempts >= 2) RETURNING *;",
+        "options": {
+          "queryReplacement": "={{ [ $json.analysis_run_id, 'automatic attempts exhausted' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6300,
+        660
+      ],
+      "id": "10000000-0000-4000-8000-000000000041",
+      "name": "Guard Exhausted Run Failure",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE tender_analysis_intake_events SET status='completed', analysis_run_id=COALESCE(NULLIF($3,'')::uuid,analysis_run_id), processed_at=now(), action=left($4,200), error_message=left($5,2000) WHERE source=$1 AND event_key=$2 AND n8n_execution_id=$6 RETURNING *, true AS completion_applied, $7::integer AS documents_dispatched, NULLIF($8,'')::text AS run_status;",
+        "options": {
+          "queryReplacement": "={{ [ $('Classify Intake Event').first().json.source, $('Classify Intake Event').first().json.source_event_key, $json.analysis_run_id ?? $('Classify Intake Event').first().json.analysis_run_id ?? '', $json.action === 'call_finalization' ? 'finalization_started' : ($json.action ?? ($json.created_new_run === true ? 'created_new_run' : 'waiting_for_workers')), $json.error_message ?? '', $execution.id, $json.documents_dispatched ?? $json.attachments?.length ?? 0, $json.run_status ?? $json.status ?? '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6520,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000042",
+      "name": "Complete Intake Event",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const allowed=['created_new_run','resumed_documents','waiting_for_workers','aggregation_started','finalization_started','already_completed','superseded_no_op','duplicate_event','manual_attention_required','automatic_attempts_exhausted','execution_status_unavailable']; if($json.completion_applied!==true)throw new Error('Intake event completion ownership mismatch'); const action=$json.action; if(!allowed.includes(action))throw new Error(`Unknown structured outcome action ${String(action)}`); return {json:{success:true,action,analysis_run_id:$json.analysis_run_id??null,tender_id:$json.tender_id??null,documents_dispatched:Number($json.documents_dispatched??0),next_state:$json.run_status??null}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6740,
+        280
+      ],
+      "id": "10000000-0000-4000-8000-000000000043",
+      "name": "Return Structured Outcome"
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "const prior=$('Classify Intake Event Owner Execution').item.json; if(!$json.id)return {json:{...prior,action:'benign_race',event_route:'no_op',reclaimable:false}}; return {json:{...prior,...$json,action:'reclaimed_event',event_route:'continue',reclaimable:true}};" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1790, -80],
+      "id": "10000000-0000-4000-8000-000000000050",
+      "name": "Classify Event Reclaim Result"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.event_route === 'continue' }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" }, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1840, -80],
+      "id": "10000000-0000-4000-8000-000000000051",
+      "name": "Stale Event Reclaimed?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const snapshot=$input.first().json; const now=Date.now(); const staleCutoff=new Date(now-3600000).toISOString(); if(['completed','superseded'].includes(snapshot.run_status))return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; const stale=[]; for(const d of snapshot.documents??[]){if(d.status!=='processing')continue;if(typeof d.id!=='string'||typeof d.analysis_run_id!=='string'||d.analysis_run_id!==snapshot.analysis_run_id||!Number.isInteger(d.attempts)||typeof d.started_at!=='string'||!Number.isFinite(Date.parse(d.started_at))||typeof d.n8n_execution_id!=='string'||!d.n8n_execution_id)throw new Error(`Malformed processing document owner snapshot ${String(d.id)}`);if(Date.parse(d.started_at)<=now-3600000)stale.push(d);} if(stale.length===0)return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; return stale.map(document=>({json:{...document,owner_id:document.n8n_execution_id,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff,skip_execution_read:false}}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4100, 100],
+      "id": "10000000-0000-4000-8000-000000000045",
+      "name": "Prepare Document Recovery Queue"
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [4320, 100],
+      "id": "10000000-0000-4000-8000-000000000046",
+      "name": "Loop Document Recovery"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $json.skip_execution_read !== true }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" }, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [4540, 100],
+      "id": "10000000-0000-4000-8000-000000000047",
+      "name": "Needs Document Owner Check?"
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "WITH expected(field_index,field_key) AS (VALUES (1,'procurement_subject'),(2,'nm_price_with_vat'),(3,'platform'),(4,'procedure_type'),(5,'application_deadline'),(6,'application_review_date'),(7,'results_date'),(8,'customer'),(9,'customer_contacts'),(10,'participation_cost'),(11,'participation_guarantee'),(12,'evaluation_criteria'),(13,'delivery_term'),(14,'payment_terms'),(15,'special_account_or_treasury'),(16,'bank_support'),(17,'government_contract'),(18,'rebidding'),(19,'national_regime'),(20,'advance_contract_guarantee'),(21,'warranty_obligations_guarantee'),(22,'licenses_certificates'),(23,'required_official_certificates'),(24,'similar_supply_experience'),(25,'analog_allowed'),(26,'analog_definition'),(27,'application_documents')), docs AS (SELECT COALESCE(jsonb_agg(d ORDER BY d.document_index),'[]'::jsonb) documents FROM tender_analysis_documents d WHERE d.analysis_run_id=$1::uuid), actual AS (SELECT * FROM tender_analysis_field_results WHERE analysis_run_id=$1::uuid), missing_fields AS (SELECT array_agg(e.field_key) keys FROM expected e LEFT JOIN actual a ON a.field_index=e.field_index AND a.field_key=e.field_key WHERE a.field_key IS NULL), unexpected_fields AS (SELECT array_agg(a.field_key) keys FROM actual a LEFT JOIN expected e ON e.field_index=a.field_index AND e.field_key=a.field_key WHERE e.field_key IS NULL), stats AS (SELECT count(*)::int final_count,count(*) FILTER (WHERE status IN ('resolved','requires_review','not_found') AND field_catalog_version='tender_fields_v1' AND result_contract_version='tender_field_final_v1')::int valid_final_count FROM actual) SELECT r.id analysis_run_id,r.status run_status,d.documents,s.final_count,(s.final_count=27 AND s.valid_final_count=27 AND m.keys IS NULL AND u.keys IS NULL) final_barrier_valid,m.keys missing_fields,u.keys unexpected_fields,$2::text trigger_kind,$3::boolean manual_override,$4::text source_event_key,$5::text source,$6::text intent FROM tender_analysis_runs r CROSS JOIN docs d CROSS JOIN stats s CROSS JOIN missing_fields m CROSS JOIN unexpected_fields u WHERE r.id=$1::uuid;", "options": { "queryReplacement": "={{ [ $('Load Run Snapshot').first().json.analysis_run_id, $('Classify Intake Event').first().json.trigger_kind, $('Classify Intake Event').first().json.manual_override, $('Classify Intake Event').first().json.source_event_key, $('Classify Intake Event').first().json.source, $('Classify Intake Event').first().json.intent ] }}" } },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [4760, 20],
+      "id": "10000000-0000-4000-8000-000000000048",
+      "name": "Reload Run Snapshot After Recovery",
+      "executeOnce": true,
+      "credentials": { "postgres": { "id": "RFpUr3McElcwyoxy", "name": "KITATEH Tenders" } }
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "const decision=$('Decide Document and Stage Action').first().json; const stage_action=$json.should_start_aggregation===true?'call_aggregator':decision.stage_action; return {json:{...decision,...$json,stage_action,should_start_finalization:decision.should_start_finalization===true,action:stage_action==='call_aggregator'?'aggregation_started':decision.action}};" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5860, 600],
+      "id": "10000000-0000-4000-8000-000000000049",
+      "name": "Classify Post-Readiness Stage"
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "const prior=$('Classify Document Execution Observations').item.json; return {json:{...prior,...$json,document_cas_applied:Boolean($json.id),document_cas_result:$json.id?'reclaimed':'benign_race'}};" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4880, 180],
+      "id": "10000000-0000-4000-8000-000000000052",
+      "name": "Classify Document CAS Result"
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "const decision=$('Classify Post-Readiness Stage').first().json; return {json:{...decision,...$json,action:decision.action,run_status:$json.status??decision.run_status,documents_dispatched:decision.attachments?.length??0}};" },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [6410, 660],
+      "id": "10000000-0000-4000-8000-000000000053",
+      "name": "Preserve Outcome After Run Guard"
+    },
+    {
+      "parameters": {
+        "content": "## PACKAGING REQUIRED\nThis repository snapshot is intentionally **inactive** (`active=false`). Before controlled import: bind both execution-read HTTP nodes to the real read-only `httpHeaderAuth` credential carrying `X-N8N-API-KEY`; create the n8n Variable `N8N_TENDER_BASE_URL`; import/publish `TENDER — Ошибка Intake Resume`, read back its real ID, and assign that actual ID to `settings.errorWorkflow`. Do not activate before these steps and read-back validation.",
+        "height": 300,
+        "width": 620
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -520
+      ],
+      "id": "10000000-0000-4000-8000-000000000044",
+      "name": "Packaging Required"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Validate Intake Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Intake Input": {
+      "main": [
+        [
+          {
+            "node": "Is Run-authoritative Invocation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Run-authoritative Invocation?": {
+      "main": [
+        [
+          {
+            "node": "Load Authoritative Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Event Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Authoritative Run": {
+      "main": [
+        [
+          {
+            "node": "Bind Authoritative Run Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bind Authoritative Run Identity": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Identity": {
+      "main": [
+        [
+          {
+            "node": "Claim New or Failed Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim New or Failed Intake Event": {
+      "main": [
+        [
+          {
+            "node": "Load Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Intake Event": {
+      "main": [
+        [
+          {
+            "node": "Classify Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Intake Event": {
+      "main": [
+        [
+          {
+            "node": "Event Outcome Is No-op?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Outcome Is No-op?": {
+      "main": [
+        [
+          {
+            "node": "Return Event No-op",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route Event Continuation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Event Continuation": {
+      "main": [
+        [
+          {
+            "node": "Read Intake Event Owner Execution",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route Run Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Intake Event Owner Execution": {
+      "main": [
+        [
+          {
+            "node": "Classify Intake Event Owner Execution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Intake Event Owner Execution": {
+      "main": [
+        [
+          {
+            "node": "Is Intake Event Owner Reclaimable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Intake Event Owner Reclaimable?": {
+      "main": [
+        [
+          {
+            "node": "Reclaim Stale Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Event No-op",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reclaim Stale Intake Event": {
+      "main": [
+        [
+          {
+            "node": "Classify Event Reclaim Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Event Reclaim Result": {
+      "main": [[{ "node": "Stale Event Reclaimed?", "type": "main", "index": 0 }]]
+    },
+    "Stale Event Reclaimed?": {
+      "main": [
+        [{ "node": "Route Run Resolution", "type": "main", "index": 0 }],
+        [{ "node": "Return Event No-op", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route Run Resolution": {
+      "main": [
+        [
+          {
+            "node": "Apply Run Entry Policy",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve TenderPlan Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve TenderPlan Runs": {
+      "main": [
+        [
+          {
+            "node": "Classify TenderPlan Run Resolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify TenderPlan Run Resolution": {
+      "main": [
+        [
+          {
+            "node": "Needs New Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs New Run?": {
+      "main": [
+        [
+          {
+            "node": "Call Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Run Entry Policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Validate Orchestrator Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Orchestrator Result": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator Created Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Created Run?": {
+      "main": [
+        [
+          {
+            "node": "Complete Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Run Entry Policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Run Entry Policy": {
+      "main": [
+        [
+          {
+            "node": "Classify Run Entry Policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Run Entry Policy": {
+      "main": [
+        [
+          {
+            "node": "Load Run Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Run Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Prepare Document Recovery Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Document Recovery Queue": {
+      "main": [[{ "node": "Loop Document Recovery", "type": "main", "index": 0 }]]
+    },
+    "Loop Document Recovery": {
+      "main": [
+        [{ "node": "Reload Run Snapshot After Recovery", "type": "main", "index": 0 }],
+        [{ "node": "Needs Document Owner Check?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Needs Document Owner Check?": {
+      "main": [
+        [{ "node": "Read Document Owner Execution", "type": "main", "index": 0 }],
+        [{ "node": "Loop Document Recovery", "type": "main", "index": 0 }]
+      ]
+    },
+    "Reload Run Snapshot After Recovery": {
+      "main": [[{ "node": "Decide Document and Stage Action", "type": "main", "index": 0 }]]
+    },
+    "Read Document Owner Execution": {
+      "main": [
+        [
+          {
+            "node": "Classify Document Execution Observations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Document Execution Observations": {
+      "main": [
+        [
+          {
+            "node": "Any Reclaimable Documents?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Reclaimable Documents?": {
+      "main": [
+        [
+          {
+            "node": "CAS Stale Document to Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Document Recovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CAS Stale Document to Failed": {
+      "main": [
+        [
+          {
+            "node": "Classify Document CAS Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Document CAS Result": {
+      "main": [[{ "node": "Loop Document Recovery", "type": "main", "index": 0 }]]
+    },
+    "Decide Document and Stage Action": {
+      "main": [
+        [
+          {
+            "node": "Is Run Already Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Run Already Completed?": {
+      "main": [
+        [
+          {
+            "node": "Complete Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Documents to Dispatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Documents to Dispatch?": {
+      "main": [
+        [
+          {
+            "node": "Split Dispatch Documents",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Complete Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Worker Readiness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Dispatch Documents": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Document Workers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Worker Readiness": {
+      "main": [
+        [
+          {
+            "node": "Classify Post-Readiness Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Post-Readiness Stage": {
+      "main": [[{ "node": "Should Start Aggregator?", "type": "main", "index": 0 }]]
+    },
+    "Should Start Aggregator?": {
+      "main": [
+        [
+          {
+            "node": "Call Aggregator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Complete Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Start Finalization?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Start Finalization?": {
+      "main": [
+        [
+          {
+            "node": "Call Finalization",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Complete Intake Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Guard Exhausted Run Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard Exhausted Run Failure": {
+      "main": [
+        [
+          {
+            "node": "Preserve Outcome After Run Guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preserve Outcome After Run Guard": {
+      "main": [[{ "node": "Complete Intake Event", "type": "main", "index": 0 }]]
+    },
+    "Complete Intake Event": {
+      "main": [
+        [
+          {
+            "node": "Return Structured Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "10000000-0000-4000-8000-000000000099",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

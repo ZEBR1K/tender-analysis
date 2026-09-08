@@ -1,0 +1,130 @@
+{
+  "name": "TENDER — Recovery Scan",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -440,
+        0
+      ],
+      "id": "30000000-0000-4000-8000-000000000001",
+      "name": "Every 10 Minutes"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT DISTINCT run.id AS analysis_run_id\nFROM tender_analysis_runs AS run\nLEFT JOIN tender_analysis_documents AS document\n  ON document.analysis_run_id = run.id\nWHERE run.status NOT IN ('completed', 'superseded')\n  AND (\n    document.status = 'pending'\n    OR (document.status = 'failed' AND document.attempts < 2)\n    OR (\n      document.status = 'processing'\n      AND document.started_at <= now() - interval '1 hour'\n    )\n    OR run.status IN ('ready_for_aggregation', 'aggregating')\n    OR (\n      run.status = 'processing'\n      AND EXISTS (\n        SELECT 1\n        FROM tender_analysis_documents AS any_document\n        WHERE any_document.analysis_run_id = run.id\n      )\n      AND NOT EXISTS (\n        SELECT 1\n        FROM tender_analysis_documents AS nonterminal_document\n        WHERE nonterminal_document.analysis_run_id = run.id\n          AND nonterminal_document.status NOT IN ('completed', 'skipped')\n      )\n    )\n  );",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -180,
+        0
+      ],
+      "id": "30000000-0000-4000-8000-000000000002",
+      "name": "Select Recovery Candidates",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "TENDER — Intake Resume"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $json.analysis_run_id }}",
+            "trigger_kind": "recovery_scan",
+            "manual_override": false,
+            "source_event_key": "={{ 'recovery:' + $execution.id + ':' + $json.analysis_run_id }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        0
+      ],
+      "id": "30000000-0000-4000-8000-000000000003",
+      "name": "Execute TENDER — Intake Resume"
+    },
+    {
+      "parameters": {
+        "content": "## PACKAGING REQUIRED\nThis repository snapshot is intentionally **inactive**. Import and publish `TENDER — Ошибка Intake Resume`, read back its real workflow ID, and assign that ID to `settings.errorWorkflow`. Bind `Execute TENDER — Intake Resume` to the imported dispatcher before activation. Scheduled/error workflow behavior must be verified in a published test copy before production use.",
+        "height": 300,
+        "width": 500,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -440,
+        180
+      ],
+      "id": "30000000-0000-4000-8000-000000000004",
+      "name": "Packaging Required"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 10 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Select Recovery Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Recovery Candidates": {
+      "main": [
+        [
+          {
+            "node": "Execute TENDER — Intake Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

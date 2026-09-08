@@ -71,7 +71,7 @@ Company matching — отдельный будущий слой.
 
 # 3. Основные компоненты
 
-Система состоит из семи n8n workflow:
+Production baseline описывается семью n8n workflow:
 
 ```text
 1. ТЕНДЕРЫ ОРКЕСТРАТОР
@@ -82,6 +82,23 @@ Company matching — отдельный будущий слой.
 6. TENDER — Финализация анализа
 7. TENDER — Генерация отчета (Report Generation V2)
 ```
+
+Дополнительно реализованы и offline-tested пять inactive repository candidate;
+их deployment и runtime promotion ещё не выполнены:
+
+```text
+8. TENDER — Intake Resume
+9. TENDER — Manual Resume
+10. TENDER — Recovery Scan
+11. TENDER — Ошибка Intake Resume
+12. TENDER — TenderPlan Mark Intake
+```
+
+`TENDER — TenderPlan Mark Intake` опрашивает current membership фиксированной
+метки `6a732cd00c61629cf1d3c144` («Проверить») каждые 10 минут через
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
+`14683` supersedes неподтверждённый notification type-5 plan. Candidate
+offline-only; pagination/exhaustive-result semantics не документированы.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -179,6 +196,10 @@ tender_analysis_field_results
 | Workflow | Главная ответственность | Что не делает |
 |---|---|---|
 | `ТЕНДЕРЫ ОРКЕСТРАТОР` | Создать run, зарегистрировать документы, запустить Workers | Не анализирует содержимое документов |
+| `TENDER — Intake Resume` *(inactive candidate)* | Выбрать new/existing run и идемпотентно продолжить его lifecycle | Не является TenderPlan poller и не создаёт новый event contract |
+| `TENDER — Manual Resume` *(inactive candidate)* | Передать operator-selected `analysis_run_id` в dispatcher с manual override | Не выбирает run по `tender_id` и не дублирует dispatch policy |
+| `TENDER — Recovery Scan` *(inactive candidate)* | Read-only выбрать незавершённые runs для повторной передачи dispatcher | Не мутирует run/documents и не решает retry policy |
+| `TENDER — Ошибка Intake Resume` *(inactive candidate)* | Зафиксировать failure принадлежащего execution intake event | Не изменяет run/documents и не заменяет document Error Workflow |
 | `TENDER — Обработать документ` | Полностью обработать один документ и сохранить facts | Не агрегирует факты между документами |
 | `TENDER — Ошибка обработки документа` | Пометить упавший processing-document как failed | Не решает retry policy всего run |
 | `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
@@ -257,6 +278,7 @@ ready_for_aggregation
 aggregating
 completed
 failed
+superseded
 ```
 
 Intended happy path:
@@ -367,21 +389,25 @@ vs
 
 # 11. Orchestrator
 
-Текущий путь:
+Текущий canonical repository candidate — inactive 14-node reusable sub-workflow с ответственностью только за создание нового run:
 
 ```text
-Manual Trigger
-→ hardcoded tender_id
+typed tender_id / source / source_event_key / trigger_kind
+→ validate input
 → TenderPlan FullInfo
-→ normalize
-→ create run
-→ register all documents
-→ split
-→ temporary extension filter
-→ Execute Document Worker
+→ require response tender._id === requested tender_id
+→ one snapshot-safe SQL:
+   insert run directly as processing
+   + register all documents as pending
+→ created_new_run?
+   ├─ true: async Worker dispatch for pdf/docx/xlsx
+   └─ false: fresh active-run SELECT + exactly-one guard
+→ one structured result
 ```
 
-На текущем MVP Orchestrator поддерживает запуск Worker только для:
+PostgreSQL partial uniqueness по `(source, tender_id) WHERE status NOT IN ('completed', 'superseded')` является concurrency boundary. `superseded` — terminal audit state, который не возобновляется. Проигравший `ON CONFLICT DO NOTHING` путь не регистрирует документы повторно и не запускает Worker.
+
+Worker по-прежнему запускается только для:
 
 ```text
 pdf
@@ -389,38 +415,54 @@ docx
 xlsx
 ```
 
-Это временное ограничение.
+Это временное ограничение. Unsupported и zero-document lifecycle не закрыты: structured output возвращается, но run всё ещё может остаться `processing` (`OR-0`, `OR-1`). Export и offline tests не доказывают import, live wiring или production runtime.
 
 ---
 
 # 12. Orchestrator input / production boundary
 
-Сейчас точка входа:
+Точка входа canonical candidate:
 
 ```text
-Manual Trigger
-+
-hardcoded tender_id
+Execute Sub-workflow Trigger v1.2
 ```
 
-Это development-only.
+Typed contract:
 
-В будущем можно заменить trigger на:
-
-```text
-Webhook
-Telegram
-Bitrix
-Scheduler
-API
-another workflow
+```json
+{
+  "tender_id": "string",
+  "source": "tenderplan",
+  "source_event_key": "string",
+  "trigger_kind": "tenderplan_mark | recovery_scan | manual"
+}
 ```
 
-без изменения downstream architecture, если сохраняется контракт:
+Все поля валидируются до HTTP/DB. FullInfo response обязан вернуть string `tender._id`, точно равный validated `tender_id`.
 
-```text
-tender_id
-```
+Orchestrator не является владельцем resume policy. Inactive repository candidate
+`TENDER — Intake Resume` уже реализован и offline-tested: он выбирает новый или
+существующий `analysis_run_id`, обрабатывает repeated mark/manual/recovery и
+вызывает Orchestrator только для new-run boundary. Conflict result Orchestrator
+имеет `action='concurrent_existing_run'` и не означает, что существующий run уже
+возобновлён.
+
+Dispatcher сохраняет тот же `analysis_run_id`, никогда не повторяет
+`completed`/`skipped` documents и ограничивает automatic path ровно двумя Worker
+claims total. Только `manual_override=true` может повторить exhausted failed
+document. `processing` считается stale после одного часа, но reclaim разрешён
+только после read-only observation соответствующего n8n execution и guarded CAS;
+недоступность execution API ничего не мутирует.
+
+Если история `(source, tender_id)` содержит только `superseded`, active-run
+boundary допускает создание нового run. Прямой automatic/manual/recovery вызов
+с superseded `analysis_run_id` возвращает `superseded_no_op` и не dispatch-ит
+Worker, Aggregator или Finalization.
+
+Manual/hardcoded boundary устранён только в inactive repository candidate.
+Production import, migration application, dispatcher/error/manual/recovery/mark
+poller wiring и runtime validation остаются отдельными gates. Relation poller —
+inactive candidate; только source contract `14683` runtime GREEN.
 
 ---
 

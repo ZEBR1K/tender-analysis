@@ -1,0 +1,284 @@
+{
+  "now": "2026-09-07T12:00:00.000Z",
+  "documentCases": [
+    {
+      "name": "completed document",
+      "document": {
+        "id": "doc-completed",
+        "status": "completed",
+        "attempts": 2,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "skip" },
+      "manual": { "action": "skip" }
+    },
+    {
+      "name": "skipped document is preserved",
+      "document": {
+        "id": "doc-skipped",
+        "status": "skipped",
+        "attempts": 0,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "preserve_skip" },
+      "manual": { "action": "preserve_skip" }
+    },
+    {
+      "name": "pending document before its first claim",
+      "document": {
+        "id": "doc-pending-0",
+        "status": "pending",
+        "attempts": 0,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "dispatch" },
+      "manual": { "action": "dispatch" }
+    },
+    {
+      "name": "pending document before its second total claim",
+      "document": {
+        "id": "doc-pending-1",
+        "status": "pending",
+        "attempts": 1,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "dispatch" },
+      "manual": { "action": "dispatch" }
+    },
+    {
+      "name": "failed document before its second total claim",
+      "document": {
+        "id": "doc-failed-1",
+        "status": "failed",
+        "attempts": 1,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "dispatch" },
+      "manual": { "action": "dispatch" }
+    },
+    {
+      "name": "failed document with automatic claim budget exhausted",
+      "document": {
+        "id": "doc-failed-2",
+        "status": "failed",
+        "attempts": 2,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "exhausted" },
+      "manual": { "action": "dispatch" }
+    },
+    {
+      "name": "pending document with automatic claim budget exhausted",
+      "document": {
+        "id": "doc-pending-2",
+        "status": "pending",
+        "attempts": 2,
+        "startedAt": null,
+        "executionState": null
+      },
+      "automatic": { "action": "exhausted" },
+      "manual": { "action": "dispatch" }
+    },
+    {
+      "name": "fresh processing document",
+      "document": {
+        "id": "doc-processing-fresh",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T11:01:00.000Z",
+        "executionId": "execution-fresh",
+        "executionState": null
+      },
+      "automatic": { "action": "leave_owned" },
+      "manual": { "action": "leave_owned" }
+    },
+    {
+      "name": "stale processing document whose execution is running",
+      "document": {
+        "id": "doc-processing-running",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T11:00:00.000Z",
+        "executionId": "execution-running",
+        "executionState": "running"
+      },
+      "automatic": { "action": "leave_owned" },
+      "manual": { "action": "leave_owned" }
+    },
+    {
+      "name": "stale processing document whose execution succeeded without completion",
+      "document": {
+        "id": "doc-processing-success",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T10:00:00.000Z",
+        "executionId": "execution-success",
+        "executionState": "success"
+      },
+      "automatic": {
+        "action": "cas_to_failed",
+        "onApplied": "dispatch",
+        "onNotApplied": "benign_race"
+      },
+      "manual": {
+        "action": "cas_to_failed",
+        "onApplied": "dispatch",
+        "onNotApplied": "benign_race"
+      }
+    },
+    {
+      "name": "stale processing document whose execution is not found",
+      "document": {
+        "id": "doc-processing-not-found",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 2,
+        "startedAt": "2026-09-07T10:00:00.000Z",
+        "executionId": "execution-not-found",
+        "executionState": "not_found"
+      },
+      "automatic": {
+        "action": "cas_to_failed",
+        "onApplied": "exhausted",
+        "onNotApplied": "benign_race"
+      },
+      "manual": {
+        "action": "cas_to_failed",
+        "onApplied": "dispatch",
+        "onNotApplied": "benign_race"
+      }
+    },
+    {
+      "name": "stale processing document whose execution is new remains owned",
+      "document": {
+        "id": "doc-processing-new",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T10:00:00.000Z",
+        "executionId": "execution-new",
+        "executionState": "new"
+      },
+      "automatic": { "action": "leave_owned" },
+      "manual": { "action": "leave_owned" }
+    },
+    {
+      "name": "stale processing document with unavailable execution status is not mutated",
+      "document": {
+        "id": "doc-processing-unavailable",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T10:00:00.000Z",
+        "executionId": "execution-unavailable",
+        "executionState": "unavailable"
+      },
+      "automatic": { "action": "execution_status_unavailable" },
+      "manual": { "action": "execution_status_unavailable" }
+    },
+    {
+      "name": "processing document at exactly one hour with terminal error is stale",
+      "document": {
+        "id": "doc-processing-boundary",
+        "analysisRunId": "run-1",
+        "status": "processing",
+        "attempts": 1,
+        "startedAt": "2026-09-07T11:00:00.000Z",
+        "executionId": "execution-error",
+        "executionState": "error"
+      },
+      "automatic": {
+        "action": "cas_to_failed",
+        "onApplied": "dispatch",
+        "onNotApplied": "benign_race"
+      },
+      "manual": {
+        "action": "cas_to_failed",
+        "onApplied": "dispatch",
+        "onNotApplied": "benign_race"
+      }
+    }
+  ],
+  "stageCases": [
+    {
+      "name": "document stage remains active",
+      "runStatus": "processing",
+      "finalCount": 0,
+      "finalBarrierValid": false,
+      "expected": "continue_document_stage"
+    },
+    {
+      "name": "ready run starts Aggregator",
+      "runStatus": "ready_for_aggregation",
+      "finalCount": 0,
+      "finalBarrierValid": false,
+      "expected": "call_aggregator"
+    },
+    {
+      "name": "aggregating run with exactly 27 valid FINAL rows starts Finalization",
+      "runStatus": "aggregating",
+      "finalCount": 27,
+      "finalBarrierValid": true,
+      "expected": "call_finalization"
+    },
+    {
+      "name": "partial aggregating run requires manual attention",
+      "runStatus": "aggregating",
+      "finalCount": 26,
+      "finalBarrierValid": false,
+      "expected": "manual_attention_required"
+    },
+    {
+      "name": "twenty-seven invalid FINAL rows require manual attention",
+      "runStatus": "aggregating",
+      "finalCount": 27,
+      "finalBarrierValid": false,
+      "expected": "manual_attention_required"
+    },
+    {
+      "name": "completed run is a no-op",
+      "runStatus": "completed",
+      "finalCount": 27,
+      "finalBarrierValid": true,
+      "expected": "no_op"
+    },
+    {
+      "name": "superseded run is an explicit terminal no-op",
+      "runStatus": "superseded",
+      "finalCount": 26,
+      "finalBarrierValid": false,
+      "expected": "superseded_no_op"
+    }
+  ],
+  "staleCasRace": {
+    "name": "Worker claims between stale scan and compare-and-set",
+    "observed": {
+      "id": "doc-stale-race",
+      "analysisRunId": "run-1",
+      "status": "processing",
+      "attempts": 1,
+      "startedAt": "2026-09-07T10:00:00.000Z",
+      "executionId": "execution-race-old",
+      "executionState": "crashed"
+    },
+    "currentAtCas": {
+      "id": "doc-stale-race",
+      "analysisRunId": "run-1",
+      "status": "processing",
+      "attempts": 2,
+      "startedAt": "2026-09-07T11:30:00.000Z",
+      "executionId": "execution-race-new",
+      "executionState": "running"
+    },
+    "expectedOnMiss": "benign_race"
+  }
+}
