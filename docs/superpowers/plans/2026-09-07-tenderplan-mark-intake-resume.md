@@ -1177,10 +1177,14 @@ order:
    configuration and connections before any producer is manually run or any
    entry workflow is activated.
 
-The 2026-09-08 read-only observation—Orchestrator `Q1RWSrB0jaTA6Dmx`
-inactive, Intake/Recovery not live, active execution count zero—is historical
-evidence only and must not be reused as the immediate execution gate. The
-rollback dry-run and real migration application remain pending.
+Runtime checkpoint 2026-09-08: exact-body rollback dry-run `14686`, fresh
+preflight `14687`, real migration `14688`, and postflights `14689/14690/14703`
+passed. The migration reconciled exactly `86/86` approved rows, preserved child
+data, and left zero active duplicate groups. New isolated copies were imported
+and read back; Intake/Orchestrator canaries `14691`, `14694`, `14697`, `14700`
+proved same-run reuse and stable-key duplicate no-op with zero Worker executions.
+This closes the migration gate but not the remaining retry/stale/manual and
+Aggregator/Finalization runtime matrix or controlled schedule activation.
 
 Report:
 

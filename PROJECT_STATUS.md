@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/tenderplan-intake-resume`
 
-## TenderPlan intake/resume checkpoint — superseded reconciliation candidate GREEN, production pending
+## TenderPlan intake/resume checkpoint — migration applied, isolated NO-WORKER canary GREEN, activation pending
 
 Starting feature commit before documentation integration: `4c32d0b`. `main` is
 not changed.
@@ -36,9 +36,37 @@ not changed.
   DB registration, contained no PostgreSQL/Execute Workflow node, performed no
   DB writes and invoked no Worker. Evidence:
   `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
-- Current superseded focused gate: `35/35 PASS` across migration, dispatcher,
-  Orchestrator and Recovery Scan tests. Fresh current full suite is
-  `526/526 PASS`.
+- Current intake/resume focused gate: `42/42 PASS` across migration, dispatcher,
+  Orchestrator, Mark Intake, Manual Resume, Recovery Scan and Error Workflow
+  tests. Fresh current full suite is `526/526 PASS`.
+- Exact-body rollback dry-run execution `14686` completed with `ROLLBACK`; the
+  follow-up snapshots showed the schema and all bounded rows unchanged.
+  Immediate full-quiescence verification was zero `new`/`running`/`waiting`
+  executions. Fresh preflight `14687` reproduced the approved `24 + 50 + 12`
+  legacy shape immediately before application.
+- Production migration execution `14688` succeeded. Read-only postflights
+  `14689`, `14690` and `14703` confirm the intake ledger, superseded audit
+  columns, superseded-aware status CHECK and partial unique index. Exactly
+  `86/86` bounded legacy runs are `superseded`, active duplicate groups are
+  zero, and the 26-field run `18f3eaee-528d-4bc1-8d72-a1ea2f313df2` is included.
+  All related data remains present: `273` documents, `577` units, `756` facts
+  and `29` field results.
+- New isolated n8n copies were created without modifying the existing live
+  workflows: Error `kff8KIrSHzo5Mmt1`, NO-WORKER Orchestrator
+  `thE9gLyNTvxLWt8I`, Intake Resume `VO8Ml0sfO65w2Jiz`, Mark Intake
+  `biYC4OvWBlfJRmnj`, Recovery Scan `lwcHHdmmNd5YE6cw` and Manual Resume
+  `z8nynFC12H9WOM9s`. Entry workflows remain inactive/unpublished. The new Error
+  workflow is published only so the inactive candidates can reference it.
+- NO-WORKER Orchestrator canaries `14691` and `14694` created/reused exactly one
+  active run for each approved test tender. Intake ledger canaries `14697` and
+  `14700` used stable mark+tender keys: the first delivery completed both ledger
+  rows, the second returned `duplicate_event` for both and preserved the same
+  `analysis_run_id`. Postflight `14703` shows both ledger rows at `attempts=1`.
+- The two canary runs contain `6` and `5` registered documents respectively;
+  every document remains `pending`, `attempts=0`, with no owner execution.
+  Searches across all 14 workflows named `Обработать документ` found zero Worker
+  executions after the canary start. In this disabled test topology the returned
+  `documents_dispatched=6/5` is queue cardinality, not actual Worker dispatch.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
@@ -46,21 +74,6 @@ not changed.
   `evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`.
 
 ### Not verified / blocked
-
-- Fresh SELECT-only preflight execution `14685` confirms the migration remains
-  unapplied: intake table/index and superseded columns are absent. The session
-  reported `current_user=postgres`, `transaction_read_only=off`; no write was
-  performed. The authoritative run-status CHECK is
-  `tender_analysis_runs_status_check` with exactly `created`, `processing`,
-  `ready_for_aggregation`, `aggregating`, `completed`, `failed`. The three
-  approved active legacy groups are exactly `24`, `50`, and `12` rows, with
-  exact maxima `2026-09-07T05:59:14.629399+00:00`,
-  `2026-08-17T18:50:41.678699+00:00`, and
-  `2026-08-23T16:29:52.779826+00:00`. The production-candidate migration
-  validates CHECK semantics without relying on its name, reconciles only those
-  bounded 86 rows atomically, leaves newer rows untouched, and fail-closes on
-  every other duplicate shape. Runtime application is still pending explicit
-  operator approval.
 - Historical Task 8 TenderPlan type-5 event contract was not established and is
   superseded, not a current poller blocker. Probe workflow
   `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
@@ -72,30 +85,25 @@ not changed.
   type-5 feed remained empty. Execution `14683` proved the read-only relation
   contract for mark `6a732cd00c61629cf1d3c144` («Проверить»), including
   duplicate `tender`/`tenders` placement and one unique tender.
-- Task 9 is implemented as an inactive offline repository candidate. Its own
-  imported/runtime behavior is not GREEN; pagination/order/cursor and
-  exhaustive-result semantics remain undocumented.
-- Existing live workflows were not changed. New workflows are inactive and
-  unpublished; production promotion and the runtime matrix remain pending.
-- Controlled migration requires quiescence, not low traffic. Immediately before
-  both the mandatory rollback dry-run and any real application, all autonomous
-  and new-run producers must be inactive/absent, system-wide n8n executions in
-  `new`/`running`/`waiting` must be zero, and no execution may target any of the
-  86 bounded runs. Any active execution aborts the operation. Entry workflows
-  must remain inactive and producers must not be run manually until migration
-  postconditions and updated candidate import/read-back are complete.
-- Read-only evidence on 2026-09-08 recorded Orchestrator
-  `Q1RWSrB0jaTA6Dmx` inactive, Intake/Recovery not live, and zero active n8n
-  executions. This is not an application-time gate result and must be repeated
-  immediately before execution.
-- The exact committed migration still requires an executable rollback dry-run
-  against the real PostgreSQL catalog, followed by proof that catalog objects,
-  all 86 run rows, their child rows and bounded counts/cutoffs are unchanged.
-  Source-regex tests are not runtime proof. Neither that dry-run nor the real
-  migration application has been performed yet.
+- Task 9 Mark Intake is imported and read back with the real TenderPlan
+  credential and the isolated Intake target, but its schedule is not activated.
+  Pagination/order/cursor and exhaustive-result semantics remain undocumented,
+  and an end-to-end scheduled poll of the current mark membership is still open.
+- Stale-owner recovery is not production-ready: the two execution-read HTTP
+  nodes in the isolated Intake candidate still need the correct read-only n8n
+  Header Auth credential and the `N8N_TENDER_BASE_URL` n8n Variable. No
+  credential was guessed or embedded.
+- The NO-WORKER canary proves run/ledger idempotency and the hard dispatch
+  boundary only. Automatic retry after failure, one-hour stale reclaim, manual
+  override, Aggregator and Finalization routes still require their controlled
+  runtime matrix before production activation.
+- Existing live workflows were not changed. Mark Intake, Recovery Scan, Manual
+  Resume and Intake Resume remain inactive/unpublished; production activation
+  remains a separate owner decision.
 - MCP ignored requested folder placement for created test workflows and returned
   `parentFolderId=null`; this is recorded as tooling/packaging drift. The safe
-  no-worker Orchestrator `thE9gLyNTvxLWt8I` remains unexecuted.
+  no-worker Orchestrator `thE9gLyNTvxLWt8I` was executed only by the bounded
+  canaries above.
 
 Controlled activation order remains:
 

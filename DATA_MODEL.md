@@ -1,7 +1,7 @@
 # DATA_MODEL — Tender Analysis
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-07
+**Последнее обновление:** 2026-09-08
 **База данных:** PostgreSQL  
 **Основной credential в n8n:** `KITATEH Tenders`  
 **Назначение:** зафиксировать физическую модель данных тендерного анализа, связи между таблицами, lifecycle сущностей, ограничения и индексы.
@@ -28,7 +28,7 @@ completed_at заполнен Finalization workflow
 
 Все 27 FINAL rows в проверенном run имели `field_catalog_version=tender_fields_v1`, `result_contract_version=tender_field_final_v1` и audit metadata.
 
-## Planned migration artifact — 07.09.2026 (не live verification)
+## Intake/resume migration — live verification 08.09.2026
 
 Repository migration:
 
@@ -36,13 +36,18 @@ Repository migration:
 migrations/2026-09-07_tender_intake_resume.sql
 ```
 
-планирует добавить:
+добавила:
 
 - terminal status `superseded` и nullable audit-поля `superseded_at` / `superseded_reason`;
 - partial unique index, запрещающий более одного active run для одного `(source, tender_id)`, где active означает status не `completed` и не `superseded`;
 - таблицу `tender_analysis_intake_events` для idempotency, ownership и audit входных TenderPlan/manual/recovery events.
 
-Наличие этого файла в repository не подтверждает применение migration. Live PostgreSQL для этих объектов в рамках Task 1 не проверялся и не изменялся. Поэтому приведённый ниже snapshot пяти основных таблиц остаётся последним verified live state, а planned objects документируются отдельно.
+Production execution `14688` применил migration после exact-body rollback dry-run
+`14686` и свежего preflight `14687`. Read-only postflights `14689`, `14690` и
+`14703` подтвердили таблицу, колонки, CHECK и partial unique index. Migration
+перевела ровно `86/86` утверждённых legacy runs в `superseded`, оставила ноль
+active duplicate groups и сохранила их children: `273` documents, `577` units,
+`756` facts и `29` field results.
 
 Migration сохраняет `IF NOT EXISTS` для повторяемого применения, но в той же transaction выполняет fail-closed validation через PostgreSQL catalogs и `information_schema`. До reconciliation она допускает только отсутствие active-run index, его точную legacy-форму с predicate `status <> 'completed'` или точную current-форму. Точный legacy index удаляется внутри transaction до supersede update и пересоздаётся с current predicate после final duplicate preflight; неизвестный same-name object/definition не удаляется и вызывает откат. Migration допускает no-op на clean/already-reconciled DB и только точную bounded reconciliation 86 подтверждённых legacy rows; любое другое active-duplicate shape, несовместимые table/constraints/columns/defaults или secondary indexes также вызывают `RAISE EXCEPTION` и откат всей migration transaction.
 
@@ -86,7 +91,7 @@ candidate facts
 | `tender_analysis_facts` | Candidate facts, найденные Extractor и проверенные Validator |
 | `tender_analysis_field_results` | Финальные результаты 27 полей после Aggregator / Targeted Recheck |
 
-Planned migration artifact, не подтверждённый как live schema:
+Live schema, подтверждённая postflights `14689`/`14690`/`14703`:
 
 | Таблица | Назначение |
 |---|---|
@@ -184,8 +189,8 @@ tender_analysis_runs.id
 | 13 | `ready_at` | timestamptz | YES | — |
 | 14 | `aggregation_started_at` | timestamptz | YES | — |
 | 15 | `completed_at` | timestamptz | YES | — |
-| 16 | `superseded_at` *(planned migration)* | timestamptz | YES | — |
-| 17 | `superseded_reason` *(planned migration)* | text | YES | — |
+| 16 | `superseded_at` | timestamptz | YES | — |
+| 17 | `superseded_reason` | text | YES | — |
 
 ---
 
@@ -322,7 +327,7 @@ CREATE INDEX idx_tender_analysis_runs_tender_status
 ON tender_analysis_runs (tender_id, status);
 ```
 
-Planned migration artifact, не подтверждённый как live index:
+Live partial unique index, подтверждённый postflights `14689`/`14690`/`14703`:
 
 ```sql
 CREATE UNIQUE INDEX uq_tender_analysis_runs_one_unfinished
@@ -373,17 +378,19 @@ tender_analysis_runs_pkey (id)
 
 ---
 
-# 4A. Planned `tender_analysis_intake_events`
+# 4A. `tender_analysis_intake_events`
 
 ## 4A.1. Deployment status
 
-Таблица описана migration artifact:
+Таблица создана migration artifact:
 
 ```text
 migrations/2026-09-07_tender_intake_resume.sql
 ```
 
-В рамках Task 1 migration не применялась, а наличие таблицы в live PostgreSQL не проверялось. Этот раздел фиксирует planned physical contract, а не verified deployment state.
+Production execution `14688` применил migration. Read-only postflights
+`14689`/`14690`/`14703` подтвердили таблицу и её schema; postflight `14703`
+также подтвердил две completed canary-строки с `attempts=1`.
 
 ## 4A.2. Назначение
 

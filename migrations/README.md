@@ -57,11 +57,12 @@ merely low traffic. Before both the rollback dry-run and the real application:
 If any active execution exists, or either check cannot be completed, abort. Do
 not manually execute a producer, and keep entry workflows inactive, until the
 migration postconditions and the import plus read-back verification of the
-updated workflow candidates are complete. Read-only evidence from 2026-09-08
-recorded live Orchestrator `Q1RWSrB0jaTA6Dmx` as inactive, Intake/Recovery as
-not live, and the active execution count as zero. That evidence is historical:
-runtime migration remains pending and all quiescence checks must be repeated
-immediately before each database execution.
+updated workflow candidates are complete. Execution-time evidence from
+2026-09-08 recorded live Orchestrator `Q1RWSrB0jaTA6Dmx` as inactive,
+Intake/Recovery as not live, and the full active execution count as zero
+immediately before both database executions. Exact-body rollback dry-run
+`14686`, fresh preflight `14687`, real application `14688`, and read-only
+postflights `14689`/`14690` completed successfully.
 
 ### Required rollback dry-run
 
@@ -106,7 +107,8 @@ the snapshots taken immediately before it. All must be unchanged:
 - the three exact active counts and microsecond maxima from preflight `14685`.
 
 Any difference, SQL error, missing `ROLLBACK`, or failed quiescence check aborts
-the rollout. This rollback dry-run has not yet been performed.
+the rollout. The required exact-body rollback dry-run was completed by execution
+`14686`; the following preflight `14687` confirmed unchanged catalog/data state.
 
 ### Real application
 
@@ -122,5 +124,11 @@ catalog queries, confirm exactly 86 rows have the bounded superseded audit
 transition, and then import and read back the updated inactive workflow
 candidates. Do not manually execute or activate entry workflows before those
 checks complete.
+
+Applied runtime checkpoint: execution `14688` committed successfully. Detailed
+postflight `14690` confirmed exactly `86/86` bounded rows with the approved
+superseded audit, zero active duplicate groups, and preserved child counts of
+`273` documents, `577` units, `756` facts and `29` field results. Post-canary
+read-only execution `14703` reconfirmed those migration invariants.
 
 Rollback would remove the intake ledger and/or uniqueness boundary and can be destructive. No automated rollback script is provided; any rollback requires a separately reviewed operator procedure and explicit approval.

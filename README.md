@@ -174,7 +174,9 @@ Typed dispatcher для new/existing run: сохраняет тот же `analys
 повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
 два Worker claims total. Manual override может повторно запустить exhausted
 failed document. Candidate реализован и offline-tested; deployment/runtime
-promotion pending.
+promotion pending. Isolated NO-WORKER copy `VO8Ml0sfO65w2Jiz` imported and
+read back; executions `14697/14700` prove stable-key ledger deduplication while
+all Worker/Aggregator/Finalization calls remain disabled.
 
 ## `TENDER — TenderPlan Mark Intake` — inactive repository candidate
 
@@ -183,6 +185,8 @@ promotion pending.
 `tender.id` / `tenders[].id` и асинхронно вызывает Intake Resume со
 стабильным mark+tender key. Notification type-5 plan superseded runtime-proven
 relation contract `14683`; deployment и runtime canary candidate pending.
+Inactive isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan
+credential and the NO-WORKER Intake candidate; its schedule is not activated.
 
 ---
 
@@ -190,7 +194,9 @@ relation contract `14683`; deployment и runtime canary candidate pending.
 
 Operator-only adapter, который принимает существующий `analysis_run_id` и
 вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
-Candidate реализован и offline-tested; deployment pending.
+Candidate реализован и offline-tested. Inactive isolated copy
+`z8nynFC12H9WOM9s` is imported/read back with a blank operator-supplied run ID;
+manual retry runtime remains pending.
 
 ---
 
@@ -198,7 +204,9 @@ Candidate реализован и offline-tested; deployment pending.
 
 Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
 Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
-Candidate реализован и offline-tested; deployment pending.
+Candidate реализован и offline-tested. Inactive isolated copy
+`lwcHHdmmNd5YE6cw` is imported/read back; scheduled retry runtime remains
+pending.
 
 ---
 
@@ -206,7 +214,8 @@ Candidate реализован и offline-tested; deployment pending.
 
 Workflow-level handler, который guarded update переводит только принадлежащий
 текущему execution intake event из `processing` в `failed`, сохраняя audit.
-Candidate реализован и offline-tested; wiring/runtime promotion pending.
+New copy `kff8KIrSHzo5Mmt1` is published and linked only as the error handler for
+the isolated candidates. Production failure-path runtime remains pending.
 
 ---
 
