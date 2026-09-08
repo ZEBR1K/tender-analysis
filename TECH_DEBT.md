@@ -203,7 +203,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |-|-|-|
 |`OR-2`|⚠ Local Task 3 implementation complete; inactive 14-node repository candidate использует typed sub-workflow input без Manual Trigger/hardcoded tender ID. Import/runtime/promotion не выполнены.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|⚠ Inactive Intake Resume, Manual Resume, Recovery Scan и Intake Error repository candidates реализованы и offline-tested. Deployment/runtime promotion, production migration и реальный TenderPlan type-5 poller остаются pending; poller заблокирован отсутствующим real type-5 event contract.|Orchestrator / Intake Resume|
+|`OR-7`|⚠ Inactive Intake Resume, Manual Resume, Recovery Scan, Intake Error и TenderPlan Mark Intake repository candidates offline-tested. Notification type-5 plan superseded runtime-proven mark relation contract `14683`. Relation pagination/order/cursor и exhaustive-result semantics не документированы; deployment/runtime promotion и production migration pending.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|
@@ -2015,8 +2015,8 @@ Stale `processing` после одного часа требует read-only obs
 guarded CAS; unavailable API не мутирует state.
 
 Debt не закрыт: production migration отсутствует, inactive candidates не
-promoted и не прошли runtime matrix. Task 8 не получил real type-5 event contract,
-поэтому Task 9 TenderPlan poller не реализован и остаётся заблокированным.
+promoted и не прошли runtime matrix. Task 9 relation poller реализован
+offline; его exhaustive coverage и runtime behavior остаются open gates.
 
 \---
 

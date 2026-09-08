@@ -2,9 +2,11 @@
 
 **Date:** 2026-09-07
 
-**Status:** approved for implementation planning
+**Status:** repository candidate implemented and offline-verified; deployment/runtime pending
 
 **Scope:** automatically detect a TenderPlan procurement mark, start one analysis for a new procurement, and resume the same `analysis_run_id` after document-processing failures without reprocessing completed documents.
+
+**Task 9 contract correction (2026-09-08):** the notification type-5 adapter below is superseded. Executions `14682/14683` proved `GET /api/tenders/v2/getlist?type=1&id=6a732cd00c61629cf1d3c144`, label «Проверить», with the same tender duplicated under `tender` and `tenders`. The poller reads current membership, derives a stable mark+tender key, and supplies no invented timestamp. Notification retention/recipient/ordering and relation pagination/exhaustiveness remain undocumented.
 
 ## 1. Goal
 
@@ -88,9 +90,9 @@ Use three small entry workflows around the existing processing workflows:
 ```text
 TENDER — TenderPlan Mark Intake
     Schedule Trigger: every 10 minutes
-    → read TenderPlan notifications
-    → retain mark-added events
-    → persist/deduplicate event
+    → read current tenders under mark «Проверить»
+    → validate and deduplicate tender IDs
+    → persist/deduplicate stable mark+tender intent
     → call TENDER — Intake / Resume
 
 TENDER — Recovery Scan
@@ -127,27 +129,28 @@ It must stop using hard-coded TenderPlan IDs and accept a typed `tender_id` inpu
 
 ## 5. TenderPlan intake contract
 
-The inspected TenderPlan Swagger exposes notification retrieval and identifies notification type `5` as a tender marked with a label. It does not document a push webhook for this event. The production adapter is therefore a scheduled poller; it behaves as an event source for the dispatcher.
+The inspected TenderPlan Swagger identifies notification type `5` as a tender marked with a label, but executions `14677`, `14680`, and `14682` returned no usable notification event. Runtime execution `14683` instead confirmed the current relation contract for mark `6a732cd00c61629cf1d3c144` («Проверить»): `GET /api/tenders/v2/getlist?type=1&id=<mark_id>` returns the tenders currently assigned to the mark. The production candidate therefore polls current mark membership rather than relying on undocumented notification retention or recipient behavior.
 
 Polling requirements:
 
 - interval: 10 minutes;
-- read every available page required to cover the poll window;
-- use an overlap window so a transient poll failure does not lose events;
-- filter only notification type `5`;
+- perform one bounded GET for the configured mark; Swagger and execution `14683` expose no pagination, ordering, cursor, or exhaustive-result contract, so the candidate must not invent one;
+- normalize only confirmed `tender.id` and `tenders[].id` paths and deduplicate repeated representations;
 - require a non-empty TenderPlan `tender_id` before dispatch;
+- derive a stable source key from the confirmed mark ID and tender ID;
+- leave `observed_at` absent when the source relation supplies no event timestamp;
 - retry transient TenderPlan network errors at the node level;
 - use a workflow-level Error Workflow;
 - store TenderPlan authentication only in n8n Credentials;
-- never advance event processing state when pagination or persistence fails.
+- never use n8n static data as the durable deduplication boundary.
 
-Exact TenderPlan request and response field names must be taken from the live Swagger and a sanitized runtime sample during implementation. The integration must not guess notification IDs, pagination parameters or nested `tender_id` paths.
+The adapter's known limitation is current-state rather than historical coverage: a relation removed between polls cannot be reconstructed, and exhaustive coverage beyond the returned response is not runtime-proven. Malformed populated relation structures fail closed.
 
 If TenderPlan later provides a supported webhook, only this adapter changes. The dispatcher contract remains unchanged.
 
 ## 6. Persistent intake event ledger
 
-Add a PostgreSQL table dedicated to notification idempotency and intake audit:
+Add a PostgreSQL table dedicated to external-intent idempotency and intake audit:
 
 ```text
 tender_analysis_intake_events
@@ -159,7 +162,7 @@ Required logical fields:
 |---|---|
 | `id` | Internal UUID primary key |
 | `source` | `tenderplan` |
-| `event_key` | Stable unique notification key |
+| `event_key` | Stable unique external-intent key |
 | `event_type` | Normalized `mark_added` |
 | `tender_id` | TenderPlan procurement ID |
 | `observed_at` | Source event time when available |
@@ -174,7 +177,7 @@ Required logical fields:
 | `created_at` | First persistence time |
 | `processed_at` | Successful terminal intake time |
 
-`event_key` must be unique per source. Prefer the stable notification identifier supplied by TenderPlan. If the runtime payload has no stable notification ID, derive a deterministic key from the normalized event type, `tender_id`, source timestamp and other immutable notification coordinates confirmed by the runtime payload. Manual and recovery invocations use synthetic keys containing their n8n execution ID and selected `analysis_run_id`.
+`event_key` must be unique per source. The selected relation adapter uses `tenderplan:mark:<mark_id>:tender:<tender_id>` because both coordinates are confirmed and immutable for one current mark membership; repeated polls intentionally produce the same key. The source relation has no confirmed event timestamp, so it does not invent one. Manual and recovery invocations use synthetic keys containing their n8n execution ID and selected `analysis_run_id`.
 
 An existing ledger row is terminally duplicate only when `status='completed'` and `processed_at` is set. Insert/retry uses an atomic event claim that records `n8n_execution_id`, increments `attempts` and sets `processing_started_at`. A fresh `processing` owner cannot be replaced. A `failed` event or a stale `processing` event whose recorded execution is confirmed terminal may be reclaimed. This prevents concurrent dispatch of the same event while allowing recovery after a transient downstream failure.
 

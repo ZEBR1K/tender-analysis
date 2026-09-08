@@ -83,7 +83,7 @@ Production baseline описывается семью n8n workflow:
 7. TENDER — Генерация отчета (Report Generation V2)
 ```
 
-Дополнительно реализованы и offline-tested четыре inactive repository candidate;
+Дополнительно реализованы и offline-tested пять inactive repository candidate;
 их deployment и runtime promotion ещё не выполнены:
 
 ```text
@@ -91,11 +91,14 @@ Production baseline описывается семью n8n workflow:
 9. TENDER — Manual Resume
 10. TENDER — Recovery Scan
 11. TENDER — Ошибка Intake Resume
+12. TENDER — TenderPlan Mark Intake
 ```
 
-TenderPlan type-5 poller отсутствует: Task 9 заблокирован до получения реального
-type-5 event contract. Пустой type-5 ответ и `marks=[]` не являются основанием
-придумывать event paths или fixture.
+`TENDER — TenderPlan Mark Intake` опрашивает current membership фиксированной
+метки `6a732cd00c61629cf1d3c144` («Проверить») каждые 10 минут через
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
+`14683` supersedes неподтверждённый notification type-5 plan. Candidate
+offline-only; pagination/exhaustive-result semantics не документированы.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -449,9 +452,9 @@ document. `processing` считается stale после одного часа
 недоступность execution API ничего не мутирует.
 
 Manual/hardcoded boundary устранён только в inactive repository candidate.
-Production import, migration application, dispatcher/error/manual/recovery wiring
-и runtime validation остаются отдельными gates. TenderPlan poller не реализован и
-заблокирован реальным type-5 event contract.
+Production import, migration application, dispatcher/error/manual/recovery/mark
+poller wiring и runtime validation остаются отдельными gates. Relation poller —
+inactive candidate; только source contract `14683` runtime GREEN.
 
 ---
 

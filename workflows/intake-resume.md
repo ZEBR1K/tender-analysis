@@ -6,6 +6,10 @@ Inactive repository candidate for the typed, resumable tender dispatcher.
 
 `tenderplan_mark` and `recovery_scan` are automatic intents. Only `manual` with `manual_override=true` may reopen a failed run or dispatch documents after two total Worker claims. The dispatcher preserves the same `analysis_run_id`, never dispatches completed or skipped documents, and leaves attempt increments to the Worker atomic claim.
 
+`observed_at` is source time only. When the upstream relation adapter has no
+confirmed event timestamp it passes no value, and the dispatcher persists null;
+it never substitutes intake wall-clock time for a source event time.
+
 Intake events are claimed in `tender_analysis_intake_events`. Duplicate completed events and fresh owned events exit as structured no-ops. A processing owner becomes eligible for inspection at an age of one hour or more; the recorded n8n execution must be observed before a compare-and-set reclaim.
 
 Document recovery treats `new`, `running`, and `waiting` executions as owned. `success`, `error`, `canceled`, `crashed`, and confirmed HTTP 404 are reclaimable. Network, credential, malformed, or unavailable observations do not mutate document state. Unknown valid execution statuses fail closed.

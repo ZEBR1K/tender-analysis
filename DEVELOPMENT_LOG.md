@@ -5788,8 +5788,9 @@ Read-only production evidence remains deliberately bounded:
 
 The pre-DB evidence is stored in
 `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
-Task 9 poller is not implemented and remains blocked on a representative real
-type-5 event.
+At this checkpoint Task 9 was not implemented and remained blocked on a
+representative type-5 event. This historical blocker was later superseded by the
+execution-`14683` mark-relation contract recorded below.
 
 Full offline suite after the runtime probes:
 
@@ -5823,3 +5824,32 @@ migration
 ```
 
 This is not a production-complete integration checkpoint.
+
+---
+
+## 2026-09-08 — Task 9 TenderPlan mark-relation poller
+
+Task 9 replaces the unconfirmed notification type-5 design with the runtime-proven
+current relation contract from execution `14683`. The inactive candidate polls
+mark `6a732cd00c61629cf1d3c144` («Проверить») every 10 minutes via one
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`, deduplicates `tender.id` and
+`tenders[].id`, and asynchronously invokes Intake Resume with a stable
+mark+tender key. Missing source event time stays null.
+
+Historical negative evidence remains separate: executions `14677`, `14680` and
+`14682` did not provide a usable type-5 event. Pagination, ordering, cursor and
+exhaustive-result semantics for the relation response are undocumented, so the
+candidate invents no pagination and documents the bounded coverage limitation.
+
+TDD RED before the export: focused poller test `0 pass / 1 fail` because
+`TENDER — TenderPlan Mark Intake.json` was absent. Final GREEN plus existing
+intake/resume regression: `28/28` assertions PASS across six focused test files.
+In the same terminal environment with `--experimental-test-isolation=none`, the
+current full suite is `521/522` and the exact detached parent `ba4edee` baseline
+is `517/518`. Both have the same single ActiveX fixture failure
+`word/activeX/_rels/activeX5.xml.rels: 286 !== 287`, so Task 9 adds four passing
+subtests and zero new failures.
+
+Production n8n, PostgreSQL, credentials and external state were not changed.
+The candidate itself has no runtime GREEN claim; only source contract `14683` is
+runtime GREEN.

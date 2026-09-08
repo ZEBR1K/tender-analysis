@@ -176,6 +176,14 @@ Typed dispatcher для new/existing run: сохраняет тот же `analys
 failed document. Candidate реализован и offline-tested; deployment/runtime
 promotion pending.
 
+## `TENDER — TenderPlan Mark Intake` — inactive repository candidate
+
+Каждые 10 минут читает current members метки
+`6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
+`tender.id` / `tenders[].id` и асинхронно вызывает Intake Resume со
+стабильным mark+tender key. Notification type-5 plan superseded runtime-proven
+relation contract `14683`; deployment и runtime canary candidate pending.
+
 ---
 
 ## `TENDER — Manual Resume` — inactive repository candidate

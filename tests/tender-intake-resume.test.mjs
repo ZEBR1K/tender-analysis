@@ -854,8 +854,8 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     tender_id: '123',
     manual_override: false,
   }, { Date: FixedDate });
-  assert.equal(defaultedObservation.observed_at, fixture.now);
-  assert.ok(defaultClockReads > 0, 'valid input without observed_at must read the clock');
+  assert.equal(defaultedObservation.observed_at, null);
+  assert.equal(defaultClockReads, 0, 'missing source timestamp must not be invented from the clock');
 
   const runEntryGate = requireNode(workflow, 'Is Run-authoritative Invocation?');
   assert.equal(runEntryGate.type, 'n8n-nodes-base.if');

@@ -904,6 +904,8 @@ Keep the workflow inactive in repository packaging until Task 10 runtime gates a
 
 ### Task 8: Capture the real TenderPlan mark contract before building the poller
 
+**Superseded contract:** executions `14677/14680/14682` did not establish a usable type-5 event. Execution `14683` instead proved the selected mark-relation contract and duplicate `tender`/`tenders` structure. The sanitized relation fixture replaces the proposed notification fixture; negative notification evidence remains historical.
+
 **Files:**
 
 - Create: `tests/fixtures/tenderplan-mark-intake/notification-type-5-sanitized.json`
@@ -955,32 +957,34 @@ git commit -m "test: capture TenderPlan mark notification contract"
 
 ### Task 9: Build the TenderPlan Mark Intake poller
 
+**Implemented contract:** fixed mark `6a732cd00c61629cf1d3c144`, one GET of `/api/tenders/v2/getlist?type=1&id=<mark_id>`, no invented pagination/cursor or timestamp, deterministic duplicate normalization, stable mark+tender key and async per-item dispatch. Since exhaustive pagination is undocumented, the candidate fails closed on malformed populated structures and documents its single-response coverage limit.
+
 **Files:**
 
 - Create: `workflows/n8n-exports/TENDER — TenderPlan Mark Intake.json`
 - Create: `workflows/tenderplan-mark-intake.md`
 - Create: `tests/tenderplan-mark-intake.test.mjs`
 
-- [ ] **Step 1: Verify HTTP pagination, retries and loop behavior in official docs**
+- [x] **Step 1: Verify HTTP pagination, retries and loop behavior in official docs**
 
 Read the local docs for HTTP Request pagination, Schedule Trigger, Loop Over Items, Execute Sub-workflow, retry-on-fail, and node error outputs. Use the smallest topology supported by the verified API contract.
 
-- [ ] **Step 2: Write the failing poller test**
+- [x] **Step 2: Write the failing poller test**
 
 Assert:
 
 - Schedule Trigger interval is 10 minutes;
 - HTTP Request uses n8n Credentials and has no literal secret headers;
-- endpoint and pagination match `swagger-contract.md`;
+- endpoint and query match the runtime-confirmed mark relation contract;
 - normalization uses only confirmed fixture paths;
-- only type `5` items continue;
+- duplicate `tender.id` and `tenders[].id` representations collapse to one item;
 - event key and `tender_id` are non-empty before dispatch;
-- each notification calls dispatcher with `trigger_kind='tenderplan_mark'` and `manual_override=false`;
+- each unique current member calls dispatcher with `trigger_kind='tenderplan_mark'` and `manual_override=false`;
 - network retries are bounded and distinct from document attempt counting;
 - the intake error workflow is configured;
-- no API operation acknowledges, deletes, or mutates TenderPlan notifications.
+- no API operation mutates TenderPlan state.
 
-- [ ] **Step 3: Confirm failure**
+- [x] **Step 3: Confirm failure**
 
 ```powershell
 node --test tests/tenderplan-mark-intake.test.mjs tests/tenderplan-notification-contract.test.mjs
@@ -988,24 +992,24 @@ node --test tests/tenderplan-mark-intake.test.mjs tests/tenderplan-notification-
 
 Expected: poller test FAILS because the export is absent; source-contract test PASSES.
 
-- [ ] **Step 4: Implement the poller**
+- [x] **Step 4: Implement the poller**
 
 Topology, adjusted only where official docs or captured pagination require it:
 
 ```text
 Schedule Trigger (10 minutes)
-→ GET TenderPlan notifications pages
-→ Normalize confirmed notification fields
-→ Filter type 5
-→ Validate event_key and tender_id
-→ Execute TENDER — Intake Resume once per notification
+→ GET current tenders for mark «Проверить»
+→ Normalize confirmed tender.id / tenders[].id paths
+→ Deduplicate and validate tender_id
+→ Build stable mark+tender event_key without invented timestamp
+→ Execute TENDER — Intake Resume once per unique tender
 ```
 
-Use async sub-workflow dispatch per event so one long tender does not block later notifications. The persistent event claim in Dispatcher is the deduplication boundary. Do not use n8n static data as the only cursor or dedup store.
+Use async sub-workflow dispatch per unique tender so one long tender does not block later members. The persistent event claim in Dispatcher is the deduplication boundary. Do not use n8n static data as the cursor or dedup store.
 
-HTTP transport retries may use the documented bounded retry setting; they do not increment document `attempts`. Exhausted HTTP failures remain visible and are retried on the next schedule because notifications are read-only and ledger dedup is durable.
+HTTP transport retries may use the documented bounded retry setting; they do not increment document `attempts`. Exhausted HTTP failures remain visible and the next schedule observes current relation state again; ledger dedup is durable.
 
-- [ ] **Step 5: Test, document and commit**
+- [x] **Step 5: Test, document and commit**
 
 ```powershell
 node --test tests/tenderplan-mark-intake.test.mjs tests/tenderplan-notification-contract.test.mjs tests/tender-intake-resume.test.mjs

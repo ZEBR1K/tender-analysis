@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/tenderplan-intake-resume`
 
-## TenderPlan intake/resume checkpoint — repository GREEN, production pending
+## TenderPlan intake/resume checkpoint — feature GREEN, production pending
 
 Starting feature commit before documentation integration: `4c32d0b`. `main` is
 not changed.
@@ -27,8 +27,11 @@ not changed.
   DB registration, contained no PostgreSQL/Execute Workflow node, performed no
   DB writes and invoked no Worker. Evidence:
   `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
-- Full offline suite after this checkpoint:
-  `node --test tests/*.test.mjs` → `518/518 PASS` on local date 2026-09-08.
+- Current focused intake/resume gate: `28/28 PASS` across six test files.
+  Current full suite is `521/522`; the exact detached parent `ba4edee` is
+  `517/518`. Both share the same unrelated ActiveX fixture failure
+  `word/activeX/_rels/activeX5.xml.rels: 286 !== 287`, so Task 9 adds four
+  passing subtests and zero new failures.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
@@ -39,14 +42,19 @@ not changed.
 
 - Live DB preflight execution `14676` found the intake migration absent:
   intake table and required partial unique/helper indexes were all `false`.
-- Task 8 real TenderPlan type-5 contract is not complete. Probe workflow
+- Historical Task 8 TenderPlan type-5 event contract was not established. Probe workflow
   `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
   FullInfo returned `marks=[]` for both test tender IDs. No event paths or fixture
   were fabricated.
 - Latest repeat probe execution `14680` produced the same negative result:
   empty type-5 list, `marks=[]` and empty `notification` for both test tender IDs.
-- Task 9 TenderPlan poller is not implemented and remains blocked on a real
-  type-5 event.
+- Execution `14682` confirmed the target tender's FullInfo mark ID while the
+  type-5 feed remained empty. Execution `14683` proved the read-only relation
+  contract for mark `6a732cd00c61629cf1d3c144` («Проверить»), including
+  duplicate `tender`/`tenders` placement and one unique tender.
+- Task 9 is implemented as an inactive offline repository candidate. Its own
+  imported/runtime behavior is not GREEN; pagination/order/cursor and
+  exhaustive-result semantics remain undocumented.
 - Existing live workflows were not changed. New workflows are inactive and
   unpublished; production promotion and the runtime matrix remain pending.
 - MCP ignored requested folder placement for created test workflows and returned
