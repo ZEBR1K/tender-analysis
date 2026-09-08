@@ -1,0 +1,7 @@
+Analyze the sealed procurement package in ../input/documents using
+../input/manifest.json and ../input/FIELD_CATALOG.md.
+
+Follow the tender-document-analysis skill. Keep your incremental working ledger
+in field-ledger.json and return only one tender_agent_result_v1 JSON object that
+matches the supplied output schema. Use the catalog and manifest hashes exactly
+as provided in the job inputs.
