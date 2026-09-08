@@ -112,8 +112,14 @@ function parseJsonResult(value) {
   if (!/^[a-f0-9]{64}$/iu.test(value.input_manifest_sha256 ?? '')) {
     structuralIssues.push('INPUT_MANIFEST_SHA256_INVALID');
   }
-  if (!Array.isArray(value.inspection_coverage)) {
-    structuralIssues.push('INSPECTION_COVERAGE_INVALID');
+  if (!Array.isArray(value.inspected_documents)) {
+    structuralIssues.push('INSPECTED_DOCUMENTS_INVALID');
+  }
+  if (!Array.isArray(value.limitations)) {
+    structuralIssues.push('LIMITATIONS_INVALID');
+  }
+  if (!Array.isArray(value.constraints)) {
+    structuralIssues.push('CONSTRAINTS_INVALID');
   }
 
   return {
