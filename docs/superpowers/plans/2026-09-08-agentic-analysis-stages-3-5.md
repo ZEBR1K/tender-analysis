@@ -325,13 +325,16 @@ validation_summary jsonb NOT NULL DEFAULT '{}'
 error_code / error_message text
 created_at / updated_at timestamptz NOT NULL
 UNIQUE (analysis_run_id, pipeline_version, replicate_index)
+UNIQUE (id, analysis_run_id)
+UNIQUE (id, analysis_run_id, field_catalog_version)
 ```
 
 `tender_agentic_documents` owns staging barrier:
 
 ```text
-job_id uuid FK → tender_agentic_jobs(id) ON DELETE CASCADE
-source_document_id uuid FK → tender_analysis_documents(id) ON DELETE CASCADE
+job_id uuid NOT NULL
+analysis_run_id uuid NOT NULL
+source_document_id uuid NOT NULL
 artifact_key text NOT NULL
 document_index integer NOT NULL
 file_name text
@@ -346,12 +349,14 @@ created_at / updated_at timestamptz NOT NULL
 PRIMARY KEY (job_id, source_document_id)
 UNIQUE (job_id, artifact_key)
 UNIQUE (job_id, document_index)
+FOREIGN KEY (job_id, analysis_run_id) → tender_agentic_jobs(id, analysis_run_id) ON DELETE CASCADE
+FOREIGN KEY (source_document_id, analysis_run_id) → tender_analysis_documents(id, analysis_run_id) ON DELETE CASCADE
 ```
 
 `tender_agentic_field_results` owns the 27 shadow rows:
 
 ```text
-job_id uuid FK → tender_agentic_jobs(id) ON DELETE CASCADE
+job_id uuid NOT NULL
 analysis_run_id uuid FK → tender_analysis_runs(id) ON DELETE CASCADE
 field_catalog_version text NOT NULL
 field_index smallint CHECK BETWEEN 1 AND 27
@@ -366,6 +371,7 @@ result_json jsonb NOT NULL
 created_at / updated_at timestamptz NOT NULL
 PRIMARY KEY (job_id, field_key)
 UNIQUE (job_id, field_index)
+FOREIGN KEY (job_id, analysis_run_id, field_catalog_version) → tender_agentic_jobs(id, analysis_run_id, field_catalog_version) ON DELETE CASCADE
 ```
 
 The migration adds no column or constraint to the existing canonical five tables.
@@ -561,7 +567,9 @@ tests/agentic-job-migration.test.mjs
 
 - [ ] Write failing migration contract tests for all columns, FKs, unique keys, status checks, field range and idempotent reapplication.
 - [ ] Add fail-closed preconditions confirming the five canonical tables have not changed unexpectedly.
+- [ ] Acquire fixed-order `ACCESS SHARE` locks on all five canonical parents and safely lock every pre-existing ordinary shadow table before catalog inspection.
 - [ ] Implement the three new tables and their indexes in one transaction.
+- [ ] Enforce job/document/result ownership with composite run identity FKs, and enforce result `field_catalog_version` against its owning job in PostgreSQL.
 - [ ] Add indexes for monitor queries: `(status, heartbeat_at)`, `(poll_claimed_at)` and `(analysis_run_id)`.
 - [ ] Add a transaction-level postcondition that inspects catalogs and aborts if any table/constraint differs from the planned contract.
 - [ ] Test against an empty fixture schema and a populated fixture schema without updating existing rows.
@@ -573,6 +581,14 @@ node --test tests/agentic-job-migration.test.mjs
 ```
 
 Expected: migration contract passes twice; canonical table definitions remain byte-identical in the fixture snapshot.
+
+The default local run may explicitly skip the real PostgreSQL fixture when neither
+`psql` nor Docker is available. CI/promotion uses
+`AGENTIC_REQUIRE_POSTGRES_RUNTIME=1`, which turns that condition into a failure.
+An external fixture URL additionally requires a database named exactly
+`agentic_shadow_test_<8-64 lowercase hex>` and
+`AGENTIC_TEST_ALLOW_DESTRUCTIVE_RESET=DROP_PUBLIC_SCHEMA_FOR_AGENTIC_SHADOW_TEST_ONLY`;
+the harness refuses to reset it unless the complete `public` object inventory is empty.
 
 - [ ] Commit:
 

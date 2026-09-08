@@ -3,6 +3,62 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
+LOCK TABLE public.tender_analysis_runs IN ACCESS SHARE MODE;
+LOCK TABLE public.tender_analysis_documents IN ACCESS SHARE MODE;
+LOCK TABLE public.tender_analysis_units IN ACCESS SHARE MODE;
+LOCK TABLE public.tender_analysis_facts IN ACCESS SHARE MODE;
+LOCK TABLE public.tender_analysis_field_results IN ACCESS SHARE MODE;
+
+DO $shadow_locks$
+DECLARE
+  shadow_table record;
+  existing_object_oid oid;
+  existing_object_kind "char";
+  existing_object_persistence "char";
+BEGIN
+  FOR shadow_table IN
+    SELECT *
+    FROM (
+      VALUES
+        ('tender_agentic_jobs'::text),
+        ('tender_agentic_documents'::text),
+        ('tender_agentic_field_results'::text)
+    ) AS shadow_tables(table_name)
+  LOOP
+    existing_object_oid := NULL;
+    existing_object_kind := NULL;
+    existing_object_persistence := NULL;
+
+    SELECT
+      table_class.oid,
+      table_class.relkind,
+      table_class.relpersistence
+    INTO existing_object_oid, existing_object_kind, existing_object_persistence
+    FROM pg_catalog.pg_class AS table_class
+    JOIN pg_catalog.pg_namespace AS table_namespace
+      ON table_namespace.oid = table_class.relnamespace
+    WHERE table_namespace.nspname = 'public'
+      AND table_class.relname = shadow_table.table_name;
+
+    IF existing_object_oid IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    IF existing_object_kind <> 'r' OR existing_object_persistence <> 'p' THEN
+      RAISE EXCEPTION
+        'Agentic migration precondition failed: existing public.% must be an ordinary permanent table',
+        shadow_table.table_name;
+    END IF;
+
+    EXECUTE pg_catalog.format(
+      'LOCK TABLE %I.%I IN ACCESS SHARE MODE',
+      'public',
+      shadow_table.table_name
+    );
+  END LOOP;
+END
+$shadow_locks$;
+
 DO $canonical_preconditions$
 DECLARE
   table_contract record;
@@ -286,8 +342,8 @@ BEGIN
     ),
     actual AS (
       SELECT
-        table_class.relname AS table_name,
-        array_agg(attribute_row.attname ORDER BY key_column.ordinality) AS key_columns
+        table_class.relname::text AS table_name,
+        array_agg(attribute_row.attname::text ORDER BY key_column.ordinality) AS key_columns
       FROM pg_catalog.pg_constraint AS constraint_row
       JOIN pg_catalog.pg_class AS table_class
         ON table_class.oid = constraint_row.conrelid
@@ -316,9 +372,13 @@ BEGIN
         )
       GROUP BY constraint_row.oid, table_class.relname
     )
-    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
-    UNION ALL
-    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN actual
+      ON actual.table_name = expected.table_name
+     AND actual.key_columns = expected.key_columns
+    WHERE expected.table_name IS NULL
+       OR actual.table_name IS NULL
   ) THEN
     RAISE EXCEPTION
       'Canonical UNIQUE contract failed: unique keys differ from the documented five-table contract';
@@ -343,10 +403,10 @@ BEGIN
     ),
     actual AS (
       SELECT
-        source_table.relname AS table_name,
-        array_agg(source_attribute.attname ORDER BY key_column.ordinality) AS key_columns,
-        referenced_table.relname AS referenced_table,
-        array_agg(referenced_attribute.attname ORDER BY key_column.ordinality) AS referenced_columns,
+        source_table.relname::text AS table_name,
+        array_agg(source_attribute.attname::text ORDER BY key_column.ordinality) AS key_columns,
+        referenced_table.relname::text AS referenced_table,
+        array_agg(referenced_attribute.attname::text ORDER BY key_column.ordinality) AS referenced_columns,
         constraint_row.confupdtype::text AS update_action,
         constraint_row.confdeltype::text AS delete_action,
         constraint_row.confmatchtype::text AS match_type
@@ -392,9 +452,18 @@ BEGIN
         constraint_row.confdeltype,
         constraint_row.confmatchtype
     )
-    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
-    UNION ALL
-    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN actual
+      ON actual.table_name = expected.table_name
+     AND actual.key_columns = expected.key_columns
+     AND actual.referenced_table = expected.referenced_table
+     AND actual.referenced_columns = expected.referenced_columns
+     AND actual.update_action = expected.update_action
+     AND actual.delete_action = expected.delete_action
+     AND actual.match_type = expected.match_type
+    WHERE expected.table_name IS NULL
+       OR actual.table_name IS NULL
   ) THEN
     RAISE EXCEPTION
       'Canonical FOREIGN KEY contract failed: references or update/delete/match/validation/immediacy semantics differ';
@@ -410,7 +479,7 @@ BEGIN
         ('tender_analysis_field_results', 3)
     ),
     actual AS (
-      SELECT table_class.relname AS table_name, count(*) AS check_count
+      SELECT table_class.relname::text AS table_name, count(*) AS check_count
       FROM pg_catalog.pg_constraint AS constraint_row
       JOIN pg_catalog.pg_class AS table_class
         ON table_class.oid = constraint_row.conrelid
@@ -433,9 +502,13 @@ BEGIN
         )
       GROUP BY table_class.relname
     )
-    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
-    UNION ALL
-    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN actual
+      ON actual.table_name = expected.table_name
+     AND actual.check_count = expected.check_count
+    WHERE expected.table_name IS NULL
+       OR actual.table_name IS NULL
   ) THEN
     RAISE EXCEPTION
       'Canonical CHECK contract failed: count, validation or enforcement differs from the documented contract';
@@ -636,9 +709,13 @@ BEGIN
         AND constraint_row.contype IN ('u', 'f', 'c')
       GROUP BY constraint_row.contype
     )
-    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
-    UNION ALL
-    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN actual
+      ON actual.constraint_type = expected.constraint_type
+     AND actual.expected_count = expected.expected_count
+    WHERE expected.constraint_type IS NULL
+       OR actual.constraint_type IS NULL
   ) THEN
     RAISE EXCEPTION
       'Canonical parent contract failed: raw UNIQUE, FOREIGN KEY or CHECK inventory contains missing or extra constraints';
@@ -850,6 +927,10 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_jobs (
     ON DELETE CASCADE,
   CONSTRAINT tender_agentic_jobs_run_pipeline_replicate_key
     UNIQUE (analysis_run_id, pipeline_version, replicate_index),
+  CONSTRAINT tender_agentic_jobs_id_run_key
+    UNIQUE (id, analysis_run_id),
+  CONSTRAINT tender_agentic_jobs_id_run_catalog_key
+    UNIQUE (id, analysis_run_id, field_catalog_version),
   CONSTRAINT tender_agentic_jobs_replicate_index_check CHECK (replicate_index >= 1),
   CONSTRAINT tender_agentic_jobs_status_check CHECK (
     status IN ('created', 'staging', 'ready', 'running', 'validating', 'completed', 'failed', 'canceled')
@@ -861,6 +942,7 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_jobs (
 
 CREATE TABLE IF NOT EXISTS public.tender_agentic_documents (
   job_id uuid NOT NULL,
+  analysis_run_id uuid NOT NULL,
   source_document_id uuid NOT NULL,
   artifact_key text NOT NULL,
   document_index integer NOT NULL,
@@ -876,13 +958,13 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_documents (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tender_agentic_documents_pkey PRIMARY KEY (job_id, source_document_id),
-  CONSTRAINT tender_agentic_documents_job_fk
-    FOREIGN KEY (job_id)
-    REFERENCES public.tender_agentic_jobs (id)
+  CONSTRAINT tender_agentic_documents_job_run_fk
+    FOREIGN KEY (job_id, analysis_run_id)
+    REFERENCES public.tender_agentic_jobs (id, analysis_run_id)
     ON DELETE CASCADE,
-  CONSTRAINT tender_agentic_documents_source_document_fk
-    FOREIGN KEY (source_document_id)
-    REFERENCES public.tender_analysis_documents (id)
+  CONSTRAINT tender_agentic_documents_source_document_run_fk
+    FOREIGN KEY (source_document_id, analysis_run_id)
+    REFERENCES public.tender_analysis_documents (id, analysis_run_id)
     ON DELETE CASCADE,
   CONSTRAINT tender_agentic_documents_artifact_key_key UNIQUE (job_id, artifact_key),
   CONSTRAINT tender_agentic_documents_document_index_key UNIQUE (job_id, document_index),
@@ -907,9 +989,9 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_field_results (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT tender_agentic_field_results_pkey PRIMARY KEY (job_id, field_key),
-  CONSTRAINT tender_agentic_field_results_job_fk
-    FOREIGN KEY (job_id)
-    REFERENCES public.tender_agentic_jobs (id)
+  CONSTRAINT tender_agentic_field_results_job_run_catalog_fk
+    FOREIGN KEY (job_id, analysis_run_id, field_catalog_version)
+    REFERENCES public.tender_agentic_jobs (id, analysis_run_id, field_catalog_version)
     ON DELETE CASCADE,
   CONSTRAINT tender_agentic_field_results_analysis_run_fk
     FOREIGN KEY (analysis_run_id)
@@ -978,8 +1060,8 @@ BEGIN
   IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_jobs') <> 29 THEN
     RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_jobs must have 29 columns';
   END IF;
-  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_documents') <> 15 THEN
-    RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_documents must have 15 columns';
+  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_documents') <> 16 THEN
+    RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_documents must have 16 columns';
   END IF;
   IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_field_results') <> 14 THEN
     RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_field_results must have 14 columns';
@@ -1012,7 +1094,8 @@ BEGIN
         (
           'tender_agentic_documents'::text,
           ARRAY[
-            'job_id:uuid:NO:none', 'source_document_id:uuid:NO:none',
+            'job_id:uuid:NO:none', 'analysis_run_id:uuid:NO:none',
+            'source_document_id:uuid:NO:none',
             'artifact_key:text:NO:none', 'document_index:int4:NO:none',
             'file_name:text:YES:none', 'mime_type:text:YES:none',
             'source_sha256:text:YES:none', 'staged_sha256:text:YES:none',
@@ -1090,19 +1173,21 @@ BEGIN
         ('tender_agentic_jobs'::text, 'tender_agentic_jobs_pkey'::text, 'p'::text),
         ('tender_agentic_jobs', 'tender_agentic_jobs_analysis_run_fk', 'f'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_run_pipeline_replicate_key', 'u'),
+        ('tender_agentic_jobs', 'tender_agentic_jobs_id_run_key', 'u'),
+        ('tender_agentic_jobs', 'tender_agentic_jobs_id_run_catalog_key', 'u'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_replicate_index_check', 'c'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_status_check', 'c'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_expected_documents_check', 'c'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_staged_documents_check', 'c'),
         ('tender_agentic_jobs', 'tender_agentic_jobs_attempts_check', 'c'),
         ('tender_agentic_documents', 'tender_agentic_documents_pkey', 'p'),
-        ('tender_agentic_documents', 'tender_agentic_documents_job_fk', 'f'),
-        ('tender_agentic_documents', 'tender_agentic_documents_source_document_fk', 'f'),
+        ('tender_agentic_documents', 'tender_agentic_documents_job_run_fk', 'f'),
+        ('tender_agentic_documents', 'tender_agentic_documents_source_document_run_fk', 'f'),
         ('tender_agentic_documents', 'tender_agentic_documents_artifact_key_key', 'u'),
         ('tender_agentic_documents', 'tender_agentic_documents_document_index_key', 'u'),
         ('tender_agentic_documents', 'tender_agentic_documents_status_check', 'c'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_pkey', 'p'),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_job_fk', 'f'),
+        ('tender_agentic_field_results', 'tender_agentic_field_results_job_run_catalog_fk', 'f'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_analysis_run_fk', 'f'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_field_index_key', 'u'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_field_index_check', 'c'),
@@ -1111,7 +1196,10 @@ BEGIN
         ('tender_agentic_field_results', 'tender_agentic_field_results_validation_level_check', 'c')
     ),
     actual AS (
-      SELECT table_class.relname, constraint_row.conname, constraint_row.contype::text
+      SELECT
+        table_class.relname::text AS table_name,
+        constraint_row.conname::text AS constraint_name,
+        constraint_row.contype::text AS constraint_type
       FROM pg_catalog.pg_constraint AS constraint_row
       JOIN pg_catalog.pg_class AS table_class
         ON table_class.oid = constraint_row.conrelid
@@ -1124,9 +1212,14 @@ BEGIN
           'tender_agentic_field_results'
         )
     )
-    (SELECT * FROM expected EXCEPT SELECT * FROM actual)
-    UNION ALL
-    (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+    SELECT 1
+    FROM expected
+    FULL OUTER JOIN actual
+      ON actual.table_name = expected.table_name
+     AND actual.constraint_name = expected.constraint_name
+     AND actual.constraint_type = expected.constraint_type
+    WHERE expected.table_name IS NULL
+       OR actual.table_name IS NULL
   ) THEN
     RAISE EXCEPTION
       'Agentic migration postcondition failed: constraint inventory differs from the planned contract';
@@ -1138,6 +1231,8 @@ BEGIN
       VALUES
         ('tender_agentic_jobs'::text, 'tender_agentic_jobs_pkey'::text, 'p'::text, ARRAY['id']::text[]),
         ('tender_agentic_jobs', 'tender_agentic_jobs_run_pipeline_replicate_key', 'u', ARRAY['analysis_run_id', 'pipeline_version', 'replicate_index']::text[]),
+        ('tender_agentic_jobs', 'tender_agentic_jobs_id_run_key', 'u', ARRAY['id', 'analysis_run_id']::text[]),
+        ('tender_agentic_jobs', 'tender_agentic_jobs_id_run_catalog_key', 'u', ARRAY['id', 'analysis_run_id', 'field_catalog_version']::text[]),
         ('tender_agentic_documents', 'tender_agentic_documents_pkey', 'p', ARRAY['job_id', 'source_document_id']::text[]),
         ('tender_agentic_documents', 'tender_agentic_documents_artifact_key_key', 'u', ARRAY['job_id', 'artifact_key']::text[]),
         ('tender_agentic_documents', 'tender_agentic_documents_document_index_key', 'u', ARRAY['job_id', 'document_index']::text[]),
@@ -1184,9 +1279,9 @@ BEGIN
     FROM (
       VALUES
         ('tender_agentic_jobs'::text, 'tender_agentic_jobs_analysis_run_fk'::text, ARRAY['analysis_run_id']::text[], 'tender_analysis_runs'::text, ARRAY['id']::text[]),
-        ('tender_agentic_documents', 'tender_agentic_documents_job_fk', ARRAY['job_id']::text[], 'tender_agentic_jobs', ARRAY['id']::text[]),
-        ('tender_agentic_documents', 'tender_agentic_documents_source_document_fk', ARRAY['source_document_id']::text[], 'tender_analysis_documents', ARRAY['id']::text[]),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_job_fk', ARRAY['job_id']::text[], 'tender_agentic_jobs', ARRAY['id']::text[]),
+        ('tender_agentic_documents', 'tender_agentic_documents_job_run_fk', ARRAY['job_id', 'analysis_run_id']::text[], 'tender_agentic_jobs', ARRAY['id', 'analysis_run_id']::text[]),
+        ('tender_agentic_documents', 'tender_agentic_documents_source_document_run_fk', ARRAY['source_document_id', 'analysis_run_id']::text[], 'tender_analysis_documents', ARRAY['id', 'analysis_run_id']::text[]),
+        ('tender_agentic_field_results', 'tender_agentic_field_results_job_run_catalog_fk', ARRAY['job_id', 'analysis_run_id', 'field_catalog_version']::text[], 'tender_agentic_jobs', ARRAY['id', 'analysis_run_id', 'field_catalog_version']::text[]),
         ('tender_agentic_field_results', 'tender_agentic_field_results_analysis_run_fk', ARRAY['analysis_run_id']::text[], 'tender_analysis_runs', ARRAY['id']::text[])
     ) AS foreign_keys(table_name, constraint_name, expected_columns, referenced_table, expected_referenced_columns)
   LOOP

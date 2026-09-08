@@ -8,6 +8,10 @@ const migrationUrl = new URL(
   '../deploy/postgres/migrations/2026-09-08-add-agentic-shadow-analysis.sql',
   import.meta.url,
 );
+const planUrl = new URL(
+  '../docs/superpowers/plans/2026-09-08-agentic-analysis-stages-3-5.md',
+  import.meta.url,
+);
 
 const canonicalTables = [
   'tender_analysis_runs',
@@ -83,6 +87,27 @@ test('migration source is present and wrapped in one ordered transaction', async
   assert.match(postconditions, /RAISE\s+EXCEPTION/i);
 });
 
+test('migration locks canonical parents and pre-existing shadow tables in a fixed order', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const canonicalPreconditionIndex = sql.indexOf('DO $canonical_preconditions$');
+  assert.ok(canonicalPreconditionIndex > 0, 'missing canonical precondition boundary');
+
+  let priorLockIndex = -1;
+  for (const table of canonicalTables) {
+    const match = new RegExp(`LOCK\\s+TABLE\\s+public\\.${table}\\s+IN\\s+ACCESS\\s+SHARE\\s+MODE\\s*;`, 'i').exec(sql);
+    assert.ok(match, `missing ACCESS SHARE lock for ${table}`);
+    assert.ok(match.index > priorLockIndex, `canonical lock order is unstable at ${table}`);
+    assert.ok(match.index < canonicalPreconditionIndex, `${table} lock must precede catalog inspection`);
+    priorLockIndex = match.index;
+  }
+
+  const shadowLocks = getDoBlock(sql, 'shadow_locks');
+  assert.ok(sql.indexOf('DO $shadow_locks$') < canonicalPreconditionIndex);
+  for (const table of shadowTables) assert.match(shadowLocks, new RegExp(`'${table}'`, 'i'));
+  assert.match(shadowLocks, /existing_object_kind\s*<>\s*'r'/i);
+  assert.match(shadowLocks, /format\s*\(\s*'LOCK TABLE %I\.%I IN ACCESS SHARE MODE'/i);
+});
+
 test('migration fail-closes on canonical parent schema drift without mutating canonical tables', async () => {
   const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
   const preconditions = getDoBlock(sql, 'canonical_preconditions');
@@ -105,6 +130,15 @@ test('migration fail-closes on canonical parent schema drift without mutating ca
   assert.match(preconditions, /relkind\s*=\s*'r'/i, 'canonical parents must remain ordinary tables');
   assert.match(preconditions, /relpersistence\s*=\s*'p'/i);
   assert.match(preconditions, /EXCEPT/i, 'column inventory must reject missing or extra columns');
+  assert.doesNotMatch(
+    preconditions,
+    /\)\s*\(SELECT \* FROM expected EXCEPT SELECT \* FROM actual\)/i,
+    'catalog difference CTEs need an explicit SELECT wrapper accepted by PostgreSQL runtime planning',
+  );
+  assert.ok(
+    (preconditions.match(/FULL\s+(?:OUTER\s+)?JOIN/gi) || []).length >= 4,
+    'catalog contract inventories must use PostgreSQL-safe symmetric joins',
+  );
   assert.match(preconditions, /PRIMARY\s+KEY/i, 'parent primary-key identities must be checked');
   assert.match(preconditions, /column_default/i, 'canonical defaults must be checked');
   assert.match(preconditions, /UNIQUE/i, 'canonical unique-key identities must be checked');
@@ -200,6 +234,16 @@ test('jobs table has the exact lifecycle, audit and ownership columns', async ()
     'tender_agentic_jobs_run_pipeline_replicate_key',
     'UNIQUE\\s*\\(\\s*analysis_run_id\\s*,\\s*pipeline_version\\s*,\\s*replicate_index\\s*\\)',
   );
+  assertNamedConstraint(
+    body,
+    'tender_agentic_jobs_id_run_key',
+    'UNIQUE\\s*\\(\\s*id\\s*,\\s*analysis_run_id\\s*\\)',
+  );
+  assertNamedConstraint(
+    body,
+    'tender_agentic_jobs_id_run_catalog_key',
+    'UNIQUE\\s*\\(\\s*id\\s*,\\s*analysis_run_id\\s*,\\s*field_catalog_version\\s*\\)',
+  );
   assertNamedConstraint(body, 'tender_agentic_jobs_replicate_index_check', 'CHECK\\s*\\(\\s*replicate_index\\s*>=\\s*1\\s*\\)');
   assertNamedConstraint(body, 'tender_agentic_jobs_expected_documents_check', 'CHECK\\s*\\(\\s*expected_documents\\s*>=\\s*0\\s*\\)');
   assertNamedConstraint(body, 'tender_agentic_jobs_staged_documents_check', 'CHECK\\s*\\(\\s*staged_documents\\s*>=\\s*0\\s*\\)');
@@ -213,6 +257,7 @@ test('documents table has the staging barrier keys and bounded status contract',
   const body = getCreateTable(stripSqlComments(await readFile(migrationUrl, 'utf8')), 'tender_agentic_documents');
   const columns = {
     job_id: 'uuid\\s+NOT\\s+NULL',
+    analysis_run_id: 'uuid\\s+NOT\\s+NULL',
     source_document_id: 'uuid\\s+NOT\\s+NULL',
     artifact_key: 'text\\s+NOT\\s+NULL',
     document_index: 'integer\\s+NOT\\s+NULL',
@@ -233,13 +278,13 @@ test('documents table has the staging barrier keys and bounded status contract',
   assertNamedConstraint(body, 'tender_agentic_documents_pkey', 'PRIMARY\\s+KEY\\s*\\(\\s*job_id\\s*,\\s*source_document_id\\s*\\)');
   assertNamedConstraint(
     body,
-    'tender_agentic_documents_job_fk',
-    'FOREIGN\\s+KEY\\s*\\(\\s*job_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_agentic_jobs\\s*\\(\\s*id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
+    'tender_agentic_documents_job_run_fk',
+    'FOREIGN\\s+KEY\\s*\\(\\s*job_id\\s*,\\s*analysis_run_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_agentic_jobs\\s*\\(\\s*id\\s*,\\s*analysis_run_id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
   );
   assertNamedConstraint(
     body,
-    'tender_agentic_documents_source_document_fk',
-    'FOREIGN\\s+KEY\\s*\\(\\s*source_document_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_analysis_documents\\s*\\(\\s*id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
+    'tender_agentic_documents_source_document_run_fk',
+    'FOREIGN\\s+KEY\\s*\\(\\s*source_document_id\\s*,\\s*analysis_run_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_analysis_documents\\s*\\(\\s*id\\s*,\\s*analysis_run_id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
   );
   assertNamedConstraint(body, 'tender_agentic_documents_artifact_key_key', 'UNIQUE\\s*\\(\\s*job_id\\s*,\\s*artifact_key\\s*\\)');
   assertNamedConstraint(body, 'tender_agentic_documents_document_index_key', 'UNIQUE\\s*\\(\\s*job_id\\s*,\\s*document_index\\s*\\)');
@@ -271,13 +316,30 @@ test('field result table isolates raw and effective exact-27 projections', async
   assertNamedConstraint(body, 'tender_agentic_field_results_pkey', 'PRIMARY\\s+KEY\\s*\\(\\s*job_id\\s*,\\s*field_key\\s*\\)');
   assertNamedConstraint(body, 'tender_agentic_field_results_field_index_key', 'UNIQUE\\s*\\(\\s*job_id\\s*,\\s*field_index\\s*\\)');
   assertNamedConstraint(body, 'tender_agentic_field_results_field_index_check', 'CHECK\\s*\\(\\s*field_index\\s+BETWEEN\\s+1\\s+AND\\s+27\\s*\\)');
-  for (const parent of ['tender_agentic_jobs', 'tender_analysis_runs']) {
-    assert.match(body, new RegExp(`REFERENCES\\s+public\\.${parent}\\s*\\(\\s*id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE`, 'i'));
-  }
+  assertNamedConstraint(
+    body,
+    'tender_agentic_field_results_job_run_catalog_fk',
+    'FOREIGN\\s+KEY\\s*\\(\\s*job_id\\s*,\\s*analysis_run_id\\s*,\\s*field_catalog_version\\s*\\)\\s+REFERENCES\\s+public\\.tender_agentic_jobs\\s*\\(\\s*id\\s*,\\s*analysis_run_id\\s*,\\s*field_catalog_version\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
+  );
+  assertNamedConstraint(
+    body,
+    'tender_agentic_field_results_analysis_run_fk',
+    'FOREIGN\\s+KEY\\s*\\(\\s*analysis_run_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_analysis_runs\\s*\\(\\s*id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
+  );
   for (const status of ['resolved', 'requires_review', 'not_found']) {
     assert.ok((body.match(new RegExp(`'${status}'`, 'gi')) || []).length >= 2, `${status} must be allowed for both status columns`);
   }
   for (const level of ['pass', 'warning', 'downgraded']) assert.match(body, new RegExp(`'${level}'`, 'i'));
+});
+
+test('implementation plan records same-run and field-catalog database ownership', async () => {
+  const plan = await readFile(planUrl, 'utf8');
+  assert.match(plan, /tender_agentic_documents[\s\S]*?analysis_run_id uuid NOT NULL/i);
+  assert.match(plan, /UNIQUE \(id, analysis_run_id\)/i);
+  assert.match(plan, /UNIQUE \(id, analysis_run_id, field_catalog_version\)/i);
+  assert.match(plan, /FOREIGN KEY \(job_id, analysis_run_id\)[\s\S]*?tender_agentic_jobs\(id, analysis_run_id\)/i);
+  assert.match(plan, /FOREIGN KEY \(source_document_id, analysis_run_id\)[\s\S]*?tender_analysis_documents\(id, analysis_run_id\)/i);
+  assert.match(plan, /FOREIGN KEY \(job_id, analysis_run_id, field_catalog_version\)[\s\S]*?tender_agentic_jobs\(id, analysis_run_id, field_catalog_version\)/i);
 });
 
 test('migration creates the three monitor indexes idempotently', async () => {
@@ -313,18 +375,20 @@ test('postconditions validate exact shadow columns, constraints, FKs and indexes
     assert.match(postconditions, new RegExp(escapeRegExp(catalog), 'i'));
   }
   assert.match(postconditions, /relkind\s*<>\s*'r'/i, 'shadow objects must remain ordinary tables');
-  for (const count of [29, 15, 14]) assert.match(postconditions, new RegExp(`<>\\s*${count}\\b`, 'i'));
+  for (const count of [29, 16, 14]) assert.match(postconditions, new RegExp(`<>\\s*${count}\\b`, 'i'));
   for (const name of [
     'tender_agentic_jobs_pkey',
     'tender_agentic_jobs_analysis_run_fk',
     'tender_agentic_jobs_run_pipeline_replicate_key',
+    'tender_agentic_jobs_id_run_key',
+    'tender_agentic_jobs_id_run_catalog_key',
     'tender_agentic_documents_pkey',
-    'tender_agentic_documents_job_fk',
-    'tender_agentic_documents_source_document_fk',
+    'tender_agentic_documents_job_run_fk',
+    'tender_agentic_documents_source_document_run_fk',
     'tender_agentic_documents_artifact_key_key',
     'tender_agentic_documents_document_index_key',
     'tender_agentic_field_results_pkey',
-    'tender_agentic_field_results_job_fk',
+    'tender_agentic_field_results_job_run_catalog_fk',
     'tender_agentic_field_results_analysis_run_fk',
     'tender_agentic_field_results_field_index_key',
     'idx_tender_agentic_jobs_status_heartbeat',
@@ -334,6 +398,12 @@ test('postconditions validate exact shadow columns, constraints, FKs and indexes
     assert.match(postconditions, new RegExp(`'${name}'`, 'i'));
   }
   assert.match(postconditions, /convalidated/i);
+  assert.doesNotMatch(
+    postconditions,
+    /\)\s*\(SELECT \* FROM expected EXCEPT SELECT \* FROM actual\)/i,
+    'shadow inventory CTE needs an explicit SELECT wrapper accepted by PostgreSQL runtime planning',
+  );
+  assert.match(postconditions, /FULL\s+(?:OUTER\s+)?JOIN/i);
   assert.match(postconditions, /condeferrable/i);
   assert.match(postconditions, /condeferred/i);
   assert.match(postconditions, /connoinherit/i);
@@ -714,6 +784,165 @@ function psqlIsAvailable() {
   return result.status === 0;
 }
 
+const DESTRUCTIVE_RESET_SENTINEL = 'DROP_PUBLIC_SCHEMA_FOR_AGENTIC_SHADOW_TEST_ONLY';
+
+const PUBLIC_OBJECT_COUNTERS = [
+  'tables',
+  'partitionedTables',
+  'views',
+  'materializedViews',
+  'sequences',
+  'indexes',
+  'partitionedIndexes',
+  'foreignTables',
+  'otherRelations',
+  'routines',
+  'types',
+  'extensions',
+  'extensionDependencies',
+  'namespaceDependencies',
+  'defaultPrivileges',
+  'operators',
+  'collations',
+  'conversions',
+  'textSearchObjects',
+  'accessMethodObjects',
+  'statistics',
+];
+
+function assertSafeExternalResetTarget(identity, environment) {
+  if (environment.AGENTIC_TEST_ALLOW_DESTRUCTIVE_RESET !== DESTRUCTIVE_RESET_SENTINEL) {
+    throw new Error('External PostgreSQL fixture requires the explicit destructive-reset sentinel');
+  }
+
+  const databaseName = String(identity?.databaseName ?? '');
+  if (/(?:prod|production|stage|staging|live)/i.test(databaseName)) {
+    throw new Error('External PostgreSQL fixture database name is production-like');
+  }
+  if (!/^agentic_shadow_test_[0-9a-f]{8,64}$/.test(databaseName)) {
+    throw new Error('External PostgreSQL fixture database name does not match the strict disposable allowlist');
+  }
+  if (identity?.readOnly !== 'off') {
+    throw new Error('External PostgreSQL fixture must be write-capable');
+  }
+
+  const publicObjects = identity?.publicObjects;
+  const actualCounters = publicObjects && typeof publicObjects === 'object' && !Array.isArray(publicObjects)
+    ? Object.keys(publicObjects).sort()
+    : [];
+  const expectedCounters = [...PUBLIC_OBJECT_COUNTERS].sort();
+  if (actualCounters.length !== expectedCounters.length
+      || actualCounters.some((counter, index) => counter !== expectedCounters[index])
+      || PUBLIC_OBJECT_COUNTERS.some((key) => !Number.isSafeInteger(publicObjects[key]) || publicObjects[key] < 0)) {
+    throw new Error('External PostgreSQL fixture public namespace inventory is invalid');
+  }
+  if (PUBLIC_OBJECT_COUNTERS.some((key) => publicObjects[key] !== 0)) {
+    throw new Error('External PostgreSQL fixture public namespace must be empty before destructive reset');
+  }
+}
+
+function assertRuntimeProviderAvailability(requiredValue, available) {
+  const normalized = String(requiredValue ?? '').trim();
+  if (!['', '0', '1'].includes(normalized)) {
+    throw new Error('AGENTIC_REQUIRE_POSTGRES_RUNTIME must be unset, 0 or 1');
+  }
+  if (normalized === '1' && !available) {
+    throw new Error('Required PostgreSQL runtime is unavailable');
+  }
+}
+
+test('external fixture reset requires sentinel, strict disposable name and an empty public namespace', () => {
+  const safeIdentity = {
+    databaseName: 'agentic_shadow_test_deadbeef',
+    readOnly: 'off',
+    publicObjects: {
+      tables: 0,
+      partitionedTables: 0,
+      views: 0,
+      materializedViews: 0,
+      sequences: 0,
+      indexes: 0,
+      partitionedIndexes: 0,
+      foreignTables: 0,
+      otherRelations: 0,
+      routines: 0,
+      types: 0,
+      extensions: 0,
+      extensionDependencies: 0,
+      namespaceDependencies: 0,
+      defaultPrivileges: 0,
+      operators: 0,
+      collations: 0,
+      conversions: 0,
+      textSearchObjects: 0,
+      accessMethodObjects: 0,
+      statistics: 0,
+    },
+  };
+  const allowedEnvironment = { AGENTIC_TEST_ALLOW_DESTRUCTIVE_RESET: DESTRUCTIVE_RESET_SENTINEL };
+
+  assert.throws(
+    () => assertSafeExternalResetTarget(safeIdentity, {}),
+    /destructive-reset sentinel/i,
+  );
+  for (const databaseName of [
+    'agentic_shadow_test_production',
+    'agentic_shadow_test_stage_deadbeef',
+    'agentic_shadow_test_live_deadbeef',
+    'production',
+    'agentic_test',
+  ]) {
+    assert.throws(
+      () => assertSafeExternalResetTarget({ ...safeIdentity, databaseName }, allowedEnvironment),
+      /database name|production-like/i,
+      databaseName,
+    );
+  }
+
+  for (const [label, publicObjects] of [
+    ['only view', { ...safeIdentity.publicObjects, views: 1 }],
+    ['only sequence', { ...safeIdentity.publicObjects, sequences: 1 }],
+    ['only public function', { ...safeIdentity.publicObjects, routines: 1 }],
+  ]) {
+    assert.throws(
+      () => assertSafeExternalResetTarget({ ...safeIdentity, publicObjects }, allowedEnvironment),
+      /public namespace.*empty/i,
+      label,
+    );
+  }
+
+  assert.doesNotThrow(() => assertSafeExternalResetTarget(safeIdentity, allowedEnvironment));
+
+  const harnessSource = createDisposablePostgres.toString();
+  for (const catalog of [
+    'pg_catalog.pg_class',
+    'pg_catalog.pg_proc',
+    'pg_catalog.pg_type',
+    'pg_catalog.pg_extension',
+    'pg_catalog.pg_default_acl',
+    'pg_catalog.pg_operator',
+    'pg_catalog.pg_collation',
+    'pg_catalog.pg_conversion',
+    'pg_catalog.pg_ts_config',
+    'pg_catalog.pg_opclass',
+    'pg_catalog.pg_statistic_ext',
+  ]) {
+    assert.match(harnessSource, new RegExp(escapeRegExp(catalog)), `${catalog} must be covered before reset`);
+  }
+  assert.match(assertSafeExternalResetTarget.toString(), /AGENTIC_TEST_ALLOW_DESTRUCTIVE_RESET/);
+});
+
+test('required PostgreSQL runtime mode fails instead of silently skipping', () => {
+  assert.throws(
+    () => assertRuntimeProviderAvailability('1', false),
+    /required.*PostgreSQL runtime.*unavailable/i,
+  );
+  assert.doesNotThrow(() => assertRuntimeProviderAvailability('1', true));
+  assert.doesNotThrow(() => assertRuntimeProviderAvailability('0', false));
+  assert.throws(() => assertRuntimeProviderAvailability('yes', false), /AGENTIC_REQUIRE_POSTGRES_RUNTIME/i);
+  assert.match(createDisposablePostgres.toString(), /AGENTIC_REQUIRE_POSTGRES_RUNTIME/);
+});
+
 function assertProcessOk(result, label) {
   assert.equal(
     result.status,
@@ -725,21 +954,83 @@ function assertProcessOk(result, label) {
 
 async function createDisposablePostgres(t) {
   const suppliedUrl = process.env.AGENTIC_TEST_POSTGRES_URL?.trim();
+  const requiredRuntime = process.env.AGENTIC_REQUIRE_POSTGRES_RUNTIME;
+  assertRuntimeProviderAvailability(requiredRuntime, true);
+
   if (suppliedUrl) {
-    assert.ok(
-      psqlIsAvailable(),
-      'AGENTIC_TEST_POSTGRES_URL was supplied, but psql is unavailable',
-    );
+    const hasPsql = psqlIsAvailable();
+    assertRuntimeProviderAvailability(requiredRuntime, hasPsql);
+    assert.ok(hasPsql, 'AGENTIC_TEST_POSTGRES_URL was supplied, but psql is unavailable');
     const env = { ...process.env, PGDATABASE: suppliedUrl, PGCONNECT_TIMEOUT: '10' };
-    const identity = assertProcessOk(
+    const identityParts = assertProcessOk(
       runProcess('psql', ['--no-psqlrc', '-v', 'ON_ERROR_STOP=1', '-At', '-c',
-        "SELECT current_database(), current_setting('transaction_read_only'), (SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p'));"], { env }),
+        String.raw`
+          WITH public_namespace AS (
+            SELECT namespace_row.oid
+            FROM pg_catalog.pg_namespace AS namespace_row
+            WHERE namespace_row.nspname = 'public'
+          )
+          SELECT
+            current_database(),
+            current_setting('transaction_read_only'),
+            pg_catalog.jsonb_build_object(
+              'tables', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'r'),
+              'partitionedTables', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'p'),
+              'views', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'v'),
+              'materializedViews', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'm'),
+              'sequences', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'S'),
+              'indexes', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'i'),
+              'partitionedIndexes', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'I'),
+              'foreignTables', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind = 'f'),
+              'otherRelations', (SELECT count(*) FROM pg_catalog.pg_class AS object_row WHERE object_row.relnamespace = public_namespace.oid AND object_row.relkind NOT IN ('r', 'p', 'v', 'm', 'S', 'i', 'I', 'f')),
+              'routines', (SELECT count(*) FROM pg_catalog.pg_proc AS object_row WHERE object_row.pronamespace = public_namespace.oid),
+              'types', (SELECT count(*) FROM pg_catalog.pg_type AS object_row WHERE object_row.typnamespace = public_namespace.oid),
+              'extensions', (SELECT count(*) FROM pg_catalog.pg_extension AS object_row WHERE object_row.extnamespace = public_namespace.oid),
+              'extensionDependencies', (
+                SELECT count(*)
+                FROM pg_catalog.pg_depend AS dependency_row
+                JOIN pg_catalog.pg_extension AS extension_row
+                  ON extension_row.oid = dependency_row.refobjid
+                 AND dependency_row.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+                 AND dependency_row.deptype = 'e'
+                WHERE extension_row.extnamespace = public_namespace.oid
+              ),
+              'namespaceDependencies', (
+                SELECT count(*)
+                FROM pg_catalog.pg_depend AS dependency_row
+                WHERE dependency_row.refclassid = 'pg_catalog.pg_namespace'::pg_catalog.regclass
+                  AND dependency_row.refobjid = public_namespace.oid
+              ),
+              'defaultPrivileges', (SELECT count(*) FROM pg_catalog.pg_default_acl AS object_row WHERE object_row.defaclnamespace = public_namespace.oid),
+              'operators', (SELECT count(*) FROM pg_catalog.pg_operator AS object_row WHERE object_row.oprnamespace = public_namespace.oid),
+              'collations', (SELECT count(*) FROM pg_catalog.pg_collation AS object_row WHERE object_row.collnamespace = public_namespace.oid),
+              'conversions', (SELECT count(*) FROM pg_catalog.pg_conversion AS object_row WHERE object_row.connamespace = public_namespace.oid),
+              'textSearchObjects',
+                (SELECT count(*) FROM pg_catalog.pg_ts_config AS object_row WHERE object_row.cfgnamespace = public_namespace.oid)
+                + (SELECT count(*) FROM pg_catalog.pg_ts_dict AS object_row WHERE object_row.dictnamespace = public_namespace.oid)
+                + (SELECT count(*) FROM pg_catalog.pg_ts_parser AS object_row WHERE object_row.prsnamespace = public_namespace.oid)
+                + (SELECT count(*) FROM pg_catalog.pg_ts_template AS object_row WHERE object_row.tmplnamespace = public_namespace.oid),
+              'accessMethodObjects',
+                (SELECT count(*) FROM pg_catalog.pg_opclass AS object_row WHERE object_row.opcnamespace = public_namespace.oid)
+                + (SELECT count(*) FROM pg_catalog.pg_opfamily AS object_row WHERE object_row.opfnamespace = public_namespace.oid),
+              'statistics', (SELECT count(*) FROM pg_catalog.pg_statistic_ext AS object_row WHERE object_row.stxnamespace = public_namespace.oid)
+            )::text
+          FROM public_namespace;
+        `], { env }),
       'disposable PostgreSQL identity preflight',
     ).split('|');
-    assert.match(identity[0] ?? '', /agentic.*test|test.*agentic/i,
-      'AGENTIC_TEST_POSTGRES_URL must target a database whose name clearly contains agentic and test');
-    assert.equal(identity[1], 'off', 'disposable PostgreSQL must be write-capable');
-    assert.equal(identity[2], '0', 'disposable PostgreSQL public schema must start with zero tables');
+    if (identityParts.length !== 3) throw new Error('Disposable PostgreSQL identity preflight returned an invalid shape');
+    let publicObjects;
+    try {
+      publicObjects = JSON.parse(identityParts[2]);
+    } catch {
+      throw new Error('Disposable PostgreSQL identity preflight returned an invalid object inventory');
+    }
+    assertSafeExternalResetTarget({
+      databaseName: identityParts[0],
+      readOnly: identityParts[1],
+      publicObjects,
+    }, process.env);
     return {
       runSql(sql, { expectFailure = false } = {}) {
         const result = runProcess(
@@ -763,9 +1054,11 @@ async function createDisposablePostgres(t) {
   }
 
   if (!dockerIsAvailable()) {
+    assertRuntimeProviderAvailability(requiredRuntime, false);
     t.skip('PostgreSQL runtime SKIP: set AGENTIC_TEST_POSTGRES_URL with psql, or start Docker');
     return null;
   }
+  assertRuntimeProviderAvailability(requiredRuntime, true);
 
   const containerName = `agentic-migration-${randomUUID()}`;
   const start = runProcess('docker', [
@@ -847,9 +1140,98 @@ test('real PostgreSQL applies empty, populated and documented-variant fixtures t
             (SELECT count(*) FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class t ON t.oid=c.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND t.relname='tender_agentic_field_results'),
             (SELECT count(*) FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname LIKE 'idx_tender_agentic_jobs_%');
         `)),
-        '29|15|14|8|6|8|3',
+        '29|16|14|10|6|8|3',
         `${fixture.name}: shadow catalog counts differ`,
       );
+    }
+
+    postgres.reset();
+    postgres.runSql(canonicalFixtureSql);
+    postgres.runSql(populatedCanonicalFixtureSql);
+    postgres.runSql(String.raw`
+      INSERT INTO public.tender_analysis_runs (id, tender_id)
+      VALUES ('10000000-0000-4000-8000-000000000002', 'fixture-tender-2');
+      INSERT INTO public.tender_analysis_documents (id, analysis_run_id, document_index)
+      VALUES (
+        '20000000-0000-4000-8000-000000000002',
+        '10000000-0000-4000-8000-000000000002',
+        1
+      );
+    `);
+    postgres.runSql(migrationSql);
+    postgres.runSql(String.raw`
+      INSERT INTO public.tender_agentic_jobs (
+        id, analysis_run_id, pipeline_version, model, reasoning_effort,
+        field_catalog_version, field_catalog_sha256, expected_documents
+      ) VALUES (
+        '50000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+        'tender_agentic_pipeline_v1', 'fixture-model', 'high',
+        'tender_fields_v1', 'fixture-catalog-hash', 1
+      );
+    `);
+
+    for (const ownershipViolation of [
+      {
+        name: 'document source from a different canonical run',
+        sql: String.raw`
+          INSERT INTO public.tender_agentic_documents (
+            job_id, analysis_run_id, source_document_id, artifact_key, document_index
+          ) VALUES (
+            '50000000-0000-4000-8000-000000000001',
+            '10000000-0000-4000-8000-000000000001',
+            '20000000-0000-4000-8000-000000000002', 'cross-source-run', 1
+          );
+        `,
+        constraint: /tender_agentic_documents_source_document_run_fk/i,
+      },
+      {
+        name: 'document job from a different analysis run',
+        sql: String.raw`
+          INSERT INTO public.tender_agentic_documents (
+            job_id, analysis_run_id, source_document_id, artifact_key, document_index
+          ) VALUES (
+            '50000000-0000-4000-8000-000000000001',
+            '10000000-0000-4000-8000-000000000002',
+            '20000000-0000-4000-8000-000000000002', 'cross-job-run', 1
+          );
+        `,
+        constraint: /tender_agentic_documents_job_run_fk/i,
+      },
+      {
+        name: 'field result from a different analysis run',
+        sql: String.raw`
+          INSERT INTO public.tender_agentic_field_results (
+            job_id, analysis_run_id, field_catalog_version, field_index, field_key,
+            reported_status, effective_status, requires_human_review,
+            validation_level, result_json
+          ) VALUES (
+            '50000000-0000-4000-8000-000000000001',
+            '10000000-0000-4000-8000-000000000002', 'tender_fields_v1',
+            1, 'procurement_subject', 'not_found', 'not_found', false, 'pass', '{}'::jsonb
+          );
+        `,
+        constraint: /tender_agentic_field_results_job_run_catalog_fk/i,
+      },
+      {
+        name: 'field result from a different field catalog',
+        sql: String.raw`
+          INSERT INTO public.tender_agentic_field_results (
+            job_id, analysis_run_id, field_catalog_version, field_index, field_key,
+            reported_status, effective_status, requires_human_review,
+            validation_level, result_json
+          ) VALUES (
+            '50000000-0000-4000-8000-000000000001',
+            '10000000-0000-4000-8000-000000000001', 'tender_fields_v2',
+            1, 'procurement_subject', 'not_found', 'not_found', false, 'pass', '{}'::jsonb
+          );
+        `,
+        constraint: /tender_agentic_field_results_job_run_catalog_fk/i,
+      },
+    ]) {
+      const rejected = postgres.runSql(ownershipViolation.sql, { expectFailure: true });
+      assert.notEqual(rejected.status, 0, `${ownershipViolation.name}: insert unexpectedly succeeded`);
+      assert.match(String(rejected.stderr), ownershipViolation.constraint, `${ownershipViolation.name}: wrong FK rejection`);
     }
 
     for (const drift of [
