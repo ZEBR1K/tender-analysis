@@ -224,8 +224,9 @@ test('negative isolation canary covers sibling jobs, Codex auth and process envi
   ]);
 });
 
-test('execute-shaped routes fail closed until the Task 8 isolation canary is verified', async (t) => {
+test('POST /v1/jobs/{uuid}/start fails closed until the Task 8 isolation canary is verified', async (t) => {
   const secret = 'e'.repeat(32);
+  const jobId = '11111111-1111-4111-8111-111111111111';
   let handlerCalled = false;
   const server = createServer({
     authenticator: createHeaderAuthenticator(secret),
@@ -239,7 +240,7 @@ test('execute-shaped routes fail closed until the Task 8 isolation canary is ver
   t.after(() => close(server));
   const base = await listen(server);
 
-  const response = await fetch(`${base}/v1/jobs/id/execute`, {
+  const response = await fetch(`${base}/v1/jobs/${jobId}/start`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -328,9 +329,11 @@ test('octet-stream uploads reach the handler incrementally and reject chunked ov
     authenticator: createHeaderAuthenticator(secret),
     bodyLimits: { maxJsonBytes: 16, maxDocumentBytes: 10 },
     healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
-    v1Handler: async ({ bodyKind, bodyStream, rawBody }) => {
+    v1Handler: async ({ bodyKind, bodyStream, rawBody, ...metadata }) => {
       assert.equal(bodyKind, 'document');
       assert.equal(rawBody, null);
+      assert.equal(Object.hasOwn(metadata, 'request'), false);
+      assert.equal(metadata.requestMetadata.headers['x-tender-codex-token'], undefined);
       let bytes = 0;
       let chunks = 0;
       for await (const chunk of bodyStream) {
@@ -411,6 +414,77 @@ test('global upload bound rejects a concurrent document stream', async (t) => {
 
   releaseFirst();
   assert.equal((await first).status, 200);
+});
+
+test('server drains an ignored chunked document and lets an eventual overflow override success', async (t) => {
+  const secret = '1'.repeat(32);
+  let handlerCalls = 0;
+  const server = createServer({
+    authenticator: createHeaderAuthenticator(secret),
+    bodyLimits: { maxJsonBytes: 16, maxDocumentBytes: 10 },
+    healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
+    v1Handler: async () => {
+      handlerCalls += 1;
+      return { success: true };
+    },
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const upload = openChunkedRequest(`${base}/v1/jobs/id/documents/ignored`, {
+    'content-type': 'application/octet-stream',
+    'x-tender-codex-token': secret,
+  });
+
+  upload.request.write(Buffer.alloc(6, 1));
+  upload.request.end(Buffer.alloc(5, 2));
+  const response = await upload.response;
+  assert.equal(response.status, 413);
+  assert.equal(response.body.error.code, 'RUNNER_BODY_TOO_LARGE');
+  assert.equal(handlerCalls, 1);
+});
+
+test('an early handler error keeps the global upload slot until request EOF', async (t) => {
+  const secret = '2'.repeat(32);
+  let firstEntered;
+  const entered = new Promise((resolve) => { firstEntered = resolve; });
+  let handlerCalls = 0;
+  const server = createServer({
+    authenticator: createHeaderAuthenticator(secret),
+    bodyLimits: { maxJsonBytes: 16, maxDocumentBytes: 32 },
+    healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
+    v1Handler: async ({ bodyStream }) => {
+      handlerCalls += 1;
+      if (handlerCalls === 1) {
+        firstEntered();
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'upload sink failed', 422);
+      }
+      for await (const _chunk of bodyStream) { /* consume a later accepted request */ }
+      return { success: true };
+    },
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const headers = {
+    'content-type': 'application/octet-stream',
+    'x-tender-codex-token': secret,
+  };
+  const first = openChunkedRequest(`${base}/v1/jobs/id/documents/first`, headers);
+  first.request.write(Buffer.alloc(4, 1));
+  await entered;
+
+  const second = await fetch(`${base}/v1/jobs/id/documents/second`, {
+    method: 'PUT',
+    headers,
+    body: Buffer.alloc(4, 2),
+  });
+  first.request.end();
+  const firstResponse = await first.response;
+
+  assert.equal(second.status, 503);
+  assert.equal((await second.json()).error.code, 'RUNNER_UPLOAD_BUSY');
+  assert.equal(handlerCalls, 1);
+  assert.equal(firstResponse.status, 422);
+  assert.equal(firstResponse.body.error.code, 'RUNNER_REQUEST_INVALID');
 });
 
 test('typed and unexpected errors expose only bounded safe messages', async (t) => {
