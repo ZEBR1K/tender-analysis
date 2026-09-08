@@ -11,6 +11,7 @@ const runnerDirectory = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const dockerfilePath = path.join(runnerDirectory, 'Dockerfile');
 const composePath = path.join(runnerDirectory, 'compose.yaml');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
+const permissionsSourcePath = path.join(runnerDirectory, 'src', 'permissions.mjs');
 
 test('runner image pins Node, Codex CLI and every document inspection tool', async () => {
   const dockerfile = await readFile(dockerfilePath, 'utf8');
@@ -25,6 +26,8 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
   assert.match(dockerfile, /npm ci --omit=dev/u);
+  assert.match(dockerfile, /CODEX_HOME=\/run\/codex-auth/u);
+  assert.doesNotMatch(dockerfile, /CODEX_HOME=\/data\/jobs/u);
   assert.match(dockerfile, /USER 10001:10001/u);
   assert.match(dockerfile, /CMD \["node", "src\/server\.mjs"\]/u);
 });
@@ -40,8 +43,16 @@ test('runner Compose boundary is internal-only, least-privilege and resource bou
   assert.match(compose, /no-new-privileges:true/u);
   assert.match(compose, /healthcheck:/u);
   assert.match(compose, /\/opt\/tender-codex-runner\/jobs:\/data\/jobs/u);
+  assert.match(compose, /\/opt\/tender-codex-runner\/secrets\/runner-auth-token:\/run\/secrets\/runner-auth-token:ro/u);
+  assert.match(compose, /\/opt\/tender-codex-runner\/secrets\/codex-auth:\/run\/codex-auth:ro/u);
+  assert.doesNotMatch(compose, /TENDER_CODEX_RUNNER_AUTH_TOKEN:\s/u);
   assert.doesNotMatch(compose, /^\s*tmpfs:/mu);
-  assert.equal((compose.match(/^\s*volumes:/gmu) || []).length, 1);
+  const hostMounts = compose.split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('- /opt/tender-codex-runner/'));
+  assert.deepEqual(hostMounts.filter((line) => !line.endsWith(':ro')), [
+    '- /opt/tender-codex-runner/jobs:/data/jobs',
+  ]);
   assert.match(compose, /cpus:\s*1\.0/u);
   assert.match(compose, /memory:\s*1536M/u);
   assert.match(compose, /pids_limit:\s*192/u);
@@ -53,6 +64,15 @@ test('runner uses constant-time Header Auth for protected routes', async () => {
   const authSource = await readFile(authSourcePath, 'utf8');
   assert.match(authSource, /timingSafeEqual/u);
   assert.match(authSource, /x-tender-codex-token/iu);
+});
+
+test('runner ships a fail-closed Codex permission boundary rather than legacy sandbox flags', async () => {
+  const permissionsSource = await readFile(permissionsSourcePath, 'utf8');
+  assert.match(permissionsSource, /filesystem\.:root/u);
+  assert.match(permissionsSource, /filesystem\.:minimal/u);
+  assert.match(permissionsSource, /--ignore-user-config/u);
+  assert.match(permissionsSource, /shell_environment_policy/u);
+  assert.doesNotMatch(permissionsSource, /dangerously-bypass/u);
 });
 
 test('runner Compose passes the Docker Compose parser', (context) => {

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 
 export const BODY_LIMITS = Object.freeze({
   maxJsonBytes: 2 * 1024 * 1024,
@@ -15,15 +16,31 @@ function positiveInteger(env, name, fallback) {
   return value;
 }
 
+function readSecretFile(filePath) {
+  if (!filePath) return '';
+  try {
+    return readFileSync(filePath, 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
 export function createConfig(env = process.env) {
+  const authTokenFile = String(env.TENDER_CODEX_RUNNER_AUTH_TOKEN_FILE || '');
   return Object.freeze({
     host: env.TENDER_CODEX_RUNNER_HOST || '127.0.0.1',
     port: positiveInteger(env, 'TENDER_CODEX_RUNNER_PORT', 8080),
     rootDirectory: path.resolve(env.TENDER_CODEX_RUNNER_ROOT || path.join(process.cwd(), '.codex-runner')),
-    authToken: String(env.TENDER_CODEX_RUNNER_AUTH_TOKEN || ''),
+    authToken: String(env.TENDER_CODEX_RUNNER_AUTH_TOKEN || readSecretFile(authTokenFile)),
+    authTokenFile,
+    codexAuthFile: path.resolve(
+      env.TENDER_CODEX_RUNNER_CODEX_AUTH_FILE || '/run/codex-auth/auth.json',
+    ),
     maxConcurrentCodex: 1,
+    maxConcurrentUploads: 1,
     maxQueuedJobs: positiveInteger(env, 'TENDER_CODEX_RUNNER_MAX_QUEUED_JOBS', 2),
     bodyLimits: BODY_LIMITS,
+    isolationCanaryVerified: false,
   });
 }
 

@@ -7,7 +7,9 @@ const PUBLIC_CODES = new Set([
   'RUNNER_QUEUE_FULL',
   'RUNNER_REQUEST_INVALID',
   'RUNNER_ROUTE_NOT_FOUND',
+  'RUNNER_UPLOAD_BUSY',
   'RUNNER_INTERNAL',
+  'RUNNER_ISOLATION_NOT_READY',
 ]);
 
 export const MAX_SAFE_ERROR_MESSAGE_LENGTH = 500;
@@ -21,12 +23,15 @@ function safeMessage(value, fallback) {
 
 export class RunnerError extends Error {
   constructor(code, message, httpStatus = 422) {
-    super(message);
+    const isPublicCode = PUBLIC_CODES.has(code);
+    super(isPublicCode ? message : 'Runner request failed');
     this.name = 'RunnerError';
-    this.code = PUBLIC_CODES.has(code) ? code : 'RUNNER_INTERNAL';
-    this.httpStatus = Number.isInteger(httpStatus) && httpStatus >= 400 && httpStatus <= 599
-      ? httpStatus
-      : 500;
+    this.code = isPublicCode ? code : 'RUNNER_INTERNAL';
+    this.httpStatus = isPublicCode
+      && Number.isInteger(httpStatus)
+      && httpStatus >= 400
+      && httpStatus <= 599
+      ? httpStatus : 500;
   }
 }
 

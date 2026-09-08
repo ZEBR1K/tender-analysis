@@ -20,11 +20,11 @@ COPY schemas ./schemas
 COPY policies ./policies
 COPY src ./src
 
-RUN mkdir --parents /data/jobs/.home /data/jobs/.codex /data/jobs/.tmp \
+RUN mkdir --parents /data/jobs/.tmp \
     && chown --recursive 10001:10001 /data/jobs
 
-ENV HOME=/data/jobs/.home \
-    CODEX_HOME=/data/jobs/.codex \
+ENV HOME=/run/codex-auth \
+    CODEX_HOME=/run/codex-auth \
     TMPDIR=/data/jobs/.tmp
 
 USER 10001:10001
