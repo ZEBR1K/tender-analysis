@@ -130,9 +130,9 @@ tests/fixtures/agentic/results/ellipsis-valid.json
 tests/fixtures/agentic/results/ellipsis-material-gap.json
 tests/fixtures/agentic/results/absence-negative.json
 tests/fixtures/agentic/results/incomplete-not-found.json
-evaluations/agentic-gold-v1/README.md
-evaluations/agentic-gold-v1/adjudication.json
-evaluations/agentic-gold-v1/source-manifest.sha256
+evaluations/agentic-baseline-v0/README.md
+evaluations/agentic-baseline-v0/adjudication.json
+evaluations/agentic-baseline-v0/source-manifest.sha256
 ```
 
 ### Изменить только после branch reconciliation
@@ -427,7 +427,7 @@ MANIFEST_HASH_MISMATCH
 
 ```text
 Lane A — можно начинать сейчас, независимо
-Tasks 1–10: gold set, schema, shadow migration, runner, source index,
+Tasks 1–10: provisional evaluation baseline, schema, shadow migration, runner, source index,
 skill, Codex execution, validator and runner lifecycle
 
 Lane B — требует завершённого reconciliation
@@ -472,24 +472,26 @@ chore: reconcile intake archive and report baselines
 
 **Gate:** one clean integration branch contains all three prerequisites; no production workflow or DB state changed.
 
-### Task 1: Build an adjudicated accuracy baseline
+### Task 1: Build a provisional four-run evaluation baseline v0
 
 **Files:**
 
 ```text
-evaluations/agentic-gold-v1/README.md
-evaluations/agentic-gold-v1/adjudication.json
-evaluations/agentic-gold-v1/source-manifest.sha256
+evaluations/agentic-baseline-v0/README.md
+evaluations/agentic-baseline-v0/adjudication.json
+evaluations/agentic-baseline-v0/source-manifest.sha256
 tests/agentic-eval-harness.test.mjs
 scripts/evaluate-agentic-result.mjs
 ```
 
-- [ ] Write `tests/agentic-eval-harness.test.mjs` first. It must fail because no full 27-field adjudication exists.
-- [ ] Define `adjudication.json` with exactly 27 catalog keys, accepted status set, mandatory material facts, forbidden conclusions and source anchors. Preserve uncertainty as an allowed set where the source itself is genuinely ambiguous.
-- [ ] Manually adjudicate all 27 fields against the 12 blind-test source files. Do not copy any agent output as truth without checking the sources.
-- [ ] Pin the SHA-256 of every source file and `FIELD_CATALOG.md` in `source-manifest.sha256`.
-- [ ] Implement `scripts/evaluate-agentic-result.mjs` to report structural pass, status agreement, critical false-resolved count, unsupported negative count, evidence verification rate and field-level diffs.
-- [ ] Add explicit oracles for the known failures: VAT arithmetic, `national_regime`, `application_documents`, `similar_supply_experience`, `participation_cost`, and the completeness-sensitive guarantee/certificate fields.
+- [ ] Write `tests/agentic-eval-harness.test.mjs` first. It must fail because the complete baseline v0 and evaluator do not yet exist.
+- [ ] Build `adjudication.json` from the four immutable archived runs plus the already completed `comparison.md` spot-check. Record exactly 27 `FIELD_CATALOG.md` keys, every reported status, accepted status set, `source_checked|cross_run_consensus|known_disagreement` confidence, mandatory material facts, forbidden conclusions, source anchors and notes.
+- [ ] Mark every field not checked against a source as `source_check_status=not_source_verified` with empty source anchors. Do not promote run agreement or citation presence into source truth.
+- [ ] Preserve the reviewed decisions: 22/27 unanimous statuses; `customer_contacts=resolved`; `participation_cost=not_found`; `national_regime=requires_review`; conservative `similar_supply_experience=requires_review`; `application_documents=requires_review`; derived `procurement_subject` count 11 rather than 10; strict `licenses_certificates` scope.
+- [ ] Pin the SHA-256 of all 12 archived source files and the archived `inputs/FIELD_CATALOG.md` in `source-manifest.sha256`.
+- [ ] Implement `scripts/evaluate-agentic-result.mjs` with explicit typed adapters for all four archived Markdown label variants and future `tender_agent_result_v1` JSON. Report structural pass, status agreement, critical false-resolved count, unsupported negative count, evidence verification rate, field-level diffs and baseline limitations as machine-readable JSON.
+- [ ] Return a typed unsupported-format error with nonzero exit for unexpected input. Do not use fuzzy semantics or treat an archived citation as source verification.
+- [ ] Document that baseline v0 is provisional, is not full source-grounded manual truth and cannot be a production acceptance gate.
 
 Run:
 
@@ -498,15 +500,15 @@ node --test tests/agentic-eval-harness.test.mjs
 node scripts/evaluate-agentic-result.mjs evaluations/codex-agentic-blind-test-2026-09-08/raw/exec/codex-result.md
 ```
 
-Expected: the test passes; the historical Markdown run is either converted by an explicit legacy adapter or rejected with a typed unsupported-format result, never silently treated as the new JSON contract.
+Expected: all four historical Markdown reports produce exact 27-field typed evaluations, future JSON uses its own adapter, and unsupported input fails with a typed nonzero result.
 
 - [ ] Commit:
 
 ```text
-test(agentic): add adjudicated 27-field evaluation baseline
+test(agentic): add provisional four-run evaluation baseline
 ```
 
-**Gate:** accuracy can be measured against a reviewed source-grounded baseline, not only agreement between models.
+**Gate:** shadow-MVP regressions can be measured against an explicitly limited four-run baseline. A complete source-grounded manual adjudication of all 27 fields remains a separate future production gate and does not block stages 3–5 shadow MVP work.
 
 ### Task 2: Define and test the agent result schemas and field policy mirror
 
@@ -1023,7 +1025,7 @@ PROJECT_STATUS.md
 
 - [ ] Run the complete 12-document blind corpus through the local runner four times with identical model, effort, prompt, skill, schema, tool versions and source hashes.
 - [ ] Store raw result, validation, source coverage, JSONL and token usage for every replicate.
-- [ ] Evaluate all four against `agentic-gold-v1`.
+- [ ] Evaluate all four against provisional `agentic-baseline-v0`; keep its status metrics diagnostic rather than treating them as production truth.
 - [ ] Compare reported and effective statuses separately so validator containment is visible.
 - [ ] Record cached input tokens but do not equate them with zero cost or subscription usage.
 - [ ] Do not tune model/effort until all four baseline runs are archived.
@@ -1049,7 +1051,7 @@ known ellipsized-but-valid quotes accepted
 no secret/client document text in runner service logs
 ```
 
-Status agreement alone is diagnostic, not a release gate. Any critical false-resolved returns implementation to Task 9; it does not justify adding a second agent automatically.
+Status agreement against baseline v0 is diagnostic, not a release gate. Validator containment and mechanical evidence checks remain the shadow gate. Any critical false-resolved returns implementation to Task 9; it does not justify adding a second agent automatically. Full source-grounded 27-field adjudication remains a separate future production-promotion gate.
 
 **Commit:**
 
@@ -1173,7 +1175,7 @@ Do not optimize cost before the Task 15 accuracy gate. After the high-effort bas
 1. keep one agent and reduce duplicated prompt text through the dedicated skill;
 2. compare `high` with `medium` reasoning under identical inputs;
 3. compare a cheaper model only after the reasoning-effort experiment;
-4. retain the same schema, validator and gold set;
+4. retain the same schema, validator and provisional baseline v0 for like-for-like shadow comparison;
 5. accept an optimization only when critical false-resolved remains zero and evidence/coverage gates remain unchanged.
 
 Cached input tokens are recorded separately because they may reduce API price, but they still count as usage and do not guarantee lower ChatGPT subscription limits. Server API-key usage follows API billing; local ChatGPT-auth runs follow the applicable ChatGPT plan/workspace limits.
