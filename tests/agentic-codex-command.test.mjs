@@ -1,8 +1,27 @@
 import assert from 'node:assert/strict';
-import { readFile, readdir } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+} from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+import {
+  buildCodexCommand,
+  executeCodexCommand,
+  sanitizeCodexEnvironment,
+  shouldRetryCodexAttempt,
+} from '../deploy/codex-runner/src/codex-command.mjs';
+import {
+  createCodexEventAccumulator,
+  parseCodexEventLine,
+} from '../deploy/codex-runner/src/codex-events.mjs';
+import { buildCodexPermissionBoundary } from '../deploy/codex-runner/src/permissions.mjs';
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
@@ -18,6 +37,14 @@ const skillPath = path.join(
 );
 const promptPath = path.join(runnerRoot, 'prompts', 'tender-analysis-v1.txt');
 const dockerfilePath = path.join(runnerRoot, 'Dockerfile');
+const fakeCodexPath = path.join(
+  repositoryRoot,
+  'tests',
+  'fixtures',
+  'agentic',
+  'fake-codex.mjs',
+);
+const fixtureJobId = '00000000-0000-4000-8000-000000000007';
 
 async function listRelativeFiles(root, directory = root) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -98,4 +125,203 @@ test('runner image contains the dedicated template and prompt', async () => {
   const dockerfile = await readFile(dockerfilePath, 'utf8');
   assert.match(dockerfile, /^COPY agent-template \.\/agent-template$/mu);
   assert.match(dockerfile, /^COPY prompts \.\/prompts$/mu);
+});
+
+test('Codex argv is fixed, shell-free and includes the exact per-job permission boundary', () => {
+  const command = buildCodexCommand({ jobId: fixtureJobId });
+  const boundary = buildCodexPermissionBoundary({ jobId: fixtureJobId });
+
+  assert.equal(command.executable, 'codex');
+  assert.deepEqual(
+    command.args.slice(0, boundary.cliArgs.length + 1),
+    ['exec', ...boundary.cliArgs],
+  );
+  assert.equal(command.cwd, boundary.workspaceDirectory);
+  assert.equal(command.promptPath, '/app/prompts/tender-analysis-v1.txt');
+  assert.equal(
+    command.resultPath,
+    `/data/jobs/${fixtureJobId}/workspace/output/result.json`,
+  );
+  assert.deepEqual(command.args.slice(boundary.cliArgs.length + 1), [
+    '--ephemeral',
+    '--ignore-rules',
+    '--model',
+    'gpt-5.6-sol',
+    '-c',
+    'model_reasoning_effort="high"',
+    '-c',
+    'tools.web_search=false',
+    '-c',
+    'tools.view_image=true',
+    '-C',
+    boundary.workspaceDirectory,
+    '--skip-git-repo-check',
+    '--output-schema',
+    '/app/schemas/tender-agent-result-v1.schema.json',
+    '--json',
+    '-o',
+    command.resultPath,
+    '-',
+  ]);
+  assert.equal(command.args.filter((entry) => entry === '--ignore-user-config').length, 1);
+  assert.equal(command.args.includes('--sandbox'), false);
+  assert.equal(command.args.includes('-s'), false);
+  assert.equal(command.args.some((entry) => entry.includes('sandbox_workspace_write')), false);
+  assert.equal(command.shell, false);
+
+  assert.throws(
+    () => buildCodexCommand({ jobId: fixtureJobId, extraArgs: ['--sandbox', 'workspace-write'] }),
+    /unsupported option|caller arguments/iu,
+  );
+});
+
+test('Codex event parser accepts audited terminals and sums exact usage', () => {
+  const accumulator = createCodexEventAccumulator();
+  accumulator.accept(parseCodexEventLine('{"type":"thread.started","thread_id":"thread-1"}'));
+  accumulator.accept(parseCodexEventLine(JSON.stringify({
+    type: 'turn.completed',
+    usage: {
+      input_tokens: 120,
+      cached_input_tokens: 80,
+      output_tokens: 30,
+      reasoning_output_tokens: 12,
+    },
+  })));
+
+  assert.deepEqual(accumulator.snapshot(), {
+    thread_id: 'thread-1',
+    terminal_event: 'turn.completed',
+    event_count: 2,
+    usage: {
+      input_tokens: 120,
+      cached_input_tokens: 80,
+      output_tokens: 30,
+      reasoning_output_tokens: 12,
+    },
+  });
+  assert.throws(() => parseCodexEventLine('not-json'), /CODEX_EVENT_STREAM_INVALID/);
+});
+
+test('Codex process environment is allowlisted and strips secret-like keys', () => {
+  const sanitized = sanitizeCodexEnvironment({
+    PATH: '/usr/bin:/bin',
+    CODEX_HOME: '/run/codex-auth',
+    HOME: '/run/codex-auth',
+    LANG: 'C.UTF-8',
+    TZ: 'Europe/Moscow',
+    OPENAI_API_KEY: 'must-not-pass',
+    TENDER_CODEX_RUNNER_AUTH_TOKEN: 'must-not-pass',
+    DATABASE_PASSWORD: 'must-not-pass',
+    SAFE_BUT_UNLISTED: 'must-not-pass',
+  });
+  assert.deepEqual(sanitized, {
+    PATH: '/usr/bin:/bin',
+    CODEX_HOME: '/run/codex-auth',
+    HOME: '/run/codex-auth',
+    LANG: 'C.UTF-8',
+    TZ: 'Europe/Moscow',
+  });
+});
+
+async function runFake(mode, { timeoutMs = 2_000, killGraceMs = 100 } = {}) {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'agentic-codex-command-'));
+  const workspaceDirectory = path.join(temporaryRoot, 'workspace');
+  const outputDirectory = path.join(workspaceDirectory, 'output');
+  const auditDirectory = path.join(temporaryRoot, 'audit');
+  await Promise.all([
+    mkdir(outputDirectory, { recursive: true }),
+    mkdir(auditDirectory, { recursive: true }),
+  ]);
+  const resultPath = path.join(outputDirectory, 'result.json');
+  const execution = await executeCodexCommand({
+    executable: process.execPath,
+    args: [fakeCodexPath, '-o', resultPath, '-'],
+    cwd: workspaceDirectory,
+    prompt: `[fake:${mode}]`,
+    resultPath,
+    auditDirectory,
+    attempt: 1,
+    timeoutMs,
+    killGraceMs,
+    baseEnv: {
+      ...process.env,
+      OPENAI_API_KEY: 'must-not-reach-fake',
+      TENDER_CODEX_RUNNER_AUTH_TOKEN: 'must-not-reach-fake',
+    },
+  });
+  return { temporaryRoot, execution };
+}
+
+test('fake Codex success preserves JSONL audit, usage and parsed result without secrets', async () => {
+  const { temporaryRoot, execution } = await runFake('success');
+  try {
+    assert.equal(execution.ok, true);
+    assert.equal(execution.code, 'CODEX_COMPLETED');
+    assert.equal(execution.exit_code, 0);
+    assert.equal(execution.valid_json_result, true);
+    assert.equal(execution.events.terminal_event, 'turn.completed');
+    assert.equal(execution.events.usage.cached_input_tokens, 80);
+    assert.equal(execution.result.schema_version, 'fake_result_v1');
+
+    const [events, stderr] = await Promise.all([
+      readFile(execution.artifacts.events, 'utf8'),
+      readFile(execution.artifacts.stderr, 'utf8'),
+    ]);
+    assert.match(events, /"type":"thread.started"/u);
+    assert.match(events, /"type":"turn.completed"/u);
+    assert.equal(events.includes('must-not-reach-fake'), false);
+    assert.equal(stderr.includes('should-hide'), false);
+    assert.ok(Buffer.byteLength(stderr) <= 64 * 1024);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('invalid event stream and nonzero exit return typed failures without throwing', async () => {
+  for (const [mode, expectedCode] of [
+    ['invalid-jsonl', 'CODEX_EVENT_STREAM_INVALID'],
+    ['nonzero', 'CODEX_PROCESS_FAILED'],
+  ]) {
+    const { temporaryRoot, execution } = await runFake(mode);
+    try {
+      assert.equal(execution.ok, false);
+      assert.equal(execution.code, expectedCode);
+    } finally {
+      await rm(temporaryRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test('wall-clock timeout terminates the child and returns a typed timeout', async () => {
+  const { temporaryRoot, execution } = await runFake('hang', {
+    timeoutMs: 80,
+    killGraceMs: 40,
+  });
+  try {
+    assert.equal(execution.ok, false);
+    assert.equal(execution.code, 'CODEX_TIMEOUT');
+    assert.equal(execution.timed_out, true);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('automatic retry is limited to process or transport failure with no valid JSON', () => {
+  for (const code of [
+    'CODEX_PROCESS_FAILED',
+    'CODEX_SPAWN_FAILED',
+    'CODEX_TIMEOUT',
+    'CODEX_TRANSPORT_ERROR',
+  ]) {
+    assert.equal(shouldRetryCodexAttempt({ code, validJsonResult: false }), true, code);
+    assert.equal(shouldRetryCodexAttempt({ code, validJsonResult: true }), false, code);
+    assert.equal(shouldRetryCodexAttempt({ code, valid_json_result: true }), false, code);
+  }
+  for (const code of [
+    'CODEX_EVENT_STREAM_INVALID',
+    'CODEX_RESULT_INVALID',
+    'CODEX_CONTRACT_INVALID',
+  ]) {
+    assert.equal(shouldRetryCodexAttempt({ code, validJsonResult: false }), false, code);
+  }
 });
