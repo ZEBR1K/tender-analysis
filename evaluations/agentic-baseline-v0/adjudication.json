@@ -1,0 +1,389 @@
+{
+  "baseline_version": "agentic_baseline_v0",
+  "field_catalog_version": "tender_fields_v1",
+  "baseline_kind": "provisional_four_run_baseline",
+  "production_acceptance_gate": false,
+  "reported_run_ids": ["run_1", "run_2", "run_3", "exec"],
+  "limitations": [
+    "The baseline combines four archived agent reports with the limited comparison.md spot-check; it is not full manual adjudication.",
+    "Cross-run consensus is diagnostic and does not establish source-grounded truth.",
+    "Archived Markdown citations are preserved as report text but are not mechanically source-verified.",
+    "Legacy Markdown has no typed claim_basis, so unsupported-negative detection is limited for archived runs.",
+    "The corpus contains one procurement and cannot establish general semantic accuracy."
+  ],
+  "fields": [
+    {
+      "field_index": 1,
+      "field_key": "procurement_subject",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "source_checked",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "If the derived number of lids is included, it must be 11 (1 + 1 + 4 + 2 + 2 + 1)."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "The derived total is 10 lids.", "severity": "critical_false_resolved"}
+      ],
+      "source_anchors": [
+        {"source_file": "Блок_7_Техническое_задание.docx", "locator": "Спецификация, six position quantities; comparison.md §4.1"}
+      ],
+      "machine_checks": {
+        "forbidden_value_phrases": ["10 крышек"],
+        "derived_quantity": {"pattern": "\\b(\\d+)\\s+крыш", "expected": 11}
+      },
+      "notes": "All statuses agree, but comparison.md found run_1's 10-lid arithmetic error; run_3 reported 11."
+    },
+    {
+      "field_index": 2,
+      "field_key": "nm_price_with_vat",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional status only; VAT/value truth was not fully source-adjudicated for baseline v0."
+    },
+    {
+      "field_index": 3,
+      "field_key": "platform",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "FIELD_CATALOG.md key is platform; status-matrix.csv's procurement_platform spelling is not authoritative."
+    },
+    {
+      "field_index": 4,
+      "field_key": "procedure_type",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "FIELD_CATALOG.md key is procedure_type; status-matrix.csv's procurement_procedure spelling is not authoritative."
+    },
+    {
+      "field_index": 5,
+      "field_key": "application_deadline",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 6,
+      "field_key": "application_review_date",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 7,
+      "field_key": "results_date",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 8,
+      "field_key": "customer",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 9,
+      "field_key": "customer_contacts",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "requires_review"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "known_disagreement",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "One confirmed contact role is sufficient; a second technical contact must not be invented."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "requires_review solely because a separate technical specialist was not found", "severity": "safe_over_escalation"}
+      ],
+      "source_anchors": [
+        {"source_file": "FIELD_CATALOG.md", "locator": "§9 customer_contacts boundary, as checked in comparison.md §4.5"}
+      ],
+      "notes": "comparison.md treats exec as an unnecessary escalation and accepts resolved."
+    },
+    {
+      "field_index": 10,
+      "field_key": "participation_cost",
+      "reported_statuses": {"run_1": "not_found", "run_2": "requires_review", "run_3": "not_found", "exec": "requires_review"},
+      "accepted_statuses": ["not_found"],
+      "confidence": "known_disagreement",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "The corpus establishes no participation tariff; the no-fee clause concerns document provision only."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "Participation is free because procurement documents are provided without charge.", "severity": "unsupported_negative"}
+      ],
+      "source_anchors": [
+        {"source_file": "Блок_1_Извещение.docx", "locator": "No-fee clause for document provision discussed in comparison.md §4.6; no participation tariff anchor preserved"}
+      ],
+      "notes": "For this bounded corpus comparison.md selects terminal not_found rather than review of an unknown external ETP tariff."
+    },
+    {
+      "field_index": 11,
+      "field_key": "participation_guarantee",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; guarantee applicability/value was not fully source-adjudicated."
+    },
+    {
+      "field_index": 12,
+      "field_key": "evaluation_criteria",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 13,
+      "field_key": "delivery_term",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 14,
+      "field_key": "payment_terms",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 15,
+      "field_key": "special_account_or_treasury",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 16,
+      "field_key": "bank_support",
+      "reported_statuses": {"run_1": "not_found", "run_2": "not_found", "run_3": "not_found", "exec": "not_found"},
+      "accepted_statuses": ["not_found"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; absence was not independently re-verified against every source."
+    },
+    {
+      "field_index": 17,
+      "field_key": "government_contract",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 18,
+      "field_key": "rebidding",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 19,
+      "field_key": "national_regime",
+      "reported_statuses": {"run_1": "requires_review", "run_2": "requires_review", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["requires_review"],
+      "confidence": "known_disagreement",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "The selected 'Not applicable' control conflicts with the selected Russian-origin document under PP 1875."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "resolved while the national-regime conflict remains unresolved", "severity": "critical_false_resolved"}
+      ],
+      "source_anchors": [
+        {"source_file": "Блок_2_Информационная_карта.docx", "locator": "Profile national-regime group and selected PP 1875 Russian-origin document; comparison.md §4.2"}
+      ],
+      "notes": "Conservative v0 status is requires_review; run_3 and exec are known critical false-resolved cases."
+    },
+    {
+      "field_index": 20,
+      "field_key": "advance_contract_guarantee",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; completeness-sensitive guarantee details were not fully source-adjudicated."
+    },
+    {
+      "field_index": 21,
+      "field_key": "warranty_obligations_guarantee",
+      "reported_statuses": {"run_1": "not_found", "run_2": "not_found", "run_3": "not_found", "exec": "not_found"},
+      "accepted_statuses": ["not_found"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; absence was not independently re-verified against every source."
+    },
+    {
+      "field_index": 22,
+      "field_key": "licenses_certificates",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "source_checked",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "Include only a document that the source directly names a license or certificate; preserve participant/product/stage scope."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "Расширять поле на разрешения, прямо не названные лицензиями или сертификатами.", "severity": "critical_false_resolved"},
+        {"conclusion": "Расширять поле на свидетельства, прямо не названные лицензиями или сертификатами.", "severity": "critical_false_resolved"},
+        {"conclusion": "Расширять поле на паспорта, прямо не названные лицензиями или сертификатами.", "severity": "critical_false_resolved"},
+        {"conclusion": "Расширять поле на лицензию банка-гаранта как на лицензию участника/товара.", "severity": "critical_false_resolved"}
+      ],
+      "source_anchors": [
+        {"source_file": "FIELD_CATALOG.md", "locator": "§22 licenses_certificates allowed/forbidden evidence boundary; comparison.md §4.4"}
+      ],
+      "machine_checks": {"forbidden_value_phrases": ["разрешен", "свидетельств", "паспорт", "лицензия банка", "лицензия ЦБ РФ"]},
+      "notes": "All four reports have resolved status but comparison.md found a shared semantic boundary violation."
+    },
+    {
+      "field_index": 23,
+      "field_key": "required_official_certificates",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; completeness of the composite list was not fully source-adjudicated."
+    },
+    {
+      "field_index": 24,
+      "field_key": "similar_supply_experience",
+      "reported_statuses": {"run_1": "resolved", "run_2": "requires_review", "run_3": "requires_review", "exec": "requires_review"},
+      "accepted_statuses": ["requires_review"],
+      "confidence": "known_disagreement",
+      "source_check_status": "comparison_spot_checked",
+      "mandatory_material_facts": [
+        {"fact": "Block 9 says experience requirements are not established, while the general Instruction requires form 3 for analogous contracts."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "resolved as no experience requirement while the form-3 conflict remains unresolved", "severity": "critical_false_resolved"}
+      ],
+      "source_anchors": [
+        {"source_file": "Блок_9_Требования.docx", "locator": "Experience requirements section cited by comparison.md §4.7"},
+        {"source_file": "Блок_3_Инструкция.docx", "locator": "General application list requiring form 3, cited by comparison.md §4.7"}
+      ],
+      "notes": "Conservative v0 status is requires_review; a future full adjudication must decide document priority."
+    },
+    {
+      "field_index": 25,
+      "field_key": "analog_allowed",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 26,
+      "field_key": "analog_definition",
+      "reported_statuses": {"run_1": "resolved", "run_2": "resolved", "run_3": "resolved", "exec": "resolved"},
+      "accepted_statuses": ["resolved"],
+      "confidence": "cross_run_consensus",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [],
+      "forbidden_conclusions": [],
+      "source_anchors": [],
+      "notes": "Provisional unanimous status; not manually source-adjudicated."
+    },
+    {
+      "field_index": 27,
+      "field_key": "application_documents",
+      "reported_statuses": {"run_1": "requires_review", "run_2": "requires_review", "run_3": "resolved", "exec": "requires_review"},
+      "accepted_statuses": ["requires_review"],
+      "confidence": "known_disagreement",
+      "source_check_status": "not_source_verified",
+      "mandatory_material_facts": [
+        {"fact": "Preserve unresolved form-3 and national-regime contradictions in the application document list."}
+      ],
+      "forbidden_conclusions": [
+        {"conclusion": "resolved while the report itself retains material application-list conflicts", "severity": "critical_false_resolved"}
+      ],
+      "source_anchors": [],
+      "notes": "Conservative v0 status is requires_review; comparison.md §4.3 records run_3's internal contradiction, but this was not a separate complete tender-source check."
+    }
+  ]
+}
