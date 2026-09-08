@@ -156,7 +156,11 @@ test('multi-procurement blind gate is explicit, immutable and nonblocking', asyn
   assert.equal(gate.current_distinct_procurements, 1);
   assert.equal(gate.status, 'awaiting_additional_procurements');
   assert.equal(gate.cases.length, 1);
-  assert.equal(new Set(gate.cases.map(({ procurement_key }) => procurement_key)).size, 1);
+  const distinctProcurements = new Set(
+    gate.cases.map(({ procurement_key }) => procurement_key),
+  ).size;
+  assert.equal(distinctProcurements, gate.current_distinct_procurements);
+  assert.ok(distinctProcurements < gate.minimum_distinct_procurements);
 
   const available = gate.cases[0];
   assert.equal(available.case_id, 'blind-2026-09-08');
@@ -165,6 +169,14 @@ test('multi-procurement blind gate is explicit, immutable and nonblocking', asyn
   assert.equal(available.adjudication, 'evaluations/agentic-baseline-v0/adjudication.json');
   assert.equal(available.source_grounded_gold, false);
   assert.equal(available.runtime_rule_eligible, false);
+  for (const relativePath of [
+    available.input_root,
+    available.source_manifest,
+    available.adjudication,
+    ...available.replicates,
+  ]) {
+    await stat(path.join(repositoryRoot, ...relativePath.split('/')));
+  }
 
   for (const forbiddenKey of [
     'source_index',
