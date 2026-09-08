@@ -491,6 +491,9 @@ export function createManifestRouteHandler({ jobStore }) {
     const statusRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/u);
     if (statusRoute) {
       routeMethod(requestMetadata, 'GET');
+      if (bodyKind !== 'none') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Job status does not accept a request body', 400);
+      }
       return {
         statusCode: 200,
         body: await jobStore.getJob(decodeRoutePart(statusRoute[1], 'job_id')),

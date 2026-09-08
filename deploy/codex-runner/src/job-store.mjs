@@ -7,6 +7,7 @@ import {
   readFile,
   readdir,
   rename,
+  rm,
   unlink,
 } from 'node:fs/promises';
 import path from 'node:path';
@@ -25,6 +26,7 @@ const STATE_FILE_NAME = 'job-state.json';
 const MANIFEST_FILE_NAME = 'manifest.json';
 const CATALOG_FILE_NAME = 'FIELD_CATALOG.md';
 const RESIDUE_PATTERN = /^\.upload-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
+const CREATE_RESIDUE_PATTERN = /^\.create-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.tmp$/iu;
 
 function storeError(code, message, httpStatus = 422) {
   return new RunnerError(code, message, httpStatus);
@@ -165,10 +167,20 @@ async function cleanupCrashResidue(temporaryDirectory) {
   }
 }
 
+async function cleanupCreateResidue(rootDirectory, jobId) {
+  const entries = await readdir(rootDirectory, { withFileTypes: true });
+  for (const entry of entries) {
+    const match = entry.name.match(CREATE_RESIDUE_PATTERN);
+    if (!match || match[1].toLowerCase() !== jobId) continue;
+    await rm(exactChild(rootDirectory, entry.name), { recursive: true, force: true });
+  }
+}
+
 export function createJobStore({
   rootDirectory,
   fieldCatalogPath,
   expectedCatalogSha256 = fieldPolicy.expected_catalog_sha256,
+  faultInjector = async () => {},
 } = {}) {
   if (typeof rootDirectory !== 'string' || rootDirectory.length === 0) {
     throw new TypeError('rootDirectory is required');
@@ -179,6 +191,7 @@ export function createJobStore({
   if (!/^[0-9a-f]{64}$/iu.test(expectedCatalogSha256 ?? '')) {
     throw new TypeError('expectedCatalogSha256 must be a SHA-256 value');
   }
+  if (typeof faultInjector !== 'function') throw new TypeError('faultInjector must be a function');
 
   const resolvedRoot = path.resolve(rootDirectory);
   const resolvedCatalogPath = path.resolve(fieldCatalogPath);
@@ -240,10 +253,11 @@ export function createJobStore({
     return withJobLock(manifest.job_id, async (normalizedJobId) => {
       await mkdir(resolvedRoot, { recursive: true, mode: 0o700 });
       const jobPath = resolveJobPath(resolvedRoot, normalizedJobId);
-      try {
-        await mkdir(jobPath, { mode: 0o700 });
-      } catch (error) {
-        if (error?.code !== 'EEXIST') throw error;
+      const existingJob = await lstat(jobPath).catch((error) => {
+        if (error?.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (existingJob) {
         await ensureRegularDirectory(jobPath);
         const existing = await readState(jobPath);
         if (existing.status === 'ready') {
@@ -255,21 +269,36 @@ export function createJobStore({
         return publicJobState(existing, { idempotent: true });
       }
 
-      const inputDirectory = exactChild(jobPath, 'input');
-      const documentsDirectory = exactChild(inputDirectory, 'documents');
-      const temporaryDirectory = exactChild(inputDirectory, '.upload-tmp');
-      await mkdir(inputDirectory, { mode: 0o700 });
-      await mkdir(documentsDirectory, { mode: 0o700 });
-      await mkdir(temporaryDirectory, { mode: 0o700 });
-      const state = {
-        manifest,
-        status: 'staging',
-        uploads: {},
-        input_manifest_sha256: null,
-      };
-      await writeState(jobPath, state);
-      await fsyncDirectory(resolvedRoot);
-      return publicJobState(state, { idempotent: false });
+      await cleanupCreateResidue(resolvedRoot, normalizedJobId);
+      const createPath = exactChild(
+        resolvedRoot,
+        `.create-${normalizedJobId}-${randomUUID()}.tmp`,
+      );
+      let published = false;
+      try {
+        await mkdir(createPath, { mode: 0o700 });
+        await faultInjector('after-create-job-directory');
+        const inputDirectory = exactChild(createPath, 'input');
+        const documentsDirectory = exactChild(inputDirectory, 'documents');
+        const temporaryDirectory = exactChild(inputDirectory, '.upload-tmp');
+        await mkdir(inputDirectory, { mode: 0o700 });
+        await mkdir(documentsDirectory, { mode: 0o700 });
+        await mkdir(temporaryDirectory, { mode: 0o700 });
+        const state = {
+          manifest,
+          status: 'staging',
+          uploads: {},
+          input_manifest_sha256: null,
+        };
+        await writeState(createPath, state);
+        await rename(createPath, jobPath);
+        published = true;
+        await fsyncDirectory(resolvedRoot);
+        return publicJobState(state, { idempotent: false });
+      } catch (error) {
+        if (!published) await rm(createPath, { recursive: true, force: true }).catch(() => {});
+        throw error;
+      }
     });
   }
 
