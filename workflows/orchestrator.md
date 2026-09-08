@@ -203,16 +203,19 @@ input_documents
 
 ---
 
-# 7. Concurrent unfinished-run policy
+# 7. Concurrent active-run policy
 
 Run INSERT использует partial unique conflict target:
 
 ```sql
-ON CONFLICT (source, tender_id) WHERE status <> 'completed'
+ON CONFLICT (source, tender_id) WHERE status NOT IN ('completed', 'superseded')
 DO NOTHING
 ```
 
-Этот контракт требует migration с partial unique index на незавершённые runs. Repository migration и тесты не являются доказательством, что индекс уже применён в production.
+Этот контракт требует migration с partial unique index на active runs;
+`completed` и terminal `superseded` не участвуют в conflict boundary. Repository
+migration и тесты не являются доказательством, что индекс уже применён в
+production.
 
 Если INSERT проиграл concurrent conflict, atomic statement возвращает sentinel:
 
@@ -228,13 +231,17 @@ SELECT ...
 FROM tender_analysis_runs
 WHERE source = $1
   AND tender_id = $2
-  AND status <> 'completed'
+  AND status NOT IN ('completed', 'superseded')
 ORDER BY created_at DESC;
 ```
 
 `LIMIT 1` намеренно отсутствует. Отдельный statement видит transaction, которая выиграла `ON CONFLICT`; все найденные строки передаются в `Проверить существующий запуск`.
 
-Guard требует ровно одну строку, обязательные identity/status поля, non-completed status и точное совпадение `(source, tender_id)` с conflict sentinel. Ноль или несколько строк — hard error, а не выбор произвольного run. Для корректной единственной строки возвращается:
+Guard требует ровно одну строку, обязательные identity/status поля, active status
+и точное совпадение `(source, tender_id)` с conflict sentinel. `completed` или
+`superseded` не могут владеть этим conflict. Ноль или несколько строк — hard
+error, а не выбор произвольного run. Для корректной единственной строки
+возвращается:
 
 ```text
 created_new_run=false
@@ -330,7 +337,7 @@ documents_dispatched
 |---|---:|---|---:|
 | Новый run, есть supported documents | `true` | `created_new_run` | число `pdf/docx/xlsx` |
 | Новый run, нет supported documents | `true` | `created_new_run` | `0` |
-| Concurrent unfinished run | `false` | `concurrent_existing_run` | `0` |
+| Concurrent active run | `false` | `concurrent_existing_run` | `0` |
 
 `status` и `next_state` оба отражают фактический текущий run status. `next_state` не содержит action label.
 
@@ -366,7 +373,7 @@ FullInfo HTTP не имеет явной retry/backoff policy. Retry долже�
 
 ## OR-2 / OR-7 — local boundary implemented, rollout pending
 
-Manual/hardcoded entry удалён из canonical repository candidate, а concurrent new-run conflict теперь fail-closed и возвращает существующий unfinished run без повторного dispatch. Это только локальная Task 3 boundary.
+Manual/hardcoded entry удалён из canonical repository candidate, а concurrent new-run conflict теперь fail-closed и возвращает существующий active run без повторного dispatch. Это только локальная Task 3 boundary.
 
 Политика stable mark-membership dedup, completed tender, same-run recovery и
 manual/recovery routing реализована и offline-tested в inactive repository
@@ -376,6 +383,10 @@ automatic path двумя Worker claims total и разрешает повтор
 только через manual override. Stale `processing` после одного часа reclaim-ится
 только после read-only n8n execution observation и guarded CAS; недоступность API
 ничего не мутирует.
+
+История только из `superseded` runs не блокирует first new mark after rollout:
+Orchestrator может создать новый active run. Сам `superseded` run остаётся
+terminal и не возобновляется ни automatic, ни manual/recovery path.
 
 Production import, migration application, wiring и runtime verification всё ещё
 не выполнены. TenderPlan type-5 contract superseded: execution `14683`
@@ -400,7 +411,7 @@ tests/tender-orchestrator-input.test.mjs
 - сохранение intake provenance;
 - один snapshot-safe atomic SQL без sibling run UPDATE;
 - partial-index conflict target и boolean `created_new_run`;
-- fresh unfinished-run SELECT без `LIMIT 1` и exactly-one guard;
+- fresh active-run SELECT без `LIMIT 1` и exactly-one guard;
 - регистрацию всех документов до первого Worker;
 - `mode=each`, passthrough Worker input и `waitForSubWorkflow=false`;
 - единый structured terminal result;
@@ -429,7 +440,7 @@ TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke 
 2. Не создавать run, если FullInfo identity не равна validated `tender_id`.
 3. Не разделять atomic run creation и полную document registration.
 4. Не добавлять sibling `UPDATE` новой строки, вставленной data-modifying CTE того же statement.
-5. Не добавлять `LIMIT 1` в unfinished-run conflict SELECT.
+5. Не добавлять `LIMIT 1` в active-run conflict SELECT.
 6. Не отправлять conflict branch в Worker.
 7. Не запускать первый Worker до регистрации всех документов.
 8. Сохранять `document_id`, `analysis_run_id` и `tender_meta` в Worker input.

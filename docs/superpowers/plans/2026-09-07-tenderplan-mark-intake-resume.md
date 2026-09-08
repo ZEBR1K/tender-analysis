@@ -4,7 +4,7 @@
 
 **Goal:** Automatically start or resume a tender analysis when TenderPlan reports that a procurement was marked, while reusing the same `analysis_run_id`, processing only unfinished documents, allowing one automatic document retry, and providing an explicit manual resume path.
 
-**Architecture:** A scheduled TenderPlan intake workflow normalizes mark notifications and calls one typed `Intake / Resume` dispatcher. PostgreSQL is the durable state and concurrency boundary: an intake-event ledger deduplicates source events, a partial unique index prevents two unfinished runs for the same tender, and compare-and-set updates protect stale-document recovery. The existing Orchestrator is narrowed to new-run creation; existing Worker, Aggregator and Finalization workflows remain the execution stages.
+**Architecture:** A scheduled TenderPlan intake workflow normalizes mark notifications and calls one typed `Intake / Resume` dispatcher. PostgreSQL is the durable state and concurrency boundary: an intake-event ledger deduplicates source events, a partial unique index prevents two active runs for the same tender, and compare-and-set updates protect stale-document recovery. The existing Orchestrator is narrowed to new-run creation; existing Worker, Aggregator and Finalization workflows remain the execution stages.
 
 **Tech Stack:** n8n workflow JSON, PostgreSQL/Supabase, TenderPlan REST API, n8n REST API, modern JavaScript in Code nodes, Node.js `node:test` contract tests.
 
@@ -18,7 +18,7 @@ In scope:
 
 - TenderPlan mark polling every 10 minutes;
 - event deduplication and audit ledger;
-- one unfinished run per `(source, tender_id)`;
+- one active run per `(source, tender_id)`;
 - same-run resume by `analysis_run_id`;
 - maximum two automatic Document Worker claims in total;
 - one-hour stale-processing recovery after n8n execution verification;
@@ -33,6 +33,26 @@ Out of scope:
 - automatically repairing a partial `aggregating` run with fewer than 27 valid FINAL rows;
 - production workflow activation, production migration application, or credential changes without a separate explicit authorization;
 - broad refactoring of existing workflows.
+
+## Approved superseded-run amendment — 2026-09-08
+
+`superseded` is a terminal, non-resumable run status. The migration adds nullable
+`superseded_at` and `superseded_reason`, preserves all runs/children and existing
+`error_message`, and changes the active-run boundary to
+`status NOT IN ('completed', 'superseded')`. It may reconcile only the exact
+`24 + 50 + 12 = 86` legacy rows and microsecond cutoffs confirmed by read-only
+execution `14685`; no duplicates is a no-op and any other duplicate shape
+aborts. A direct automatic/manual/recovery call for a superseded ID returns
+`superseded_no_op` without dispatch. History containing only superseded runs may
+admit the first new post-rollout mark, but the stable mark+tender key and
+remove/reassign no-repeat semantics remain unchanged.
+
+Safe upgrade also covers a pre-existing exact legacy
+`uq_tender_analysis_runs_one_unfinished` predicate `status <> 'completed'`.
+After catalog validation, that index alone is dropped inside the transaction
+before reconciliation and recreated with the current predicate after the final
+duplicate preflight. An exact current index is retained; no index is valid for a
+fresh DB; every unknown or incompatible same-name object aborts without drop.
 
 ## Implementation order and safety gates
 
@@ -68,17 +88,17 @@ const migrationUrl = new URL(
   import.meta.url,
 );
 
-test('migration rejects duplicate unfinished runs before adding uniqueness', async () => {
+test('migration rejects unexpected duplicate active runs before adding uniqueness', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
   assert.match(sql, /GROUP BY\s+source\s*,\s*tender_id/i);
   assert.match(sql, /HAVING\s+count\(\*\)\s*>\s*1/i);
   assert.match(sql, /RAISE EXCEPTION/i);
 });
 
-test('migration enforces one unfinished run and durable event ownership', async () => {
+test('migration enforces one active run and durable event ownership', async () => {
   const sql = await readFile(migrationUrl, 'utf8');
   assert.match(sql, /CREATE UNIQUE INDEX[\s\S]+ON\s+tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)/i);
-  assert.match(sql, /WHERE\s+status\s*<>\s*'completed'/i);
+  assert.match(sql, /WHERE\s+status\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)/i);
   assert.match(sql, /CREATE TABLE[\s\S]+tender_analysis_intake_events/i);
   for (const column of ['event_key', 'analysis_run_id', 'status', 'attempts', 'n8n_execution_id', 'processing_started_at']) {
     assert.match(sql, new RegExp(`\\b${column}\\b`, 'i'));
@@ -99,17 +119,21 @@ Expected: FAIL because the migration file does not exist.
 
 - [ ] **Step 3: Write the migration with a fail-closed preflight**
 
-Create `migrations/2026-09-07_tender_intake_resume.sql` as an explicit transaction. The first executable block must detect duplicate unfinished rows and abort without choosing or deleting either run:
+Create `migrations/2026-09-07_tender_intake_resume.sql` as one explicit
+transaction. Before uniqueness, it adds the two nullable audit columns,
+discovers and validates the exact status-only CHECK semantics, adds
+`superseded`, and performs only the bounded reconciliation described in the
+approved amendment. The final preflight remains fail-closed:
 
 ```sql
 BEGIN;
 
-DO $$
+DO $duplicate_preflight$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM public.tender_analysis_runs
-    WHERE status <> 'completed'
+    WHERE status NOT IN ('completed', 'superseded')
     GROUP BY source, tender_id
     HAVING count(*) > 1
   ) THEN
@@ -117,11 +141,11 @@ BEGIN
       'Cannot enforce one unfinished run: duplicate (source, tender_id) rows exist';
   END IF;
 END
-$$;
+$duplicate_preflight$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tender_analysis_runs_one_unfinished
   ON public.tender_analysis_runs (source, tender_id)
-  WHERE status <> 'completed';
+  WHERE status NOT IN ('completed', 'superseded');
 ```
 
 Then create the event ledger:
@@ -371,7 +395,7 @@ inserted_run AS (
     tender_meta
   )
   VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), 'processing', $5::integer, $6::jsonb)
-  ON CONFLICT (source, tender_id) WHERE status <> 'completed'
+  ON CONFLICT (source, tender_id) WHERE status NOT IN ('completed', 'superseded')
   DO NOTHING
   RETURNING *
 ),
@@ -634,6 +658,7 @@ and returns document actions plus one stage action. Cover at least:
 | run `aggregating`, 27 valid FINAL | Finalization | Finalization |
 | run `aggregating`, fewer than 27 | manual attention | manual attention |
 | run `completed` | no-op | no-op |
+| run `superseded` | explicit no-op | explicit no-op |
 
 - [ ] **Step 2: Write failing workflow-structure and decision tests**
 
@@ -689,16 +714,17 @@ Do not use an advisory lock across nodes.
 
 For `tenderplan_mark`, query by `(source='tenderplan', tender_id)`:
 
-- latest completed and no unfinished run → complete event as `already_completed`;
-- one unfinished run → reuse it;
-- no run → call Orchestrator;
-- more than one unfinished run → fail loudly as invariant violation.
+- latest completed and no active run → complete event as `already_completed`;
+- one active run → reuse it;
+- no run, or only superseded history → call Orchestrator;
+- more than one active run → fail loudly as invariant violation;
+- direct superseded `analysis_run_id` → `superseded_no_op`, with no dispatch.
 
 A repeated TenderPlan mark remains automatic: it reuses the unfinished run but cannot bypass `attempts >= 2` or reopen a run failed after automatic exhaustion. A duplicate delivery with the same `source_event_key` remains a duplicate no-op.
 
 For `manual` and `recovery_scan`, load exactly `analysis_run_id`, derive `tender_id` from the run, and reject conflicting caller identity.
 
-If the Orchestrator loses the unique-index race and returns `created_new_run=false`, continue with the returned existing run and never register documents again.
+If the Orchestrator loses the unique-index race and returns `created_new_run=false`, continue with the returned existing active run and never register documents again.
 
 - [ ] **Step 6: Implement document classification and dispatch**
 
@@ -733,6 +759,7 @@ When no document dispatch is required:
 - if `aggregating` and valid FINAL count is 27, call Finalization;
 - if `aggregating` and valid FINAL count is below 27, return `manual_attention_required` without mutating the run;
 - if `completed`, return `already_completed`.
+- if `superseded`, return `superseded_no_op` and dispatch nothing.
 
 Pin the duplicated readiness SQL in a contract test so the Worker and dispatcher cannot drift silently. Do not use Merge as a long-lived barrier.
 
@@ -837,7 +864,7 @@ Assert:
 
 - Schedule Trigger runs every 10 minutes;
 - candidate selection is PostgreSQL-backed;
-- only unfinished runs are selected;
+- only active runs are selected; `completed` and `superseded` are excluded;
 - documents qualify as `pending`, `failed AND attempts < 2`, or `processing` at least one hour old;
 - a `processing` run whose documents are all `completed`/`skipped` is selected so a missed readiness claim can be repaired;
 - stage-only candidates include `ready_for_aggregation` and `aggregating`;
@@ -862,7 +889,7 @@ SELECT DISTINCT run.id AS analysis_run_id
 FROM tender_analysis_runs AS run
 LEFT JOIN tender_analysis_documents AS document
   ON document.analysis_run_id = run.id
-WHERE run.status <> 'completed'
+WHERE run.status NOT IN ('completed', 'superseded')
   AND (
     document.status = 'pending'
     OR (document.status = 'failed' AND document.attempts < 2)
@@ -1050,7 +1077,7 @@ Document this path:
 ```text
 TenderPlan mark poll
 → durable event claim
-→ resolve/create one unfinished run
+→ resolve/create one active run
 → dispatch only eligible documents with same analysis_run_id
 → DB readiness barrier
 → Aggregator
@@ -1102,7 +1129,7 @@ Before production activation, prove these scenarios in an isolated n8n project/d
 
 1. first mark creates one run and registers documents once;
 2. duplicate notification is a no-op;
-3. concurrent distinct mark events create one unfinished run;
+3. concurrent distinct mark events create one active run;
 4. retry keeps the same `analysis_run_id` and skips completed documents;
 5. attempts 1 automatically retries once; attempts 2 does not;
 6. manual resume dispatches an exhausted failed document;
@@ -1114,6 +1141,8 @@ Before production activation, prove these scenarios in an isolated n8n project/d
 12. `aggregating` plus 27 valid FINAL calls Finalization;
 13. partial `aggregating` returns manual attention;
 14. completed tender mark is a no-op.
+15. superseded run ID is an explicit no-op for automatic, recovery and manual paths.
+16. only-superseded history permits one new post-rollout run, while the stable event key still blocks remove/reassign replay.
 
 Runtime proof must include execution IDs, selected database rows before/after, and confirmation that only the intended document changed. Sanitize evidence before committing it.
 
@@ -1128,6 +1157,30 @@ git commit -m "docs: integrate tender intake and resume architecture"
 ```
 
 - [ ] **Step 8: Stop at the production-change boundary**
+
+Before a commit-capable production migration run, complete these gates in
+order:
+
+1. establish full quiescence: every autonomous/new-run producer is inactive or
+   absent; an immediate preferably system-wide check shows zero n8n executions
+   in `new`, `running` or `waiting`; and no execution targets the 86 bounded
+   legacy runs. Any active execution aborts the operation;
+2. execute the exact committed migration body against the real catalog with
+   only its terminal `COMMIT;` replaced in memory by `ROLLBACK;`, using
+   `ON_ERROR_STOP`; source-regex tests do not satisfy this runtime gate;
+3. after `ROLLBACK`, prove all catalog definitions, the 86 run rows and their
+   child rows, and the three bounded counts/cutoffs are identical to the
+   immediate pre-dry-run snapshots;
+4. repeat the quiescence checks immediately, then execute the committed
+   migration and verify its catalog/data postconditions;
+5. import the updated workflow candidates while inactive and verify read-back
+   configuration and connections before any producer is manually run or any
+   entry workflow is activated.
+
+The 2026-09-08 read-only observation—Orchestrator `Q1RWSrB0jaTA6Dmx`
+inactive, Intake/Recovery not live, active execution count zero—is historical
+evidence only and must not be reused as the immediate execution gate. The
+rollback dry-run and real migration application remain pending.
 
 Report:
 
@@ -1146,7 +1199,7 @@ Do not call the feature production-complete until migration application, workflo
 
 - [ ] No hardcoded tender or analysis-run IDs remain in production-candidate entry workflows.
 - [ ] No secrets are stored in workflow JSON, tests, docs or fixtures.
-- [ ] One unfinished run per `(source, tender_id)` is enforced by PostgreSQL.
+- [ ] One active run per `(source, tender_id)` is enforced by PostgreSQL; completed and superseded history is excluded.
 - [ ] Intake events are atomically owned, deduplicated and auditable.
 - [ ] Same-run resume never reprocesses a completed document.
 - [ ] Automatic attempt cap is exactly two claims total.

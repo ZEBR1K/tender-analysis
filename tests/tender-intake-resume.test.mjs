@@ -496,6 +496,30 @@ test('decision model: completed runs suppress document dispatch and stage mutati
   assert.equal(result.stageAction, 'no_op');
 });
 
+test('decision model: superseded runs never resume for automatic or manual intent', () => {
+  for (const intent of [...automaticIntents, manualIntent]) {
+    const result = evaluate({
+      intent,
+      runStatus: 'superseded',
+      finalCount: 26,
+      finalBarrierValid: false,
+      document: {
+        id: `doc-under-superseded-${intent.triggerKind}`,
+        status: 'failed',
+        attempts: 2,
+        startedAt: null,
+        executionState: null,
+      },
+    });
+
+    assert.deepEqual(result.documentActions, [{
+      id: `doc-under-superseded-${intent.triggerKind}`,
+      action: 'skip_run_superseded',
+    }]);
+    assert.equal(result.stageAction, 'superseded_no_op');
+  }
+});
+
 test('decision model: raw count 27 is insufficient without the full FINAL barrier', () => {
   assert.equal(
     evaluate({
@@ -1021,13 +1045,14 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(tenderRunQuery, /from (?:public\.)?tender_analysis_runs/iu);
   assert.match(tenderRunQuery, /source\s*=\s*'tenderplan'/iu);
   assert.match(tenderRunQuery, /tender_id\s*=\s*\$1/iu);
-  assert.match(tenderRunQuery, /status\s*<>\s*'completed'|status\s*!=\s*'completed'/iu);
+  assert.match(tenderRunQuery, /status\s+not\s+in\s*\(\s*'completed'\s*,\s*'superseded'\s*\)/iu);
   const runResolutionCode = requireNode(
     workflow,
     'Classify TenderPlan Run Resolution',
   ).parameters.jsCode;
-  assert.match(runResolutionCode, /unfinished[\s\S]*>\s*1[\s\S]*throw/iu);
+  assert.match(runResolutionCode, /active[\s\S]*>\s*1[\s\S]*throw/iu);
   assert.match(runResolutionCode, /already_completed/iu);
+  assert.match(runResolutionCode, /superseded/iu);
   assert.match(runResolutionCode, /reuse|existing/iu);
   assert.match(runResolutionCode, /orchestrator|create/iu);
 
@@ -1073,6 +1098,18 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(runPolicyCode, /failed[\s\S]*manual[\s\S]*processing/iu);
   assert.match(runPolicyCode, /automatic_attempts_exhausted/iu);
   assert.match(runPolicyCode, /completed[\s\S]*already_completed/iu);
+  assert.match(runPolicyCode, /superseded[\s\S]*superseded_no_op/iu);
+  const supersededPolicy = await executeSingleCodeJson(
+    requireNode(workflow, 'Classify Run Entry Policy'),
+    {
+      status: 'superseded',
+      trigger_kind: 'manual',
+      manual_override: true,
+      analysis_run_id: '11111111-1111-4111-8111-111111111111',
+    },
+  );
+  assert.equal(supersededPolicy.action, 'superseded_no_op');
+  assert.equal(supersededPolicy.run_status, 'superseded');
 
   const postgresNodes = workflow.nodes.filter((node) =>
     node.type === 'n8n-nodes-base.postgres');
@@ -1214,6 +1251,22 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.equal(completedRunDecision.has_documents_to_dispatch, false);
   assert.equal(completedRunDecision.document_actions[0].action, 'skip_run_completed');
   assert.equal(completedRunDecision.stage_action, 'already_completed');
+  assert.equal(completedRunDecision.terminal_no_op, true);
+
+  const supersededRunDecision = await executeSingleCodeJson(documentDecision, decisionInput({
+    trigger_kind: 'manual',
+    manual_override: true,
+    run_status: 'superseded',
+    final_count: 26,
+    final_barrier_valid: false,
+    documents: [{ ...baseDocument, status: 'failed', attempts: 2 }],
+  }));
+  assert.deepEqual(supersededRunDecision.attachments, []);
+  assert.equal(supersededRunDecision.has_documents_to_dispatch, false);
+  assert.equal(supersededRunDecision.document_actions[0].action, 'skip_run_superseded');
+  assert.equal(supersededRunDecision.stage_action, 'superseded_no_op');
+  assert.equal(supersededRunDecision.action, 'superseded_no_op');
+  assert.equal(supersededRunDecision.terminal_no_op, true);
 
   const invalidFinalBarrierDecision = await executeSingleCodeJson(documentDecision, decisionInput({
     run_status: 'aggregating',
@@ -1404,7 +1457,7 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     workflow,
     'Prepare Document Recovery Queue',
   ).parameters.jsCode;
-  assert.match(recoveryQueueCode, /run_status\s*===\s*['"]completed['"]/u);
+  assert.match(recoveryQueueCode, /\[['"]completed['"],['"]superseded['"]\]\.includes\(snapshot\.run_status\)/u);
   assert.match(recoveryQueueCode, /Malformed processing document owner snapshot/u);
   assert.ok(canReach(workflow, 'CAS Stale Document to Failed', 'Classify Document CAS Result'));
   assert.match(
@@ -1493,8 +1546,8 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const completedRunGate = requireNode(workflow, 'Is Run Already Completed?');
   assert.equal(completedRunGate.type, 'n8n-nodes-base.if');
   assertIfGateCondition(completedRunGate, {
-    field: 'stage_action',
-    equals: 'already_completed',
+    field: 'terminal_no_op',
+    equals: true,
   });
   assert.ok(canReach(workflow, documentDecision.name, completedRunGate.name));
   assert.deepEqual(
@@ -1513,8 +1566,13 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     aggregatorCall.name,
     finalizationCall.name,
   ]) {
-    assert.equal(completedRunPath.has(forbiddenNode), false, `${forbiddenNode} follows completed run`);
+    assert.equal(completedRunPath.has(forbiddenNode), false, `${forbiddenNode} follows a terminal run`);
   }
+
+  assert.match(
+    requireNode(workflow, 'Return Structured Outcome').parameters.jsCode,
+    /superseded_no_op/u,
+  );
 
   const finalizationGate = requireNode(workflow, 'Should Start Finalization?');
   assert.equal(finalizationGate.type, 'n8n-nodes-base.if');

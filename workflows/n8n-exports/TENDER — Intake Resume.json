@@ -408,7 +408,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT *, count(*) FILTER (WHERE status <> 'completed') OVER () AS unfinished FROM tender_analysis_runs WHERE source='tenderplan' AND tender_id=$1 ORDER BY created_at DESC;",
+        "query": "SELECT *, count(*) FILTER (WHERE status NOT IN ('completed', 'superseded')) OVER () AS unfinished FROM tender_analysis_runs WHERE source='tenderplan' AND tender_id=$1 ORDER BY created_at DESC;",
         "options": {
           "queryReplacement": "={{ [ $json.tender_id ] }}"
         }
@@ -432,7 +432,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const context=$('Classify Intake Event').first().json; const rows=$input.all().map(i=>i.json).filter(r=>r.id); const unfinished=rows.filter(r=>r.status!=='completed'); if (unfinished.length > 1) throw new Error('Invariant violation: unfinished run count > 1'); if (unfinished.length===1) return [{json:{...context,...unfinished[0],analysis_run_id:unfinished[0].id,run_resolution:'reuse_existing'}}]; if (rows.some(r=>r.status==='completed')) return [{json:{...context,...rows[0],analysis_run_id:rows[0].id,run_resolution:'already_completed'}}]; return [{json:{...context,run_resolution:'call_orchestrator'}}];"
+        "jsCode": "const context=$('Classify Intake Event').first().json; const rows=$input.all().map(i=>i.json).filter(r=>r.id); const active=rows.filter(r=>!['completed','superseded'].includes(r.status)); if (active.length > 1) throw new Error('Invariant violation: active run count > 1'); if (active.length===1) return [{json:{...context,...active[0],analysis_run_id:active[0].id,run_resolution:'reuse_existing'}}]; const completed=rows.find(r=>r.status==='completed'); if (completed) return [{json:{...context,...completed,analysis_run_id:completed.id,run_resolution:'already_completed'}}]; return [{json:{...context,run_resolution:'call_orchestrator'}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -579,7 +579,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const status=$json.status ?? $json.run_status; if (status==='failed' && $json.trigger_kind!=='manual') return {json:{...$json,action:'automatic_attempts_exhausted',run_status:'failed'}}; if (status==='failed' && $json.trigger_kind==='manual' && $json.manual_override===true) return {json:{...$json,action:'reopened',run_status:'processing'}}; if (status==='completed') return {json:{...$json,action:'already_completed',run_status:'completed'}}; return {json:{...$json,run_status:status ?? 'processing'}};"
+        "jsCode": "const status=$json.status ?? $json.run_status; if (status==='superseded') return {json:{...$json,action:'superseded_no_op',run_status:'superseded'}}; if (status==='failed' && $json.trigger_kind!=='manual') return {json:{...$json,action:'automatic_attempts_exhausted',run_status:'failed'}}; if (status==='failed' && $json.trigger_kind==='manual' && $json.manual_override===true) return {json:{...$json,action:'reopened',run_status:'processing'}}; if (status==='completed') return {json:{...$json,action:'already_completed',run_status:'completed'}}; return {json:{...$json,run_status:status ?? 'processing'}};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -711,7 +711,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const input=$json; const docs=Array.isArray(input.documents)?input.documents:[]; const manual=input.trigger_kind==='manual'&&input.manual_override===true; const actions=[]; const attachments=[]; for(const d of docs){let action;if(input.run_status==='completed')action='skip_run_completed';else if(d.status==='completed')action='skip';else if(d.status==='skipped')action='preserve_skip';else if((d.status==='pending'||d.status==='failed')&&(manual||Number(d.attempts)<2))action='dispatch';else if(d.status==='pending'||d.status==='failed')action='exhausted';else action='leave_owned';actions.push({id:d.id,action});if(action==='dispatch')attachments.push({document_id:d.id,document_index:d.document_index,file_name:d.file_name,file_extension:d.file_extension,display_name:d.display_name,download_url:d.download_url,publication_at:d.publication_at,source_size:d.source_size,mime_type:d.mime_type,file_size:d.file_size,status:d.status});} let stage_action='waiting_for_workers';let should_start_finalization=false;if(input.run_status==='completed')stage_action='already_completed';else if(input.run_status==='ready_for_aggregation')stage_action='call_aggregator';else if(input.run_status==='aggregating'){if(input.final_count===27&&input.final_barrier_valid===true){stage_action='call_finalization';should_start_finalization=true;}else stage_action='manual_attention_required';}else if(input.run_status==='failed')stage_action=manual?'reopen_failed_run':'automatic_attempts_exhausted';const action=attachments.length>0?'resumed_documents':stage_action;return {json:{...input,attachments,document_actions:actions,has_documents_to_dispatch:attachments.length>0,stage_action,should_start_finalization,action}};"
+        "jsCode": "const input=$json; const docs=Array.isArray(input.documents)?input.documents:[]; const manual=input.trigger_kind==='manual'&&input.manual_override===true; const actions=[]; const attachments=[]; for(const d of docs){let action;if(input.run_status==='completed')action='skip_run_completed';else if(input.run_status==='superseded')action='skip_run_superseded';else if(d.status==='completed')action='skip';else if(d.status==='skipped')action='preserve_skip';else if((d.status==='pending'||d.status==='failed')&&(manual||Number(d.attempts)<2))action='dispatch';else if(d.status==='pending'||d.status==='failed')action='exhausted';else action='leave_owned';actions.push({id:d.id,action});if(action==='dispatch')attachments.push({document_id:d.id,document_index:d.document_index,file_name:d.file_name,file_extension:d.file_extension,display_name:d.display_name,download_url:d.download_url,publication_at:d.publication_at,source_size:d.source_size,mime_type:d.mime_type,file_size:d.file_size,status:d.status});} let stage_action='waiting_for_workers';let should_start_finalization=false;if(input.run_status==='completed')stage_action='already_completed';else if(input.run_status==='superseded')stage_action='superseded_no_op';else if(input.run_status==='ready_for_aggregation')stage_action='call_aggregator';else if(input.run_status==='aggregating'){if(input.final_count===27&&input.final_barrier_valid===true){stage_action='call_finalization';should_start_finalization=true;}else stage_action='manual_attention_required';}else if(input.run_status==='failed')stage_action=manual?'reopen_failed_run':'automatic_attempts_exhausted';const terminal_no_op=['already_completed','superseded_no_op'].includes(stage_action);const action=attachments.length>0?'resumed_documents':stage_action;return {json:{...input,attachments,document_actions:actions,has_documents_to_dispatch:attachments.length>0,stage_action,terminal_no_op,should_start_finalization,action}};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -732,11 +732,12 @@
           },
           "conditions": [
             {
-              "leftValue": "={{ $json.stage_action }}",
-              "rightValue": "already_completed",
+              "leftValue": "={{ $json.terminal_no_op }}",
+              "rightValue": "",
               "operator": {
-                "type": "string",
-                "operation": "equals"
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
               }
             }
           ],
@@ -1021,7 +1022,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const allowed=['created_new_run','resumed_documents','waiting_for_workers','aggregation_started','finalization_started','already_completed','duplicate_event','manual_attention_required','automatic_attempts_exhausted','execution_status_unavailable']; if($json.completion_applied!==true)throw new Error('Intake event completion ownership mismatch'); const action=$json.action; if(!allowed.includes(action))throw new Error(`Unknown structured outcome action ${String(action)}`); return {json:{success:true,action,analysis_run_id:$json.analysis_run_id??null,tender_id:$json.tender_id??null,documents_dispatched:Number($json.documents_dispatched??0),next_state:$json.run_status??null}};"
+        "jsCode": "const allowed=['created_new_run','resumed_documents','waiting_for_workers','aggregation_started','finalization_started','already_completed','superseded_no_op','duplicate_event','manual_attention_required','automatic_attempts_exhausted','execution_status_unavailable']; if($json.completion_applied!==true)throw new Error('Intake event completion ownership mismatch'); const action=$json.action; if(!allowed.includes(action))throw new Error(`Unknown structured outcome action ${String(action)}`); return {json:{success:true,action,analysis_run_id:$json.analysis_run_id??null,tender_id:$json.tender_id??null,documents_dispatched:Number($json.documents_dispatched??0),next_state:$json.run_status??null}};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1051,7 +1052,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const snapshot=$input.first().json; const now=Date.now(); const staleCutoff=new Date(now-3600000).toISOString(); if(snapshot.run_status==='completed')return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; const stale=[]; for(const d of snapshot.documents??[]){if(d.status!=='processing')continue;if(typeof d.id!=='string'||typeof d.analysis_run_id!=='string'||d.analysis_run_id!==snapshot.analysis_run_id||!Number.isInteger(d.attempts)||typeof d.started_at!=='string'||!Number.isFinite(Date.parse(d.started_at))||typeof d.n8n_execution_id!=='string'||!d.n8n_execution_id)throw new Error(`Malformed processing document owner snapshot ${String(d.id)}`);if(Date.parse(d.started_at)<=now-3600000)stale.push(d);} if(stale.length===0)return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; return stale.map(document=>({json:{...document,owner_id:document.n8n_execution_id,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff,skip_execution_read:false}}));"
+        "jsCode": "const snapshot=$input.first().json; const now=Date.now(); const staleCutoff=new Date(now-3600000).toISOString(); if(['completed','superseded'].includes(snapshot.run_status))return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; const stale=[]; for(const d of snapshot.documents??[]){if(d.status!=='processing')continue;if(typeof d.id!=='string'||typeof d.analysis_run_id!=='string'||d.analysis_run_id!==snapshot.analysis_run_id||!Number.isInteger(d.attempts)||typeof d.started_at!=='string'||!Number.isFinite(Date.parse(d.started_at))||typeof d.n8n_execution_id!=='string'||!d.n8n_execution_id)throw new Error(`Malformed processing document owner snapshot ${String(d.id)}`);if(Date.parse(d.started_at)<=now-3600000)stale.push(d);} if(stale.length===0)return [{json:{skip_execution_read:true,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff}}]; return stale.map(document=>({json:{...document,owner_id:document.n8n_execution_id,analysis_run_id:snapshot.analysis_run_id,stale_cutoff:staleCutoff,skip_execution_read:false}}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

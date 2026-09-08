@@ -18,6 +18,11 @@ Each unique tender is asynchronously passed to `TENDER — Intake Resume` with `
 
 The relation has no confirmed event timestamp, so `observed_at` is absent and the dispatcher persists it as null. Repeated polls produce the same key; the PostgreSQL intake ledger is the sole durable deduplication boundary. Removing and later reassigning the same mark does not create a new event: the stable mark+tender key remains a duplicate and does not restart analysis by itself. Automatic recovery is initiated by `TENDER — Recovery Scan`; operator retry is initiated by `TENDER — Manual Resume` with the existing `analysis_run_id`. No workflow static data is used.
 
+After the migration supersedes the bounded pre-rollout legacy runs, the first
+poll has no pre-existing ledger event and may create a new run when history for
+that tender contains only `superseded`. Once that stable mark+tender key is
+claimed, later remove/reassign cycles remain duplicates as before.
+
 ## Bounded coverage and failure behavior
 
 Swagger/OpenAPI documents `type` and `id` but no pagination, ordering, cursor or exhaustive-result semantics. The workflow makes exactly one bounded request and invents no fields. Any malformed populated relation fails the whole normalization step; an empty relation emits no items. HTTP transport uses at most three attempts with five seconds between attempts.

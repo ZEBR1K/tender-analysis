@@ -6,7 +6,7 @@
 
 ## Назначение
 
-`TENDER — Recovery Scan` находит незавершённые `analysis_run`, которым нужно повторно передать управление в `TENDER — Intake Resume`. Он не принимает решений о конкретном действии и ничего не изменяет в PostgreSQL.
+`TENDER — Recovery Scan` находит active `analysis_run`, которым нужно повторно передать управление в `TENDER — Intake Resume`. Он не принимает решений о конкретном действии и ничего не изменяет в PostgreSQL.
 
 ```text
 Schedule Trigger
@@ -16,7 +16,9 @@ Schedule Trigger
 
 ## Кандидаты
 
-Единственный PostgreSQL-запрос возвращает `analysis_run_id`, если run ещё не `completed` и выполняется хотя бы одно условие:
+Единственный PostgreSQL-запрос использует
+`run.status NOT IN ('completed', 'superseded')` и возвращает
+`analysis_run_id`, если выполняется хотя бы одно условие:
 
 - есть документ `pending`;
 - есть документ `failed` с `attempts < 2`;
@@ -24,7 +26,7 @@ Schedule Trigger
 - run находится в `ready_for_aggregation` или `aggregating`;
 - run имеет статус `processing`, содержит документы, и все они уже `completed`/`skipped` — восстановление пропущенного readiness-перехода.
 
-Документы `failed` с `attempts >= 2` сами по себе не создают automatic retry candidate. SQL выполняет только `SELECT`; mutation и повторная классификация принадлежат dispatcher’у.
+Документы `failed` с `attempts >= 2` сами по себе не создают automatic retry candidate. Terminal `superseded` никогда не выбирается. SQL выполняет только `SELECT`; mutation и повторная классификация принадлежат dispatcher’у.
 
 ## Вызов dispatcher
 

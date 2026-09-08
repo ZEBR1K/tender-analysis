@@ -184,7 +184,7 @@ function isUnfinishedRunSelect(node) {
     /\bFROM\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sql) &&
     /\bsource\b/i.test(sql) &&
     /\btender_id\b/i.test(sql) &&
-    /\bstatus\b\s*<>\s*'completed'/i.test(sql) &&
+    /\bstatus\b\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)/i.test(sql) &&
     !/\b(?:INSERT|UPDATE|DELETE)\b/i.test(sql)
   );
 }
@@ -409,8 +409,8 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
 
   assert.match(
     creationSql,
-    /\bON\s+CONFLICT\s*\(\s*"?source"?\s*,\s*"?tender_id"?\s*\)\s*WHERE\s+"?status"?\s*<>\s*'completed'\s+DO\s+NOTHING\b/i,
-    "run INSERT must use ON CONFLICT (source,tender_id) WHERE status <> 'completed' DO NOTHING",
+    /\bON\s+CONFLICT\s*\(\s*"?source"?\s*,\s*"?tender_id"?\s*\)\s*WHERE\s+"?status"?\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)\s+DO\s+NOTHING\b/i,
+    "run INSERT must use the active-run partial-index predicate",
   );
   assert.match(
     creationSql,

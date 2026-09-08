@@ -250,6 +250,13 @@
       "finalCount": 27,
       "finalBarrierValid": true,
       "expected": "no_op"
+    },
+    {
+      "name": "superseded run is an explicit terminal no-op",
+      "runStatus": "superseded",
+      "finalCount": 26,
+      "finalBarrierValid": false,
+      "expected": "superseded_no_op"
     }
   ],
   "staleCasRace": {

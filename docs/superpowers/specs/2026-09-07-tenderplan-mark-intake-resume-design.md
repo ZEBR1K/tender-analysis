@@ -8,6 +8,16 @@
 
 **Task 9 contract correction (2026-09-08):** the notification type-5 adapter below is superseded. Executions `14682/14683` proved `GET /api/tenders/v2/getlist?type=1&id=6a732cd00c61629cf1d3c144`, label «Проверить», with the same tender duplicated under `tender` and `tenders`. The poller reads current membership, derives a stable mark+tender key, and supplies no invented timestamp. Removing and later reassigning the same mark does not create a new event: the same key remains a duplicate and does not restart analysis. Automatic recovery uses Recovery Scan; operator retry uses Manual Resume with the existing `analysis_run_id`. Notification retention/recipient/ordering and relation pagination/exhaustiveness remain undocumented.
 
+**Superseded-run amendment (2026-09-08):** the owner approved terminal run
+status `superseded` for the exact 86 pre-rollout legacy rows confirmed by
+read-only execution `14685`. Runs and all children remain intact;
+`superseded_at` and `superseded_reason` record the transition without replacing
+`error_message`. A superseded run never resumes. Active-run uniqueness excludes
+both `completed` and `superseded`; therefore the first post-rollout mark may
+create a new run when prior history is only superseded, while subsequent
+remove/reassign observations still use the same stable event key and remain
+duplicates.
+
 ## 1. Goal
 
 An employee marks a procurement in TenderPlan. The system must detect that event and route it to the tender-analysis pipeline.
@@ -47,6 +57,9 @@ The user confirmed the following policy:
 6. Manual resume may retry the same run after the automatic budget is exhausted. It does not reset `attempts`.
 7. Repeated current-membership observations use the same stable mark+tender key; removing and later reassigning the same mark does not create a new event or restart analysis.
 8. Automatic recovery uses Recovery Scan; operator retry uses Manual Resume with the existing `analysis_run_id`. Starting a fresh historical reanalysis requires a separate explicit action.
+9. `superseded` is terminal and cannot be reopened by mark intake, Recovery Scan, or Manual Resume.
+10. Superseding preserves the run, every child row, and existing `error_message`; nullable `superseded_at` and `superseded_reason` provide audit.
+11. The production-candidate migration may reconcile only the exact bounded 86-row legacy shape from execution `14685`; any other active duplicate shape rolls back.
 
 ## 3. Current state and authoritative discrepancies
 
@@ -190,6 +203,7 @@ created_new_run
 resumed_existing_run
 already_active
 already_completed
+superseded_no_op
 retry_exhausted
 duplicate_event
 conflict_multiple_runs
@@ -239,7 +253,7 @@ Expected business outcomes return a structured result. Unknown states, malformed
 
 ## 8. Run resolution and tender deduplication
 
-For `tenderplan_mark`, the dispatcher resolves by `(source='tenderplan', tender_id)`. PostgreSQL enforces at most one unfinished run with a partial unique index on `(source, tender_id)` for statuses other than `completed`.
+For `tenderplan_mark`, the dispatcher resolves by `(source='tenderplan', tender_id)`. PostgreSQL enforces at most one active run with a partial unique index on `(source, tender_id)` using `status NOT IN ('completed', 'superseded')`.
 
 Resolution policy:
 
@@ -248,6 +262,7 @@ Resolution policy:
 | No run exists | Call the new-run Orchestrator path |
 | Exactly one unfinished run exists | Reuse its `analysis_run_id` |
 | One or more completed runs and no unfinished run | Return `already_completed` |
+| Only superseded history exists | Call the new-run Orchestrator path |
 | More than one unfinished run | Fail closed with `conflict_multiple_runs` and alert |
 
 Unfinished includes:
@@ -260,7 +275,28 @@ aggregating
 failed
 ```
 
-Before creating the index, migration preflight must fail if existing data contains more than one unfinished run for the same `(source, tender_id)`; it must not choose or delete a run automatically.
+`superseded` and `completed` are terminal and are not unfinished/active.
+
+Before creating the index, the migration may reconcile only these exact active
+legacy groups: `24` rows for
+`manual_test/manual-calibration-167-26-ZO` through
+`2026-09-07T05:59:14.629399+00:00`, `50` rows for
+`tenderplan/6a7af04c3951804ff31b66a6` through
+`2026-08-17T18:50:41.678699+00:00`, and `12` rows for
+`tenderplan/6a7ef6ac3951804ff32da751` through
+`2026-08-23T16:29:52.779826+00:00`. It must assert the complete shape before
+updating exactly 86 rows. No active duplicates is a no-op; any other shape
+aborts and rolls back. No run or child is deleted.
+
+Before that update, the migration must inspect the same-name active-run index.
+It may drop only the exact valid legacy definition on `(source, tender_id)`
+with predicate `status <> 'completed'`; this happens inside the transaction and
+before reconciliation because the legacy predicate still indexes
+`superseded`. The exact current definition is retained, absence is the fresh-DB
+path, and every unknown or incompatible same-name object aborts without a
+drop. After reconciliation and the final duplicate preflight, the migration
+creates the current predicate. Transaction rollback restores a dropped legacy
+index if any later step fails.
 
 The new-run SQL uses conflict-aware insert against that partial uniqueness boundary and returns whether it inserted a run or lost the conflict. Creation of the run and registration of its complete document set must occur in the same PostgreSQL statement/transaction after TenderPlan FullInfo has been normalized. A failure cannot commit an empty `created` run between those two operations. When the insert loses a concurrent conflict, the caller performs a fresh `SELECT` to load the now-visible unfinished run. Therefore two concurrent dispatcher claims may both reach the create boundary, but only one can create the run and register documents; the other reuses the returned unfinished `analysis_run_id` and must not register documents again.
 
@@ -385,6 +421,7 @@ After document dispatch or when no Worker needs to run, the dispatcher reads DB 
 | Run is `aggregating` with 27 valid FINAL rows | Call Finalization; it already supports safe `already_completed` behavior |
 | Run is `aggregating` with fewer than 27 FINAL rows | Return `manual_attention_required`; do not reset or rerun Aggregator blindly |
 | Run is `completed` | Return `already_completed` |
+| Run is `superseded` | Return `superseded_no_op`; dispatch nothing |
 
 This scope guarantees automatic recovery of the document stage and safe continuation into an unstarted Aggregator. It does not invent automatic recovery for a partially executed Aggregator because the current run schema does not record an Aggregator execution owner and the current Aggregator claim rejects `aggregating`.
 
@@ -413,7 +450,7 @@ Credentials required by TenderPlan and the n8n API remain in n8n Credentials. No
 
 ## 15. Concurrency and idempotency invariants
 
-1. One procurement may have historical completed runs, but PostgreSQL enforces at most one unfinished run per `(source, tender_id)`.
+1. One procurement may have historical completed/superseded runs, but PostgreSQL enforces at most one active run per `(source, tender_id)`.
 2. One stable TenderPlan mark+tender intent causes at most one dispatcher action.
 3. One Document Worker execution processes exactly one document.
 4. Worker atomic claim remains the final protection against duplicate dispatch.
@@ -449,6 +486,8 @@ The design is accepted only when implementation proves at least these cases:
 18. `ready_for_aggregation` resumes Aggregator without running any Worker.
 19. `aggregating` plus 27 valid FINAL rows invokes Finalization safely.
 20. Partial `aggregating` returns visible `manual_attention_required` and performs no lifecycle reset.
+21. Automatic, recovery, and manual requests for a superseded `analysis_run_id` return `superseded_no_op` and reach no Worker, Aggregator, or Finalization.
+22. After bounded reconciliation, the first mark may create a new run when only superseded history exists; the stable key still prevents remove/reassign replay after that first claim.
 
 Verification must include offline workflow/SQL contract tests, workflow validation, read-back connection verification, isolated n8n runtime tests and a bounded end-to-end test. Production publication is a separate explicit step.
 

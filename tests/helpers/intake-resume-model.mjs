@@ -82,6 +82,8 @@ function classifyStage(runStatus, finalCount, finalBarrierValid, intent) {
         : 'manual_attention_required';
     case 'completed':
       return 'no_op';
+    case 'superseded':
+      return 'superseded_no_op';
     case 'failed':
       return intent === 'manual'
         ? 'reopen_failed_run'
@@ -113,6 +115,9 @@ function classifyDocument(document, intent, now, runStatus) {
   }
   if (runStatus === 'completed') {
     return { id: document.id, action: 'skip_run_completed' };
+  }
+  if (runStatus === 'superseded') {
+    return { id: document.id, action: 'skip_run_superseded' };
   }
 
   if (document.status === 'completed') {

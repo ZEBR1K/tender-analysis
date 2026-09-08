@@ -6,6 +6,13 @@ Inactive repository candidate for the typed, resumable tender dispatcher.
 
 `tenderplan_mark` and `recovery_scan` are automatic intents. Only `manual` with `manual_override=true` may reopen a failed run or dispatch documents after two total Worker claims. The dispatcher preserves the same `analysis_run_id`, never dispatches completed or skipped documents, and leaves attempt increments to the Worker atomic claim.
 
+`superseded` is a separate terminal run state. Any direct automatic, recovery,
+or manual request for that `analysis_run_id` returns explicit
+`action=superseded_no_op`, dispatches no document, Aggregator, or Finalization,
+and never reopens the run. TenderPlan resolution treats `completed` and
+`superseded` as non-active; if history contains only `superseded`, the first new
+mark event after rollout may call Orchestrator to create a new run.
+
 `observed_at` is source time only. When the upstream relation adapter has no
 confirmed event timestamp it passes no value, and the dispatcher persists null;
 it never substitutes intake wall-clock time for a source event time.

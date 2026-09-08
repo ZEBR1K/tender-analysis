@@ -63,12 +63,22 @@ test('migration has ordered transaction and validation boundaries', async () => 
   const doBlocks = getDoBlocks(sql);
 
   const begin = findRequired(sql, /^BEGIN\s*;/i, 'leading BEGIN');
-  const preflight = doBlocks.find((block) => block.tag === '$$');
+  const indexUpgrade = doBlocks.find(
+    (block) => block.tag.toLowerCase() === '$active_run_index_upgrade$',
+  );
+  assert.ok(indexUpgrade, 'missing active-run index upgrade DO block');
+  const reconciliation = doBlocks.find(
+    (block) => block.tag.toLowerCase() === '$legacy_reconciliation$',
+  );
+  assert.ok(reconciliation, 'missing bounded legacy reconciliation DO block');
+  const preflight = doBlocks.find(
+    (block) => block.tag.toLowerCase() === '$duplicate_preflight$',
+  );
   assert.ok(preflight, 'missing duplicate preflight DO block');
 
   const uniqueIndex = findRequired(
     sql,
-    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s*<>\s*'completed'\s*;/i,
+    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)\s*;/i,
     'unfinished-run unique index statement',
   );
   const ledger = findRequired(
@@ -82,7 +92,15 @@ test('migration has ordered transaction and validation boundaries', async () => 
   assert.ok(postconditions, 'missing postcondition validation DO block');
   const commit = findRequired(sql, /COMMIT\s*;\s*$/i, 'trailing COMMIT');
 
-  assert.ok(begin.index < preflight.index, 'BEGIN must precede duplicate preflight');
+  assert.ok(begin.index < indexUpgrade.index, 'BEGIN must precede index upgrade');
+  assert.ok(
+    indexUpgrade.index < reconciliation.index,
+    'legacy index replacement must precede superseded reconciliation',
+  );
+  assert.ok(
+    reconciliation.index < preflight.index,
+    'reconciliation must precede duplicate preflight',
+  );
   assert.ok(preflight.index < uniqueIndex.index, 'preflight must precede unique index');
   assert.ok(uniqueIndex.index < ledger.index, 'unique index must precede ledger creation');
   assert.ok(ledger.index < postconditions.index, 'ledger creation must precede postconditions');
@@ -91,12 +109,14 @@ test('migration has ordered transaction and validation boundaries', async () => 
 
 test('migration rejects duplicate unfinished runs before adding uniqueness', async () => {
   const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
-  const [preflight] = getDoBlocks(sql);
+  const preflight = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$duplicate_preflight$',
+  );
   assert.ok(preflight, 'missing duplicate preflight DO block');
 
   assert.match(
     preflight.body,
-    /IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tender_analysis_runs\s+WHERE\s+status\s*<>\s*'completed'\s+GROUP\s+BY\s+source\s*,\s*tender_id\s+HAVING\s+count\(\*\)\s*>\s*1\s*\)\s+THEN[\s\S]*?RAISE\s+EXCEPTION/i,
+    /IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+public\.tender_analysis_runs\s+WHERE\s+status\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)[\s\S]*?GROUP\s+BY\s+source\s*,\s*tender_id\s+HAVING\s+count\(\*\)\s*>\s*1\s*\)\s+THEN[\s\S]*?RAISE\s+EXCEPTION/i,
   );
 });
 
@@ -105,7 +125,127 @@ test('migration enforces one unfinished run', async () => {
 
   assert.match(
     sql,
-    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s*<>\s*'completed'\s*;/i,
+    /CREATE\s+UNIQUE\s+INDEX\s+IF\s+NOT\s+EXISTS\s+uq_tender_analysis_runs_one_unfinished\s+ON\s+public\.tender_analysis_runs\s*\(\s*source\s*,\s*tender_id\s*\)\s+WHERE\s+status\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)\s*;/i,
+  );
+});
+
+test('migration safely upgrades only the exact known legacy active-run index', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const upgrade = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$active_run_index_upgrade$',
+  );
+  assert.ok(upgrade, 'missing active-run index upgrade DO block');
+
+  for (const catalogContract of [
+    /pg_catalog\.pg_class/i,
+    /pg_catalog\.pg_namespace/i,
+    /pg_catalog\.pg_index/i,
+    /pg_catalog\.pg_attribute/i,
+    /pg_catalog\.pg_get_expr/i,
+    /pg_catalog\.pg_get_indexdef/i,
+  ]) {
+    assert.match(upgrade.body, catalogContract);
+  }
+
+  assert.match(upgrade.body, /uq_tender_analysis_runs_one_unfinished/i);
+  assert.match(upgrade.body, /index_metadata\.indrelid\s*=\s*runs_oid/i);
+  assert.match(upgrade.body, /index_metadata\.indisunique/i);
+  assert.match(upgrade.body, /NOT\s+index_metadata\.indisprimary/i);
+  assert.match(upgrade.body, /index_metadata\.indisvalid/i);
+  assert.match(upgrade.body, /index_metadata\.indisready/i);
+  assert.match(upgrade.body, /index_metadata\.indnkeyatts\s*=\s*2/i);
+  assert.match(upgrade.body, /index_metadata\.indnatts\s*=\s*2/i);
+  assert.match(upgrade.body, /first_key\.attname\s*=\s*'source'/i);
+  assert.match(upgrade.body, /second_key\.attname\s*=\s*'tender_id'/i);
+  assert.match(upgrade.body, /status<>''completed''/i);
+  assert.match(upgrade.body, /status<>allarray\[''completed'',''superseded''\]/i);
+  assert.match(
+    upgrade.body,
+    /IF\s+index_definition_kind\s*=\s*'legacy'\s+THEN[\s\S]*?EXECUTE\s+format\s*\(\s*'DROP\s+INDEX\s+%I\.%I'/i,
+  );
+  assert.match(
+    upgrade.body,
+    /ELSE[\s\S]*?RAISE\s+EXCEPTION[\s\S]*?incompatible definition/i,
+    'unknown same-name objects or index definitions must fail closed',
+  );
+  assert.doesNotMatch(
+    upgrade.body,
+    /DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?public\.uq_tender_analysis_runs_one_unfinished/i,
+    'same-name index must never be dropped without catalog validation',
+  );
+});
+
+test('migration adds auditable superseded run state through a validated status contract', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const statusContract = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$run_status_contract$',
+  );
+  assert.ok(statusContract, 'missing run status contract migration block');
+
+  assert.match(
+    sql,
+    /ALTER\s+TABLE\s+public\.tender_analysis_runs\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+superseded_at\s+timestamptz\s*;/i,
+  );
+  assert.match(
+    sql,
+    /ALTER\s+TABLE\s+public\.tender_analysis_runs\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+superseded_reason\s+text\s*;/i,
+  );
+  assert.match(statusContract.body, /pg_catalog\.pg_constraint/i);
+  assert.match(statusContract.body, /pg_catalog\.pg_get_constraintdef/i);
+  assert.match(statusContract.body, /pg_catalog\.pg_attribute/i);
+  assert.match(statusContract.body, /conkey/i);
+  assert.match(statusContract.body, /convalidated/i);
+  assert.match(statusContract.body, /created/i);
+  assert.match(statusContract.body, /ready_for_aggregation/i);
+  assert.match(statusContract.body, /superseded/i);
+  assert.match(statusContract.body, /DROP\s+CONSTRAINT/i);
+  assert.match(statusContract.body, /ADD\s+CONSTRAINT/i);
+  assert.match(statusContract.body, /format\s*\(/i);
+  assert.doesNotMatch(
+    statusContract.body,
+    /DROP\s+CONSTRAINT\s+tender_analysis_runs_status_check/i,
+    'status CHECK replacement must use the discovered authoritative constraint, not a guessed name',
+  );
+});
+
+test('migration reconciles only the approved 86 legacy runs and is a no-op without active duplicates', async () => {
+  const sql = stripSqlComments(await readFile(migrationUrl, 'utf8'));
+  const reconciliation = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$legacy_reconciliation$',
+  );
+  assert.ok(reconciliation, 'missing bounded legacy reconciliation block');
+
+  for (const [source, tenderId, count, cutoff] of [
+    ['manual_test', 'manual-calibration-167-26-ZO', 24, '2026-09-07T05:59:14.629399+00:00'],
+    ['tenderplan', '6a7af04c3951804ff31b66a6', 50, '2026-08-17T18:50:41.678699+00:00'],
+    ['tenderplan', '6a7ef6ac3951804ff32da751', 12, '2026-08-23T16:29:52.779826+00:00'],
+  ]) {
+    assert.match(reconciliation.body, new RegExp(source, 'i'));
+    assert.match(reconciliation.body, new RegExp(tenderId, 'i'));
+    assert.match(reconciliation.body, new RegExp(String(count), 'i'));
+    assert.match(reconciliation.body, new RegExp(cutoff.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  }
+
+  assert.match(reconciliation.body, /status\s+NOT\s+IN\s*\(\s*'completed'\s*,\s*'superseded'\s*\)/i);
+  assert.match(reconciliation.body, /IF\s+EXISTS\s*\([\s\S]*?HAVING\s+count\(\*\)\s*>\s*1[\s\S]*?THEN/i);
+  assert.match(reconciliation.body, /CROSS\s+JOIN\s+LATERAL/i);
+  assert.match(reconciliation.body, /created_at\s*<=\s*approved\.cutoff/i);
+  assert.match(reconciliation.body, /UPDATE\s+public\.tender_analysis_runs/i);
+  assert.match(reconciliation.body, /status\s*=\s*'superseded'/i);
+  assert.match(reconciliation.body, /superseded_at\s*=\s*NOW\(\)/i);
+  assert.match(reconciliation.body, /superseded_reason\s*=/i);
+  assert.match(reconciliation.body, /updated_at\s*=\s*NOW\(\)/i);
+  assert.match(reconciliation.body, /GET\s+DIAGNOSTICS[\s\S]*ROW_COUNT/i);
+  assert.match(reconciliation.body, /<>\s*86/i);
+  assert.doesNotMatch(reconciliation.body, /error_message\s*=/i);
+
+  const duplicatePreflight = getDoBlocks(sql).find(
+    (block) => block.tag.toLowerCase() === '$duplicate_preflight$',
+  );
+  assert.ok(duplicatePreflight, 'missing final duplicate preflight');
+  assert.ok(
+    reconciliation.index < duplicatePreflight.index,
+    'bounded update must precede the final fail-closed duplicate preflight',
   );
 });
 
@@ -171,6 +311,7 @@ test('migration validates created or pre-existing schema objects fail closed', a
     'manual',
     'processing',
     'completed',
+    'superseded',
     'failed',
   ]) {
     assert.match(postconditions, new RegExp(`'${checkLiteral}'`, 'i'));

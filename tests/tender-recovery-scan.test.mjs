@@ -17,7 +17,7 @@ const expectedQuery = `SELECT DISTINCT run.id AS analysis_run_id
 FROM tender_analysis_runs AS run
 LEFT JOIN tender_analysis_documents AS document
   ON document.analysis_run_id = run.id
-WHERE run.status <> 'completed'
+WHERE run.status NOT IN ('completed', 'superseded')
   AND (
     document.status = 'pending'
     OR (document.status = 'failed' AND document.attempts < 2)
@@ -99,7 +99,7 @@ test('recovery scan selects retryable runs and delegates each run to Intake Resu
     /\b(?:insert|update|delete|truncate|alter|create|drop)\b/iu,
     'Recovery Scan candidate query must remain read-only',
   );
-  assert.match(sql, /run\.status <> 'completed'/u);
+  assert.match(sql, /run\.status NOT IN \('completed', 'superseded'\)/u);
   assert.match(sql, /document\.status = 'pending'/u);
   assert.match(sql, /document\.status = 'failed' AND document\.attempts < 2/u);
   assert.match(sql, /document\.started_at <= now\(\) - interval '1 hour'/u);

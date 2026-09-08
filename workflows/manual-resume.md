@@ -27,6 +27,10 @@ The adapter sends exactly:
 
 It never accepts or sends `tender_id`, cannot create a new run, and contains no run/document classification. `TENDER — Intake Resume` remains the only dispatcher and owns all run, document, aggregation, and finalization decisions.
 
+If the selected run is terminal `superseded`, the dispatcher returns
+`superseded_no_op`. Manual override never reopens that status and dispatches no
+Worker, Aggregator, or Finalization work.
+
 `Execute TENDER — Intake Resume` waits for sub-workflow completion. The manual execution therefore exposes the dispatcher's structured result unchanged, including dispatched, exhausted, aggregation-started, finalization-started, manual-attention, and no-op outcomes.
 
 ## Operator procedure

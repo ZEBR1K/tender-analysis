@@ -38,12 +38,13 @@ migrations/2026-09-07_tender_intake_resume.sql
 
 планирует добавить:
 
-- partial unique index, запрещающий более одного незавершённого run для одного `(source, tender_id)`;
+- terminal status `superseded` и nullable audit-поля `superseded_at` / `superseded_reason`;
+- partial unique index, запрещающий более одного active run для одного `(source, tender_id)`, где active означает status не `completed` и не `superseded`;
 - таблицу `tender_analysis_intake_events` для idempotency, ownership и audit входных TenderPlan/manual/recovery events.
 
 Наличие этого файла в repository не подтверждает применение migration. Live PostgreSQL для этих объектов в рамках Task 1 не проверялся и не изменялся. Поэтому приведённый ниже snapshot пяти основных таблиц остаётся последним verified live state, а planned objects документируются отдельно.
 
-Migration сохраняет `IF NOT EXISTS` для повторяемого применения, но в той же transaction выполняет fail-closed postcondition validation через PostgreSQL catalogs и `information_schema`. Несовместимые pre-existing index/table/constraints/columns/defaults или secondary indexes вызывают `RAISE EXCEPTION` и откат всей migration transaction.
+Migration сохраняет `IF NOT EXISTS` для повторяемого применения, но в той же transaction выполняет fail-closed validation через PostgreSQL catalogs и `information_schema`. До reconciliation она допускает только отсутствие active-run index, его точную legacy-форму с predicate `status <> 'completed'` или точную current-форму. Точный legacy index удаляется внутри transaction до supersede update и пересоздаётся с current predicate после final duplicate preflight; неизвестный same-name object/definition не удаляется и вызывает откат. Migration допускает no-op на clean/already-reconciled DB и только точную bounded reconciliation 86 подтверждённых legacy rows; любое другое active-duplicate shape, несовместимые table/constraints/columns/defaults или secondary indexes также вызывают `RAISE EXCEPTION` и откат всей migration transaction.
 
 Текущая verified модель данных состоит из пяти основных таблиц:
 
@@ -183,6 +184,8 @@ tender_analysis_runs.id
 | 13 | `ready_at` | timestamptz | YES | — |
 | 14 | `aggregation_started_at` | timestamptz | YES | — |
 | 15 | `completed_at` | timestamptz | YES | — |
+| 16 | `superseded_at` *(planned migration)* | timestamptz | YES | — |
+| 17 | `superseded_reason` *(planned migration)* | text | YES | — |
 
 ---
 
@@ -213,6 +216,7 @@ ready_for_aggregation
 aggregating
 completed
 failed
+superseded
 ```
 
 Constraint:
@@ -226,7 +230,8 @@ CHECK (
       'ready_for_aggregation',
       'aggregating',
       'completed',
-      'failed'
+      'failed',
+      'superseded'
     ]
   )
 )
@@ -258,6 +263,19 @@ created / processing / ready_for_aggregation / aggregating
 failed
 ```
 
+Administrative terminal transition in the pending migration:
+
+```text
+approved bounded legacy active run
+  ↓
+superseded
+```
+
+`superseded` is terminal. Automatic recovery and Manual Resume return an
+explicit no-op for that `analysis_run_id`; they never reopen it. The run and all
+children remain stored for audit. A new run may be created when the only prior
+history for `(source, tender_id)` is `superseded`.
+
 ### Семантика timestamps
 
 ```text
@@ -275,6 +293,12 @@ aggregation_started_at
 
 completed_at
 → полный анализ завершён
+
+superseded_at
+→ run атомарно выведен из active lifecycle утверждённой reconciliation
+
+superseded_reason
+→ фиксированная bounded audit-причина supersede
 ```
 
 `completed_at` заполняется Finalization workflow после успешной DB-backed проверки 27/27 уникальных FINAL fields и atomic completion claim.
@@ -303,10 +327,15 @@ Planned migration artifact, не подтверждённый как live index:
 ```sql
 CREATE UNIQUE INDEX uq_tender_analysis_runs_one_unfinished
 ON tender_analysis_runs (source, tender_id)
-WHERE status <> 'completed';
+WHERE status NOT IN ('completed', 'superseded');
 ```
 
-Этот partial unique index допускает historical `completed` runs, но должен обеспечить не более одного незавершённого run для одного `(source, tender_id)`. До его создания migration fail-closed проверяет существующие дубликаты и не выбирает/не удаляет их автоматически.
+Этот partial unique index допускает historical terminal `completed` и
+`superseded` runs, но должен обеспечить не более одного active run для одного
+`(source, tender_id)`. До его создания migration либо выполняет единственную
+утверждённую bounded reconciliation 86 legacy rows, либо fail-closed откатывает
+любое иное duplicate shape. Ни run, ни его children не удаляются, а исходный
+`error_message` не перезаписывается.
 
 PK index:
 

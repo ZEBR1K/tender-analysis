@@ -276,6 +276,7 @@ ready_for_aggregation
 aggregating
 completed
 failed
+superseded
 ```
 
 Intended happy path:
@@ -398,11 +399,11 @@ typed tender_id / source / source_event_key / trigger_kind
    + register all documents as pending
 → created_new_run?
    ├─ true: async Worker dispatch for pdf/docx/xlsx
-   └─ false: fresh unfinished-run SELECT + exactly-one guard
+   └─ false: fresh active-run SELECT + exactly-one guard
 → one structured result
 ```
 
-PostgreSQL partial uniqueness по `(source, tender_id) WHERE status <> 'completed'` является concurrency boundary. Проигравший `ON CONFLICT DO NOTHING` путь не регистрирует документы повторно и не запускает Worker.
+PostgreSQL partial uniqueness по `(source, tender_id) WHERE status NOT IN ('completed', 'superseded')` является concurrency boundary. `superseded` — terminal audit state, который не возобновляется. Проигравший `ON CONFLICT DO NOTHING` путь не регистрирует документы повторно и не запускает Worker.
 
 Worker по-прежнему запускается только для:
 
@@ -450,6 +451,11 @@ claims total. Только `manual_override=true` может повторить 
 document. `processing` считается stale после одного часа, но reclaim разрешён
 только после read-only observation соответствующего n8n execution и guarded CAS;
 недоступность execution API ничего не мутирует.
+
+Если история `(source, tender_id)` содержит только `superseded`, active-run
+boundary допускает создание нового run. Прямой automatic/manual/recovery вызов
+с superseded `analysis_run_id` возвращает `superseded_no_op` и не dispatch-ит
+Worker, Aggregator или Finalization.
 
 Manual/hardcoded boundary устранён только в inactive repository candidate.
 Production import, migration application, dispatcher/error/manual/recovery/mark
