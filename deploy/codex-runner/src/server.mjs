@@ -9,6 +9,7 @@ import packageMetadata from '../package.json' with { type: 'json' };
 import { BODY_LIMITS, config } from './config.mjs';
 import { normalizeRunnerError, RunnerError, toSafeError } from './errors.mjs';
 import { createHeaderAuthenticator } from './http-auth.mjs';
+import { createJobStore } from './job-store.mjs';
 import { permissionBoundaryContractReady } from './permissions.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -425,6 +426,90 @@ async function defaultV1Handler() {
   throw new RunnerError('RUNNER_ROUTE_NOT_FOUND', 'Route was not found', 404);
 }
 
+function parseJson(rawBody) {
+  try {
+    return JSON.parse(rawBody.toString('utf8'));
+  } catch {
+    throw new RunnerError('RUNNER_REQUEST_INVALID', 'Request body must contain valid JSON', 400);
+  }
+}
+
+function routeMethod(requestMetadata, expected) {
+  if (requestMetadata.method !== expected) {
+    throw new RunnerError('RUNNER_METHOD_NOT_ALLOWED', 'HTTP method is not allowed for this route', 405);
+  }
+}
+
+function decodeRoutePart(value, label) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new RunnerError('RUNNER_REQUEST_INVALID', `${label} is not valid URL encoding`, 400);
+  }
+}
+
+export function createManifestRouteHandler({ jobStore }) {
+  if (!jobStore) throw new TypeError('jobStore is required');
+  return async ({ requestMetadata, url, bodyKind, rawBody, bodyStream }) => {
+    if (url.pathname === '/v1/jobs') {
+      routeMethod(requestMetadata, 'PUT');
+      if (bodyKind !== 'json') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Job manifest requires a JSON body', 400);
+      }
+      const result = await jobStore.createJob(parseJson(rawBody));
+      return { statusCode: result.idempotent ? 200 : 201, body: result };
+    }
+
+    const documentRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/documents\/([^/]+)$/u);
+    if (documentRoute) {
+      routeMethod(requestMetadata, 'PUT');
+      if (bodyKind !== 'document') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Document upload requires an octet-stream body', 400);
+      }
+      return {
+        statusCode: 200,
+        body: await jobStore.uploadDocument({
+          jobId: decodeRoutePart(documentRoute[1], 'job_id'),
+          artifactKey: decodeRoutePart(documentRoute[2], 'artifact_key'),
+          bodyStream,
+        }),
+      };
+    }
+
+    const sealRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/seal$/u);
+    if (sealRoute) {
+      routeMethod(requestMetadata, 'POST');
+      if (bodyKind !== 'none') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Seal does not accept a request body', 400);
+      }
+      return {
+        statusCode: 200,
+        body: await jobStore.sealJob(decodeRoutePart(sealRoute[1], 'job_id')),
+      };
+    }
+
+    const statusRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/u);
+    if (statusRoute) {
+      routeMethod(requestMetadata, 'GET');
+      return {
+        statusCode: 200,
+        body: await jobStore.getJob(decodeRoutePart(statusRoute[1], 'job_id')),
+      };
+    }
+
+    return defaultV1Handler();
+  };
+}
+
+function createDefaultV1Handler() {
+  return createManifestRouteHandler({
+    jobStore: createJobStore({
+      rootDirectory: config.rootDirectory,
+      fieldCatalogPath: config.fieldCatalogPath,
+    }),
+  });
+}
+
 export function createServer({
   authenticator = createHeaderAuthenticator(config.authToken),
   bodyLimits = config.bodyLimits,
@@ -438,8 +523,9 @@ export function createServer({
     isolationCanaryVerified: config.isolationCanaryVerified,
   }),
   executionBoundary = { ready: config.isolationCanaryVerified },
-  v1Handler = defaultV1Handler,
+  v1Handler,
 } = {}) {
+  const resolvedV1Handler = v1Handler ?? createDefaultV1Handler();
   return http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url || '/', 'http://tender-codex-runner.invalid');
@@ -463,7 +549,7 @@ export function createServer({
         }
         let result;
         if (!requestHasBody(request)) {
-          result = await v1Handler({
+          result = await resolvedV1Handler({
             requestMetadata,
             url,
             bodyKind: 'none',
@@ -479,7 +565,7 @@ export function createServer({
             const bodyStream = createBoundedDocumentStream(request, bodyLimits);
             result = await uploadGate.run(() => handleDocumentRequest({
               bodyStream,
-              handler: () => v1Handler({
+              handler: () => resolvedV1Handler({
                 requestMetadata,
                 url,
                 bodyKind: 'document',
@@ -494,7 +580,7 @@ export function createServer({
             });
           } else {
             const rawBody = await readBoundedRequestBody(request, bodyLimits);
-            result = await v1Handler({
+            result = await resolvedV1Handler({
               requestMetadata,
               url,
               bodyKind: 'json',

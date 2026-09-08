@@ -10,6 +10,7 @@ const repositoryRoot = path.resolve(testsDirectory, '..');
 const runnerDirectory = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const dockerfilePath = path.join(runnerDirectory, 'Dockerfile');
 const composePath = path.join(runnerDirectory, 'compose.yaml');
+const attributesPath = path.join(repositoryRoot, '.gitattributes');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
 const permissionsSourcePath = path.join(runnerDirectory, 'src', 'permissions.mjs');
 const implementationPlanPath = path.join(
@@ -21,7 +22,10 @@ const implementationPlanPath = path.join(
 );
 
 test('runner image pins Node, Codex CLI and every document inspection tool', async () => {
-  const dockerfile = await readFile(dockerfilePath, 'utf8');
+  const [dockerfile, attributes] = await Promise.all([
+    readFile(dockerfilePath, 'utf8'),
+    readFile(attributesPath, 'utf8'),
+  ]);
 
   assert.match(dockerfile, /^FROM node:24\.18\.0-bookworm-slim$/mu);
   assert.match(dockerfile, /@openai\/codex@0\.153\.4/u);
@@ -33,6 +37,11 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
   assert.match(dockerfile, /npm ci --omit=dev/u);
+  assert.match(dockerfile, /COPY field-catalog \.\/field-catalog/u);
+  assert.match(
+    attributes,
+    /^deploy\/codex-runner\/field-catalog\/FIELD_CATALOG\.md binary$/mu,
+  );
   assert.match(dockerfile, /CODEX_HOME=\/run\/codex-auth/u);
   assert.doesNotMatch(dockerfile, /CODEX_HOME=\/data\/jobs/u);
   assert.match(dockerfile, /USER 10001:10001/u);
