@@ -1,0 +1,30 @@
+---
+name: tender-document-analysis
+description: Use when analyzing one sealed procurement package into the 27-field tender_agent_result_v1 contract.
+---
+
+# Tender document analysis
+
+1. Read `../input/manifest.json` and `../input/FIELD_CATALOG.md`. Create
+   `field-ledger.json` with every catalog field before drawing conclusions.
+2. Work one document at a time. For each immutable original, choose the useful
+   method yourself: direct text, visual inspection, OCR, OOXML, or another
+   available local method. Do not perform a mechanical conversion merely to
+   satisfy a coverage counter.
+3. After each document, update the ledger and its source notes. Add one
+   `inspected_documents` entry using the manifest `artifact_key`; honestly list
+   inspected parts, methods, and notes. Record unreadable or uncertain material
+   in `limitations` instead of claiming it was examined.
+4. Use only the meanings in the catalog. For `resolved` and `requires_review`,
+   include evidence with the manifest `artifact_key` and a useful human
+   `locator`. A quote is optional audit text. Never invent a quote, source, or
+   locator.
+5. If a value cannot be established after attempting the manifest documents,
+   use `not_found`; `value_text` may be null and `evidence` may be empty. Do not
+   turn missing information into “no”, “false”, or “not required”.
+6. Review the ledger across documents. Keep an unresolved material conflict as
+   `requires_review` and explain it; do not silently choose one source.
+7. Before returning, confirm exactly 27 unique catalog `field_key` values,
+   allowed statuses, required evidence/locator where applicable, and the
+   top-level `inspected_documents`, `limitations`, and `constraints` audit.
+   Return only `tender_agent_result_v1` JSON matching the supplied schema.
