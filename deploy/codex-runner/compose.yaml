@@ -1,0 +1,43 @@
+services:
+  codex-runner:
+    build:
+      context: .
+    image: tender-codex-runner:0.1.0
+    container_name: tender-codex-runner
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TENDER_CODEX_RUNNER_HOST: 0.0.0.0
+      TENDER_CODEX_RUNNER_PORT: "8080"
+      TENDER_CODEX_RUNNER_ROOT: /data/jobs
+      TENDER_CODEX_RUNNER_AUTH_TOKEN: "${TENDER_CODEX_RUNNER_AUTH_TOKEN:-}"
+      TENDER_CODEX_RUNNER_MAX_QUEUED_JOBS: "2"
+      TZ: Europe/Moscow
+    volumes:
+      - /opt/tender-codex-runner/jobs:/data/jobs
+    networks:
+      - n8n_default
+    pids_limit: 192
+    deploy:
+      resources:
+        limits:
+          cpus: 1.0
+          memory: 1536M
+          pids: 192
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  n8n_default:
+    external: true
