@@ -34,7 +34,7 @@ The audit followed the repository source-of-truth order and compared:
 - `README.md`, `ARCHITECTURE.md`, `PROJECT_STATUS.md`, `TECH_DEBT.md`;
 - `DATA_MODEL.md`, `FIELD_CATALOG.md`, `REPORT_FIELD_MAPPING.md`;
 - current workflow exports and workflow documentation for Intake, Orchestrator, Document Worker, Aggregator, Targeted Recheck, Finalization and Report Generation;
-- the latest intake branch at commit `cec69c0`;
+- the current superseding intake tip at commit `2701bc81de1fdb48a61ad9c512aa5b39f3676f76` (supersedes the earlier sibling tip `cec69c0`);
 - the archive-ingestion branch at commit `f596755`;
 - read-only live n8n workflow metadata and graphs;
 - the four-run blind-test archive in `evaluations/codex-agentic-blind-test-2026-09-08`;
@@ -229,7 +229,7 @@ The validator may keep a value as provisional while downgrading the status. It m
 
 Implementation must not begin by merging the current branches blindly.
 
-1. `codex/agentic-analysis-mvp` is based on `26e8906` plus the blind-test archive, while the intake branch has a newer `cec69c0` superseded-run change.
+1. `codex/agentic-analysis-mvp` is based on `26e8906` plus the blind-test archive, while the intake branch now has the superseding `2701bc81de1fdb48a61ad9c512aa5b39f3676f76` change; it supersedes the earlier sibling tip `cec69c0` rather than erasing that historical checkpoint.
 2. `codex/archive-ingestion` is based on main and contains the deployed archive service and inactive preparation workflow, but not the latest intake work.
 3. The intake migration remains unapplied in live PostgreSQL.
 4. The archive `ingestion_metadata` migration and Orchestrator wiring are not production-complete.
