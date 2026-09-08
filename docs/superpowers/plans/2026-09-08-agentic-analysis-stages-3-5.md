@@ -447,7 +447,7 @@ Lane A не редактирует существующие workflow и поэт
 **Files:** no implementation file changes; create the integration branch/worktree only.
 
 - [ ] Start a fresh `codex/agentic-analysis-integration` worktree from the reviewed commit that contains current `main` Report PDF changes.
-- [ ] Merge or cherry-pick the final `codex/tenderplan-intake-resume` series through `cec69c0`; resolve only documented conflicts.
+- [ ] Merge or cherry-pick the final `codex/tenderplan-intake-resume` series through `2701bc8`; this current sibling tip supersedes the earlier `cec69c0` plan reference. Resolve only documented conflicts.
 - [ ] Merge or cherry-pick `codex/archive-ingestion` through `f596755`.
 - [ ] Confirm the resulting tree contains the latest intake migration, archive service, `TENDER — Подготовить документацию`, current PDF report export and blind-test evaluation archive.
 - [ ] Compare every shared workflow export with live n8n again. Record exact workflow IDs, active flags, node counts, version IDs and downstream targets in `PROJECT_STATUS.md`.

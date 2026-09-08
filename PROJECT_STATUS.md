@@ -4,6 +4,83 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
+## Task 0 baseline reconciliation and live routing audit — 2026-09-08
+
+The integration branch starts from archive/report tip `f596755`, merges the
+current intake tip `2701bc8` (which supersedes the earlier `cec69c0` plan
+reference), and then merges Agentic Lane A tip `0b5a95b`. The four expected
+intake conflicts in `AGENTS.md`, `README.md`, `PROJECT_STATUS.md` and
+`DEVELOPMENT_LOG.md` were resolved by retaining both archive/report and intake
+state. `FIELD_CATALOG.md` was not semantically edited. The complete blind-test
+archive and its `raw/` subtree retain the exact Lane A Git tree objects
+`4d82e2a0351e572d56d3354e5fa9c3f3a9cd299d` and
+`a231738d23513883f257c71870f8c69396da5e27`.
+
+Fresh production n8n evidence was collected through the scoped read-only API
+using only paginated workflow-list and workflow-detail GET requests. The list
+contained 100 accessible workflows. `versionId` below is the current draft
+version returned by workflow detail; `activeVersionId` is shown separately when
+it differs or is absent. Live n8n is authoritative where repository exports
+conflict.
+
+| Role / live workflow | ID | Active | `versionId` / `activeVersionId` | Nodes | Execute Workflow targets |
+|---|---|---:|---|---:|---|
+| Orchestrator — `ТЕНДЕРЫ ОРКЕСТРАТОР` | `Q1RWSrB0jaTA6Dmx` | no | `75a99242-ad3a-47c1-beac-b7a407ae3795` / null | 12 | `Запустить обработку документа` → `W4mNOUkdsFtNENpI` (inactive) |
+| Document Preparation — `TENDER — Подготовить документацию` | `0scTZu1aBKsMd6AM` | no | `15d704c2-08b7-41be-9218-77469a6ba08b` / null | 15 | none |
+| Worker — `TENDER — Обработать документ` | `1Pw61ZY3HgBSvcUr` | yes | `f3d9fdb3-21ea-4d38-8dba-5bc65dd3309d` / same | 37 | → `iLt7wLLfueg8qffZ` (inactive) |
+| Worker candidate — `[PROD CANDIDATE] TENDER — Обработать документ` | `csnDg78NzN1nIjUT` | yes | `778dfb50-72be-434d-ba82-2f8fcf90daec` / `c5977af5-c263-4846-8af2-762b85edcc87` | 52 current draft | → `ftvmrEHoMbPOAqZG` (active) |
+| Worker candidate — `[3 TEST] TENDER — Обработать документ` | `2T7szFpiGcfNpKkB` | no | `55664cef-7e4f-4d9b-8f28-e1e2eb6a7c52` / null | 60 | → `iLt7wLLfueg8qffZ` (inactive) |
+| Worker candidate — `[DW-23 TEST CODEX] TENDER — Обработать документ` | `W4mNOUkdsFtNENpI` | no | `a32653e5-4486-46b8-9617-6e90c56dd0ed` / null | 86 | disabled call → `ftvmrEHoMbPOAqZG` (active) |
+| Worker candidate — `LEGACY [DW-23 TEST CODEX] TENDER — Обработать документ` | `URFdslUfULtOLv9B` | yes | `1c1654cf-e47c-443f-9cc1-e6776afa1ba5` / same | 86 | → `ftvmrEHoMbPOAqZG` (active) |
+| Aggregator candidate — `[LEGACY] TENDER — Агрегация закупки` | `iLt7wLLfueg8qffZ` | no | `89b33d04-8fd2-4efa-b363-8ba7b9263d46` / null | 24 | 2× → `9uDOU31DGo30fGXX` (active); 2× → `cSsh9yjpS7t5p0OO` (active) |
+| Aggregator — `TENDER — Агрегация закупки` | `ftvmrEHoMbPOAqZG` | yes | `1f5f6f96-1eb9-4f02-8a9a-8b80b7c1e87b` / same | 31 | 2× → `pReSd1KIRTgbysUZ` (active); 2× → `cSsh9yjpS7t5p0OO` (active) |
+| Targeted Recheck — `TENDER - Targeted Recheck` | `9uDOU31DGo30fGXX` | yes | `4e0858c9-6ca2-42c7-969b-e74a2f91b8c6` / same | 64 | 8× → `cSsh9yjpS7t5p0OO` (active) |
+| Targeted Recheck candidate — `[TEST CODEX] TENDER - Targeted Recheck` | `nI47FcgzYwGzwGqy` | yes | `799914f2-4a76-43fe-a501-3b9445ad6313` / same | 64 | 8× → `cSsh9yjpS7t5p0OO` (active) |
+| Targeted Recheck route guard — `[TEST ROUTE GUARD 14449] TENDER - Targeted Recheck` | `pReSd1KIRTgbysUZ` | yes | `a88d9d2a-c86b-4563-89f5-e07aec99a99a` / same | 70 | 9× → `cSsh9yjpS7t5p0OO` (active) |
+| Finalization — `TENDER — Финализация анализа` | `cSsh9yjpS7t5p0OO` | yes | `742051fe-a58a-4e03-afa6-6233c0177247` / same | 5 | → `ckPnP3hRhKu4Mf9u` (active) |
+| Report — `TENDER — Генерация отчета` | `ckPnP3hRhKu4Mf9u` | yes | `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` / same | 12 | none |
+| Intake Resume candidate — `[CODEX CANDIDATE] TENDER — Intake Resume — NO WORKER` | `VO8Ml0sfO65w2Jiz` | no | `55d3a8a2-9864-4d83-bd69-7bf96ff7a0be` / null | 53 | enabled → `thE9gLyNTvxLWt8I` (inactive no-worker Orchestrator); disabled → `1Pw61ZY3HgBSvcUr`, `ftvmrEHoMbPOAqZG`, `cSsh9yjpS7t5p0OO` (all active) |
+| Mark Intake candidate — `[CODEX CANDIDATE] TENDER — TenderPlan Mark Intake` | `biYC4OvWBlfJRmnj` | no | `1bba9fab-250f-4280-ab85-82bcd99326ea` / null | 5 | → `VO8Ml0sfO65w2Jiz` (inactive) |
+| Manual Resume candidate — `[CODEX CANDIDATE] TENDER — Manual Resume` | `z8nynFC12H9WOM9s` | no | `65506d90-f32c-4488-aacb-66e0d03d2cd7` / null | 3 | → `VO8Ml0sfO65w2Jiz` (inactive) |
+| Recovery Scan candidate — `[CODEX CANDIDATE] TENDER — Recovery Scan` | `lwcHHdmmNd5YE6cw` | no | `19976752-0f3e-4427-8e2e-e44a7490659c` / null | 4 | → `VO8Ml0sfO65w2Jiz` (inactive) |
+| Intake Error — `TENDER — Ошибка Intake Resume` | `kff8KIrSHzo5Mmt1` | yes | `717888b5-22df-4ec6-b632-2704d6ee8fb4` / same | 4 | none |
+
+Fresh local/live conflicts and authoritative resolution:
+
+- repository Orchestrator has 14 nodes at `466ed98e-…` and routes to
+  `URFdslUfULtOLv9B`; live has 12 nodes at `75a99242-…` and routes to inactive
+  `W4mNOUkdsFtNENpI`; live is the current production state;
+- repository canonical Worker is an 85-node identity-neutral package routing to
+  inactive legacy Aggregator `iLt7wLLfueg8qffZ`; no exact installed live identity
+  matches that package. Repository beta ID `URFdslUfULtOLv9B` also has stale
+  name/version metadata relative to live;
+- repository Aggregator `ftvmrEHoMbPOAqZG`, Finalization
+  `cSsh9yjpS7t5p0OO` and Report `ckPnP3hRhKu4Mf9u` match live identity,
+  current version, node count and Execute Workflow targets. Repository exports
+  omit live `activeVersionId` metadata;
+- repository canonical Targeted Recheck identifies `pReSd1KIRTgbysUZ` as an
+  inactive 70-node candidate at `cae31e7f-…`; live has the same ID and 70-node
+  target shape but is active at `a88d9d2a-…`; live is authoritative;
+- repository Intake/Mark/Manual/Recovery packages contain no installed IDs and
+  preserve packaging placeholders. The only matching accessible live candidates
+  are the inactive `[CODEX CANDIDATE]` workflows above, with Intake deliberately
+  wired to a no-worker Orchestrator. Repository Intake Error is inactive and
+  identity-neutral, while live Intake Error is active at `kff8KIrSHzo5Mmt1`.
+
+Worker routing selection is **BLOCKED**. The only direct inactive/inactive pair,
+`2T7szFpiGcfNpKkB → iLt7wLLfueg8qffZ`, is not a closed test chain because the
+Aggregator has enabled calls to active production Targeted Recheck
+`9uDOU31DGo30fGXX` and active Finalization `cSsh9yjpS7t5p0OO`, which continues to
+active Report Generation. Inactive Worker `W4mNOUkdsFtNENpI` cannot form the
+required pair either: its Aggregator node is disabled and targets active
+`ftvmrEHoMbPOAqZG`. No inactive test Worker plus matching inactive test
+Aggregator is therefore selected. Production routing was not changed.
+
+Post-reconciliation verification is GREEN: the focused intake/archive/report
+command completed `68/68` tests, the full repository command completed
+`565/565` tests, and no historical or new failure signature remains in this
+integrated tree.
+
 ## Archive extractor deployment — runtime GREEN
 
 The bounded archive extractor from commit `cc2336e` is deployed as the isolated
