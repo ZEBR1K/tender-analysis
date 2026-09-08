@@ -2020,9 +2020,15 @@ Exact-body rollback dry-run `14686`, preflight `14687`, production migration
 legacy runs are `superseded`, no active duplicate group remains, and children
 are preserved. Isolated canaries `14691/14694/14697/14700` prove one active run
 per test tender, same-run reuse, stable mark-key duplicate no-op and zero Worker
-executions. Debt remains open because the retry/stale/manual/Aggregator/
-Finalization runtime matrix is incomplete, the stale-owner execution-read
-credential/variable are not packaged, and all entry candidates remain inactive.
+executions. Executions `14704`-`14742` prove the retry/stale/manual/CAS/API-outage,
+scoped Recovery Scan, production-mode Error Workflow and same-event retry matrix.
+The global inventory confirms zero Worker, Aggregator, Finalization or production
+Orchestrator executions in that window. Debt remains open because downstream
+Aggregator/Finalization runtime and controlled production activation are outside
+the approved no-Worker canary boundary, and all entry candidates remain inactive.
+The repository export stores the non-secret self-hosted origin directly because
+Custom Variables are unavailable on the current plan; it keeps the credential
+reference unbound for secret-safe packaging.
 
 \---
 

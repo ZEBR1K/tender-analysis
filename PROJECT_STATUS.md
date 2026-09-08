@@ -29,7 +29,7 @@ not changed.
   remove/reassign no-repeat semantics are unchanged.
 - A `processing` document becomes stale after one hour. Reclaim requires
   read-only n8n execution observation plus guarded CAS; unavailable API,
-  malformed observation and unknown status do not mutate state.
+  malformed/mismatched-ID observation and unknown status do not mutate state.
 - Read-only pre-DB smoke execution `14678` in workflow
   `yocBDh0nCvPPxItn` verified exact Orchestrator input validation, TenderPlan
   FullInfo identity and normalization for both test tender IDs. It stopped before
@@ -67,6 +67,28 @@ not changed.
   Searches across all 14 workflows named `Обработать документ` found zero Worker
   executions after the canary start. In this disabled test topology the returned
   `documents_dispatched=6/5` is queue cardinality, not actual Worker dispatch.
+- The isolated Intake runtime matrix is GREEN. Credential smoke `14704` returned
+  HTTP 200. Post-fix stale-event executions `14707/14708` preserved the same run,
+  incremented the event to attempt 2 and queued 6 pending documents. Automatic
+  attempt-cap executions `14711`-`14716` excluded a failed document at attempt 2
+  while manual override included it. Terminal-owner reclaim `14719/14720` moved
+  the stale processing document to `failed` with a guarded increment; cleanup
+  `14721` restored the approved canary state.
+- A live waiting owner was not reclaimed in `14726/14727`; an intentional
+  Execution API outage failed closed in `14729/14730`; corrected CAS-race canary
+  `14734` returned `cas_rows=0` after a competing owner update. Recovery Scan
+  `14736/14737` reused the same run. Production-mode Error Workflow executions
+  `14738/14739` marked the exact event failed, and `14740/14741` retried that
+  same event/run to `completed`, attempts 2. Read-only verifier `14742` found all
+  6 documents pending and no processing/failed documents.
+- The global execution inventory for `14722`-`14742` contains only isolated test,
+  Intake, Recovery and Error workflows. No Document Worker, Aggregator,
+  Finalization or production Orchestrator execution was created.
+- Post-review hardening now requires an HTTP 200 execution-read body ID to match
+  the requested owner exactly; a mismatch fails closed as unavailable. The same
+  two-node patch was applied only to inactive candidate `VO8Ml0sfO65w2Jiz` and
+  read back at draft version `3b46d3ac-bdc6-4e73-9201-37e3f4fae15e` with both
+  guards present, no active version, and Worker/Aggregator/Finalization disabled.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
@@ -89,14 +111,16 @@ not changed.
   credential and the isolated Intake target, but its schedule is not activated.
   Pagination/order/cursor and exhaustive-result semantics remain undocumented,
   and an end-to-end scheduled poll of the current mark membership is still open.
-- Stale-owner recovery is not production-ready: the two execution-read HTTP
-  nodes in the isolated Intake candidate still need the correct read-only n8n
-  Header Auth credential and the `N8N_TENDER_BASE_URL` n8n Variable. No
-  credential was guessed or embedded.
-- The NO-WORKER canary proves run/ledger idempotency and the hard dispatch
-  boundary only. Automatic retry after failure, one-hour stale reclaim, manual
-  override, Aggregator and Finalization routes still require their controlled
-  runtime matrix before production activation.
+- The isolated Intake retry/stale/manual/CAS/API-outage runtime matrix is GREEN.
+  Both execution-read HTTP nodes are bound in the isolated live candidate to the
+  owner-created read-only Header Auth credential and use the explicit non-secret
+  self-hosted origin `https://n8nworkup.ru`; no API key is embedded. The portable
+  repository export intentionally keeps the credential reference unbound.
+- Exact execution-response ID correlation is offline-tested and present in the
+  inactive live candidate, but has not required an additional runtime canary.
+- Aggregator and Finalization routes remain unverified in this change because the
+  approved canary boundary required stopping before Document Worker. Their
+  controlled end-to-end runtime test is a separate promotion gate.
 - Existing live workflows were not changed. Mark Intake, Recovery Scan, Manual
   Resume and Intake Resume remain inactive/unpublished; production activation
   remains a separate owner decision.

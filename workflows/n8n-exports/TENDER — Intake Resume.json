@@ -167,7 +167,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT e.*, $3::boolean AS run_authoritative, $4::boolean AS manual_override, $5::text AS input_trigger_kind, $2::text AS source_event_key, COALESCE(e.analysis_run_id, NULLIF($6, '')::uuid) AS input_analysis_run_id, COALESCE(e.tender_id, NULLIF($7, '')) AS input_tender_id, $8::text AS intent, now() AS current_at FROM tender_analysis_intake_events e WHERE e.source = $1 AND e.event_key = $2;",
+        "query": "SELECT e.*, e.processing_started_at::text AS processing_started_at_cas, $3::boolean AS run_authoritative, $4::boolean AS manual_override, $5::text AS input_trigger_kind, $2::text AS source_event_key, COALESCE(e.analysis_run_id, NULLIF($6, '')::uuid) AS input_analysis_run_id, COALESCE(e.tender_id, NULLIF($7, '')) AS input_tender_id, $8::text AS intent, now() AS current_at FROM tender_analysis_intake_events e WHERE e.source = $1 AND e.event_key = $2;",
         "options": {
           "queryReplacement": "={{ [ $('Prepare Event Identity').first().json.source, $('Prepare Event Identity').first().json.source_event_key, $('Prepare Event Identity').first().json.run_authoritative, $('Prepare Event Identity').first().json.manual_override, $('Prepare Event Identity').first().json.trigger_kind, $('Prepare Event Identity').first().json.analysis_run_id ?? '', $('Prepare Event Identity').first().json.tender_id ?? '', $('Prepare Event Identity').first().json.intent ] }}"
         }
@@ -280,7 +280,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $vars.N8N_TENDER_BASE_URL + '/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
+        "url": "={{ 'https://n8nworkup.ru/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -306,7 +306,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const input = $json; const owner = typeof $ === 'function' ? $('Classify Intake Event').item.json : {}; const base = { ...owner, ...input }; const unavailable = { ...base, action: 'execution_status_unavailable', execution_observation: 'unavailable', reclaimable: false }; if (input.error || !Number.isInteger(input.statusCode)) return { json: unavailable }; if (input.statusCode === 404) return { json: { ...base, execution_state: 'not_found', execution_observation: 'reclaimable', reclaimable: true } }; if (input.statusCode !== 200 || !input.body || typeof input.body.id !== 'string' || typeof input.body.status !== 'string' || typeof input.body.finished !== 'boolean') return { json: unavailable }; const state=input.body.status; if (['new','running','waiting'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'owned', reclaimable: false } }; if (['success','error','canceled','crashed'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'reclaimable', reclaimable: true } }; throw new Error(`Unknown execution status ${state}`);"
+        "jsCode": "const input = $json; const owner = typeof $ === 'function' ? $('Classify Intake Event').item.json : {}; const base = { ...owner, ...input }; const unavailable = { ...base, action: 'execution_status_unavailable', execution_observation: 'unavailable', reclaimable: false }; if (input.error || !Number.isInteger(input.statusCode)) return { json: unavailable }; if (input.statusCode === 404) return { json: { ...base, execution_state: 'not_found', execution_observation: 'reclaimable', reclaimable: true } }; if (input.statusCode !== 200 || !input.body || typeof input.body.id !== 'string' || typeof input.body.status !== 'string' || typeof input.body.finished !== 'boolean') return { json: unavailable }; const expectedOwner=base.owner_id??base.n8n_execution_id; if(typeof expectedOwner!=='string'||input.body.id!==expectedOwner)return {json:unavailable}; const state=input.body.status; if (['new','running','waiting'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'owned', reclaimable: false } }; if (['success','error','canceled','crashed'].includes(state)) return { json: { ...base, execution_state: state, execution_observation: 'reclaimable', reclaimable: true } }; throw new Error(`Unknown execution status ${state}`);"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -354,7 +354,7 @@
         "operation": "executeQuery",
         "query": "UPDATE tender_analysis_intake_events SET status='processing', attempts=tender_analysis_intake_events.attempts + 1, n8n_execution_id=$5, processing_started_at=now(), error_message=NULL WHERE source=$1 AND event_key=$2 AND status='processing' AND n8n_execution_id=$3 AND processing_started_at=$4::timestamptz AND processing_started_at <= $6::timestamptz RETURNING *;",
         "options": {
-          "queryReplacement": "={{ [ $json.source, $json.event_key, $json.owner_id ?? $json.n8n_execution_id, $json.processing_started_at, $execution.id, $json.stale_cutoff ] }}"
+          "queryReplacement": "={{ [ $json.source, $json.event_key, $json.owner_id ?? $json.n8n_execution_id, $json.processing_started_at_cas, $execution.id, $json.stale_cutoff ] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -615,7 +615,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $vars.N8N_TENDER_BASE_URL + '/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
+        "url": "={{ 'https://n8nworkup.ru/api/v1/executions/' + $json.n8n_execution_id + '?includeData=false' }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "options": {
@@ -641,7 +641,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const input=$json; const document=typeof $==='function'?$('Loop Document Recovery').item.json:{}; const base={...document,...input}; const unavailable={...base,execution_observation:'unavailable',reclaimable:false}; if(input.error||!Number.isInteger(input.statusCode)) return {json:unavailable}; if(input.statusCode===404)return {json:{...base,execution_state:'not_found',execution_observation:'reclaimable',reclaimable:true}}; if(input.statusCode!==200||!input.body||typeof input.body.id!=='string'||typeof input.body.status!=='string'||typeof input.body.finished!=='boolean')return {json:unavailable}; const state=input.body.status; if(['new','running','waiting'].includes(state))return {json:{...base,execution_state:state,execution_observation:'owned',reclaimable:false}}; if(['success','error','canceled','crashed'].includes(state))return {json:{...base,execution_state:state,execution_observation:'reclaimable',reclaimable:true}}; throw new Error(`Unknown execution observation status ${state}`);"
+        "jsCode": "const input=$json; const document=typeof $==='function'?$('Loop Document Recovery').item.json:{}; const base={...document,...input}; const unavailable={...base,execution_observation:'unavailable',reclaimable:false}; if(input.error||!Number.isInteger(input.statusCode)) return {json:unavailable}; if(input.statusCode===404)return {json:{...base,execution_state:'not_found',execution_observation:'reclaimable',reclaimable:true}}; if(input.statusCode!==200||!input.body||typeof input.body.id!=='string'||typeof input.body.status!=='string'||typeof input.body.finished!=='boolean')return {json:unavailable}; const expectedOwner=base.owner_id??base.n8n_execution_id; if(typeof expectedOwner!=='string'||input.body.id!==expectedOwner)return {json:unavailable}; const state=input.body.status; if(['new','running','waiting'].includes(state))return {json:{...base,execution_state:state,execution_observation:'owned',reclaimable:false}}; if(['success','error','canceled','crashed'].includes(state))return {json:{...base,execution_state:state,execution_observation:'reclaimable',reclaimable:true}}; throw new Error(`Unknown execution observation status ${state}`);"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1112,7 +1112,7 @@
     },
     {
       "parameters": {
-        "content": "## PACKAGING REQUIRED\nThis repository snapshot is intentionally **inactive** (`active=false`). Before controlled import: bind both execution-read HTTP nodes to the real read-only `httpHeaderAuth` credential carrying `X-N8N-API-KEY`; create the n8n Variable `N8N_TENDER_BASE_URL`; import/publish `TENDER — Ошибка Intake Resume`, read back its real ID, and assign that actual ID to `settings.errorWorkflow`. Do not activate before these steps and read-back validation.",
+        "content": "## PACKAGING REQUIRED\nThis repository snapshot is intentionally **inactive** (`active=false`). Before controlled import: confirm both execution-read HTTP nodes target the intended self-hosted origin `https://n8nworkup.ru` and bind them to the real read-only `httpHeaderAuth` credential carrying `X-N8N-API-KEY`; import/publish `TENDER — Ошибка Intake Resume`, read back its real ID, and assign that actual ID to `settings.errorWorkflow`. Do not activate before these steps and read-back validation.",
         "height": 300,
         "width": 620
       },
