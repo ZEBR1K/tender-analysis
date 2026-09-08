@@ -2022,8 +2022,11 @@ are preserved. Isolated canaries `14691/14694/14697/14700` prove one active run
 per test tender, same-run reuse, stable mark-key duplicate no-op and zero Worker
 executions. Executions `14704`-`14742` prove the retry/stale/manual/CAS/API-outage,
 scoped Recovery Scan, production-mode Error Workflow and same-event retry matrix.
-The global inventory confirms zero Worker, Aggregator, Finalization or production
-Orchestrator executions in that window. Debt remains open because downstream
+Current-state Mark Intake execution `14743` exposed the live TenderPlan `_id`
+contract; after the minimal normalizer correction, `14744` dispatched Intake
+execution `14745`, which returned `duplicate_event` with the existing run ID.
+The global inventories confirm zero Worker, Aggregator, Finalization or production
+Orchestrator executions in both windows. Debt remains open because downstream
 Aggregator/Finalization runtime and controlled production activation are outside
 the approved no-Worker canary boundary, and all entry candidates remain inactive.
 The repository export stores the non-secret self-hosted origin directly because

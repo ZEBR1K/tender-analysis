@@ -1,10 +1,10 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-08
+**Snapshot date:** 2026-09-09
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/tenderplan-intake-resume`
 
-## TenderPlan intake/resume checkpoint — migration applied, isolated NO-WORKER canary GREEN, activation pending
+## TenderPlan intake/resume checkpoint — automatic mark path GREEN in isolated NO-WORKER contour, activation pending
 
 Starting feature commit before documentation integration: `4c32d0b`. `main` is
 not changed.
@@ -89,6 +89,15 @@ not changed.
   two-node patch was applied only to inactive candidate `VO8Ml0sfO65w2Jiz` and
   read back at draft version `3b46d3ac-bdc6-4e73-9201-37e3f4fae15e` with both
   guards present, no active version, and Worker/Aggregator/Finalization disabled.
+- Current-state Mark Intake execution `14743` exposed the first incorrect state:
+  TenderPlan returns its internal 24-character identifier in `tender._id` /
+  `tenders[]._id`, while `tender.id` may be an external procurement identifier.
+  The repository and inactive candidate normalizer now validate and deduplicate
+  `_id`. Repeat execution `14744` succeeded and launched only Intake execution
+  `14745`; that child returned `duplicate_event` with the existing
+  `analysis_run_id=d29195fd-13af-49cc-a1a5-6c7a3f44a8cf`. The global execution
+  inventory for the canary window contains only `14744` and `14745`: no
+  Orchestrator, Document Worker, Aggregator or Finalization execution was created.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
@@ -108,9 +117,10 @@ not changed.
   contract for mark `6a732cd00c61629cf1d3c144` («Проверить»), including
   duplicate `tender`/`tenders` placement and one unique tender.
 - Task 9 Mark Intake is imported and read back with the real TenderPlan
-  credential and the isolated Intake target, but its schedule is not activated.
-  Pagination/order/cursor and exhaustive-result semantics remain undocumented,
-  and an end-to-end scheduled poll of the current mark membership is still open.
+  credential and the isolated Intake target. Its manual current-state poll is
+  runtime GREEN through Intake duplicate/no-op (`14744` → `14745`), but the
+  ten-minute schedule is intentionally not activated. Pagination/order/cursor
+  and exhaustive-result semantics remain undocumented.
 - The isolated Intake retry/stale/manual/CAS/API-outage runtime matrix is GREEN.
   Both execution-read HTTP nodes are bound in the isolated live candidate to the
   owner-created read-only Header Auth credential and use the explicit non-secret

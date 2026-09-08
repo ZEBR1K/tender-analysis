@@ -29,7 +29,8 @@ async function runNormalizer(normalizer, inputs) {
 test('mark relation fixture is sanitized and preserves the confirmed duplicate structure', () => {
   const fixtureText = fs.readFileSync(fixturePath, 'utf8');
   const fixture = JSON.parse(fixtureText);
-  assert.equal(fixture.tender.id, fixture.tenders[0].id);
+  assert.equal(fixture.tender._id, fixture.tenders[0]._id);
+  assert.equal(fixture.tender.id, 'external-number_1');
   assert.deepEqual(Object.keys(fixture).sort(), ['tender', 'tenders']);
   assert.doesNotMatch(fixtureText, /https?:|token|authorization|password|customer|client/iu);
 });
@@ -97,8 +98,9 @@ test('normalizer deduplicates confirmed paths and emits only stable dispatcher c
   assert.deepEqual(await runNormalizer(normalizer, [{ tender: null, tenders: [] }]), []);
   await assert.rejects(runNormalizer(normalizer, [{ error: 'shape changed' }]), /malformed.*missing tender\/tenders/iu);
   await assert.rejects(runNormalizer(normalizer, [{ data: [] }]), /malformed.*missing tender\/tenders/iu);
-  await assert.rejects(runNormalizer(normalizer, [{ tender: { id: '' }, tenders: [] }]), /malformed.*tender.*id/iu);
-  await assert.rejects(runNormalizer(normalizer, [{ tender: { id: 'not-an-id' }, tenders: [] }]), /malformed.*tender.*id/iu);
+  await assert.rejects(runNormalizer(normalizer, [{ tender: { _id: '' }, tenders: [] }]), /malformed.*tender.*_id/iu);
+  await assert.rejects(runNormalizer(normalizer, [{ tender: { _id: 'not-an-id' }, tenders: [] }]), /malformed.*tender.*_id/iu);
+  await assert.rejects(runNormalizer(normalizer, [{ tender: { id: '111111111111111111111111' }, tenders: [] }]), /malformed.*tender.*_id/iu);
   await assert.rejects(runNormalizer(normalizer, [{ tender: {}, tenders: [] }]), /malformed.*tender.*id/iu);
   await assert.rejects(runNormalizer(normalizer, [{ tender: null, tenders: [null] }]), /malformed.*tenders\[0\]/iu);
   await assert.rejects(runNormalizer(normalizer, [{ tender: null, tenders: 'wrong' }]), /malformed.*tenders/iu);

@@ -182,9 +182,11 @@ all Worker/Aggregator/Finalization calls remain disabled.
 
 Каждые 10 минут читает current members метки
 `6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
-`tender.id` / `tenders[].id` и асинхронно вызывает Intake Resume со
+`tender._id` / `tenders[]._id` и асинхронно вызывает Intake Resume со
 стабильным mark+tender key. Notification type-5 plan superseded runtime-proven
-relation contract `14683`; deployment и runtime canary candidate pending.
+relation contract `14683`. Initial candidate execution `14743` failed closed on
+the earlier `id` assumption; corrected `14744` → `14745` is runtime GREEN through
+the Intake duplicate/no-op path with the existing `analysis_run_id`.
 Inactive isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan
 credential and the NO-WORKER Intake candidate; its schedule is not activated.
 

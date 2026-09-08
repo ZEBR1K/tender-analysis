@@ -90,6 +90,8 @@ the all-Worker search are authoritative for the safety boundary.
 | `14738/14739` | A one-shot production webhook failure invoked the linked Error Workflow, which marked the exact event failed while preserving event key and run ID. |
 | `14740/14741` | Retry of the same failed event reused the same event ID and run ID, incremented attempts from 1 to 2, and completed. |
 | `14742` | Read-only verifier: event completed/attempts 2; 6 documents pending, zero processing and zero failed. |
+| `14743` | First full Mark Intake draft canary reached the normalizer and failed closed because live TenderPlan used internal `_id` while the candidate expected `id`; Intake and all downstream workflows were not called. |
+| `14744/14745` | Corrected Mark Intake poll succeeded, dispatched one asynchronous Intake call, and returned `duplicate_event` with the existing run `d29195fd-13af-49cc-a1a5-6c7a3f44a8cf`. |
 
 Harness attempt `14723/14724` failed before Intake state mutation because the
 test supplied PostgreSQL `now()::text` instead of an ISO timestamp. Error
@@ -114,6 +116,15 @@ offline and was not represented as a new runtime execution.
 A global execution search covering `14722`-`14742` found only the isolated Wait,
 harness, Intake, Error, Recovery and one-shot canary workflows. It found no
 Document Worker, Aggregator, Finalization or production Orchestrator execution.
+
+The current-state Mark Intake canary provided an additional bounded execution
+window. Execution `14743` established the real response identity contract:
+`tender._id` / `tenders[]._id` is the internal 24-character ID used by FullInfo,
+whereas `tender.id` may be an external procurement number with a type suffix.
+After the minimal `_id` correction, parent `14744` and child `14745` were the
+only executions in the window. The child took the stable-key duplicate/no-op
+path and preserved the existing `analysis_run_id`; no Orchestrator, Document
+Worker, Aggregator or Finalization execution existed.
 
 Final offline verification is GREEN: the six-file
 `tender-intake-resume/error/migration + tenderplan-mark-intake + manual-resume + recovery-scan`

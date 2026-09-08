@@ -97,8 +97,11 @@ Production baseline описывается семью n8n workflow:
 `TENDER — TenderPlan Mark Intake` опрашивает current membership фиксированной
 метки `6a732cd00c61629cf1d3c144` («Проверить») каждые 10 минут через
 GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
-`14683` supersedes неподтверждённый notification type-5 plan. Candidate
-offline-only; pagination/exhaustive-result semantics не документированы.
+`14683` supersedes неподтверждённый notification type-5 plan. Executions
+`14743`-`14745` additionally confirm that the internal tender identity is `_id`
+and that the inactive live candidate reaches Intake duplicate/no-op without any
+downstream execution. Its schedule remains inactive; pagination/exhaustive-result
+semantics не документированы.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -457,10 +460,12 @@ boundary допускает создание нового run. Прямой auto
 с superseded `analysis_run_id` возвращает `superseded_no_op` и не dispatch-ит
 Worker, Aggregator или Finalization.
 
-Manual/hardcoded boundary устранён только в inactive repository candidate.
-Production import, migration application, dispatcher/error/manual/recovery/mark
-poller wiring и runtime validation остаются отдельными gates. Relation poller —
-inactive candidate; только source contract `14683` runtime GREEN.
+Manual/hardcoded boundary устранён в inactive repository candidate и проверен в
+isolated NO-WORKER contour. Migration applied; dispatcher/error/manual/recovery
+и mark-poller candidates imported and runtime-tested within the documented
+safety boundary. Production promotion/activation and downstream Worker,
+Aggregator/Finalization runtime remain separate gates. Relation poller schedule
+remains inactive; manual current-state canary `14744` → `14745` is GREEN.
 
 ---
 
