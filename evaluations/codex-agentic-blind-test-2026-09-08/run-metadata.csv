@@ -1,0 +1,6 @@
+run,mode,model,reasoning,duration,result_status_counts,protocol_note
+run-1,interactive,gpt-5.6-sol,high,44:33,"resolved=22;requires_review=2;not_found=3","one context compaction observed"
+run-2,interactive,gpt-5.6-sol,high,41:55,"resolved=21;requires_review=4;not_found=2","extra user message disabled Graphify; no domain hint"
+run-3,interactive,gpt-5.6-sol,high,46:20,"resolved=23;requires_review=1;not_found=3","one context compaction observed"
+exec,exec,not independently confirmed from JSONL,not independently confirmed,41:38,"resolved=21;requires_review=4;not_found=2","duration calculated from log timestamps"
+
