@@ -28,6 +28,13 @@ const CATALOG_FILE_NAME = 'FIELD_CATALOG.md';
 const RESIDUE_PATTERN = /^\.upload-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
 const CREATE_RESIDUE_PATTERN = /^\.create-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.tmp$/iu;
 const WRITE_RESIDUE_PATTERN = /^\.write-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
+const SEALED_JOB_STATUSES = new Set([
+  'ready',
+  'running',
+  'validating',
+  'completed',
+  'failed',
+]);
 
 function storeError(code, message, httpStatus = 422) {
   return new RunnerError(code, message, httpStatus);
@@ -275,7 +282,10 @@ export function createJobStore({
   }
 
   async function verifySealedJob(job) {
-    if (job.state.status !== 'ready') {
+    if (
+      !SEALED_JOB_STATUSES.has(job.state.status)
+      || !/^[0-9a-f]{64}$/iu.test(job.state.input_manifest_sha256 ?? '')
+    ) {
       throw storeError('RUNNER_MANIFEST_INCOMPLETE', 'Job input is not sealed', 409);
     }
 
@@ -290,6 +300,30 @@ export function createJobStore({
     if (canonicalJson(manifest) !== canonicalJson(job.state.manifest)) {
       throw storeError('RUNNER_MANIFEST_MISMATCH', 'Sealed manifest state is invalid');
     }
+
+    await assertExactDirectoryEntries(
+      job.inputDirectory,
+      [
+        { name: '.upload-tmp', kind: 'directory' },
+        { name: CATALOG_FILE_NAME, kind: 'file' },
+        { name: MANIFEST_FILE_NAME, kind: 'file' },
+        { name: 'documents', kind: 'directory' },
+      ],
+      'Agent-visible input contains undeclared files',
+    );
+    await assertExactDirectoryEntries(
+      job.temporaryDirectory,
+      [],
+      'Agent-visible upload staging contains undeclared files',
+    );
+    await assertExactDirectoryEntries(
+      job.documentsDirectory,
+      manifest.documents.map((document) => ({
+        name: documentPhysicalName(document),
+        kind: 'file',
+      })),
+      'Agent-visible documents do not exactly match the sealed manifest',
+    );
 
     for (const document of manifest.documents) {
       await assertFileIdentity(
@@ -534,6 +568,29 @@ export function createJobStore({
         exactChild(job.inputDirectory, MANIFEST_FILE_NAME),
         `${canonicalJson(persistedManifest)}\n`,
       );
+      await assertExactDirectoryEntries(
+        job.inputDirectory,
+        [
+          { name: '.upload-tmp', kind: 'directory' },
+          { name: CATALOG_FILE_NAME, kind: 'file' },
+          { name: MANIFEST_FILE_NAME, kind: 'file' },
+          { name: 'documents', kind: 'directory' },
+        ],
+        'Agent-visible input contains undeclared files',
+      );
+      await assertExactDirectoryEntries(
+        job.temporaryDirectory,
+        [],
+        'Agent-visible upload staging contains undeclared files',
+      );
+      await assertExactDirectoryEntries(
+        job.documentsDirectory,
+        persistedManifest.documents.map((document) => ({
+          name: documentPhysicalName(document),
+          kind: 'file',
+        })),
+        'Agent-visible documents do not exactly match the sealed manifest',
+      );
       job.state.status = 'ready';
       job.state.input_manifest_sha256 = manifestSha256;
       await writeState(job.jobPath, job.state);
@@ -576,4 +633,23 @@ export function createJobStore({
     uploadDocument,
     verifySealedInput,
   });
+}
+
+async function assertExactDirectoryEntries(directory, expectedEntries, message) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const expected = new Map(expectedEntries.map((entry) => [entry.name, entry.kind]));
+  if (entries.length !== expected.size) {
+    throw storeError('RUNNER_DOCUMENT_MISMATCH', message);
+  }
+  for (const entry of entries) {
+    const expectedKind = expected.get(entry.name);
+    const actualKind = entry.isFile() && !entry.isSymbolicLink()
+      ? 'file'
+      : entry.isDirectory() && !entry.isSymbolicLink()
+        ? 'directory'
+        : 'other';
+    if (expectedKind !== actualKind) {
+      throw storeError('RUNNER_DOCUMENT_MISMATCH', message);
+    }
+  }
 }

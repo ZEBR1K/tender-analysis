@@ -142,8 +142,14 @@ test('manifest/catalog identity and exact field contract fail with retained issu
       rawResult: JSON.stringify(result),
     });
     assert.equal(report.valid, false, item.code);
-    assert.equal(report.envelope, null, item.code);
     assert.ok(codes(report).includes(item.code), `${item.code}: ${JSON.stringify(report.issues)}`);
+    const cannotPreserveFieldContract = ['DUPLICATE_FIELD', 'FIELD_SET_MISMATCH', 'STATUS_INVALID']
+      .includes(item.code);
+    if (cannotPreserveFieldContract) {
+      assert.equal(report.envelope, null, item.code);
+    } else {
+      assert.equal(report.envelope.valid, false, item.code);
+    }
   }
 });
 
@@ -156,6 +162,7 @@ test('all reported source identities must belong to this procurement manifest', 
     rawResult: JSON.stringify(unknownEvidence),
   });
   assert.ok(codes(evidenceReport).includes('SOURCE_UNKNOWN'));
+  assert.equal(evidenceReport.envelope.valid, false);
 
   const unknownInspection = structuredClone(fixture.result);
   unknownInspection.inspected_documents[0].artifact_key = 'foreign-doc';
@@ -164,6 +171,7 @@ test('all reported source identities must belong to this procurement manifest', 
     rawResult: JSON.stringify(unknownInspection),
   });
   assert.ok(codes(inspectionReport).includes('SOURCE_UNKNOWN'));
+  assert.equal(inspectionReport.envelope.valid, false);
 });
 
 test('source-file mutation becomes FILE_INTEGRITY_MISMATCH before persistence', async (t) => {
@@ -181,8 +189,45 @@ test('source-file mutation becomes FILE_INTEGRITY_MISMATCH before persistence', 
     rawResult: JSON.stringify(fixture.result),
   });
   assert.equal(report.valid, false);
-  assert.equal(report.envelope, null);
+  assert.equal(report.envelope.valid, false);
   assert.deepEqual(codes(report), ['FILE_INTEGRITY_MISMATCH']);
+});
+
+test('sealed input remains verifiable while the lifecycle is validating', async (t) => {
+  const fixture = await buildSealedFixture(t);
+  const statePath = path.join(
+    resolveJobPath(fixture.rootDirectory, fixture.manifest.job_id),
+    'job-state.json',
+  );
+  const state = await loadJson(statePath);
+  state.status = 'validating';
+  await writeFile(statePath, `${JSON.stringify(state)}\n`, 'utf8');
+
+  const report = await fixture.validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: JSON.stringify(fixture.result),
+  });
+  assert.equal(report.valid, true);
+});
+
+test('undeclared agent-visible files fail integrity without being deleted', async (t) => {
+  const fixture = await buildSealedFixture(t);
+  const foreignPath = path.join(
+    resolveJobPath(fixture.rootDirectory, fixture.manifest.job_id),
+    'input',
+    'documents',
+    '9999-foreign.source',
+  );
+  await writeFile(foreignPath, 'foreign bytes');
+
+  const report = await fixture.validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: JSON.stringify(fixture.result),
+  });
+  assert.equal(report.valid, false);
+  assert.equal(report.envelope.valid, false);
+  assert.deepEqual(codes(report), ['FILE_INTEGRITY_MISMATCH']);
+  assert.equal((await readFile(foreignPath, 'utf8')), 'foreign bytes');
 });
 
 test('not_found needs no invented evidence and semantic content is never runtime-scored', async (t) => {
