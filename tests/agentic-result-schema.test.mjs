@@ -23,6 +23,10 @@ const policyPath = path.join(
   'policies',
   'tender-fields-v1.json',
 );
+const schemaPaths = [
+  path.join(runnerRoot, 'schemas', 'tender-agent-result-v1.schema.json'),
+  path.join(runnerRoot, 'schemas', 'tender-agent-validation-v1.schema.json'),
+];
 const rootCatalogPath = path.join(repositoryRoot, 'FIELD_CATALOG.md');
 const blindCatalogRelativePath =
   'evaluations/codex-agentic-blind-test-2026-09-08/inputs/FIELD_CATALOG.md';
@@ -135,6 +139,29 @@ test('strict Ajv boundary compiles and accepts the closed result and validation 
   assert.equal(envelopeValidation.schema_valid, true);
   assert.deepEqual(envelopeValidation.issues, []);
   assert.equal(envelopeValidation.valid, true);
+});
+
+test('every controlled schema enum contains unique values', async () => {
+  for (const schemaPath of schemaPaths) {
+    const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
+    const visit = (node, pointer = '#') => {
+      if (!node || typeof node !== 'object') {
+        return;
+      }
+      if (Array.isArray(node.enum)) {
+        assert.equal(
+          new Set(node.enum.map((value) => JSON.stringify(value))).size,
+          node.enum.length,
+          `${path.basename(schemaPath)} ${pointer}/enum contains duplicates`,
+        );
+      }
+      for (const [key, value] of Object.entries(node)) {
+        visit(value, `${pointer}/${key}`);
+      }
+    };
+
+    visit(schema);
+  }
 });
 
 test('result catalog hash must match the policy-pinned catalog identity', async () => {
