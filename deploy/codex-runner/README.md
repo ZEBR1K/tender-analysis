@@ -25,6 +25,8 @@ The authenticated staging API is deliberately small:
 
 Original file names are metadata only. Physical source names are generated from the validated document index and artifact key, and no caller-supplied name is ever resolved as a path. Uploads are written to a same-filesystem temporary file, hashed while streaming, fsynced, and atomically renamed only when SHA-256 and byte size match the declaration. Exact repeated uploads are idempotent before sealing; conflicting uploads and every post-seal upload are rejected.
 
+An idempotent seal revalidates the pinned catalog copy, every staged source file, and the exact sealed manifest/hash before reporting `ready`. The store exposes the same `verifySealedInput(job_id)` integrity primitive for the future pre-start gate. Recovery removes only exact job-local `.write-<uuid>.tmp`, `.upload-<uuid>.tmp`, and `.create-<job>-<uuid>.tmp` files created by the runner; unknown files and directories are never recursively treated as write residue.
+
 The manifest intentionally contains only job/run/catalog identity and source-file identity (`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256). It does not extract or index pages, sheets, OOXML parts, text, or OCR. Codex chooses how to inspect each source in a later task.
 
 ## Per-job Codex permissions

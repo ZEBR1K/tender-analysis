@@ -281,6 +281,55 @@ test('seal copies the pinned catalog and emits a deterministic source-only manif
   }
 });
 
+test('idempotent seal revalidates source files, catalog and sealed manifest', async (t) => {
+  const { rootDirectory, store } = await createFixtureStore(t);
+  const manifest = await loadFixture();
+  await store.createJob(manifest);
+  await stageAll(store, manifest);
+  const sealed = await store.sealJob(manifest.job_id);
+  const inputDirectory = path.join(resolveJobPath(rootDirectory, manifest.job_id), 'input');
+  const sourcePath = path.join(
+    inputDirectory,
+    'documents',
+    documentPhysicalName(manifest.documents[0]),
+  );
+  const sealedCatalogPath = path.join(inputDirectory, 'FIELD_CATALOG.md');
+  const sealedManifestPath = path.join(inputDirectory, 'manifest.json');
+  const [sourceBytes, catalogBytes, manifestBytes] = await Promise.all([
+    readFile(sourcePath),
+    readFile(sealedCatalogPath),
+    readFile(sealedManifestPath),
+  ]);
+
+  const changedSource = Buffer.from(sourceBytes);
+  changedSource[0] ^= 0xff;
+  await writeFile(sourcePath, changedSource);
+  await assert.rejects(
+    store.sealJob(manifest.job_id),
+    (error) => assertRunnerError(error, 'RUNNER_DOCUMENT_MISMATCH'),
+  );
+  await writeFile(sourcePath, sourceBytes);
+
+  const changedCatalog = Buffer.from(catalogBytes);
+  changedCatalog[0] ^= 0xff;
+  await writeFile(sealedCatalogPath, changedCatalog);
+  await assert.rejects(
+    store.sealJob(manifest.job_id),
+    (error) => assertRunnerError(error, 'RUNNER_CATALOG_MISMATCH'),
+  );
+  await writeFile(sealedCatalogPath, catalogBytes);
+
+  await writeFile(sealedManifestPath, '{}\n');
+  await assert.rejects(
+    store.sealJob(manifest.job_id),
+    (error) => assertRunnerError(error, 'RUNNER_MANIFEST_MISMATCH'),
+  );
+  await writeFile(sealedManifestPath, manifestBytes);
+
+  const verified = await store.verifySealedInput(manifest.job_id);
+  assert.deepEqual(verified, { ...sealed, idempotent: true });
+});
+
 test('original file names stay metadata and never become filesystem paths', async (t) => {
   const { rootDirectory, store } = await createFixtureStore(t);
   const manifest = await loadFixture();
@@ -343,6 +392,33 @@ test('known crash residue is cleaned without touching unrelated files', async (t
     bodyStream: asStream(bytesFor('doc-001')),
   });
   assert.deepEqual(await readdir(temporaryDirectory), ['keep.txt']);
+});
+
+test('known atomic-write crash residue is removed from job and agent-visible input only', async (t) => {
+  const { rootDirectory, store } = await createFixtureStore(t);
+  const manifest = await loadFixture();
+  await store.createJob(manifest);
+  const jobPath = resolveJobPath(rootDirectory, manifest.job_id);
+  const inputDirectory = path.join(jobPath, 'input');
+  const residueName = '.write-11111111-1111-4111-8111-111111111111.tmp';
+
+  await Promise.all([
+    writeFile(path.join(jobPath, residueName), 'partial state'),
+    writeFile(path.join(inputDirectory, residueName), 'partial manifest'),
+    writeFile(path.join(inputDirectory, '.write-not-a-uuid.tmp'), 'unknown'),
+    writeFile(path.join(inputDirectory, 'keep.txt'), 'unrelated'),
+    mkdir(path.join(inputDirectory, '.write-22222222-2222-4222-8222-222222222222.tmp')),
+  ]);
+
+  await store.getJob(manifest.job_id);
+  assert.equal((await readdir(jobPath)).includes(residueName), false);
+  assert.deepEqual((await readdir(inputDirectory)).sort(), [
+    '.upload-tmp',
+    '.write-22222222-2222-4222-8222-222222222222.tmp',
+    '.write-not-a-uuid.tmp',
+    'documents',
+    'keep.txt',
+  ]);
 });
 
 test('a crash after atomic rename is recovered from exact staged bytes', async (t) => {

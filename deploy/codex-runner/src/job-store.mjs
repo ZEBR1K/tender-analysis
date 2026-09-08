@@ -27,6 +27,7 @@ const MANIFEST_FILE_NAME = 'manifest.json';
 const CATALOG_FILE_NAME = 'FIELD_CATALOG.md';
 const RESIDUE_PATTERN = /^\.upload-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
 const CREATE_RESIDUE_PATTERN = /^\.create-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.tmp$/iu;
+const WRITE_RESIDUE_PATTERN = /^\.write-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
 
 function storeError(code, message, httpStatus = 422) {
   return new RunnerError(code, message, httpStatus);
@@ -96,17 +97,30 @@ async function hashReadable(readable) {
   return { byteSize, sha256: hash.digest('hex').toUpperCase() };
 }
 
-async function hashFile(filePath) {
+async function hashFile(filePath, {
+  code = 'RUNNER_DOCUMENT_MISMATCH',
+  message = 'A staged source path is missing or is not a regular file',
+} = {}) {
   const metadata = await lstat(filePath).catch((error) => {
-    if (error?.code === 'ENOENT') {
-      throw storeError('RUNNER_DOCUMENT_MISMATCH', 'A staged source file is missing');
-    }
+    if (error?.code === 'ENOENT') throw storeError(code, message);
     throw error;
   });
   if (!metadata.isFile() || metadata.isSymbolicLink()) {
-    throw storeError('RUNNER_DOCUMENT_MISMATCH', 'A staged source path is not a regular file');
+    throw storeError(code, message);
   }
-  return hashReadable(createReadStream(filePath));
+  try {
+    return await hashReadable(createReadStream(filePath));
+  } catch (error) {
+    if (['EISDIR', 'ELOOP', 'ENOENT'].includes(error?.code)) throw storeError(code, message);
+    throw error;
+  }
+}
+
+async function assertFileIdentity(filePath, expected, code, message) {
+  const actual = await hashFile(filePath, { code, message });
+  if (actual.byteSize !== expected.byteSize || actual.sha256 !== expected.sha256) {
+    throw storeError(code, message);
+  }
 }
 
 function publicJobState(state, { idempotent } = {}) {
@@ -162,6 +176,17 @@ async function cleanupCrashResidue(temporaryDirectory) {
     if (!RESIDUE_PATTERN.test(entry.name)) continue;
     if (!entry.isFile() && !entry.isSymbolicLink()) continue;
     await unlink(exactChild(temporaryDirectory, entry.name)).catch((error) => {
+      if (error?.code !== 'ENOENT') throw error;
+    });
+  }
+}
+
+async function cleanupAtomicWriteResidue(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!WRITE_RESIDUE_PATTERN.test(entry.name)) continue;
+    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+    await unlink(exactChild(directory, entry.name)).catch((error) => {
       if (error?.code !== 'ENOENT') throw error;
     });
   }
@@ -236,6 +261,10 @@ export function createJobStore({
       ensureRegularDirectory(documentsDirectory),
       ensureRegularDirectory(temporaryDirectory),
     ]);
+    await Promise.all([
+      cleanupAtomicWriteResidue(jobPath),
+      cleanupAtomicWriteResidue(inputDirectory),
+    ]);
     return {
       jobPath,
       inputDirectory,
@@ -243,6 +272,66 @@ export function createJobStore({
       temporaryDirectory,
       state: await readState(jobPath),
     };
+  }
+
+  async function verifySealedJob(job) {
+    if (job.state.status !== 'ready') {
+      throw storeError('RUNNER_MANIFEST_INCOMPLETE', 'Job input is not sealed', 409);
+    }
+
+    let manifest;
+    try {
+      manifest = normalizeSourceManifest(job.state.manifest, {
+        expectedCatalogSha256: normalizedCatalogSha256,
+      });
+    } catch {
+      throw storeError('RUNNER_MANIFEST_MISMATCH', 'Sealed manifest state is invalid');
+    }
+    if (canonicalJson(manifest) !== canonicalJson(job.state.manifest)) {
+      throw storeError('RUNNER_MANIFEST_MISMATCH', 'Sealed manifest state is invalid');
+    }
+
+    for (const document of manifest.documents) {
+      await assertFileIdentity(
+        exactChild(job.documentsDirectory, documentPhysicalName(document)),
+        { byteSize: document.byte_size, sha256: document.source_sha256 },
+        'RUNNER_DOCUMENT_MISMATCH',
+        'A sealed source file no longer matches the manifest',
+      );
+    }
+
+    const catalog = await catalogBytes();
+    await assertFileIdentity(
+      exactChild(job.inputDirectory, CATALOG_FILE_NAME),
+      {
+        byteSize: catalog.length,
+        sha256: createHash('sha256').update(catalog).digest('hex').toUpperCase(),
+      },
+      'RUNNER_CATALOG_MISMATCH',
+      'Sealed field catalog no longer matches the runner catalog',
+    );
+
+    const persistedManifest = {
+      ...manifest,
+      staged_documents: manifest.expected_documents,
+    };
+    const manifestSha256 = computeManifestSha256(persistedManifest);
+    if (job.state.input_manifest_sha256 !== manifestSha256) {
+      throw storeError('RUNNER_MANIFEST_MISMATCH', 'Sealed manifest hash no longer matches job state');
+    }
+    persistedManifest.input_manifest_sha256 = manifestSha256;
+    const manifestBytes = Buffer.from(`${canonicalJson(persistedManifest)}\n`, 'utf8');
+    await assertFileIdentity(
+      exactChild(job.inputDirectory, MANIFEST_FILE_NAME),
+      {
+        byteSize: manifestBytes.length,
+        sha256: createHash('sha256').update(manifestBytes).digest('hex').toUpperCase(),
+      },
+      'RUNNER_MANIFEST_MISMATCH',
+      'Sealed manifest file no longer matches job state',
+    );
+
+    return publicJobState(job.state, { idempotent: true });
   }
 
   async function createJob(rawManifest) {
@@ -259,6 +348,7 @@ export function createJobStore({
       });
       if (existingJob) {
         await ensureRegularDirectory(jobPath);
+        await cleanupAtomicWriteResidue(jobPath);
         const existing = await readState(jobPath);
         if (existing.status === 'ready') {
           throw storeError('RUNNER_JOB_SEALED', 'Sealed job inputs are immutable', 409);
@@ -413,7 +503,7 @@ export function createJobStore({
   async function sealJob(jobId) {
     return withJobLock(jobId, async (normalizedJobId) => {
       const job = await loadJob(normalizedJobId);
-      if (job.state.status === 'ready') return publicJobState(job.state, { idempotent: true });
+      if (job.state.status === 'ready') return verifySealedJob(job);
       if (job.state.status !== 'staging') {
         throw storeError('RUNNER_REQUEST_INVALID', 'Job cannot be sealed from its current state', 409);
       }
@@ -459,5 +549,12 @@ export function createJobStore({
     });
   }
 
-  return Object.freeze({ createJob, getJob, sealJob, uploadDocument });
+  async function verifySealedInput(jobId) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      return verifySealedJob(job);
+    });
+  }
+
+  return Object.freeze({ createJob, getJob, sealJob, uploadDocument, verifySealedInput });
 }
