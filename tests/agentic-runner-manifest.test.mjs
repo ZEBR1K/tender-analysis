@@ -133,6 +133,36 @@ test('job paths accept only UUIDs and never resolve outside the configured root'
   }
 });
 
+test('job creation remains retryable when a crash is injected after mkdir but before state', async (t) => {
+  const rootDirectory = await mkdtemp(path.join(os.tmpdir(), 'agentic-manifest-create-fault-'));
+  t.after(() => rm(rootDirectory, { recursive: true, force: true }));
+  const manifest = await loadFixture();
+  const faultedStore = createJobStore({
+    rootDirectory,
+    fieldCatalogPath: catalogPath,
+    expectedCatalogSha256,
+    faultInjector(phase) {
+      if (phase === 'after-create-job-directory') throw new Error('simulated create crash');
+    },
+  });
+
+  await assert.rejects(faultedStore.createJob(manifest), /simulated create crash/u);
+  await assert.rejects(
+    stat(resolveJobPath(rootDirectory, manifest.job_id)),
+    (error) => error?.code === 'ENOENT',
+  );
+
+  const recoveredStore = createJobStore({
+    rootDirectory,
+    fieldCatalogPath: catalogPath,
+    expectedCatalogSha256,
+  });
+  const recovered = await recoveredStore.createJob(manifest);
+  assert.equal(recovered.status, 'staging');
+  assert.equal(recovered.idempotent, false);
+  assert.deepEqual(await readdir(rootDirectory), [manifest.job_id]);
+});
+
 test('streamed upload verifies declared size and SHA-256 and leaves no partial file', async (t) => {
   const { rootDirectory, store } = await createFixtureStore(t);
   const manifest = await loadFixture();
@@ -394,4 +424,41 @@ test('authenticated HTTP routes create, stream, seal and report one exact job', 
     input_manifest_sha256: '<sha256>',
   });
   assert.match(statusBody.input_manifest_sha256, /^[A-F0-9]{64}$/u);
+});
+
+test('GET job status rejects a request body instead of silently ignoring it', async (t) => {
+  const { store } = await createFixtureStore(t);
+  const manifest = await loadFixture();
+  await store.createJob(manifest);
+  const secret = 'b'.repeat(32);
+  const server = createServer({
+    authenticator: createHeaderAuthenticator(secret),
+    healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
+    v1Handler: createManifestRouteHandler({ jobStore: store }),
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+
+  const response = await new Promise((resolve, reject) => {
+    const request = http.request(`${base}/v1/jobs/${manifest.job_id}`, {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'content-length': '2',
+        'x-tender-codex-token': secret,
+      },
+    }, (incoming) => {
+      const chunks = [];
+      incoming.on('data', (chunk) => chunks.push(chunk));
+      incoming.on('end', () => resolve({
+        statusCode: incoming.statusCode,
+        body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+      }));
+    });
+    request.on('error', reject);
+    request.end('{}');
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.body.error.code, 'RUNNER_REQUEST_INVALID');
 });
