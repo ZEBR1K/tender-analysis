@@ -12,6 +12,14 @@ import { createHeaderAuthenticator } from './http-auth.mjs';
 import { permissionBoundaryContractReady } from './permissions.mjs';
 
 const execFileAsync = promisify(execFile);
+const DOCUMENT_STREAM_LIFECYCLE = Symbol('documentStreamLifecycle');
+const JOB_START_ROUTE = /^\/v1\/jobs\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/start$/iu;
+const HANDLER_REDACTED_HEADERS = new Set([
+  'authorization',
+  'cookie',
+  'proxy-authorization',
+  'x-tender-codex-token',
+]);
 
 function writeJson(response, statusCode, body) {
   const payload = Buffer.from(`${JSON.stringify(body)}\n`, 'utf8');
@@ -88,18 +96,105 @@ export function createBoundedDocumentStream(request, limits = BODY_LIMITS) {
     throw new RunnerError('RUNNER_BODY_TOO_LARGE', `Request body exceeds ${limit} bytes`, 413);
   }
 
-  return (async function* streamDocument() {
-    let total = 0;
-    for await (const chunk of request) {
-      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      total += value.length;
-      if (total > limit) {
-        request.resume();
-        throw new RunnerError('RUNNER_BODY_TOO_LARGE', `Request body exceeds ${limit} bytes`, 413);
-      }
-      yield value;
+  const source = request[Symbol.asyncIterator]();
+  let total = 0;
+  let complete = false;
+  let limitError = null;
+
+  async function readNext() {
+    if (limitError) throw limitError;
+    if (complete) return { done: true, value: undefined };
+    const item = await source.next();
+    if (item.done) {
+      complete = true;
+      return { done: true, value: undefined };
     }
-  }());
+    const value = Buffer.isBuffer(item.value) ? item.value : Buffer.from(item.value);
+    total += value.length;
+    if (total > limit) {
+      limitError = new RunnerError(
+        'RUNNER_BODY_TOO_LARGE',
+        `Request body exceeds ${limit} bytes`,
+        413,
+      );
+      try {
+        while (!(await source.next()).done) { /* drain without retaining further bytes */ }
+      } catch {
+        // A peer abort also terminates ownership of this request body.
+      }
+      complete = true;
+      throw limitError;
+    }
+    return { done: false, value };
+  }
+
+  const bodyStream = {
+    next: readNext,
+    async return() {
+      return { done: true, value: undefined };
+    },
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+  };
+  Object.defineProperty(bodyStream, DOCUMENT_STREAM_LIFECYCLE, {
+    value: Object.freeze({
+      isComplete: () => complete,
+      async finish() {
+        try {
+          while (!complete && !limitError) await readNext();
+        } catch (error) {
+          if (!limitError) throw error;
+        }
+        if (limitError) {
+          throw limitError;
+        }
+      },
+    }),
+  });
+  return Object.freeze(bodyStream);
+}
+
+async function handleDocumentRequest({ bodyStream, handler }) {
+  const lifecycle = bodyStream[DOCUMENT_STREAM_LIFECYCLE];
+  let result;
+  let handlerError;
+  try {
+    result = await handler();
+  } catch (error) {
+    handlerError = error;
+  }
+
+  const consumedByHandler = lifecycle.isComplete();
+  await lifecycle.finish();
+  if (handlerError) throw handlerError;
+  if (!consumedByHandler) {
+    throw new RunnerError(
+      'RUNNER_REQUEST_INVALID',
+      'Document upload handler did not consume the complete request body',
+      422,
+    );
+  }
+  return result;
+}
+
+export function buildV1RouteMetadata(request, url) {
+  return Object.freeze({
+    requiresExecutionBoundary: request.method === 'POST' && JOB_START_ROUTE.test(url.pathname),
+  });
+}
+
+function buildHandlerRequestMetadata(request) {
+  const headers = Object.fromEntries(Object.entries(request.headers)
+    .filter(([name]) => !HANDLER_REDACTED_HEADERS.has(name.toLowerCase()))
+    .map(([name, value]) => [
+      name,
+      Array.isArray(value) ? Object.freeze([...value]) : value,
+    ]));
+  return Object.freeze({
+    method: request.method || null,
+    headers: Object.freeze(headers),
+  });
 }
 
 export function createUploadGate({ maxConcurrentUploads = 1 } = {}) {
@@ -356,7 +451,9 @@ export function createServer({
 
       if (url.pathname.startsWith('/v1/')) {
         authenticator.assertAuthorized(request.headers);
-        if (url.pathname.endsWith('/execute') && executionBoundary.ready !== true) {
+        const routeMetadata = buildV1RouteMetadata(request, url);
+        const requestMetadata = buildHandlerRequestMetadata(request);
+        if (routeMetadata.requiresExecutionBoundary && executionBoundary.ready !== true) {
           request.resume();
           throw new RunnerError(
             'RUNNER_ISOLATION_NOT_READY',
@@ -367,25 +464,30 @@ export function createServer({
         let result;
         if (!requestHasBody(request)) {
           result = await v1Handler({
-            request,
+            requestMetadata,
             url,
             bodyKind: 'none',
             rawBody: Buffer.alloc(0),
             bodyStream: null,
             queue,
+            routeMetadata,
           });
         } else {
           const contentType = String(request.headers['content-type'] || '').split(';', 1)[0]
             .trim().toLowerCase();
           if (contentType === 'application/octet-stream') {
             const bodyStream = createBoundedDocumentStream(request, bodyLimits);
-            result = await uploadGate.run(() => v1Handler({
-              request,
-              url,
-              bodyKind: 'document',
-              rawBody: null,
+            result = await uploadGate.run(() => handleDocumentRequest({
               bodyStream,
-              queue,
+              handler: () => v1Handler({
+                requestMetadata,
+                url,
+                bodyKind: 'document',
+                rawBody: null,
+                bodyStream,
+                queue,
+                routeMetadata,
+              }),
             })).catch((error) => {
               if (error instanceof RunnerError && error.code === 'RUNNER_UPLOAD_BUSY') request.resume();
               throw error;
@@ -393,12 +495,13 @@ export function createServer({
           } else {
             const rawBody = await readBoundedRequestBody(request, bodyLimits);
             result = await v1Handler({
-              request,
+              requestMetadata,
               url,
               bodyKind: 'json',
               rawBody,
               bodyStream: null,
               queue,
+              routeMetadata,
             });
           }
         }

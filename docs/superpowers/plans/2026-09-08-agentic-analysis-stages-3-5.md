@@ -761,19 +761,16 @@ tests/agentic-codex-command.test.mjs
 ```
 
 - [ ] Build an argv array without shell interpolation. Never compose a shell command string.
+- [ ] Import `buildCodexPermissionBoundary` and include `buildCodexPermissionBoundary({ jobId }).cliArgs` unchanged in every invocation. Explicitly forbid both legacy forms: reject `--sandbox`/`-s` and every `sandbox_workspace_write.*` override before spawn. Callers cannot append permission or shell-environment overrides after the boundary arguments.
 - [ ] Pin the baseline invocation semantically equivalent to:
 
 ```text
 codex exec
+  <...buildCodexPermissionBoundary({ jobId }).cliArgs>
   --ephemeral
-  --ignore-user-config
   --ignore-rules
-  --sandbox workspace-write
   --model gpt-5.6-sol
   -c model_reasoning_effort="high"
-  -c sandbox_workspace_write.network_access=false
-  -c shell_environment_policy.inherit="core"
-  -c shell_environment_policy.ignore_default_excludes=false
   -c tools.web_search=false
   -c tools.view_image=true
   -C <job>/workspace

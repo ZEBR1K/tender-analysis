@@ -10,7 +10,7 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 - The runner Header Auth token is mounted read-only at `/run/secrets/runner-auth-token`. The dedicated Codex auth directory is mounted read-only at `/run/codex-auth`; never mount a user's complete Codex home, home directory or the n8n filesystem.
 - The service receives only its own Header Auth token and Codex credential at deployment time. It must never receive TenderPlan, n8n, PostgreSQL, Supabase or Telegram credentials.
 - Exactly one Codex process may run at a time. The initial queue accepts at most two waiting jobs and fails closed beyond that bound.
-- JSON bodies are limited to 2 MiB and may be buffered. Document bodies are limited to 50 MiB, are exposed to the route handler as a bounded `AsyncIterable`, and are never concatenated in memory. The single global document-upload slot rejects overlap with `503 RUNNER_UPLOAD_BUSY`; Task 5 must consume that stream directly while computing SHA-256 and performing an atomic rename.
+- JSON bodies are limited to 2 MiB and may be buffered. Document bodies are limited to 50 MiB, are exposed to the route handler as a bounded `AsyncIterable`, and are never concatenated in memory. The raw HTTP stream is not exposed to route handlers. The server retains the single global document-upload slot until full EOF, drains an early handler return/error without retaining bytes, and lets an eventual size overflow override apparent success. Overlap is rejected with `503 RUNNER_UPLOAD_BUSY`; Task 5 must consume the stream completely while computing SHA-256 and performing an atomic rename.
 
 `GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions and boolean readiness flags. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
 
@@ -20,7 +20,7 @@ The runner builds a fresh permission profile for each job and supplies it throug
 
 Spawned shell commands inherit no process environment. The runner supplies only fixed `PATH`, job-local `HOME`/`TMPDIR`, `LANG` and `LC_ALL`; credential-like variables are not forwarded. The actual Codex service process may read the dedicated auth mount, while its sandboxed shell may not.
 
-Task 4 provides a structural boundary builder and negative-canary contract only. Any `/execute`-shaped route returns `503 RUNNER_ISOLATION_NOT_READY` until Task 8 runs a real sandbox canary proving that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
+Task 4 provides a structural boundary builder and negative-canary contract only. The real execution entry point, `POST /v1/jobs/{uuid}/start`, carries explicit `requiresExecutionBoundary` route metadata and returns `503 RUNNER_ISOLATION_NOT_READY` until Task 8 runs a real sandbox canary proving that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
 
 ## Local checks
 

@@ -12,6 +12,13 @@ const dockerfilePath = path.join(runnerDirectory, 'Dockerfile');
 const composePath = path.join(runnerDirectory, 'compose.yaml');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
 const permissionsSourcePath = path.join(runnerDirectory, 'src', 'permissions.mjs');
+const implementationPlanPath = path.join(
+  repositoryRoot,
+  'docs',
+  'superpowers',
+  'plans',
+  '2026-09-08-agentic-analysis-stages-3-5.md',
+);
 
 test('runner image pins Node, Codex CLI and every document inspection tool', async () => {
   const dockerfile = await readFile(dockerfilePath, 'utf8');
@@ -73,6 +80,16 @@ test('runner ships a fail-closed Codex permission boundary rather than legacy sa
   assert.match(permissionsSource, /--ignore-user-config/u);
   assert.match(permissionsSource, /shell_environment_policy/u);
   assert.doesNotMatch(permissionsSource, /dangerously-bypass/u);
+});
+
+test('Task 8 consumes the boundary builder and explicitly forbids both legacy sandbox forms', async () => {
+  const plan = await readFile(implementationPlanPath, 'utf8');
+  const task8 = plan.split('### Task 8:', 2)[1].split('### Task 9:', 1)[0];
+
+  assert.match(task8, /buildCodexPermissionBoundary\(\{ jobId \}\)\.cliArgs/u);
+  assert.match(task8, /forbid[^\n]*--sandbox[^\n]*sandbox_workspace_write/iu);
+  assert.doesNotMatch(task8, /^\s*--sandbox\s+workspace-write\s*$/mu);
+  assert.doesNotMatch(task8, /^\s*-c\s+sandbox_workspace_write\./mu);
 });
 
 test('runner Compose passes the Docker Compose parser', (context) => {
