@@ -1,27 +1,29 @@
-# Agentic shadow migration — PostgreSQL 17.9 runtime evidence
+# Agentic shadow migration — raw PostgreSQL 17 evidence
 
-Date: 2026-09-09
-Migration commit under test: `f1261a164fe6fd430ef0bc183930552bc03bb63a`
+recorded_at_utc: 2026-09-08T22:49:56Z
+server_version: 17.9
+server_version_num: 170009
+migration_sha256_lf: dc5cac97ae8aeb928f4f4d27fc5149bcf68dc5d48f2ed688e369d416d60fa08d
+execution_mode: embedded-postgres-local-disposable
+command: node "$env:TEMP\agentic-embedded-pg17\verify-agentic-runtime.mjs"
+exit_code: 0
 
-## Execution boundary
+The command ran against a temporary local database directory created for this
+execution. No production database was accessed. The SHA-256 is calculated from
+the exact migration under test after normalizing CRLF to LF, so the repository
+test can compare it with the current migration on Windows and Unix checkouts.
 
-The migration was exercised against a disposable local PostgreSQL 17.9 instance. No production database was accessed or changed. The executable repository gate is:
+## Raw stdout
 
-```powershell
-$env:AGENTIC_REQUIRE_POSTGRES_RUNTIME = '1'
-node --test tests/agentic-job-migration.test.mjs
+```text
+server_version|17.9
+server_version_num|170009
+migration_sha256_lf|dc5cac97ae8aeb928f4f4d27fc5149bcf68dc5d48f2ed688e369d416d60fa08d
+fixtures|empty,populated,documented-variant
+double-apply|3 passed
+ownership|4 cross-run/cross-catalog rejects passed
+drift|5 fail-closed rollbacks passed
 ```
 
-The version-controlled harness automatically uses Docker PostgreSQL 17 when available. Its guarded external-fixture mode additionally requires the explicit reset sentinel, a disposable allow-listed database name, and an empty `public` namespace.
-
-For this recorded run, a temporary local embedded PostgreSQL 17.9 server executed the same canonical fixtures and migration SQL used by the test. This avoided production access while Docker and native `psql` were unavailable on the host.
-
-## Result
-
-- Empty, populated, and documented-variant canonical fixtures: double-apply passed.
-- Canonical catalog and populated-row snapshots: unchanged after both applications.
-- Cross-run document/job ownership and cross-catalog result ownership: all four invalid inserts rejected by the expected composite foreign keys.
-- Representative default, CHECK, foreign-key, UNIQUE, and index drift: all five migrations failed closed; rollback left no shadow tables.
-- PostgreSQL 17 parser accepted the migration and all fixture statements.
-
-This evidence complements the executable test and does not replace it. The checked database contract covers schema and audit ownership integrity only; it adds no semantic decision logic for the 27 tender fields.
+The runtime contract covers schema and audit ownership integrity only. It adds
+no semantic decision logic for the 27 tender fields.

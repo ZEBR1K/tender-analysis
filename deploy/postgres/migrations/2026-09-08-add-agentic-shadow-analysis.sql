@@ -20,10 +20,11 @@ BEGIN
     SELECT *
     FROM (
       VALUES
-        ('tender_agentic_jobs'::text),
-        ('tender_agentic_documents'::text),
-        ('tender_agentic_field_results'::text)
-    ) AS shadow_tables(table_name)
+        (1, 'tender_agentic_jobs'::text),
+        (2, 'tender_agentic_documents'::text),
+        (3, 'tender_agentic_field_results'::text)
+    ) AS shadow_tables(lock_order, table_name)
+    ORDER BY shadow_tables.lock_order
   LOOP
     existing_object_oid := NULL;
     existing_object_kind := NULL;

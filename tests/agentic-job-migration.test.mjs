@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -108,6 +108,17 @@ test('migration blocks concurrent canonical and shadow schema changes in a fixed
   const shadowLocks = getDoBlock(sql, 'shadow_locks');
   assert.ok(sql.indexOf('DO $shadow_locks$') < canonicalPreconditionIndex);
   for (const table of shadowTables) assert.match(shadowLocks, new RegExp(`'${table}'`, 'i'));
+  assert.deepEqual(
+    [...shadowLocks.matchAll(/\(\s*(\d+)\s*,\s*'(tender_agentic_[a-z_]+)'::text\s*\)/gi)]
+      .map(([, lockOrder, tableName]) => [Number(lockOrder), tableName]),
+    shadowTables.map((tableName, index) => [index + 1, tableName]),
+    'shadow lock rows must carry the canonical ordinal sequence',
+  );
+  assert.match(
+    shadowLocks,
+    /AS\s+shadow_tables\s*\(\s*lock_order\s*,\s*table_name\s*\)\s*ORDER\s+BY\s+shadow_tables\.lock_order/i,
+    'shadow locks must explicitly consume the ordinal sequence',
+  );
   assert.match(shadowLocks, /existing_object_kind\s*<>\s*'r'/i);
   assert.match(shadowLocks, /format\s*\(\s*'LOCK TABLE %I\.%I IN SHARE UPDATE EXCLUSIVE MODE'/i);
   assert.doesNotMatch(sql, /LOCK\s+TABLE[\s\S]*?IN\s+ACCESS\s+SHARE\s+MODE/i);
@@ -348,13 +359,27 @@ test('implementation plan records same-run and field-catalog database ownership'
   assert.match(plan, /FOREIGN KEY \(job_id, analysis_run_id, field_catalog_version\)[\s\S]*?tender_agentic_jobs\(id, analysis_run_id, field_catalog_version\)/i);
 });
 
-test('sanitized PostgreSQL 17.9 runtime evidence records the executable migration gate', async () => {
-  const evidence = await readFile(runtimeEvidenceUrl, 'utf8');
-  const migrationCommit = 'f1261a164fe6fd430ef0bc183930552bc03bb63a';
+test('raw PostgreSQL 17 evidence is bound to the current migration bytes', async () => {
+  const [evidence, migration] = await Promise.all([
+    readFile(runtimeEvidenceUrl, 'utf8'),
+    readFile(migrationUrl, 'utf8'),
+  ]);
+  const expectedMigrationSha256 = createHash('sha256')
+    .update(migration.replace(/\r\n/g, '\n'))
+    .digest('hex');
+  const properties = Object.fromEntries(
+    [...evidence.matchAll(/^([a-z][a-z0-9_]*):\s*`?([^`\r\n]+)`?\s*$/gm)]
+      .map(([, key, value]) => [key, value]),
+  );
 
-  assert.match(evidence, /PostgreSQL 17\.9/i);
-  assert.match(evidence, new RegExp(migrationCommit, 'i'));
-  assert.match(evidence, /node --test tests\/agentic-job-migration\.test\.mjs/i);
+  assert.equal(properties.server_version, '17.9');
+  assert.equal(properties.server_version_num, '170009');
+  assert.equal(properties.migration_sha256_lf, expectedMigrationSha256);
+  assert.equal(properties.execution_mode, 'embedded-postgres-local-disposable');
+  assert.equal(properties.command, 'node "$env:TEMP\\agentic-embedded-pg17\\verify-agentic-runtime.mjs"');
+  assert.equal(properties.exit_code, '0');
+  assert.match(evidence, /raw stdout[\s\S]*server_version_num\|170009/i);
+  assert.match(evidence, new RegExp(`migration_sha256_lf\\|${expectedMigrationSha256}`, 'i'));
   assert.match(evidence, /empty[\s\S]*populated[\s\S]*documented[- ]variant/i);
   assert.match(evidence, /double[- ]apply/i);
   assert.match(evidence, /cross-run[\s\S]*cross-catalog/i);
