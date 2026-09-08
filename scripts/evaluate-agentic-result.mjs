@@ -74,10 +74,19 @@ function parseLegacyMarkdown(content) {
       claim_basis: null,
       evidence: null,
       raw_section: section,
+      adapter_issues: [],
     };
   });
 
-  return { inputFormat: 'legacy_markdown_v0', fields };
+  return {
+    inputFormat: 'legacy_markdown_v0',
+    fields,
+    structuralIssues: [],
+  };
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseJsonResult(value) {
@@ -93,17 +102,60 @@ function parseJsonResult(value) {
     );
   }
 
+  const structuralIssues = [];
+  if (value.field_catalog_version !== 'tender_fields_v1') {
+    structuralIssues.push('FIELD_CATALOG_VERSION_INVALID');
+  }
+  if (!/^[a-f0-9]{64}$/iu.test(value.field_catalog_sha256 ?? '')) {
+    structuralIssues.push('FIELD_CATALOG_SHA256_INVALID');
+  }
+  if (!/^[a-f0-9]{64}$/iu.test(value.input_manifest_sha256 ?? '')) {
+    structuralIssues.push('INPUT_MANIFEST_SHA256_INVALID');
+  }
+  if (!Array.isArray(value.inspection_coverage)) {
+    structuralIssues.push('INSPECTION_COVERAGE_INVALID');
+  }
+
   return {
     inputFormat: 'tender_agent_result_v1_json',
-    fields: value.fields.map((field) => ({
-      field_index: field.field_index,
-      field_key: field.field_key,
-      status: field.status,
-      value_text: field.value_text ?? null,
-      claim_basis: field.claim_basis ?? null,
-      evidence: Array.isArray(field.evidence) ? field.evidence : null,
-      raw_section: null,
-    })),
+    fields: value.fields.map((field) => {
+      if (!isRecord(field)) {
+        structuralIssues.push('FIELD_ENTRY_INVALID');
+        return {
+          field_index: null,
+          field_key: null,
+          status: null,
+          value_text: null,
+          claim_basis: null,
+          evidence: null,
+          raw_section: null,
+          adapter_issues: ['FIELD_ENTRY_INVALID'],
+        };
+      }
+      const fieldEntryValid =
+        Number.isInteger(field.field_index) &&
+        typeof field.field_key === 'string' &&
+        typeof field.status === 'string' &&
+        (field.value_text === null || typeof field.value_text === 'string');
+      if (!fieldEntryValid) structuralIssues.push('FIELD_ENTRY_INVALID');
+      return {
+        field_index: Number.isInteger(field.field_index)
+          ? field.field_index
+          : null,
+        field_key:
+          typeof field.field_key === 'string' ? field.field_key : null,
+        status: typeof field.status === 'string' ? field.status : null,
+        value_text:
+          field.value_text === null || typeof field.value_text === 'string'
+            ? field.value_text
+            : null,
+        claim_basis: field.claim_basis ?? null,
+        evidence: Array.isArray(field.evidence) ? field.evidence : null,
+        raw_section: null,
+        adapter_issues: fieldEntryValid ? [] : ['FIELD_ENTRY_INVALID'],
+      };
+    }),
+    structuralIssues: unique(structuralIssues),
   };
 }
 
@@ -146,6 +198,12 @@ function hasForbiddenValue(field, baselineField) {
 }
 
 function evaluateFields(parsed, baseline) {
+  const baselineByIndex = new Map(
+    baseline.fields.map((field) => [field.field_index, field]),
+  );
+  const baselineByKey = new Map(
+    baseline.fields.map((field) => [field.field_key, field]),
+  );
   const indices = parsed.fields.map(({ field_index: index }) => index);
   const keys = parsed.fields.map(({ field_key: key }) => key);
   const indexCounts = new Map(
@@ -157,39 +215,44 @@ function evaluateFields(parsed, baseline) {
   const keyCounts = new Map(
     keys.map((key) => [key, keys.filter((candidate) => candidate === key).length]),
   );
-  const byIndex = new Map(
-    parsed.fields.map((field) => [field.field_index, field]),
-  );
+  const fieldDiffs = parsed.fields.map((field, occurrenceIndex) => {
+    const baselineAtIndex = baselineByIndex.get(field.field_index);
+    const policyField = baselineByKey.get(field.field_key);
+    const exactMapping = baselineAtIndex?.field_key === field.field_key;
+    const uniqueMapping =
+      exactMapping &&
+      indexCounts.get(field.field_index) === 1 &&
+      keyCounts.get(field.field_key) === 1;
+    const issues = [...(field.adapter_issues ?? [])];
 
-  const fieldDiffs = baseline.fields.map((baselineField) => {
-    const field = byIndex.get(baselineField.field_index);
-    const issues = [];
-
-    if (!field) {
-      issues.push('MISSING_FIELD');
-      return {
-        field_index: baselineField.field_index,
-        field_key: baselineField.field_key,
-        reported_status: null,
-        accepted_statuses: baselineField.accepted_statuses,
-        status_agreement: false,
-        issues,
-      };
-    }
-    if (field.field_key !== baselineField.field_key) {
+    if (!baselineAtIndex) issues.push('FIELD_INDEX_INVALID');
+    if (baselineAtIndex && !exactMapping) {
       issues.push('FIELD_KEY_MISMATCH');
+    }
+    if ((indexCounts.get(field.field_index) ?? 0) > 1) {
+      issues.push('DUPLICATE_FIELD_INDEX');
+    }
+    if ((keyCounts.get(field.field_key) ?? 0) > 1) {
+      issues.push('DUPLICATE_FIELD_KEY');
     }
     if (!allowedStatuses.has(field.status)) issues.push('STATUS_INVALID');
 
-    const statusAgreement = baselineField.accepted_statuses.includes(field.status);
-    if (!statusAgreement) issues.push('STATUS_DISAGREEMENT');
+    const statusAgreement =
+      uniqueMapping && baselineAtIndex.accepted_statuses.includes(field.status);
+    if (
+      exactMapping &&
+      allowedStatuses.has(field.status) &&
+      !baselineAtIndex.accepted_statuses.includes(field.status)
+    ) {
+      issues.push('STATUS_DISAGREEMENT');
+    }
     if (
       field.status === 'resolved' &&
-      baselineField.accepted_statuses.includes('requires_review')
+      policyField?.accepted_statuses.includes('requires_review')
     ) {
       issues.push('CRITICAL_FALSE_RESOLVED');
     }
-    if (hasForbiddenValue(field, baselineField)) {
+    if (policyField && hasForbiddenValue(field, policyField)) {
       issues.push('FORBIDDEN_CONCLUSION');
       if (field.status === 'resolved') issues.push('CRITICAL_FALSE_RESOLVED');
     }
@@ -205,20 +268,50 @@ function evaluateFields(parsed, baseline) {
     }
 
     return {
-      field_index: baselineField.field_index,
-      field_key: baselineField.field_key,
+      occurrence_index: occurrenceIndex + 1,
+      field_index: field.field_index,
+      field_key: field.field_key,
+      expected_field_index: policyField?.field_index ?? baselineAtIndex?.field_index ?? null,
+      expected_field_key: baselineAtIndex?.field_key ?? policyField?.field_key ?? null,
       reported_status: field.status,
-      accepted_statuses: baselineField.accepted_statuses,
+      accepted_statuses:
+        policyField?.accepted_statuses ?? baselineAtIndex?.accepted_statuses ?? [],
       status_agreement: statusAgreement,
       issues: unique(issues),
     };
   });
 
-  const exactCatalogMapping = baseline.fields.every((baselineField) => {
-    const field = byIndex.get(baselineField.field_index);
-    return field?.field_key === baselineField.field_key;
-  });
+  for (const baselineField of baseline.fields) {
+    const hasExactOccurrence = parsed.fields.some(
+      (field) =>
+        field.field_index === baselineField.field_index &&
+        field.field_key === baselineField.field_key,
+    );
+    if (!hasExactOccurrence) {
+      fieldDiffs.push({
+        occurrence_index: null,
+        field_index: baselineField.field_index,
+        field_key: baselineField.field_key,
+        expected_field_index: baselineField.field_index,
+        expected_field_key: baselineField.field_key,
+        reported_status: null,
+        accepted_statuses: baselineField.accepted_statuses,
+        status_agreement: false,
+        issues: ['MISSING_FIELD'],
+      });
+    }
+  }
+
+  const exactCatalogMapping = baseline.fields.every(
+    (baselineField) =>
+      parsed.fields.filter(
+        (field) =>
+          field.field_index === baselineField.field_index &&
+          field.field_key === baselineField.field_key,
+      ).length === 1,
+  );
   const structuralPass =
+    parsed.structuralIssues.length === 0 &&
     parsed.fields.length === baseline.fields.length &&
     indexCounts.size === baseline.fields.length &&
     keyCounts.size === baseline.fields.length &&
@@ -235,6 +328,7 @@ function evaluateFields(parsed, baseline) {
     baseline_version: baseline.baseline_version,
     input_format: parsed.inputFormat,
     structural_pass: structuralPass,
+    structural_issues: parsed.structuralIssues,
     field_count: parsed.fields.length,
     status_agreement: {
       matched_fields: matchedFields,

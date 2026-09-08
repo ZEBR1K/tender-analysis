@@ -108,6 +108,26 @@ function runEvaluator(inputPath) {
   return { ...result, output };
 }
 
+function buildFutureJson(adjudication) {
+  return {
+    schema_version: 'tender_agent_result_v1',
+    field_catalog_version: 'tender_fields_v1',
+    field_catalog_sha256: 'a'.repeat(64),
+    input_manifest_sha256: 'b'.repeat(64),
+    inspection_coverage: [],
+    fields: adjudication.fields.map((field) => ({
+      field_index: field.field_index,
+      field_key: field.field_key,
+      status: field.accepted_statuses[0],
+      value_text: field.accepted_statuses[0] === 'not_found' ? null : 'fixture',
+      claim_basis: 'explicit_positive',
+      evidence: [],
+      conflicts: [],
+      rationale: 'Evaluator adapter fixture only.',
+    })),
+  };
+}
+
 test('provisional baseline v0 declares its limits and exact 27-field catalog contract', async () => {
   const [readme, adjudication] = await Promise.all([
     readFile(readmePath, 'utf8'),
@@ -288,23 +308,7 @@ test('future tender_agent_result_v1 JSON uses an explicit typed adapter', async 
     path.join(os.tmpdir(), 'agentic-evaluator-'),
   );
   const inputPath = path.join(temporaryDirectory, 'result.json');
-  const resultJson = {
-    schema_version: 'tender_agent_result_v1',
-    field_catalog_version: 'tender_fields_v1',
-    field_catalog_sha256: 'a'.repeat(64),
-    input_manifest_sha256: 'b'.repeat(64),
-    inspection_coverage: [],
-    fields: adjudication.fields.map((field) => ({
-      field_index: field.field_index,
-      field_key: field.field_key,
-      status: field.accepted_statuses[0],
-      value_text: field.accepted_statuses[0] === 'not_found' ? null : 'fixture',
-      claim_basis: 'explicit_positive',
-      evidence: [],
-      conflicts: [],
-      rationale: 'Evaluator adapter fixture only.',
-    })),
-  };
+  const resultJson = buildFutureJson(adjudication);
 
   try {
     await writeFile(inputPath, `${JSON.stringify(resultJson)}\n`, 'utf8');
@@ -356,6 +360,114 @@ test('derived procurement lid quantity is checked exactly when JSON reports it',
       ({ field_key: key }) => key === 'procurement_subject',
     );
     assert.ok(subject.issues.includes('FORBIDDEN_CONCLUSION'));
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('status agreement requires the exact baseline field index and key mapping', async () => {
+  const adjudication = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(
+    path.join(os.tmpdir(), 'agentic-evaluator-'),
+  );
+  const inputPath = path.join(temporaryDirectory, 'mismatched-key.json');
+  const resultJson = buildFutureJson(adjudication);
+  resultJson.fields[0].field_key = 'unexpected_subject_key';
+
+  try {
+    await writeFile(inputPath, `${JSON.stringify(resultJson)}\n`, 'utf8');
+    const result = runEvaluator(inputPath);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output.structural_pass, false);
+    assert.equal(result.output.status_agreement.matched_fields, 26);
+    const malformed = result.output.field_diffs.find(
+      ({ field_key: key }) => key === 'unexpected_subject_key',
+    );
+    assert.ok(malformed);
+    assert.equal(malformed.status_agreement, false);
+    assert.ok(malformed.issues.includes('FIELD_KEY_MISMATCH'));
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('every duplicate index occurrence is reported and contributes critical diagnostics', async () => {
+  const adjudication = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(
+    path.join(os.tmpdir(), 'agentic-evaluator-'),
+  );
+  const inputPath = path.join(temporaryDirectory, 'duplicate-index.json');
+  const resultJson = buildFutureJson(adjudication);
+  const nationalRegimeIndex = resultJson.fields.findIndex(
+    ({ field_key: key }) => key === 'national_regime',
+  );
+  resultJson.fields.splice(nationalRegimeIndex, 0, {
+    ...structuredClone(resultJson.fields[nationalRegimeIndex]),
+    status: 'resolved',
+    value_text: 'Не применяется.',
+  });
+
+  try {
+    await writeFile(inputPath, `${JSON.stringify(resultJson)}\n`, 'utf8');
+    const result = runEvaluator(inputPath);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output.structural_pass, false);
+    assert.equal(result.output.field_count, 28);
+    assert.equal(result.output.field_diffs.length, 28);
+    const duplicates = result.output.field_diffs.filter(
+      ({ field_key: key }) => key === 'national_regime',
+    );
+    assert.equal(duplicates.length, 2);
+    assert.ok(duplicates.every(({ status_agreement: agreement }) => !agreement));
+    assert.ok(
+      duplicates.every(({ issues }) => issues.includes('DUPLICATE_FIELD_INDEX')),
+    );
+    assert.ok(
+      duplicates.every(({ issues }) => issues.includes('DUPLICATE_FIELD_KEY')),
+    );
+    assert.equal(result.output.critical_false_resolved_count, 1);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('malformed controlled JSON identity and field entries fail structurally without a generic crash', async () => {
+  const adjudication = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(
+    path.join(os.tmpdir(), 'agentic-evaluator-'),
+  );
+  const inputPath = path.join(temporaryDirectory, 'malformed-result.json');
+  const resultJson = buildFutureJson(adjudication);
+  resultJson.field_catalog_version = 42;
+  resultJson.field_catalog_sha256 = 'not-a-sha';
+  resultJson.input_manifest_sha256 = null;
+  resultJson.inspection_coverage = {};
+  resultJson.fields[0] = {
+    field_index: {},
+    field_key: [],
+    status: null,
+    value_text: {},
+  };
+
+  try {
+    await writeFile(inputPath, `${JSON.stringify(resultJson)}\n`, 'utf8');
+    const result = runEvaluator(inputPath);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output.ok, true);
+    assert.equal(result.output.input_format, 'tender_agent_result_v1_json');
+    assert.equal(result.output.structural_pass, false);
+    assert.deepEqual(result.output.structural_issues, [
+      'FIELD_CATALOG_VERSION_INVALID',
+      'FIELD_CATALOG_SHA256_INVALID',
+      'INPUT_MANIFEST_SHA256_INVALID',
+      'INSPECTION_COVERAGE_INVALID',
+      'FIELD_ENTRY_INVALID',
+    ]);
+    assert.ok(
+      result.output.field_diffs.some(({ issues }) =>
+        issues.includes('FIELD_ENTRY_INVALID'),
+      ),
+    );
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
