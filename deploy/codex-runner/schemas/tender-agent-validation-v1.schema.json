@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kitatech.local/schemas/tender-agent-validation-v1.schema.json",
+  "title": "Tender agent validation envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "valid",
+    "job_issues",
+    "fields",
+    "raw_result_sha256",
+    "validated_result_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tender_agent_validation_v1"
+    },
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "job_issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "raw_result_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "validated_result_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "nonBlankString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "nullableString": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fieldKey": {
+      "type": "string",
+      "enum": [
+        "procurement_subject",
+        "nm_price_with_vat",
+        "platform",
+        "procedure_type",
+        "application_deadline",
+        "application_review_date",
+        "results_date",
+        "customer",
+        "customer_contacts",
+        "participation_cost",
+        "participation_guarantee",
+        "evaluation_criteria",
+        "delivery_term",
+        "payment_terms",
+        "special_account_or_treasury",
+        "bank_support",
+        "government_contract",
+        "rebidding",
+        "national_regime",
+        "advance_contract_guarantee",
+        "warranty_obligations_guarantee",
+        "licenses_certificates",
+        "required_official_certificates",
+        "similar_supply_experience",
+        "analog_allowed",
+        "analog_definition",
+        "application_documents"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "requires_review",
+        "not_found"
+      ]
+    },
+    "issueCode": {
+      "type": "string",
+      "enum": [
+        "SCHEMA_INVALID",
+        "FIELD_SET_MISMATCH",
+        "DUPLICATE_FIELD",
+        "STATUS_INVALID",
+        "VALUE_REQUIRED",
+        "SOURCE_UNKNOWN",
+        "INSPECTION_INCOMPLETE",
+        "LOCATOR_INVALID",
+        "QUOTE_NOT_VERIFIED",
+        "ELLIPSIS_FRAGMENT_MISMATCH",
+        "ELLIPSIS_MATERIAL_GAP",
+        "CONFLICT_BLOCKS_RESOLVED",
+        "NEGATIVE_BASIS_MISSING",
+        "NOT_FOUND_WITH_INCOMPLETE_COVERAGE",
+        "COMPLETENESS_PROOF_MISSING",
+        "ARITHMETIC_MISMATCH",
+        "CATALOG_HASH_MISMATCH",
+        "MANIFEST_HASH_MISMATCH"
+      ]
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "path"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/issueCode"
+        },
+        "message": {
+          "$ref": "#/$defs/nonBlankString"
+        },
+        "path": {
+          "type": "string"
+        },
+        "field_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 27
+        },
+        "field_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fieldKey"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/nonBlankString"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "dimension": {
+          "type": "string",
+          "enum": [
+            "field_index",
+            "field_key"
+          ]
+        },
+        "keyword": {
+          "type": "string"
+        },
+        "schema_path": {
+          "type": "string"
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_index",
+        "field_key",
+        "reported_status",
+        "effective_status",
+        "reported_value_text",
+        "effective_value_text",
+        "validation_level",
+        "issues"
+      ],
+      "properties": {
+        "field_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 27
+        },
+        "field_key": {
+          "$ref": "#/$defs/fieldKey"
+        },
+        "reported_status": {
+          "$ref": "#/$defs/status"
+        },
+        "effective_status": {
+          "$ref": "#/$defs/status"
+        },
+        "reported_value_text": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "effective_value_text": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "validation_level": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "warning",
+            "downgraded"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "reported_status": {
+                "const": "resolved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reported_value_text": {
+                "$ref": "#/$defs/nonBlankString"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "reported_status": {
+                "const": "not_found"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "reported_value_text": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effective_status": {
+                "const": "resolved"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "effective_value_text": {
+                "$ref": "#/$defs/nonBlankString"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "effective_status": {
+                "const": "not_found"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "effective_value_text": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -78,6 +78,7 @@ Shadow path не пишет в `tender_analysis_field_results`, не меняе�
 deploy/codex-runner/Dockerfile
 deploy/codex-runner/compose.yaml
 deploy/codex-runner/package.json
+deploy/codex-runner/package-lock.json
 deploy/codex-runner/README.md
 deploy/codex-runner/src/config.mjs
 deploy/codex-runner/src/errors.mjs
@@ -90,6 +91,7 @@ deploy/codex-runner/src/source-index/docx.mjs
 deploy/codex-runner/src/source-index/xlsx.mjs
 deploy/codex-runner/src/codex-command.mjs
 deploy/codex-runner/src/codex-events.mjs
+deploy/codex-runner/src/schema-validation.mjs
 deploy/codex-runner/src/result-validator.mjs
 deploy/codex-runner/src/server.mjs
 deploy/codex-runner/agent-template/AGENTS.md
@@ -515,6 +517,9 @@ test(agentic): add provisional four-run evaluation baseline
 **Files:**
 
 ```text
+deploy/codex-runner/package.json
+deploy/codex-runner/package-lock.json
+deploy/codex-runner/src/schema-validation.mjs
 deploy/codex-runner/schemas/tender-agent-result-v1.schema.json
 deploy/codex-runner/schemas/tender-agent-validation-v1.schema.json
 deploy/codex-runner/policies/tender-fields-v1.json
@@ -524,6 +529,7 @@ tests/fixtures/agentic/results/*.json
 
 - [ ] Write failing schema tests for missing field, duplicate key/index, unknown status, `resolved` without value/evidence, `not_found` with value, invalid evidence location and malformed ordered fragments.
 - [ ] Add one valid exact-quote fixture and one valid ellipsized/ordered-fragment fixture.
+- [ ] Pin `ajv@8.20.0` and `ajv-formats@3.0.1` exactly, commit the lockfile and compile both Draft 2020-12 schemas through the reusable strict Ajv boundary used later by Task 9.
 - [ ] Implement the two JSON Schemas with `additionalProperties=false` at every controlled object level.
 - [ ] Build `tender-fields-v1.json` as an executable validation-policy mirror keyed by all 27 `field_key` values. Store the expected catalog SHA and only mechanical guards: negative-result sensitivity, completeness requirement, arithmetic/date type, selected-control requirement.
 - [ ] Add a test proving exact one-to-one mapping with `FIELD_CATALOG.md`; a missing or extra policy key is a hard failure.

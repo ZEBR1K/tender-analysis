@@ -1,0 +1,243 @@
+{
+  "policy_version": "tender_fields_v1",
+  "field_catalog_version": "tender_fields_v1",
+  "expected_catalog_sha256": "ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843",
+  "catalog_snapshot_source": "evaluations/codex-agentic-blind-test-2026-09-08/inputs/FIELD_CATALOG.md",
+  "root_catalog_source": "FIELD_CATALOG.md",
+  "root_catalog_sha256_observed": "6A480E2D32F177BEE60BB454CF85F8A6964D34E251065A71A16BF88EF3B522E9",
+  "root_catalog_reconciliation_required": true,
+  "deployment_gate": "blocked_pending_root_catalog_reconciliation",
+  "fields": {
+    "procurement_subject": {
+      "field_index": 1,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "text",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "component_sum_consistency"
+      ]
+    },
+    "nm_price_with_vat": {
+      "field_index": 2,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "money",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency",
+        "vat_consistency"
+      ]
+    },
+    "platform": {
+      "field_index": 3,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "text",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "procedure_type": {
+      "field_index": 4,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "text",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "application_deadline": {
+      "field_index": 5,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "date",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "application_review_date": {
+      "field_index": 6,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "date",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "results_date": {
+      "field_index": 7,
+      "negative_result_sensitive": false,
+      "completeness_required": true,
+      "value_kind": "date",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "customer": {
+      "field_index": 8,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "text",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "customer_contacts": {
+      "field_index": 9,
+      "negative_result_sensitive": false,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "participation_cost": {
+      "field_index": 10,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "money",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency"
+      ]
+    },
+    "participation_guarantee": {
+      "field_index": 11,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency"
+      ]
+    },
+    "evaluation_criteria": {
+      "field_index": 12,
+      "negative_result_sensitive": false,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "delivery_term": {
+      "field_index": 13,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "date",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "payment_terms": {
+      "field_index": 14,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency"
+      ]
+    },
+    "special_account_or_treasury": {
+      "field_index": 15,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "boolean_like",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "bank_support": {
+      "field_index": 16,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "boolean_like",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "government_contract": {
+      "field_index": 17,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "boolean_like",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "rebidding": {
+      "field_index": 18,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "boolean_like",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "national_regime": {
+      "field_index": 19,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": true,
+      "arithmetic_checks": []
+    },
+    "advance_contract_guarantee": {
+      "field_index": 20,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency"
+      ]
+    },
+    "warranty_obligations_guarantee": {
+      "field_index": 21,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": [
+        "money_amount_consistency"
+      ]
+    },
+    "licenses_certificates": {
+      "field_index": 22,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "required_official_certificates": {
+      "field_index": 23,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "similar_supply_experience": {
+      "field_index": 24,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "analog_allowed": {
+      "field_index": 25,
+      "negative_result_sensitive": true,
+      "completeness_required": false,
+      "value_kind": "boolean_like",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "analog_definition": {
+      "field_index": 26,
+      "negative_result_sensitive": false,
+      "completeness_required": false,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    },
+    "application_documents": {
+      "field_index": 27,
+      "negative_result_sensitive": true,
+      "completeness_required": true,
+      "value_kind": "composite",
+      "selected_control_required": false,
+      "arithmetic_checks": []
+    }
+  }
+}
