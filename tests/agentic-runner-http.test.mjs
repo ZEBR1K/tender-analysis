@@ -176,7 +176,6 @@ test('permission builder grants only current job roots and supplies CLI override
   assert.equal(boundary.workspaceDirectory, `/data/jobs/${jobId}/workspace`);
   assert.deepEqual(boundary.readOnlyDirectories, [
     `/data/jobs/${jobId}/input`,
-    `/data/jobs/${jobId}/source-index`,
   ]);
   assert.equal(boundary.cliArgs[0], '--ignore-user-config');
   assert.ok(boundary.cliArgs.includes('--strict-config'));
@@ -191,7 +190,6 @@ test('permission builder grants only current job roots and supplies CLI override
     'permissions.tender-analysis-job.filesystem./data/jobs="deny"',
     `permissions.tender-analysis-job.filesystem./data/jobs/${jobId}/workspace="write"`,
     `permissions.tender-analysis-job.filesystem./data/jobs/${jobId}/input="read"`,
-    `permissions.tender-analysis-job.filesystem./data/jobs/${jobId}/source-index="read"`,
     'permissions.tender-analysis-job.filesystem./run/codex-auth="deny"',
     'permissions.tender-analysis-job.filesystem./run/secrets="deny"',
     'permissions.tender-analysis-job.filesystem./proc/*/environ="deny"',
@@ -204,6 +202,10 @@ test('permission builder grants only current job roots and supplies CLI override
   ]) {
     assert.ok(overrides.includes(required), `missing CLI permission override: ${required}`);
   }
+  assert.equal(
+    overrides.some((entry) => entry.includes('/source-index')),
+    false,
+  );
   assert.ok(overrides.includes(`shell_environment_policy.set.HOME="/data/jobs/${jobId}/workspace"`));
   assert.ok(overrides.includes(`shell_environment_policy.set.TMPDIR="/data/jobs/${jobId}/workspace/.tmp"`));
   assert.equal(overrides.some((entry) => /KEY|SECRET|TOKEN|CODEX_HOME/u.test(entry)), false);

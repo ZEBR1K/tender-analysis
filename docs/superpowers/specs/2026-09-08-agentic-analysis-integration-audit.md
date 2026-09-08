@@ -19,7 +19,7 @@ TenderPlan mark
                     |
                     +→ current Document Worker → Aggregator → Finalization → report
                     |
-                    `→ new Agentic Dispatch → isolated Codex runner → deterministic validation
+                    `→ new Agentic Dispatch → isolated Codex runner → contract/source validation
                                                 → shadow 27-field results
 ```
 
@@ -94,8 +94,9 @@ This path has extensive audit history and regression coverage, but its semantic 
 
 - the production fallback;
 - the comparison baseline for shadow evaluation;
-- a source of proven field-specific safety rules;
 - an independent signal when legacy and agentic results disagree.
+
+Legacy behavior and the existing one-procurement baseline remain evaluation evidence. They are not inputs for new parser, validator or field-specific runtime rules.
 
 It should not be called from the new agentic runner and the runner should not read its generated facts or FINAL results. The blind comparison must remain independent.
 
@@ -121,7 +122,7 @@ Stages 3–5 must not write shadow agentic results into `tender_analysis_field_r
 | Targeted Recheck | No change in stages 3–5. |
 | Finalization | No change in shadow mode. |
 | Report Generation | No change in shadow mode; use only after later promotion to the canonical FINAL contract. |
-| `FIELD_CATALOG.md` | Copy a hashed snapshot into each job; remains authoritative for all 27 meanings. |
+| `FIELD_CATALOG.md` | Remains authoritative for all 27 meanings. Shadow-v0 temporarily pins the user-confirmed blind-test input snapshot; its 27-key/index mapping matches the repository catalog but its hash differs, so production deployment remains gated until explicit reconciliation. |
 | Blind-test archive | Use as the first repeatability and regression corpus; it is not itself a gold standard. |
 
 ## 5. New components required
@@ -132,12 +133,12 @@ A separate non-public Docker service will:
 
 1. receive documents from n8n one at a time;
 2. verify SHA-256 and seal an immutable input manifest;
-3. build mechanical text/OOXML/page-image indexes for navigation and evidence checks;
-4. create one isolated job folder per procurement analysis;
+3. create one isolated job folder per procurement analysis;
+4. give Codex read-only access to the original files and let it choose text, visual, OCR or OOXML inspection;
 5. run one non-interactive Codex process;
-6. capture JSONL events and token usage;
-7. validate the final JSON deterministically;
-8. expose job status and validated artifacts to n8n.
+6. capture JSONL events, agent-reported inspection audit and token usage;
+7. validate only the closed JSON contract, immutable hashes, source membership and file integrity;
+8. expose job status and contract-valid artifacts to n8n.
 
 The service will have no public host port and no PostgreSQL or TenderPlan credentials. n8n uploads bytes to it over the internal Docker network.
 
@@ -151,7 +152,7 @@ The service will have no public host port and no PostgreSQL or TenderPlan creden
 
 - `tender_agentic_jobs`: one durable job and its configuration, lifecycle, usage and artifact metadata.
 - `tender_agentic_documents`: one staged source file per job with source document ID, hash, size and staging status.
-- `tender_agentic_field_results`: exact 27 raw/effective results per job.
+- `tender_agentic_field_results`: exact 27 agent-reported results and contract issues per job.
 
 The three tables are additive. Existing five analysis tables and their contracts remain unchanged in shadow mode.
 
@@ -192,38 +193,31 @@ The runner will use `codex exec` with:
 
 Development repeatability runs may use the same saved ChatGPT login as the blind test on a trusted local runner. The unattended server path should use a project-scoped API credential and standard API billing. These are different billing/limit regimes and must not be conflated. The server credential is available only to the Codex process and is filtered out of tool subprocess environments.
 
-## 8. Deterministic validation boundary
+## 8. Agent-led validation boundary
 
-The validator can prove structure and source correspondence; it cannot prove by itself that an agent understood every business nuance. Its role is to reject or downgrade unsafe outputs, never to invent or promote a value.
+The runner does not judge the business meaning of Codex's findings and does not rewrite field status or value. Runtime checks are limited to security, original-file integrity and the closed JSON contract:
 
-Hard job-level failures:
+- the final JSON conforms to the versioned closed schema and allowed status enum;
+- the result contains the exact unique 27-key/index catalog mapping;
+- catalog and manifest identities match the sealed job inputs;
+- every staged original still matches its recorded size and SHA-256;
+- every reported evidence `artifact_key` belongs to that procurement's sealed manifest;
+- every `resolved` or `requires_review` field has evidence with a nonblank human locator.
 
-- final JSON does not conform to schema;
-- the exact 27-key catalog set is missing, duplicated or reordered incompatibly;
-- a source file identity is unknown;
-- the input manifest or catalog hash changed during the run.
+`not_found` may have an empty evidence array. Its audit context is the agent-reported top-level `inspected_documents`, `limitations` and `constraints`; the runner does not infer complete coverage from those reports. A quote may be kept as optional audit text, but runtime never searches for it, scores its sufficiency or compares it with the value.
 
-Field-level downgrade to `requires_review`:
+There is no field-level semantic downgrade and no reported/effective status split in this contour. Quote matching, ellipsis logic, value-to-text consistency, page or structural completeness, arithmetic/date/VAT checks, negative-answer rules, conflict resolution and field-specific containment are explicitly outside runtime validation.
 
-- `resolved` has no usable evidence;
-- an evidence fragment cannot be found at the declared source location;
-- the agent reports a material unresolved conflict but still returns `resolved`;
-- a negative conclusion is based only on absence;
-- `not_found` is returned while any document/page/structural inspection is incomplete;
-- a completeness-critical field lacks the field-specific completeness proof required by `FIELD_CATALOG.md`;
-- numeric/date claims contradict their verified evidence.
+| Retained runtime check | Single allowed justification |
+|---|---|
+| Authentication, job isolation and resource bounds | Security |
+| Upload size/SHA, catalog identity and manifest identity | Original-file integrity |
+| Evidence `artifact_key` membership in the sealed procurement manifest | Original-file integrity |
+| Closed schemas, types, required properties and status enum | JSON contract |
+| Exact unique 27-key/index mapping | JSON contract |
+| Evidence and a nonblank locator for `resolved` and `requires_review` | JSON contract |
 
-Harmless presentation differences are not failures. Unicode, whitespace, punctuation and equivalent date formatting are normalized. An ellipsized citation is accepted as ordered verified fragments within the same source location when every supplied fragment exists and the omitted interval does not hide conflicting material tokens. The raw quote remains preserved in audit.
-
-The persisted result keeps both:
-
-```text
-reported_status / reported_value
-effective_status / effective_value
-validation issues and downgrade reason
-```
-
-The validator may keep a value as provisional while downgrading the status. It may never change `not_found` into a negative fact or upgrade any field to `resolved`.
+If Codex makes a semantic error, it is addressed first in the short tender-analysis skill and rerun in repeated blind tests across multiple procurements. A new programmatic check is eligible only after the same problem is reproduced across procurements, is not reliably fixed by instruction and protects one of the three allowed categories without duplicating Codex reasoning. The single-procurement baseline remains offline evaluation evidence, not a source of runtime rules.
 
 ## 9. Reconciliation blockers found
 
