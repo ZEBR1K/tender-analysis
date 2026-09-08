@@ -9,6 +9,7 @@ import packageMetadata from '../package.json' with { type: 'json' };
 import { BODY_LIMITS, config } from './config.mjs';
 import { normalizeRunnerError, RunnerError, toSafeError } from './errors.mjs';
 import { createHeaderAuthenticator } from './http-auth.mjs';
+import { permissionBoundaryContractReady } from './permissions.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -49,7 +50,16 @@ function requestHasBody(request) {
 
 export async function readBoundedRequestBody(request, limits = BODY_LIMITS) {
   if (!requestHasBody(request)) return Buffer.alloc(0);
-  const limit = contentTypeLimit(request.headers['content-type'], limits);
+  const normalizedType = String(request.headers['content-type'] || '').split(';', 1)[0]
+    .trim().toLowerCase();
+  if (normalizedType !== 'application/json') {
+    throw new RunnerError(
+      'RUNNER_CONTENT_TYPE_INVALID',
+      'Buffered request bodies must be application/json',
+      415,
+    );
+  }
+  const limit = limits.maxJsonBytes;
   const declaredLength = Number(request.headers['content-length']);
   if (Number.isFinite(declaredLength) && declaredLength > limit) {
     request.resume();
@@ -68,6 +78,56 @@ export async function readBoundedRequestBody(request, limits = BODY_LIMITS) {
     chunks.push(value);
   }
   return Buffer.concat(chunks, total);
+}
+
+export function createBoundedDocumentStream(request, limits = BODY_LIMITS) {
+  const limit = contentTypeLimit(request.headers['content-type'], limits);
+  const declaredLength = Number(request.headers['content-length']);
+  if (Number.isFinite(declaredLength) && declaredLength > limit) {
+    request.resume();
+    throw new RunnerError('RUNNER_BODY_TOO_LARGE', `Request body exceeds ${limit} bytes`, 413);
+  }
+
+  return (async function* streamDocument() {
+    let total = 0;
+    for await (const chunk of request) {
+      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += value.length;
+      if (total > limit) {
+        request.resume();
+        throw new RunnerError('RUNNER_BODY_TOO_LARGE', `Request body exceeds ${limit} bytes`, 413);
+      }
+      yield value;
+    }
+  }());
+}
+
+export function createUploadGate({ maxConcurrentUploads = 1 } = {}) {
+  if (!Number.isSafeInteger(maxConcurrentUploads) || maxConcurrentUploads <= 0) {
+    throw new Error('maxConcurrentUploads must be a positive integer');
+  }
+  let active = 0;
+  return Object.freeze({
+    async run(task) {
+      if (typeof task !== 'function') throw new TypeError('task must be a function');
+      if (active >= maxConcurrentUploads) {
+        throw new RunnerError(
+          'RUNNER_UPLOAD_BUSY',
+          'Runner has reached its concurrent upload limit',
+          503,
+        );
+      }
+      active += 1;
+      try {
+        return await task();
+      } finally {
+        active -= 1;
+      }
+    },
+    snapshot() {
+      return { active, max_concurrent: maxConcurrentUploads };
+    },
+  });
 }
 
 export function createSingleProcessQueue({ maxQueuedJobs }) {
@@ -128,10 +188,14 @@ export function buildHealthReport({
   authReady,
   storeReady,
   toolVersions,
+  isolationReady = false,
+  codexAuthReady = false,
+  isolationCanaryVerified = false,
   queue,
 }) {
   const toolsReady = requiredToolsReady(toolVersions);
-  const ready = Boolean(authReady && storeReady && toolsReady);
+  const ready = Boolean(authReady && storeReady && toolsReady && isolationReady && codexAuthReady);
+  const executeReady = Boolean(ready && isolationCanaryVerified);
   return {
     schema_version: 'tender_codex_runner_health_v1',
     status: ready ? 'ready' : 'not_ready',
@@ -141,6 +205,10 @@ export function buildHealthReport({
       auth: Boolean(authReady),
       store: Boolean(storeReady),
       tools: toolsReady,
+      isolation: Boolean(isolationReady),
+      codex_auth: Boolean(codexAuthReady),
+      isolation_canary: Boolean(isolationCanaryVerified),
+      execute: executeReady,
     },
     queue,
   };
@@ -151,59 +219,108 @@ function firstLine(value) {
   return line.trim().slice(0, 200) || null;
 }
 
-async function commandVersion(command, args) {
+function probeDiagnostic(error) {
+  const output = firstLine(error?.stderr) || firstLine(error?.stdout);
+  return output || firstLine(`tool probe failed (${firstLine(error?.code) || 'unknown'})`);
+}
+
+export async function probeCommandVersion(command, args, { execute = execFileAsync } = {}) {
   try {
-    const { stdout, stderr } = await execFileAsync(command, args, {
+    const result = await execute(command, args, {
       windowsHide: true,
       timeout: 10_000,
       maxBuffer: 256 * 1024,
       env: process.env,
     });
-    return firstLine(stdout) || firstLine(stderr);
+    const exitCode = result?.exitCode ?? result?.code ?? 0;
+    if (exitCode !== 0) {
+      return {
+        version: null,
+        diagnostic: probeDiagnostic(result),
+      };
+    }
+    const version = firstLine(result?.stdout) || firstLine(result?.stderr);
+    return {
+      version,
+      diagnostic: version ? null : 'tool probe returned no version',
+    };
   } catch (error) {
-    return firstLine(error?.stdout) || firstLine(error?.stderr);
+    return {
+      version: null,
+      diagnostic: probeDiagnostic(error),
+    };
   }
 }
 
 export async function probeToolVersions() {
-  const [codex, poppler, libreoffice, tesseract, languages] = await Promise.all([
-    commandVersion('codex', ['--version']),
-    commandVersion('pdftotext', ['-v']),
-    commandVersion('libreoffice', ['--version']),
-    commandVersion('tesseract', ['--version']),
+  const [codex, poppler, libreoffice, tesseract, languagesResult] = await Promise.all([
+    probeCommandVersion('codex', ['--version']),
+    probeCommandVersion('pdftotext', ['-v']),
+    probeCommandVersion('libreoffice', ['--version']),
+    probeCommandVersion('tesseract', ['--version']),
     execFileAsync('tesseract', ['--list-langs'], {
       windowsHide: true,
       timeout: 10_000,
       maxBuffer: 256 * 1024,
       env: process.env,
-    }).then(({ stdout }) => String(stdout).split(/\r?\n/u).map((line) => line.trim()))
-      .catch(() => []),
+    }).then(({ stdout }) => ({
+      languages: String(stdout).split(/\r?\n/u).map((line) => line.trim()),
+      diagnostic: null,
+    })).catch((error) => ({
+      languages: [],
+      diagnostic: probeDiagnostic(error),
+    })),
   ]);
   return {
-    node: process.version,
-    codex,
-    poppler,
-    libreoffice,
-    tesseract,
-    ocr_languages: ['eng', 'rus'].filter((language) => languages.includes(language)),
+    versions: {
+      node: process.version,
+      codex: codex.version,
+      poppler: poppler.version,
+      libreoffice: libreoffice.version,
+      tesseract: tesseract.version,
+      ocr_languages: ['eng', 'rus'].filter((language) => languagesResult.languages.includes(language)),
+    },
+    diagnostics: {
+      codex: codex.diagnostic,
+      poppler: poppler.diagnostic,
+      libreoffice: libreoffice.diagnostic,
+      tesseract: tesseract.diagnostic,
+      ocr_languages: languagesResult.diagnostic,
+    },
   };
 }
 
-function createDefaultHealthProvider({ authenticator, queue, rootDirectory }) {
-  const toolVersions = probeToolVersions();
+function createDefaultHealthProvider({
+  authenticator,
+  queue,
+  rootDirectory,
+  codexAuthFile,
+  isolationCanaryVerified,
+}) {
+  const toolProbe = probeToolVersions();
   return async () => {
     let storeReady = false;
+    let codexAuthReady = false;
     try {
       await access(rootDirectory, fsConstants.R_OK | fsConstants.W_OK);
       storeReady = true;
     } catch {
       storeReady = false;
     }
+    try {
+      await access(codexAuthFile, fsConstants.R_OK);
+      codexAuthReady = true;
+    } catch {
+      codexAuthReady = false;
+    }
     return buildHealthReport({
       serviceVersion: packageMetadata.version,
       authReady: authenticator.ready,
       storeReady,
-      toolVersions: await toolVersions,
+      toolVersions: (await toolProbe).versions,
+      isolationReady: permissionBoundaryContractReady(),
+      codexAuthReady,
+      isolationCanaryVerified,
       queue: queue.snapshot(),
     });
   };
@@ -217,11 +334,15 @@ export function createServer({
   authenticator = createHeaderAuthenticator(config.authToken),
   bodyLimits = config.bodyLimits,
   queue = createSingleProcessQueue({ maxQueuedJobs: config.maxQueuedJobs }),
+  uploadGate = createUploadGate({ maxConcurrentUploads: config.maxConcurrentUploads }),
   healthProvider = createDefaultHealthProvider({
     authenticator,
     queue,
     rootDirectory: config.rootDirectory,
+    codexAuthFile: config.codexAuthFile,
+    isolationCanaryVerified: config.isolationCanaryVerified,
   }),
+  executionBoundary = { ready: config.isolationCanaryVerified },
   v1Handler = defaultV1Handler,
 } = {}) {
   return http.createServer(async (request, response) => {
@@ -235,8 +356,52 @@ export function createServer({
 
       if (url.pathname.startsWith('/v1/')) {
         authenticator.assertAuthorized(request.headers);
-        const rawBody = await readBoundedRequestBody(request, bodyLimits);
-        const result = await v1Handler({ request, url, rawBody, queue });
+        if (url.pathname.endsWith('/execute') && executionBoundary.ready !== true) {
+          request.resume();
+          throw new RunnerError(
+            'RUNNER_ISOLATION_NOT_READY',
+            'Runner execution isolation has not passed its runtime canary',
+            503,
+          );
+        }
+        let result;
+        if (!requestHasBody(request)) {
+          result = await v1Handler({
+            request,
+            url,
+            bodyKind: 'none',
+            rawBody: Buffer.alloc(0),
+            bodyStream: null,
+            queue,
+          });
+        } else {
+          const contentType = String(request.headers['content-type'] || '').split(';', 1)[0]
+            .trim().toLowerCase();
+          if (contentType === 'application/octet-stream') {
+            const bodyStream = createBoundedDocumentStream(request, bodyLimits);
+            result = await uploadGate.run(() => v1Handler({
+              request,
+              url,
+              bodyKind: 'document',
+              rawBody: null,
+              bodyStream,
+              queue,
+            })).catch((error) => {
+              if (error instanceof RunnerError && error.code === 'RUNNER_UPLOAD_BUSY') request.resume();
+              throw error;
+            });
+          } else {
+            const rawBody = await readBoundedRequestBody(request, bodyLimits);
+            result = await v1Handler({
+              request,
+              url,
+              bodyKind: 'json',
+              rawBody,
+              bodyStream: null,
+              queue,
+            });
+          }
+        }
         return writeJson(response, result?.statusCode || 200, result?.body ?? result ?? { success: true });
       }
 

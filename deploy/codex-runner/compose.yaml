@@ -15,11 +15,14 @@ services:
       TENDER_CODEX_RUNNER_HOST: 0.0.0.0
       TENDER_CODEX_RUNNER_PORT: "8080"
       TENDER_CODEX_RUNNER_ROOT: /data/jobs
-      TENDER_CODEX_RUNNER_AUTH_TOKEN: "${TENDER_CODEX_RUNNER_AUTH_TOKEN:-}"
+      TENDER_CODEX_RUNNER_AUTH_TOKEN_FILE: /run/secrets/runner-auth-token
+      TENDER_CODEX_RUNNER_CODEX_AUTH_FILE: /run/codex-auth/auth.json
       TENDER_CODEX_RUNNER_MAX_QUEUED_JOBS: "2"
       TZ: Europe/Moscow
     volumes:
       - /opt/tender-codex-runner/jobs:/data/jobs
+      - /opt/tender-codex-runner/secrets/runner-auth-token:/run/secrets/runner-auth-token:ro
+      - /opt/tender-codex-runner/secrets/codex-auth:/run/codex-auth:ro
     networks:
       - n8n_default
     pids_limit: 192
