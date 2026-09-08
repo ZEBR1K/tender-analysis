@@ -1,0 +1,49 @@
+{
+  "field": {
+    "field_index": 14,
+    "field_key": "payment_terms",
+    "status": "requires_review",
+    "value_text": "Конфликтующие значения: A / B",
+    "evidence": [
+      {
+        "artifact_key": "doc-a",
+        "locator": "раздел 4"
+      },
+      {
+        "artifact_key": "doc-b",
+        "locator": "пункт 7"
+      }
+    ],
+    "rationale": "Равноправные документы содержат несовместимые значения, а правило приоритета отсутствует; выбирать A как resolved нельзя."
+  },
+  "audit": {
+    "inspected_documents": [
+      {
+        "artifact_key": "doc-a",
+        "inspected_parts": [
+          "раздел 4"
+        ],
+        "methods": [
+          "данные сценария"
+        ],
+        "notes": "Указано значение A."
+      },
+      {
+        "artifact_key": "doc-b",
+        "inspected_parts": [
+          "пункт 7"
+        ],
+        "methods": [
+          "данные сценария"
+        ],
+        "notes": "Указано несовместимое значение B."
+      }
+    ],
+    "limitations": [
+      "Исходные документы непосредственно не предоставлены; вывод основан на условиях сценария."
+    ],
+    "constraints": [
+      "Документы равноправны, правило приоритета отсутствует."
+    ]
+  }
+}
