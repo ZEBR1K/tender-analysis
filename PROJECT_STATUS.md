@@ -43,6 +43,8 @@ not changed.
   `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
   FullInfo returned `marks=[]` for both test tender IDs. No event paths or fixture
   were fabricated.
+- Latest repeat probe execution `14680` produced the same negative result:
+  empty type-5 list, `marks=[]` and empty `notification` for both test tender IDs.
 - Task 9 TenderPlan poller is not implemented and remains blocked on a real
   type-5 event.
 - Existing live workflows were not changed. New workflows are inactive and
