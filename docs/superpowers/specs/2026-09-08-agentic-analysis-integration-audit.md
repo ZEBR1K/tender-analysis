@@ -186,7 +186,7 @@ The runner will use `codex exec` with:
 
 - `--ephemeral` so Codex rollout files are not retained outside the job audit artifacts;
 - `--ignore-user-config` and `--ignore-rules` for isolation from the owner's normal setup;
-- `--sandbox workspace-write` with command-network access disabled;
+- the per-job `buildCodexPermissionBoundary({ jobId }).cliArgs` permission profile with command-network access disabled; legacy `--sandbox`/`-s` flags are forbidden;
 - `--output-schema` for the final response contract;
 - `--json` for event and token audit;
 - `-o` for the final result artifact.

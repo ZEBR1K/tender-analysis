@@ -245,7 +245,7 @@ validated_result_sha256
 
 ### 4.4. Runner HTTP API
 
-Сервис слушает только internal Docker network `:8080` и требует Header Auth `X-Tender-Runner-Key` для всех `/v1/*` endpoints:
+Сервис слушает только internal Docker network `:8080` и требует Header Auth `X-Tender-Codex-Token` для всех `/v1/*` endpoints:
 
 ```text
 GET    /health
