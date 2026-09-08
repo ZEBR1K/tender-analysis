@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 
 let prompt = '';
@@ -10,6 +11,14 @@ const resultPath = outputIndex >= 0 ? process.argv[outputIndex + 1] : null;
 
 if (mode === 'hang') {
   setInterval(() => {}, 10_000);
+} else if (mode === 'child-hang') {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 10000)'], {
+    stdio: 'ignore',
+  });
+  await writeFile('child.pid', `${child.pid}\n`, 'utf8');
+  setInterval(() => {}, 10_000);
+} else if (mode === 'terminal-no-result') {
+  process.stdout.write('{"type":"turn.completed","usage":{}}\n');
 } else if (mode === 'invalid-jsonl') {
   process.stdout.write('not-json\n');
   if (resultPath) await writeFile(resultPath, '{"schema_version":"fake_result_v1"}\n', 'utf8');

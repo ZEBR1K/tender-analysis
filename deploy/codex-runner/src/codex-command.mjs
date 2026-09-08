@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process';
-import { open, readFile, stat, writeFile } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { open, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -31,6 +31,7 @@ const CODEX_ENVIRONMENT_ALLOWLIST = [
   'PATHEXT',
   'TEMP',
   'TMP',
+  'TMPDIR',
 ];
 
 function controlledPosixRoot(value, name) {
@@ -138,16 +139,40 @@ function redactStderr(value, secretValues = []) {
 async function readBoundedJson(filePath) {
   try {
     const metadata = await stat(filePath);
-    if (!metadata.isFile() || metadata.size > MAX_RESULT_BYTES) return { valid: false, value: null };
-    const source = await readFile(filePath, 'utf8');
-    const value = JSON.parse(source);
+    if (!metadata.isFile() || metadata.size > MAX_RESULT_BYTES) {
+      return { valid: false, value: null, bytes: null };
+    }
+    const bytes = await readFile(filePath);
+    const value = JSON.parse(bytes.toString('utf8'));
     return {
       valid: value !== null && typeof value === 'object' && !Array.isArray(value),
       value,
+      bytes,
     };
   } catch {
-    return { valid: false, value: null };
+    return { valid: false, value: null, bytes: null };
   }
+}
+
+function terminateProcessTree(child, signal) {
+  if (!child?.pid) return Promise.resolve();
+  if (process.platform === 'win32') {
+    const args = ['/PID', String(child.pid), '/T'];
+    if (signal === 'SIGKILL') args.push('/F');
+    return new Promise((resolve) => {
+      const killer = execFile('taskkill', args, { windowsHide: true }, () => resolve());
+      killer.once('error', () => {
+        child.kill(signal);
+        resolve();
+      });
+    });
+  }
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    child.kill(signal);
+  }
+  return Promise.resolve();
 }
 
 function waitForClose(child) {
@@ -165,6 +190,7 @@ function attemptArtifactPaths(auditDirectory, attempt) {
   return {
     events: path.join(auditDirectory, `codex-events.attempt-${attempt}.jsonl`),
     stderr: path.join(auditDirectory, `codex-stderr.attempt-${attempt}.log`),
+    result: path.join(auditDirectory, `codex-result.attempt-${attempt}.json`),
     status: path.join(auditDirectory, `codex-status.attempt-${attempt}.json`),
   };
 }
@@ -190,24 +216,35 @@ export async function executeCodexCommand({
   if (!Number.isSafeInteger(killGraceMs) || killGraceMs <= 0) throw new TypeError('killGraceMs must be positive');
 
   const artifacts = attemptArtifactPaths(auditDirectory, attempt);
-  const [eventsHandle, stderrHandle] = await Promise.all([
-    open(artifacts.events, 'w', 0o600),
-    open(artifacts.stderr, 'w', 0o600),
-  ]);
+  let eventsHandle;
+  let stderrHandle;
+  try {
+    eventsHandle = await open(artifacts.events, 'wx', 0o600);
+    stderrHandle = await open(artifacts.stderr, 'wx', 0o600);
+  } catch (error) {
+    await eventsHandle?.close().catch(() => {});
+    await stderrHandle?.close().catch(() => {});
+    throw error;
+  }
   const accumulator = createCodexEventAccumulator();
   let eventError = null;
   const stderrChunks = [];
   let stderrCaptured = 0;
   let timedOut = false;
   let forceTimer = null;
+  const terminationTasks = [];
   let child;
 
   try {
+    await unlink(resultPath).catch((error) => {
+      if (error?.code !== 'ENOENT') throw error;
+    });
     child = spawnProcess(executable, args, {
       cwd,
       env: sanitizeCodexEnvironment(baseEnv),
       shell: false,
       windowsHide: true,
+      detached: process.platform !== 'win32',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const stdoutTask = (async () => {
@@ -234,8 +271,10 @@ export async function executeCodexCommand({
 
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
-      forceTimer = setTimeout(() => child.kill('SIGKILL'), killGraceMs);
+      terminationTasks.push(terminateProcessTree(child, 'SIGTERM'));
+      forceTimer = setTimeout(() => {
+        terminationTasks.push(terminateProcessTree(child, 'SIGKILL'));
+      }, killGraceMs);
     }, timeoutMs);
     child.stdin.on('error', () => {});
     child.stdin.end(prompt);
@@ -244,11 +283,18 @@ export async function executeCodexCommand({
     clearTimeout(timeoutTimer);
     if (forceTimer) clearTimeout(forceTimer);
     await Promise.all([stdoutTask, stderrTask]);
+    await Promise.all(terminationTasks);
 
     const stderr = redactStderr(Buffer.concat(stderrChunks).toString('utf8'), secretValues);
     await stderrHandle.write(stderr);
     await Promise.all([eventsHandle.sync(), stderrHandle.sync()]);
     const parsedResult = await readBoundedJson(resultPath);
+    if (parsedResult.bytes) {
+      await writeFile(artifacts.result, parsedResult.bytes, {
+        flag: 'wx',
+        mode: 0o600,
+      });
+    }
     const events = accumulator.snapshot();
 
     let code = 'CODEX_COMPLETED';
@@ -272,6 +318,7 @@ export async function executeCodexCommand({
     };
     await writeFile(artifacts.status, `${JSON.stringify({ ...response, result: undefined })}\n`, {
       encoding: 'utf8',
+      flag: 'wx',
       mode: 0o600,
     });
     return response;
@@ -293,17 +340,31 @@ export async function runCodexAttempt({
   jobId,
   jobsRoot = '/data/jobs',
   runnerRoot = '/app',
-  auditDirectory = path.posix.join(jobsRoot, jobId, 'audit'),
   attempt = 1,
-  ...executionOptions
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  killGraceMs = DEFAULT_KILL_GRACE_MS,
+  secretValues = [],
 } = {}) {
+  const options = arguments[0] ?? {};
+  assertNoUnsupportedOptions(options, new Set([
+    'jobId',
+    'jobsRoot',
+    'runnerRoot',
+    'attempt',
+    'timeoutMs',
+    'killGraceMs',
+    'secretValues',
+  ]));
   const command = buildCodexCommand({ jobId, jobsRoot, runnerRoot });
   const prompt = await readFile(command.promptPath, 'utf8');
+  const auditDirectory = path.posix.join(jobsRoot, jobId, 'audit');
   return executeCodexCommand({
-    ...command,
-    prompt,
     auditDirectory,
     attempt,
-    ...executionOptions,
+    timeoutMs,
+    killGraceMs,
+    secretValues,
+    ...command,
+    prompt,
   });
 }
