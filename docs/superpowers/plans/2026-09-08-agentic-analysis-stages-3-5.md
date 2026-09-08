@@ -805,6 +805,7 @@ tests/fixtures/agentic/results/*.json
 - [ ] Write one failing test per required issue code before implementation.
 - [ ] Validate immutable catalog and manifest hashes before reading fields.
 - [ ] Validate exact 27 keys and indexes before field-level processing; a structural mismatch fails the whole job.
+- [ ] Keep inspection-coverage artifact uniqueness, `page <= page_to` ordering and evidence-to-artifact/manifest linkage in this Task 9 validation layer; the Task 2 schema boundary validates their closed structural shapes only.
 - [ ] Resolve evidence only through `artifact_key` and indexed location; never accept a free filename match.
 - [ ] Implement exact and ordered-fragment verification with the normalization boundary in section 5.
 - [ ] Preserve shortened quotes when verified; do not require a whole source sentence or reject a harmless ellipsis.

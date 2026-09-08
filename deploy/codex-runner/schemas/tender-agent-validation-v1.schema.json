@@ -104,6 +104,7 @@
       "type": "string",
       "enum": [
         "SCHEMA_INVALID",
+        "CATALOG_HASH_MISMATCH",
         "FIELD_SET_MISMATCH",
         "DUPLICATE_FIELD",
         "STATUS_INVALID",

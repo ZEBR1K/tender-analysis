@@ -137,6 +137,27 @@ test('strict Ajv boundary compiles and accepts the closed result and validation 
   assert.equal(envelopeValidation.valid, true);
 });
 
+test('result catalog hash must match the policy-pinned catalog identity', async () => {
+  const validators = await getValidators();
+  const result = await loadJson('valid-27.json');
+  assert.equal(
+    result.field_catalog_sha256,
+    'ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',
+  );
+  result.field_catalog_sha256 = 'f'.repeat(64);
+
+  const validation = validators.validateResult(result);
+  assert.equal(validation.schema_valid, true);
+  assert.equal(validation.valid, false);
+  assert.deepEqual(validation.issues, [
+    {
+      code: 'CATALOG_HASH_MISMATCH',
+      message: 'field_catalog_sha256 does not match the policy-pinned catalog.',
+      path: '/field_catalog_sha256',
+    },
+  ]);
+});
+
 test('exact-quote and ordered-fragment result fixtures are both accepted', async () => {
   const validators = await getValidators();
   const [exact, ellipsis] = await Promise.all([
@@ -383,11 +404,14 @@ test('schema boundary issue objects round-trip through the closed validation env
   const duplicate = await loadJson('duplicate-field.json');
   const invalidStatus = clone(result);
   invalidStatus.fields[0].status = 'maybe';
+  const catalogMismatch = clone(result);
+  catalogMismatch.field_catalog_sha256 = 'f'.repeat(64);
   const envelope = buildValidationEnvelope(result);
   envelope.valid = false;
   envelope.job_issues = [
     ...validators.validateResult(duplicate).issues,
     ...validators.validateResult(invalidStatus).issues,
+    ...validators.validateResult(catalogMismatch).issues,
   ];
 
   const validation = validators.validateValidationEnvelope(envelope);

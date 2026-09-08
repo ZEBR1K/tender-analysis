@@ -121,6 +121,26 @@ function fieldSetIssues(fields, expectedFields) {
   return issues;
 }
 
+function catalogHashIssues(value, expectedCatalogHash) {
+  const reportedCatalogHash = value?.field_catalog_sha256;
+  if (
+    typeof reportedCatalogHash !== 'string' ||
+    !/^[A-Fa-f0-9]{64}$/u.test(reportedCatalogHash)
+  ) {
+    return [];
+  }
+  if (reportedCatalogHash.toUpperCase() === expectedCatalogHash) {
+    return [];
+  }
+  return [
+    {
+      code: 'CATALOG_HASH_MISMATCH',
+      message: 'field_catalog_sha256 does not match the policy-pinned catalog.',
+      path: '/field_catalog_sha256',
+    },
+  ];
+}
+
 function loadExpectedFields(policy) {
   if (policy?.field_catalog_version !== 'tender_fields_v1') {
     throw new Error('Field policy must declare field_catalog_version=tender_fields_v1.');
@@ -154,15 +174,25 @@ function assertSchemaPolicyParity(schema, expectedFields, schemaName) {
   }
 }
 
-function createContractValidator(schemaValidator, expectedFields) {
+function createContractValidator(
+  schemaValidator,
+  expectedFields,
+  { expectedCatalogHash } = {},
+) {
   return (value) => {
     const schemaValid = schemaValidator(value);
     const schemaIssues = normalizeSchemaIssues(schemaValidator.errors ?? []);
     const semanticIssues = fieldSetIssues(value?.fields, expectedFields);
-    const issues = [...schemaIssues, ...semanticIssues];
+    const identityIssues = expectedCatalogHash
+      ? catalogHashIssues(value, expectedCatalogHash)
+      : [];
+    const issues = [...schemaIssues, ...semanticIssues, ...identityIssues];
 
     return {
-      valid: schemaValid && semanticIssues.length === 0,
+      valid:
+        schemaValid &&
+        semanticIssues.length === 0 &&
+        identityIssues.length === 0,
       schema_valid: schemaValid,
       issues,
     };
@@ -187,6 +217,10 @@ export async function createSchemaValidators({
   const validationSchema = parseJson(validationSource, validationSchemaPath);
   const policy = parseJson(policySource, policyPath);
   const expectedFields = loadExpectedFields(policy);
+  const expectedCatalogHash = policy.expected_catalog_sha256;
+  if (!/^[A-Fa-f0-9]{64}$/u.test(expectedCatalogHash ?? '')) {
+    throw new Error('Field policy must declare a 64-hex expected_catalog_sha256.');
+  }
 
   assertSchemaPolicyParity(resultSchema, expectedFields, resultSchemaName);
   assertSchemaPolicyParity(validationSchema, expectedFields, validationSchemaName);
@@ -204,7 +238,9 @@ export async function createSchemaValidators({
   return Object.freeze({
     draft: '2020-12',
     strict: true,
-    validateResult: createContractValidator(resultValidator, expectedFields),
+    validateResult: createContractValidator(resultValidator, expectedFields, {
+      expectedCatalogHash: expectedCatalogHash.toUpperCase(),
+    }),
     validateValidationEnvelope: createContractValidator(
       validationEnvelopeValidator,
       expectedFields,
