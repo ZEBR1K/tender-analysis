@@ -1,0 +1,18 @@
+{
+  "field_result": {
+    "field_key": "payment_terms",
+    "status": "requires_review",
+    "value": null,
+    "evidence": [
+      {
+        "document": "doc-a",
+        "section": "раздел 4"
+      },
+      {
+        "document": "doc-b",
+        "section": "пункт 7"
+      }
+    ]
+  },
+  "audit": "Обнаружены равноправные несовместимые значения A и B; оснований выбрать A нет."
+}

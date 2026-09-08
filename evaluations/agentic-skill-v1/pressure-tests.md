@@ -1,8 +1,8 @@
 # Tender document analysis skill pressure tests
 
-Date: 2026-09-09  
-Mode: offline synthetic review plus the archived four-run baseline  
-External paid Codex calls: none  
+Date: 2026-09-09
+Mode: offline synthetic review plus the archived four-run baseline
+External paid Codex calls: none
 Runtime blocking: no
 
 ## RED baseline without the dedicated skill
@@ -33,8 +33,18 @@ Independent reviewers applied the new skill to five synthetic pressure cases:
 | Encrypted XLSX | Record the open attempt and limitation without claiming sheet inspection | PASS |
 | Demand to pre-index every page/part | Choose document-specific methods and create no mechanical index | PASS |
 
-The skill also passed the repository contract tests and the skill-creator
-validator. The current real corpus still contains one procurement only. This
+The exact paired conflict scenario and both raw answers are preserved under
+[`paired-conflict`](./paired-conflict/). Without the skill, the agent correctly
+kept the conflict open but returned the legacy `document`/`section` evidence
+shape. With the skill, it kept `requires_review`, used manifest
+`artifact_key` plus nonblank `locator`, and produced the required inspection
+audit. The comparison is contract-only; it does not score the meaning or
+sufficiency of evidence.
+
+The skill also passed the repository contract tests. `quick_validate.py` from
+the installed `skill-creator` package printed `Skill is valid!` when run with a
+temporary PyYAML dependency directory; this is development evidence, not a
+runtime dependency of the runner. The current real corpus still contains one procurement only. This
 GREEN result validates prompt behavior, not cross-procurement semantic
 accuracy; the nonblocking gate in `evaluations/agentic-blind-tests-v1` remains
 `awaiting_additional_procurements`.
