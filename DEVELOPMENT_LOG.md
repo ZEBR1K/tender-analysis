@@ -5776,3 +5776,22 @@ Repository synchronization added a guarded read-only production export script an
 - post-promotion runtime of production version `a6fbb0f6-…` is intentionally not verified yet.
 
 No production execution, DB query/write, workflow write, credential change or infrastructure mutation was performed by Codex during this synchronization.
+
+## 2026-09-08 — Archive extractor deployed and runtime-checked
+
+Commit `cc2336e` was deployed to `/opt/tender-archive-extractor` as the isolated
+Compose project `tender-archive-extractor`. Preflight recorded Docker/Compose,
+`n8n_default`, system resources and exact IDs/start times/restart counts for all
+eight existing containers. Only the new image `tender-archive-extractor:26.03-1`
+was built and only `archive-extractor` was started with `--no-deps`.
+
+Runtime checks confirmed healthy status, zero restarts, no host ports, non-root
+execution, read-only root filesystem, dropped capabilities, resource limits and
+HTTP reachability from both n8n main and worker. A direct ZIP canary and nested
+`ZIP → 7Z → file` canary returned deterministic manifests and exact artifact
+bytes. Both exact test runs were deleted, subsequent artifact reads returned
+`404`, and temporary canary/staging files were removed. All pre-existing
+container identities and start times remained unchanged. RAR/TAR/GZIP and a
+real TenderPlan archive remain runtime-pending. The n8n preparation workflow
+stays inactive/unwired; PostgreSQL and the production Orchestrator were not
+changed.

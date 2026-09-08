@@ -151,7 +151,7 @@ internal Gotenberg conversion + binary report_pdf
 
 ## `TENDER — Подготовить документацию` — inactive integration candidate
 
-Новый reusable sub-workflow принимает metadata всех TenderPlan attachments, пропускает прямые PDF/DOCX/XLSX без скачивания, последовательно распаковывает архивы через внутренний bounded extractor и возвращает полный manifest либо typed failure. Workflow `0scTZu1aBKsMd6AM` создан в n8n как inactive draft и пока не подключён к production Orchestrator.
+Новый reusable sub-workflow принимает metadata всех TenderPlan attachments, пропускает прямые PDF/DOCX/XLSX без скачивания, последовательно распаковывает архивы через внутренний bounded extractor и возвращает полный manifest либо typed failure. Workflow `0scTZu1aBKsMd6AM` создан в n8n как inactive draft и пока не подключён к production Orchestrator. Внутренний `archive-extractor` развёрнут отдельным Compose-проектом на production host и прошёл health, ZIP и nested `ZIP → 7Z → file` runtime-canary; существующие контейнеры при deployment не перезапускались.
 
 Документация:
 

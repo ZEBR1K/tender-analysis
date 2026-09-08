@@ -113,16 +113,26 @@ MCP pin-tests на live n8n:
 - execution `14673`: ZIP с двумя PDF одинакового basename в разных путях + TXT, success;
 - execution `14674`: typed `ARCHIVE_TOTAL_TOO_LARGE`, fail-closed output.
 
-В этих execution HTTP Request nodes были заменены pin data. Поэтому они подтверждают Code/IF/Split Out/Loop topology и output contracts, но не подтверждают сетевую доступность или реальную распаковку внутренним 7-Zip сервисом.
+В этих execution HTTP Request nodes были заменены pin data. Поэтому они подтверждают Code/IF/Split Out/Loop topology и output contracts, но сами по себе не подтверждают сетевую доступность или реальную распаковку внутренним 7-Zip сервисом.
+
+Production extractor runtime-check от 2026-09-08:
+
+- отдельный Compose-проект развёрнут в `/opt/tender-archive-extractor` как контейнер `tender-archive-extractor`, image `tender-archive-extractor:26.03-1`;
+- контейнер `healthy`, `restart_count=0`, без опубликованных host ports, подключён к `n8n_default`;
+- health endpoint вернул `tender_archive_extractor_health_v1` из `n8n-n8n-1` и `n8n-n8n-worker-1`;
+- реальный ZIP-canary создал manifest для одного файла, download из обоих n8n-контейнеров вернул точные bytes, exact-run cleanup удалил artifact и последующий GET вернул `404`;
+- nested-canary `ZIP → 7Z → file` распознал два archive container level, вернул `archive_depth=2`, скачал точные bytes из n8n и был очищен exact-run cleanup;
+- IDs, `StartedAt` и restart counts всех восьми существовавших до deployment контейнеров не изменились;
+- RAR/TAR/GZIP и реальный TenderPlan archive ещё не проходили runtime-canary; это остаётся отдельным verification gate и не отменяет local regression coverage.
 
 ## Следующий интеграционный шаг
 
 После завершения параллельных изменений Orchestrator:
 
-1. развернуть и проверить `deploy/archive-extractor` на сервере;
-2. применить additive migration `deploy/postgres/migrations/2026-09-07-add-document-ingestion-metadata.sql`;
-3. вызвать этот workflow после нормализации TenderPlan attachments;
-4. регистрировать все `manifest.documents` одной DB-операцией;
-5. запускать Workers только для зарегистрированных документов со статусом `pending`;
-6. на `success=false` завершать run как failed и не запускать Workers;
-7. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback.
+1. применить additive migration `deploy/postgres/migrations/2026-09-07-add-document-ingestion-metadata.sql`;
+2. вызвать этот workflow после нормализации TenderPlan attachments;
+3. регистрировать все `manifest.documents` одной DB-операцией;
+4. запускать Workers только для зарегистрированных документов со статусом `pending`;
+5. на `success=false` завершать run как failed и не запускать Workers;
+6. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback;
+7. выполнить bounded runtime-canary на реальном TenderPlan archive до production activation.

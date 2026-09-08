@@ -1,8 +1,32 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-06
+**Snapshot date:** 2026-09-08
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw23-three-way-integration`
+**Branch at snapshot:** `codex/archive-ingestion`
+
+## Archive extractor deployment — runtime GREEN
+
+The bounded archive extractor from commit `cc2336e` is deployed as the isolated
+Compose project `tender-archive-extractor` in `/opt/tender-archive-extractor`.
+The container is healthy with no host port, non-root UID/GID `10001:10001`, a
+read-only root filesystem, dropped capabilities, `no-new-privileges`, and
+limits of 512 MiB, 0.5 CPU and 64 PIDs. Both production n8n main and worker
+containers resolve the internal service and receive the expected health
+contract.
+
+Two disposable runtime canaries are GREEN: direct ZIP extraction and nested
+`ZIP → 7Z → file`. Both returned deterministic manifests and exact downloaded
+bytes; exact-run cleanup succeeded and post-cleanup artifact reads returned
+`404`. All eight pre-existing containers retained their exact IDs, start times
+and restart counts across deployment. Canary artifacts were deleted and the
+staging directory was removed. RAR/TAR/GZIP and a real TenderPlan archive have
+not yet been runtime exercised.
+
+The n8n workflow `0scTZu1aBKsMd6AM` remains inactive and unwired. PostgreSQL,
+the production Orchestrator and its workflows were not changed. The next
+integration gate is the reviewed additive migration and minimal Orchestrator
+wiring after the concurrent Orchestrator work is reconciled, followed by one
+bounded real-archive canary before activation.
 
 ## DW-24 ActiveX GroupName NUL containment — runtime GREEN
 
