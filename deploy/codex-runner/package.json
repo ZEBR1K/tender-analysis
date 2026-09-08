@@ -4,7 +4,11 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.18.0"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test ../../tests/agentic-runner-*.test.mjs"
   },
   "dependencies": {
     "ajv": "8.20.0",
