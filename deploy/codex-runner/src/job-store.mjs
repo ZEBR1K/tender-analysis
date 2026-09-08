@@ -556,5 +556,24 @@ export function createJobStore({
     });
   }
 
-  return Object.freeze({ createJob, getJob, sealJob, uploadDocument, verifySealedInput });
+  async function readVerifiedInputManifest(jobId) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      await verifySealedJob(job);
+      return structuredClone({
+        ...job.state.manifest,
+        staged_documents: job.state.manifest.expected_documents,
+        input_manifest_sha256: job.state.input_manifest_sha256,
+      });
+    });
+  }
+
+  return Object.freeze({
+    createJob,
+    getJob,
+    readVerifiedInputManifest,
+    sealJob,
+    uploadDocument,
+    verifySealedInput,
+  });
 }
