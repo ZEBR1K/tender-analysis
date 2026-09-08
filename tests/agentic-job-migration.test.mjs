@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -93,14 +95,54 @@ test('migration fail-closes on canonical parent schema drift without mutating ca
     'pg_catalog.pg_namespace',
     'pg_catalog.pg_attribute',
     'pg_catalog.pg_constraint',
+    'pg_catalog.pg_index',
+    'pg_catalog.pg_get_constraintdef',
+    'pg_catalog.pg_get_indexdef',
     'information_schema.columns',
   ]) {
     assert.match(preconditions, new RegExp(escapeRegExp(catalog), 'i'));
   }
-  assert.match(preconditions, /relkind\s+IN\s*\(\s*'r'\s*,\s*'p'\s*\)/i);
+  assert.match(preconditions, /relkind\s*=\s*'r'/i, 'canonical parents must remain ordinary tables');
   assert.match(preconditions, /relpersistence\s*=\s*'p'/i);
   assert.match(preconditions, /EXCEPT/i, 'column inventory must reject missing or extra columns');
   assert.match(preconditions, /PRIMARY\s+KEY/i, 'parent primary-key identities must be checked');
+  assert.match(preconditions, /column_default/i, 'canonical defaults must be checked');
+  assert.match(preconditions, /UNIQUE/i, 'canonical unique-key identities must be checked');
+  assert.match(preconditions, /FOREIGN\s+KEY/i, 'canonical foreign-key identities must be checked');
+  assert.match(preconditions, /CHECK/i, 'canonical check semantics must be checked');
+  assert.match(preconditions, /constraint_row\.confupdtype::text\s+AS\s+update_action/i);
+  assert.match(preconditions, /constraint_row\.confdeltype::text\s+AS\s+delete_action/i);
+  assert.match(preconditions, /constraint_row\.confmatchtype::text\s+AS\s+match_type/i);
+  assert.match(preconditions, /'a'::text\s*,\s*'c'::text\s*,\s*'s'::text/i);
+  assert.match(preconditions, /convalidated/i);
+  assert.match(preconditions, /NOT\s+constraint_row\.condeferrable/i);
+  assert.match(preconditions, /NOT\s+constraint_row\.condeferred/i);
+  assert.match(preconditions, /NOT\s+constraint_row\.connoinherit/i);
+  assert.match(
+    preconditions,
+    /repeat\s*\(\s*','\s*,\s*array_length\s*\(\s*expected_values\s*,\s*1\s*\)\s*-\s*1\s*\)/i,
+    'enum checks must enforce the exact simple-column predicate shape, not only the quoted values',
+  );
+
+  for (const guardedContract of [
+    'canonical default contract',
+    'canonical unique contract',
+    'canonical foreign key contract',
+    'canonical check contract',
+    'canonical index contract',
+  ]) {
+    assert.match(preconditions, new RegExp(guardedContract, 'i'));
+  }
+  for (const representative of [
+    'tender_fields_v1',
+    'application_documents',
+    'idx_tender_analysis_facts_run_field',
+    'idx_tender_analysis_documents_run_status',
+    'tender_analysis_documents',
+    'tender_analysis_runs',
+  ]) {
+    assert.match(preconditions, new RegExp(representative, 'i'));
+  }
 
   for (const table of canonicalTables) {
     assert.doesNotMatch(sql, new RegExp(`ALTER\\s+TABLE\\s+public\\.${escapeRegExp(table)}`, 'i'));
@@ -270,6 +312,7 @@ test('postconditions validate exact shadow columns, constraints, FKs and indexes
   ]) {
     assert.match(postconditions, new RegExp(escapeRegExp(catalog), 'i'));
   }
+  assert.match(postconditions, /relkind\s*<>\s*'r'/i, 'shadow objects must remain ordinary tables');
   for (const count of [29, 15, 14]) assert.match(postconditions, new RegExp(`<>\\s*${count}\\b`, 'i'));
   for (const name of [
     'tender_agentic_jobs_pkey',
@@ -293,7 +336,13 @@ test('postconditions validate exact shadow columns, constraints, FKs and indexes
   assert.match(postconditions, /convalidated/i);
   assert.match(postconditions, /condeferrable/i);
   assert.match(postconditions, /condeferred/i);
+  assert.match(postconditions, /connoinherit/i);
   assert.match(postconditions, /confdeltype\s*=\s*'c'/i);
+  assert.match(
+    postconditions,
+    /repeat\s*\(\s*','\s*,\s*array_length\s*\(\s*status_contract\.expected_values\s*,\s*1\s*\)\s*-\s*1\s*\)/i,
+    'shadow enum postconditions must validate the exact simple-column predicate shape',
+  );
   assert.match(postconditions, /indisvalid/i);
   assert.match(postconditions, /indisready/i);
 });
@@ -330,4 +379,532 @@ test('source-level empty and populated fixture model remains idempotent and leav
   const beforeRows = populatedRows;
   applyCreateIfMissing(canonicalFixture);
   assert.equal(populatedRows, beforeRows, 'migration source must not update populated canonical fixture rows');
+});
+
+const canonicalFixtureSql = String.raw`
+CREATE TABLE public.tender_analysis_runs (
+  id uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid(),
+  source text NOT NULL DEFAULT 'tenderplan',
+  tender_id text NOT NULL,
+  tender_number text,
+  tender_external_id text,
+  status text NOT NULL DEFAULT 'created',
+  documents_total integer NOT NULL DEFAULT 0,
+  tender_meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  error_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  ready_at timestamptz,
+  aggregation_started_at timestamptz,
+  completed_at timestamptz,
+  CONSTRAINT tender_analysis_runs_pkey PRIMARY KEY (id),
+  CONSTRAINT tender_analysis_runs_documents_total_check CHECK (documents_total >= 0),
+  CONSTRAINT tender_analysis_runs_status_check CHECK (
+    status IN ('created', 'processing', 'ready_for_aggregation', 'aggregating', 'completed', 'failed')
+  )
+);
+CREATE INDEX idx_tender_analysis_runs_status ON public.tender_analysis_runs (status);
+CREATE INDEX idx_tender_analysis_runs_tender_id ON public.tender_analysis_runs (tender_id);
+CREATE INDEX idx_tender_analysis_runs_tender_status ON public.tender_analysis_runs (tender_id, status);
+
+CREATE TABLE public.tender_analysis_documents (
+  id uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid(),
+  analysis_run_id uuid NOT NULL,
+  document_index integer NOT NULL,
+  file_name text,
+  file_extension text,
+  display_name text,
+  download_url text,
+  publication_at timestamptz,
+  source_size bigint,
+  mime_type text,
+  file_size bigint,
+  status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  n8n_execution_id text,
+  units_total integer,
+  facts_count integer,
+  error_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  started_at timestamptz,
+  completed_at timestamptz,
+  CONSTRAINT tender_analysis_documents_pkey PRIMARY KEY (id),
+  CONSTRAINT tender_analysis_documents_analysis_run_fk
+    FOREIGN KEY (analysis_run_id) REFERENCES public.tender_analysis_runs (id) ON DELETE CASCADE,
+  CONSTRAINT tender_analysis_documents_run_index_key UNIQUE (analysis_run_id, document_index),
+  CONSTRAINT tender_analysis_documents_id_run_key UNIQUE (id, analysis_run_id),
+  CONSTRAINT tender_analysis_documents_document_index_check CHECK (document_index > 0),
+  CONSTRAINT tender_analysis_documents_attempts_check CHECK (attempts >= 0),
+  CONSTRAINT tender_analysis_documents_units_total_check CHECK (units_total IS NULL OR units_total >= 0),
+  CONSTRAINT tender_analysis_documents_facts_count_check CHECK (facts_count IS NULL OR facts_count >= 0),
+  CONSTRAINT tender_analysis_documents_status_check CHECK (
+    status IN ('pending', 'processing', 'completed', 'failed', 'skipped')
+  )
+);
+CREATE INDEX idx_tender_analysis_documents_execution ON public.tender_analysis_documents (n8n_execution_id);
+CREATE INDEX idx_tender_analysis_documents_run ON public.tender_analysis_documents (analysis_run_id);
+CREATE INDEX idx_tender_analysis_documents_run_status ON public.tender_analysis_documents (analysis_run_id, status);
+
+CREATE TABLE public.tender_analysis_units (
+  id uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid(),
+  analysis_run_id uuid NOT NULL,
+  document_id uuid NOT NULL,
+  analysis_unit_id text NOT NULL,
+  unit_index integer,
+  units_total integer,
+  section_id text,
+  section_title text,
+  section_kind text,
+  part_index integer,
+  parts_total integer,
+  source_pages jsonb NOT NULL DEFAULT '[]'::jsonb,
+  analysis_unit jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ai_segments jsonb NOT NULL DEFAULT '[]'::jsonb,
+  provenance jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tender_analysis_units_pkey PRIMARY KEY (id),
+  CONSTRAINT tender_analysis_units_run_fk
+    FOREIGN KEY (analysis_run_id) REFERENCES public.tender_analysis_runs (id) ON DELETE CASCADE,
+  CONSTRAINT tender_analysis_units_document_run_fk
+    FOREIGN KEY (document_id, analysis_run_id)
+    REFERENCES public.tender_analysis_documents (id, analysis_run_id) ON DELETE CASCADE,
+  CONSTRAINT tender_analysis_units_document_unit_key UNIQUE (document_id, analysis_unit_id),
+  CONSTRAINT tender_analysis_units_document_unit_run_key
+    UNIQUE (document_id, analysis_unit_id, analysis_run_id),
+  CONSTRAINT tender_analysis_units_unit_index_check CHECK (unit_index IS NULL OR unit_index > 0),
+  CONSTRAINT tender_analysis_units_units_total_check CHECK (units_total IS NULL OR units_total >= 0),
+  CONSTRAINT tender_analysis_units_part_index_check CHECK (part_index IS NULL OR part_index > 0),
+  CONSTRAINT tender_analysis_units_parts_total_check CHECK (parts_total IS NULL OR parts_total > 0)
+);
+CREATE INDEX idx_tender_analysis_units_analysis_unit_id ON public.tender_analysis_units (analysis_unit_id);
+CREATE INDEX idx_tender_analysis_units_document ON public.tender_analysis_units (document_id);
+CREATE INDEX idx_tender_analysis_units_run ON public.tender_analysis_units (analysis_run_id);
+
+CREATE TABLE public.tender_analysis_facts (
+  id uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid(),
+  analysis_run_id uuid NOT NULL,
+  document_id uuid NOT NULL,
+  analysis_unit_id text NOT NULL,
+  fact_index integer NOT NULL,
+  field_catalog_version text NOT NULL DEFAULT 'tender_fields_v1',
+  field_key text NOT NULL,
+  value_text text NOT NULL,
+  extractor_status text NOT NULL,
+  extractor_confidence double precision NOT NULL,
+  extractor_review_reason_code text,
+  extractor_review_note text,
+  validator_verdict text NOT NULL,
+  validator_confidence double precision NOT NULL,
+  validator_reason_code text,
+  validator_reason_note text,
+  evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
+  extractor_meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  validator_meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tender_analysis_facts_pkey PRIMARY KEY (id),
+  CONSTRAINT tender_analysis_facts_run_fk
+    FOREIGN KEY (analysis_run_id) REFERENCES public.tender_analysis_runs (id) ON DELETE CASCADE,
+  CONSTRAINT tender_analysis_facts_unit_run_fk
+    FOREIGN KEY (document_id, analysis_unit_id, analysis_run_id)
+    REFERENCES public.tender_analysis_units (document_id, analysis_unit_id, analysis_run_id)
+    ON DELETE CASCADE,
+  CONSTRAINT tender_analysis_facts_unit_fact_key UNIQUE (document_id, analysis_unit_id, fact_index),
+  CONSTRAINT tender_analysis_facts_fact_index_check CHECK (fact_index >= 0),
+  CONSTRAINT tender_analysis_facts_extractor_confidence_check CHECK (
+    extractor_confidence >= 0 AND extractor_confidence <= 1
+  ),
+  CONSTRAINT tender_analysis_facts_validator_confidence_check CHECK (
+    validator_confidence >= 0 AND validator_confidence <= 1
+  ),
+  CONSTRAINT tender_analysis_facts_extractor_status_check CHECK (
+    extractor_status IN ('found', 'requires_review')
+  ),
+  CONSTRAINT tender_analysis_facts_validator_verdict_check CHECK (
+    validator_verdict IN ('confirmed', 'requires_review', 'rejected')
+  ),
+  CONSTRAINT tender_analysis_facts_field_key_check CHECK (
+    field_key IN (
+      'procurement_subject', 'nm_price_with_vat', 'platform', 'procedure_type',
+      'application_deadline', 'application_review_date', 'results_date', 'customer',
+      'customer_contacts', 'participation_cost', 'participation_guarantee',
+      'evaluation_criteria', 'delivery_term', 'payment_terms',
+      'special_account_or_treasury', 'bank_support', 'government_contract', 'rebidding',
+      'national_regime', 'advance_contract_guarantee', 'warranty_obligations_guarantee',
+      'licenses_certificates', 'required_official_certificates',
+      'similar_supply_experience', 'analog_allowed', 'analog_definition',
+      'application_documents'
+    )
+  )
+);
+CREATE INDEX idx_tender_analysis_facts_document ON public.tender_analysis_facts (document_id);
+CREATE INDEX idx_tender_analysis_facts_run_field ON public.tender_analysis_facts (analysis_run_id, field_key);
+CREATE INDEX idx_tender_analysis_facts_unit ON public.tender_analysis_facts (document_id, analysis_unit_id);
+CREATE INDEX idx_tender_analysis_facts_verdict ON public.tender_analysis_facts (analysis_run_id, validator_verdict);
+
+CREATE TABLE public.tender_analysis_field_results (
+  analysis_run_id uuid NOT NULL,
+  field_catalog_version text NOT NULL,
+  result_contract_version text NOT NULL,
+  field_index smallint NOT NULL,
+  field_key text NOT NULL,
+  status text NOT NULL,
+  value_text text,
+  confidence numeric,
+  requires_human_review boolean NOT NULL DEFAULT false,
+  resolution_method text NOT NULL,
+  result_json jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tender_analysis_field_results_pkey PRIMARY KEY (analysis_run_id, field_key),
+  CONSTRAINT tender_analysis_field_results_run_index_key UNIQUE (analysis_run_id, field_index),
+  CONSTRAINT tender_analysis_field_results_field_index_check CHECK (field_index BETWEEN 1 AND 27),
+  CONSTRAINT tender_analysis_field_results_confidence_check CHECK (
+    confidence IS NULL OR (confidence >= 0 AND confidence <= 1)
+  ),
+  CONSTRAINT tender_analysis_field_results_status_check CHECK (
+    status IN ('resolved', 'not_found', 'requires_review')
+  )
+);
+CREATE UNIQUE INDEX tender_analysis_field_results_unique
+  ON public.tender_analysis_field_results (analysis_run_id, field_key);
+`;
+
+const populatedCanonicalFixtureSql = String.raw`
+INSERT INTO public.tender_analysis_runs (
+  id, tender_id, tender_number, status, documents_total, tender_meta,
+  created_at, started_at, updated_at
+) VALUES (
+  '10000000-0000-4000-8000-000000000001', 'fixture-tender', 'fixture-number',
+  'processing', 1, '{"fixture":true}'::jsonb,
+  '2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z'
+);
+INSERT INTO public.tender_analysis_documents (
+  id, analysis_run_id, document_index, file_name, status, attempts,
+  created_at, updated_at
+) VALUES (
+  '20000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001', 1, 'fixture.pdf', 'completed', 1,
+  '2026-01-01T00:01:00Z', '2026-01-01T00:01:01Z'
+);
+INSERT INTO public.tender_analysis_units (
+  id, analysis_run_id, document_id, analysis_unit_id, unit_index, units_total,
+  created_at, updated_at
+) VALUES (
+  '30000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001', 'fixture-unit', 1, 1,
+  '2026-01-01T00:02:00Z', '2026-01-01T00:02:01Z'
+);
+INSERT INTO public.tender_analysis_facts (
+  id, analysis_run_id, document_id, analysis_unit_id, fact_index, field_key,
+  value_text, extractor_status, extractor_confidence, validator_verdict,
+  validator_confidence, created_at, updated_at
+) VALUES (
+  '40000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001', 'fixture-unit', 0, 'customer',
+  'Fixture customer', 'found', 1, 'confirmed', 1,
+  '2026-01-01T00:03:00Z', '2026-01-01T00:03:01Z'
+);
+INSERT INTO public.tender_analysis_field_results (
+  analysis_run_id, field_catalog_version, result_contract_version, field_index,
+  field_key, status, value_text, confidence, requires_human_review,
+  resolution_method, result_json, created_at, updated_at
+) VALUES (
+  '10000000-0000-4000-8000-000000000001', 'tender_fields_v1',
+  'tender_field_final_v1', 8, 'customer', 'resolved', 'Fixture customer', 1,
+  false, 'fixture', '{"fixture":true}'::jsonb,
+  '2026-01-01T00:04:00Z', '2026-01-01T00:04:01Z'
+);
+`;
+
+const documentedCanonicalVariantsSql = String.raw`
+ALTER TABLE public.tender_analysis_runs
+  ADD COLUMN superseded_at timestamptz,
+  ADD COLUMN superseded_reason text;
+ALTER TABLE public.tender_analysis_runs
+  DROP CONSTRAINT tender_analysis_runs_status_check;
+ALTER TABLE public.tender_analysis_runs
+  ADD CONSTRAINT tender_analysis_runs_status_check CHECK (
+    status IN (
+      'created', 'processing', 'ready_for_aggregation', 'aggregating',
+      'completed', 'failed', 'superseded'
+    )
+  );
+CREATE UNIQUE INDEX uq_tender_analysis_runs_one_unfinished
+  ON public.tender_analysis_runs (source, tender_id)
+  WHERE status NOT IN ('completed', 'superseded');
+ALTER TABLE public.tender_analysis_documents
+  ADD COLUMN ingestion_metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+`;
+
+const canonicalCatalogSnapshotSql = String.raw`
+SELECT jsonb_build_object(
+  'columns', (
+    SELECT jsonb_agg(
+      jsonb_build_array(table_name, column_name, udt_name, is_nullable, column_default)
+      ORDER BY table_name, ordinal_position
+    )
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN (
+        'tender_analysis_runs', 'tender_analysis_documents', 'tender_analysis_units',
+        'tender_analysis_facts', 'tender_analysis_field_results'
+      )
+  ),
+  'constraints', (
+    SELECT jsonb_agg(
+      jsonb_build_array(table_class.relname, constraint_row.contype,
+        pg_catalog.pg_get_constraintdef(constraint_row.oid, true))
+      ORDER BY table_class.relname, constraint_row.contype,
+        pg_catalog.pg_get_constraintdef(constraint_row.oid, true)
+    )
+    FROM pg_catalog.pg_constraint AS constraint_row
+    JOIN pg_catalog.pg_class AS table_class ON table_class.oid = constraint_row.conrelid
+    JOIN pg_catalog.pg_namespace AS table_namespace ON table_namespace.oid = table_class.relnamespace
+    WHERE table_namespace.nspname = 'public'
+      AND table_class.relname IN (
+        'tender_analysis_runs', 'tender_analysis_documents', 'tender_analysis_units',
+        'tender_analysis_facts', 'tender_analysis_field_results'
+      )
+  ),
+  'indexes', (
+    SELECT jsonb_agg(jsonb_build_array(tablename, indexname, indexdef) ORDER BY tablename, indexname)
+    FROM pg_catalog.pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename IN (
+        'tender_analysis_runs', 'tender_analysis_documents', 'tender_analysis_units',
+        'tender_analysis_facts', 'tender_analysis_field_results'
+      )
+  )
+)::text;
+`;
+
+const canonicalRowsSnapshotSql = String.raw`
+SELECT jsonb_build_object(
+  'runs', (SELECT coalesce(jsonb_agg(to_jsonb(row_value) ORDER BY id), '[]'::jsonb) FROM public.tender_analysis_runs AS row_value),
+  'documents', (SELECT coalesce(jsonb_agg(to_jsonb(row_value) ORDER BY id), '[]'::jsonb) FROM public.tender_analysis_documents AS row_value),
+  'units', (SELECT coalesce(jsonb_agg(to_jsonb(row_value) ORDER BY id), '[]'::jsonb) FROM public.tender_analysis_units AS row_value),
+  'facts', (SELECT coalesce(jsonb_agg(to_jsonb(row_value) ORDER BY id), '[]'::jsonb) FROM public.tender_analysis_facts AS row_value),
+  'field_results', (SELECT coalesce(jsonb_agg(to_jsonb(row_value) ORDER BY analysis_run_id, field_key), '[]'::jsonb) FROM public.tender_analysis_field_results AS row_value)
+)::text;
+`;
+
+function runProcess(command, args, options = {}) {
+  return spawnSync(command, args, {
+    encoding: 'utf8',
+    timeout: options.timeout ?? 120_000,
+    input: options.input,
+    env: options.env ?? process.env,
+    windowsHide: true,
+  });
+}
+
+function dockerIsAvailable() {
+  const result = runProcess('docker', ['info', '--format', '{{.ServerVersion}}'], { timeout: 10_000 });
+  return result.status === 0;
+}
+
+function psqlIsAvailable() {
+  const result = runProcess('psql', ['--version'], { timeout: 10_000 });
+  return result.status === 0;
+}
+
+function assertProcessOk(result, label) {
+  assert.equal(
+    result.status,
+    0,
+    `${label} failed (exit ${result.status}): ${String(result.stderr || result.stdout).trim()}`,
+  );
+  return String(result.stdout).trim();
+}
+
+async function createDisposablePostgres(t) {
+  const suppliedUrl = process.env.AGENTIC_TEST_POSTGRES_URL?.trim();
+  if (suppliedUrl) {
+    assert.ok(
+      psqlIsAvailable(),
+      'AGENTIC_TEST_POSTGRES_URL was supplied, but psql is unavailable',
+    );
+    const env = { ...process.env, PGDATABASE: suppliedUrl, PGCONNECT_TIMEOUT: '10' };
+    const identity = assertProcessOk(
+      runProcess('psql', ['--no-psqlrc', '-v', 'ON_ERROR_STOP=1', '-At', '-c',
+        "SELECT current_database(), current_setting('transaction_read_only'), (SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p'));"], { env }),
+      'disposable PostgreSQL identity preflight',
+    ).split('|');
+    assert.match(identity[0] ?? '', /agentic.*test|test.*agentic/i,
+      'AGENTIC_TEST_POSTGRES_URL must target a database whose name clearly contains agentic and test');
+    assert.equal(identity[1], 'off', 'disposable PostgreSQL must be write-capable');
+    assert.equal(identity[2], '0', 'disposable PostgreSQL public schema must start with zero tables');
+    return {
+      runSql(sql, { expectFailure = false } = {}) {
+        const result = runProcess(
+          'psql', ['--no-psqlrc', '-v', 'ON_ERROR_STOP=1', '-At', '-X', '-q'],
+          { env, input: sql },
+        );
+        if (!expectFailure) assertProcessOk(result, 'psql fixture command');
+        return result;
+      },
+      reset() {
+        assertProcessOk(
+          runProcess('psql', ['--no-psqlrc', '-v', 'ON_ERROR_STOP=1', '-At', '-X', '-q'], {
+            env,
+            input: 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;\n',
+          }),
+          'reset disposable PostgreSQL schema',
+        );
+      },
+      close() {},
+    };
+  }
+
+  if (!dockerIsAvailable()) {
+    t.skip('PostgreSQL runtime SKIP: set AGENTIC_TEST_POSTGRES_URL with psql, or start Docker');
+    return null;
+  }
+
+  const containerName = `agentic-migration-${randomUUID()}`;
+  const start = runProcess('docker', [
+    'run', '--detach', '--rm', '--name', containerName, '--network', 'none',
+    '--env', 'POSTGRES_HOST_AUTH_METHOD=trust', '--env', 'POSTGRES_DB=agentic_test',
+    'postgres:17-alpine',
+  ], { timeout: 180_000 });
+  assertProcessOk(start, 'start disposable PostgreSQL container');
+
+  const dockerSql = (sql, { expectFailure = false } = {}) => {
+    const result = runProcess(
+      'docker', ['exec', '--interactive', containerName, 'psql', '--no-psqlrc',
+        '-v', 'ON_ERROR_STOP=1', '-At', '-X', '-q', '-U', 'postgres', '-d', 'agentic_test'],
+      { input: sql },
+    );
+    if (!expectFailure) assertProcessOk(result, 'Docker PostgreSQL fixture command');
+    return result;
+  };
+
+  let ready = false;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const result = runProcess('docker', [
+      'exec', containerName, 'pg_isready', '-U', 'postgres', '-d', 'agentic_test',
+    ], { timeout: 5_000 });
+    if (result.status === 0) {
+      ready = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (!ready) {
+    runProcess('docker', ['rm', '--force', containerName], { timeout: 30_000 });
+    assert.fail('disposable PostgreSQL container did not become ready');
+  }
+
+  return {
+    runSql: dockerSql,
+    reset() {
+      dockerSql('DROP SCHEMA public CASCADE; CREATE SCHEMA public;\n');
+    },
+    close() {
+      runProcess('docker', ['rm', '--force', containerName], { timeout: 30_000 });
+    },
+  };
+}
+
+test('real PostgreSQL applies empty, populated and documented-variant fixtures twice and rejects representative drift', { timeout: 300_000 }, async (t) => {
+  const postgres = await createDisposablePostgres(t);
+  if (!postgres) return;
+
+  const migrationSql = await readFile(migrationUrl, 'utf8');
+  try {
+    for (const fixture of [
+      { name: 'empty', seed: '' },
+      { name: 'populated', seed: populatedCanonicalFixtureSql },
+      { name: 'documented intake/archive variants', seed: documentedCanonicalVariantsSql },
+    ]) {
+      postgres.reset();
+      postgres.runSql(canonicalFixtureSql);
+      if (fixture.seed) postgres.runSql(fixture.seed);
+      const catalogBefore = assertProcessOk(postgres.runSql(canonicalCatalogSnapshotSql), `${fixture.name} catalog before`);
+      const rowsBefore = assertProcessOk(postgres.runSql(canonicalRowsSnapshotSql), `${fixture.name} rows before`);
+
+      postgres.runSql(migrationSql);
+      postgres.runSql(migrationSql);
+
+      const catalogAfter = assertProcessOk(postgres.runSql(canonicalCatalogSnapshotSql), `${fixture.name} catalog after`);
+      const rowsAfter = assertProcessOk(postgres.runSql(canonicalRowsSnapshotSql), `${fixture.name} rows after`);
+      assert.equal(catalogAfter, catalogBefore, `${fixture.name}: canonical catalog changed`);
+      assert.equal(rowsAfter, rowsBefore, `${fixture.name}: canonical rows changed`);
+      assert.equal(
+        assertProcessOk(postgres.runSql(String.raw`
+          SELECT
+            (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='tender_agentic_jobs'),
+            (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='tender_agentic_documents'),
+            (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='tender_agentic_field_results'),
+            (SELECT count(*) FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class t ON t.oid=c.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND t.relname='tender_agentic_jobs'),
+            (SELECT count(*) FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class t ON t.oid=c.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND t.relname='tender_agentic_documents'),
+            (SELECT count(*) FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class t ON t.oid=c.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND t.relname='tender_agentic_field_results'),
+            (SELECT count(*) FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname LIKE 'idx_tender_agentic_jobs_%');
+        `)),
+        '29|15|14|8|6|8|3',
+        `${fixture.name}: shadow catalog counts differ`,
+      );
+    }
+
+    for (const drift of [
+      {
+        name: 'altered default',
+        sql: "ALTER TABLE public.tender_analysis_runs ALTER COLUMN status SET DEFAULT 'processing';",
+        error: /canonical default contract/i,
+      },
+      {
+        name: 'removed facts 27-key CHECK',
+        sql: 'ALTER TABLE public.tender_analysis_facts DROP CONSTRAINT tender_analysis_facts_field_key_check;',
+        error: /canonical check contract/i,
+      },
+      {
+        name: 'changed documents to runs FK action',
+        sql: String.raw`
+          ALTER TABLE public.tender_analysis_documents DROP CONSTRAINT tender_analysis_documents_analysis_run_fk;
+          ALTER TABLE public.tender_analysis_documents ADD CONSTRAINT tender_analysis_documents_analysis_run_fk
+            FOREIGN KEY (analysis_run_id) REFERENCES public.tender_analysis_runs (id) ON DELETE SET NULL;
+        `,
+        error: /canonical foreign key contract/i,
+      },
+      {
+        name: 'removed document unique key',
+        sql: 'ALTER TABLE public.tender_analysis_documents DROP CONSTRAINT tender_analysis_documents_run_index_key;',
+        error: /canonical unique contract/i,
+      },
+      {
+        name: 'removed expected facts index',
+        sql: 'DROP INDEX public.idx_tender_analysis_facts_run_field;',
+        error: /canonical index contract/i,
+      },
+    ]) {
+      postgres.reset();
+      postgres.runSql(canonicalFixtureSql);
+      postgres.runSql(drift.sql);
+      const failed = postgres.runSql(migrationSql, { expectFailure: true });
+      assert.notEqual(failed.status, 0, `${drift.name}: migration unexpectedly succeeded`);
+      assert.match(String(failed.stderr), drift.error, `${drift.name}: wrong fail-closed reason`);
+      assert.equal(
+        assertProcessOk(postgres.runSql(String.raw`
+          SELECT count(*) FROM pg_catalog.pg_class AS table_class
+          JOIN pg_catalog.pg_namespace AS table_namespace ON table_namespace.oid=table_class.relnamespace
+          WHERE table_namespace.nspname='public'
+            AND table_class.relname IN ('tender_agentic_jobs','tender_agentic_documents','tender_agentic_field_results');
+        `)),
+        '0',
+        `${drift.name}: failed migration left a shadow table behind`,
+      );
+    }
+  } finally {
+    try {
+      postgres.reset();
+    } finally {
+      postgres.close();
+    }
+  }
 });
