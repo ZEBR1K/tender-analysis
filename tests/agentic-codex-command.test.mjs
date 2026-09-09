@@ -195,6 +195,13 @@ test('agent template staging copies only trusted instructions and rejects drift'
       '.agents/skills/tender-document-analysis/SKILL.md',
       'AGENTS.md',
     ]);
+    assert.deepEqual((await readdir(workspaceDirectory)).sort(), [
+      '.agents',
+      '.tmp',
+      'AGENTS.md',
+      'output',
+    ]);
+    assert.deepEqual(await readdir(path.join(temporaryRoot, 'audit')), []);
     assert.equal(
       await readFile(path.join(workspaceDirectory, 'AGENTS.md'), 'utf8'),
       await readFile(agentInstructionsPath, 'utf8'),
@@ -312,6 +319,15 @@ test('fake Codex success preserves JSONL audit, usage and parsed result without 
     ]);
     assert.match(events, /"type":"thread.started"/u);
     assert.match(events, /"type":"turn.completed"/u);
+    const completedEvent = events.trim().split('\n')
+      .map((line) => JSON.parse(line))
+      .find((event) => event.type === 'turn.completed');
+    assert.deepEqual(completedEvent.usage, {
+      input_tokens: 120,
+      cached_input_tokens: 80,
+      output_tokens: 30,
+      reasoning_output_tokens: 12,
+    });
     assert.equal(events.includes('must-not-reach-fake'), false);
     assert.equal(events.includes('OPENAI_API_KEY'), false);
     assert.equal(events.includes('TENDER_CODEX_RUNNER_AUTH_TOKEN'), false);

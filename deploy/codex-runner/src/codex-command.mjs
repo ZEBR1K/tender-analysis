@@ -42,6 +42,12 @@ const CODEX_ENVIRONMENT_ALLOWLIST = [
   'TMP',
   'TMPDIR',
 ];
+const NON_SECRET_AUDIT_COUNTER_KEYS = new Set([
+  'input_tokens',
+  'cached_input_tokens',
+  'output_tokens',
+  'reasoning_output_tokens',
+]);
 
 function controlledPosixRoot(value, name) {
   const normalized = path.posix.normalize(String(value || ''));
@@ -151,7 +157,10 @@ function redactSecretText(value, secretValues = []) {
 }
 
 function redactEventValue(value, secretValues, key = '') {
-  if (/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(key)) return '[REDACTED]';
+  if (
+    /(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(key)
+    && !NON_SECRET_AUDIT_COUNTER_KEYS.has(key)
+  ) return '[REDACTED]';
   if (typeof value === 'string') return redactSecretText(value, secretValues);
   if (Array.isArray(value)) {
     return value.map((entry) => redactEventValue(entry, secretValues));
@@ -238,6 +247,11 @@ export async function stageAgentTemplate({ workspaceDirectory, templateDirectory
   }
   await ensureRegularDirectory(workspaceDirectory);
   await ensureRegularDirectory(templateDirectory);
+  const jobDirectory = path.dirname(workspaceDirectory);
+  await ensureRegularDirectory(jobDirectory);
+  await ensureRegularDirectory(path.join(workspaceDirectory, 'output'));
+  await ensureRegularDirectory(path.join(workspaceDirectory, '.tmp'));
+  await ensureRegularDirectory(path.join(jobDirectory, 'audit'));
   const agentsDirectory = path.join(workspaceDirectory, '.agents');
   const skillsDirectory = path.join(agentsDirectory, 'skills');
   const skillDirectory = path.join(skillsDirectory, 'tender-document-analysis');
