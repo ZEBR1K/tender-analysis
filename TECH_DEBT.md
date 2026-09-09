@@ -203,7 +203,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |-|-|-|
 |`OR-2`|⚠ Local Task 3 implementation complete; inactive 14-node repository candidate использует typed sub-workflow input без Manual Trigger/hardcoded tender ID. Import/runtime/promotion не выполнены.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|⚠ Production migration `14688` applied and verified; isolated inactive Intake Resume, Manual Resume, Recovery Scan and TenderPlan Mark Intake copies imported. NO-WORKER idempotency canary GREEN; retry/stale/manual/final routes, poller coverage and activation remain pending.|Orchestrator / Intake Resume|
+|`OR-7`|⚠ Production migration `14688` applied and verified; isolated inactive Intake Resume, Manual Resume, Recovery Scan and TenderPlan Mark Intake copies imported. NO-WORKER idempotency and retry/stale/manual/CAS/API-outage matrix GREEN. New inactive/unpublished DW-8 Worker `YX7RBDdy0fnTvoSV` and Orchestrator `TRLYuU7mVyE1bjjr` are wired into the Intake draft, while Worker/Aggregator/Finalization dispatch remains disabled. Worker runtime retry canary, import-default parity, downstream routes and activation remain pending.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|

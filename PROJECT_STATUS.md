@@ -103,6 +103,27 @@ not changed.
   normalized config and connections parity under the documented comparison
   boundary. Sanitized evidence:
   `evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`.
+- A fresh read-only live check on 2026-09-09 found additional Orchestrator drift:
+  `Q1RWSrB0jaTA6Dmx` now targets inactive Worker `W4mNOUkdsFtNENpI`, whereas the
+  earlier checked-in preflight recorded `URFdslUfULtOLv9B`. None of the existing
+  live Worker candidates checked (`1Pw61ZY3HgBSvcUr`, `URFdslUfULtOLv9B`,
+  `csnDg78NzN1nIjUT`) contains the DW-8 scoped retry-persistence contract.
+- Two new isolated, inactive and unpublished candidates were therefore created
+  without changing existing workflows. Worker `YX7RBDdy0fnTvoSV` has 85 nodes,
+  the canonical Cloudflare Extractor configuration, the DW-8
+  `current_unit_ids` / `deleted_stale_units` query, existing credential
+  references, document Error Workflow `jYzQ8RtNmnTM2PGz`, and canonical
+  Aggregator target `ftvmrEHoMbPOAqZG`; the Aggregator call remains disabled for
+  the bounded Worker canary. Orchestrator `TRLYuU7mVyE1bjjr` has 14 nodes and
+  calls only this new Worker. Read-back confirms both have `active=false` and
+  `activeVersionId=null`.
+- Inactive Intake Resume candidate `VO8Ml0sfO65w2Jiz` was wired in draft to
+  Orchestrator `TRLYuU7mVyE1bjjr` and Worker `YX7RBDdy0fnTvoSV`; direct Worker,
+  Aggregator and Finalization dispatch nodes remain disabled. Read-back version
+  is `58ee1a87-3a74-4b61-ab2c-642882a0fc7f` with zero validation warnings. The
+  temporary import artifacts were scanned before upload: no embedded API keys,
+  tokens, passwords, Authorization values or pin data were found. Fresh full
+  repository suite remains `526/526 PASS`.
 
 ### Not verified / blocked
 - Historical Task 8 TenderPlan type-5 event contract was not established and is
@@ -134,6 +155,17 @@ not changed.
 - Existing live workflows were not changed. Mark Intake, Recovery Scan, Manual
   Resume and Intake Resume remain inactive/unpublished; production activation
   remains a separate owner decision.
+- The new Worker has not been executed because the approved runtime boundary
+  still stops before Document Worker. Therefore DW-8 controlled retry behavior,
+  paid AI calls, production-DB writes, Aggregator/Finalization and schedule
+  activation remain unverified. Publication/activation must not proceed until a
+  separately approved bounded Worker canary is GREEN.
+- n8n import preserved all `101/101` Worker connection edges and the critical
+  claim/persistence SQL, but normalized away eleven explicitly exported default
+  parameter paths across ten nodes. The current HTTP Request type definition
+  documents omitted `batchInterval` as default `1000`; the other omissions are
+  likewise default-shaped. Exact installed-runtime equivalence is intentionally
+  not claimed until node-schema review and the bounded canary are complete.
 - MCP ignored requested folder placement for created test workflows and returned
   `parentFolderId=null`; this is recorded as tooling/packaging drift. The safe
   no-worker Orchestrator `thE9gLyNTvxLWt8I` was executed only by the bounded
