@@ -51,7 +51,7 @@ async function loadJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
 
-async function setupReadyJob(t, { now } = {}) {
+async function setupReadyJob(t, { now, faultInjector } = {}) {
   const rootDirectory = await mkdtemp(path.join(os.tmpdir(), 'agentic-lifecycle-'));
   t.after(() => rm(rootDirectory, { recursive: true, force: true }));
   const manifest = await loadJson(manifestFixturePath);
@@ -60,6 +60,7 @@ async function setupReadyJob(t, { now } = {}) {
     fieldCatalogPath: catalogPath,
     expectedCatalogSha256,
     now,
+    faultInjector,
   });
   await store.createJob(manifest);
   for (const document of manifest.documents) {
@@ -307,6 +308,166 @@ test('restart recovery marks orphaned work as typed retryable failure', async (t
   }]);
 });
 
+test('restart commits a fully journaled success after a crash before state update', async (t) => {
+  let injectCrash = true;
+  const fixture = await setupReadyJob(t, {
+    faultInjector: async (phase) => {
+      if (injectCrash && phase === 'after-terminal-validation-artifact') {
+        injectCrash = false;
+        throw new Error('simulated crash after terminal journal');
+      }
+    },
+  });
+  const validator = await createAgentResultValidator({ jobStore: fixture.store });
+  const claim = await fixture.store.claimStart(fixture.manifest.job_id);
+  const execution = successExecution(fixture.result, claim.attempt);
+  await fixture.store.markValidating(fixture.manifest.job_id, {
+    attempt: claim.attempt,
+    execution,
+  });
+  const validation = await validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: execution.raw_result,
+  });
+  await assert.rejects(
+    fixture.store.completeAttempt(fixture.manifest.job_id, {
+      attempt: claim.attempt,
+      execution,
+      rawResult: execution.raw_result,
+      validationEnvelope: validation.envelope,
+    }),
+    /simulated crash/iu,
+  );
+
+  const restarted = createJobStore({
+    rootDirectory: fixture.rootDirectory,
+    fieldCatalogPath: catalogPath,
+    expectedCatalogSha256,
+  });
+  await restarted.recoverOrphanedJobs();
+  const completed = await restarted.getJob(fixture.manifest.job_id);
+  assert.equal(completed.status, 'completed');
+  assert.equal(completed.attempt, 1);
+  assert.equal((await restarted.getResult(fixture.manifest.job_id)).result.fields.length, 27);
+});
+
+test('partial attempt-1 success journal does not block distinct attempt-2 artifacts', async (t) => {
+  let injectCrash = true;
+  const fixture = await setupReadyJob(t, {
+    faultInjector: async (phase) => {
+      if (injectCrash && phase === 'after-terminal-result-artifact') {
+        injectCrash = false;
+        throw new Error('simulated crash after partial terminal journal');
+      }
+    },
+  });
+  const validator = await createAgentResultValidator({ jobStore: fixture.store });
+  const firstClaim = await fixture.store.claimStart(fixture.manifest.job_id);
+  const firstExecution = successExecution(fixture.result, firstClaim.attempt);
+  await fixture.store.markValidating(fixture.manifest.job_id, {
+    attempt: firstClaim.attempt,
+    execution: firstExecution,
+  });
+  const firstValidation = await validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: firstExecution.raw_result,
+  });
+  await assert.rejects(
+    fixture.store.completeAttempt(fixture.manifest.job_id, {
+      attempt: firstClaim.attempt,
+      execution: firstExecution,
+      rawResult: firstExecution.raw_result,
+      validationEnvelope: firstValidation.envelope,
+    }),
+    /simulated crash/iu,
+  );
+
+  const restarted = createJobStore({
+    rootDirectory: fixture.rootDirectory,
+    fieldCatalogPath: catalogPath,
+    expectedCatalogSha256,
+  });
+  await restarted.recoverOrphanedJobs();
+  const orphaned = await restarted.getJob(fixture.manifest.job_id);
+  assert.equal(orphaned.failure.code, 'RUNNER_ORPHANED_EXECUTION');
+  assert.equal(orphaned.failure.retryable, true);
+
+  const secondClaim = await restarted.claimStart(fixture.manifest.job_id);
+  const changedResult = structuredClone(fixture.result);
+  changedResult.limitations = ['completed on attempt two'];
+  const secondExecution = successExecution(changedResult, secondClaim.attempt);
+  await restarted.markValidating(fixture.manifest.job_id, {
+    attempt: secondClaim.attempt,
+    execution: secondExecution,
+  });
+  const restartedValidator = await createAgentResultValidator({ jobStore: restarted });
+  const secondValidation = await restartedValidator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: secondExecution.raw_result,
+  });
+  await restarted.completeAttempt(fixture.manifest.job_id, {
+    attempt: secondClaim.attempt,
+    execution: secondExecution,
+    rawResult: secondExecution.raw_result,
+    validationEnvelope: secondValidation.envelope,
+  });
+  const released = await restarted.getResult(fixture.manifest.job_id);
+  assert.deepEqual(released.result.limitations, ['completed on attempt two']);
+  assert.equal((await restarted.getJob(fixture.manifest.job_id)).attempt, 2);
+});
+
+test('restart preserves a journaled contract failure without a paid retry', async (t) => {
+  let injectCrash = true;
+  const fixture = await setupReadyJob(t, {
+    faultInjector: async (phase) => {
+      if (injectCrash && phase === 'after-failure-validation-artifact') {
+        injectCrash = false;
+        throw new Error('simulated crash after contract failure journal');
+      }
+    },
+  });
+  const validator = await createAgentResultValidator({ jobStore: fixture.store });
+  const invalid = structuredClone(fixture.result);
+  invalid.fields[0].evidence[0].locator = '   ';
+  const claim = await fixture.store.claimStart(fixture.manifest.job_id);
+  const execution = successExecution(invalid, claim.attempt);
+  await fixture.store.markValidating(fixture.manifest.job_id, {
+    attempt: claim.attempt,
+    execution,
+  });
+  const validation = await validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: execution.raw_result,
+  });
+  assert.equal(validation.valid, false);
+  await assert.rejects(
+    fixture.store.failAttempt(fixture.manifest.job_id, {
+      attempt: claim.attempt,
+      code: 'CODEX_CONTRACT_INVALID',
+      retryable: false,
+      execution,
+      validationEnvelope: validation.envelope,
+      validationIssues: validation.issues,
+    }),
+    /simulated crash/iu,
+  );
+
+  const restarted = createJobStore({
+    rootDirectory: fixture.rootDirectory,
+    fieldCatalogPath: catalogPath,
+    expectedCatalogSha256,
+  });
+  await restarted.recoverOrphanedJobs();
+  const failed = await restarted.getJob(fixture.manifest.job_id);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.failure.code, 'CODEX_CONTRACT_INVALID');
+  assert.equal(failed.failure.retryable, false);
+  assert.equal(failed.failure.validation.envelope_available, true);
+  const repeated = await restarted.claimStart(fixture.manifest.job_id);
+  assert.equal(repeated.should_execute, false);
+  assert.equal(repeated.attempt, 1);
+});
+
 test('TTL cleanup removes only exact old terminal jobs and never active jobs', async (t) => {
   let currentTime = new Date('2026-09-01T00:00:00.000Z');
   const fixture = await setupReadyJob(t, { now: () => currentTime });
@@ -352,7 +513,7 @@ test('completed artifacts are rechecked against their persisted hashes before re
   const resultPath = path.join(
     resolveJobPath(fixture.rootDirectory, fixture.manifest.job_id),
     'audit',
-    'result.json',
+    `validated-result.attempt-${claim.attempt}.json`,
   );
   const changed = structuredClone(fixture.result);
   changed.limitations = ['tampered after completion'];
