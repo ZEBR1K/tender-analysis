@@ -1,0 +1,134 @@
+{
+  "generated_at": "2026-09-08T13:59:03.894469+00:00",
+  "nodes": {
+    "agents_project_operating_rules": {
+      "code_fingerprint": "d3cedba3c4c5e99e6ddb95d3de8dc4916a328fa81ba260ce25223c148a59bce5",
+      "label": "Tender Analysis Project Operating Rules",
+      "last": "2026-09-06T20:37:26.312672+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-06T20:37:26.312672+00:00",
+          "outcome": "useful",
+          "q": "А вот то, что ты меня вопросы спрашивал, suggested questions — это что? Окей, посмотри сейчас в Agents MD файле, есть инструкции для применения graphify?"
+        }
+      ],
+      "score": 0.960964436,
+      "source_file": "AGENTS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "agents_source_of_truth_hierarchy": {
+      "code_fingerprint": "d3cedba3c4c5e99e6ddb95d3de8dc4916a328fa81ba260ce25223c148a59bce5",
+      "label": "Project Source-of-Truth Hierarchy",
+      "last": "2026-09-06T20:37:26.312672+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-06T20:37:26.312672+00:00",
+          "outcome": "useful",
+          "q": "А вот то, что ты меня вопросы спрашивал, suggested questions — это что? Окей, посмотри сейчас в Agents MD файле, есть инструкции для применения graphify?"
+        }
+      ],
+      "score": 0.960964436,
+      "source_file": "AGENTS.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "data_model_tender_analysis_documents": {
+      "code_fingerprint": "d10fa314ffcf1a6b7ee8604f737a80d96965030fc605001feb249da035e8e9d8",
+      "label": "tender_analysis_documents",
+      "last": "2026-09-07T20:22:12.887765+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T20:22:12.887765+00:00",
+          "outcome": "useful",
+          "q": "Ещё раз, ну что ты сейчас хочешь сделать? То есть основная сейчас работа выполнена, правильно я понимаю? То есть уже готов функционал, когда ставится метка на закупку и она начинается анализироваться, правильно я понимаю? Или как? Или что вообще происходит?"
+        }
+      ],
+      "score": 0.983185727,
+      "source_file": "DATA_MODEL.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "field_catalog_business_confirmation_fields": {
+      "code_fingerprint": "abcbea68911ce9ffad9d436c9eabe708e12dbc4f04f7d5591cafe4c58359b843",
+      "label": "Fields Requiring Business Confirmation",
+      "last": "2026-09-07T21:45:52.805295+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T21:45:52.805295+00:00",
+          "outcome": "useful",
+          "q": "Действительно ли три параллельных агентских анализа Codex стабильно дают хороший результат и достаточно ли этого для перехода системы?"
+        }
+      ],
+      "score": 0.984506457,
+      "source_file": "FIELD_CATALOG.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "tech_debt_mvp_critical_path": {
+      "code_fingerprint": "6872cfd6ade02343213c30aa6f7e37df36e474856e04a94869fde30501aab562",
+      "label": "MVP Critical Path",
+      "last": "2026-09-07T21:45:52.805295+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T21:45:52.805295+00:00",
+          "outcome": "useful",
+          "q": "Действительно ли три параллельных агентских анализа Codex стабильно дают хороший результат и достаточно ли этого для перехода системы?"
+        }
+      ],
+      "score": 0.984506457,
+      "source_file": "TECH_DEBT.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "workflows_document_worker_deterministic_evidence_validation": {
+      "code_fingerprint": "f003bcfaf3f5980358345b7557b60b0c4e9b5c25770ef90f88bd0c81826afdb6",
+      "label": "Deterministic Evidence Validation",
+      "last": "2026-09-07T21:45:52.805295+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T21:45:52.805295+00:00",
+          "outcome": "useful",
+          "q": "Действительно ли три параллельных агентских анализа Codex стабильно дают хороший результат и достаточно ли этого для перехода системы?"
+        }
+      ],
+      "score": 0.984506457,
+      "source_file": "workflows/document-worker.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "workflows_document_worker_document_worker": {
+      "code_fingerprint": "f003bcfaf3f5980358345b7557b60b0c4e9b5c25770ef90f88bd0c81826afdb6",
+      "label": "Tender Document Worker Workflow",
+      "last": "2026-09-07T20:22:12.887765+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T20:22:12.887765+00:00",
+          "outcome": "useful",
+          "q": "Ещё раз, ну что ты сейчас хочешь сделать? То есть основная сейчас работа выполнена, правильно я понимаю? То есть уже готов функционал, когда ставится метка на закупку и она начинается анализироваться, правильно я понимаю? Или как? Или что вообще происходит?"
+        }
+      ],
+      "score": 0.983185727,
+      "source_file": "workflows/document-worker.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "workflows_orchestrator_orchestrator_workflow": {
+      "code_fingerprint": "47d55d1a6fed1a3fdcb5ba18c03c5a43a1d6f7257c1d98662c78b30cd7db71af",
+      "label": "Tender Analysis Orchestrator Workflow",
+      "last": "2026-09-07T20:22:12.887765+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T20:22:12.887765+00:00",
+          "outcome": "useful",
+          "q": "Ещё раз, ну что ты сейчас хочешь сделать? То есть основная сейчас работа выполнена, правильно я понимаю? То есть уже готов функционал, когда ставится метка на закупку и она начинается анализироваться, правильно я понимаю? Или как? Или что вообще происходит?"
+        }
+      ],
+      "score": 0.983185727,
+      "source_file": "workflows/orchestrator.md",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
+  "version": 1
+}
