@@ -980,12 +980,9 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_field_results (
   field_catalog_version text NOT NULL,
   field_index smallint NOT NULL,
   field_key text NOT NULL,
-  reported_status text NOT NULL,
-  effective_status text NOT NULL,
-  reported_value_text text,
-  effective_value_text text,
-  requires_human_review boolean NOT NULL,
-  validation_level text NOT NULL,
+  status text NOT NULL,
+  value_text text,
+  validation_issues jsonb NOT NULL DEFAULT '[]'::jsonb,
   result_json jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -1000,14 +997,8 @@ CREATE TABLE IF NOT EXISTS public.tender_agentic_field_results (
     ON DELETE CASCADE,
   CONSTRAINT tender_agentic_field_results_field_index_key UNIQUE (job_id, field_index),
   CONSTRAINT tender_agentic_field_results_field_index_check CHECK (field_index BETWEEN 1 AND 27),
-  CONSTRAINT tender_agentic_field_results_reported_status_check CHECK (
-    reported_status IN ('resolved', 'requires_review', 'not_found')
-  ),
-  CONSTRAINT tender_agentic_field_results_effective_status_check CHECK (
-    effective_status IN ('resolved', 'requires_review', 'not_found')
-  ),
-  CONSTRAINT tender_agentic_field_results_validation_level_check CHECK (
-    validation_level IN ('pass', 'warning', 'downgraded')
+  CONSTRAINT tender_agentic_field_results_status_check CHECK (
+    status IN ('resolved', 'requires_review', 'not_found')
   )
 );
 
@@ -1064,8 +1055,8 @@ BEGIN
   IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_documents') <> 16 THEN
     RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_documents must have 16 columns';
   END IF;
-  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_field_results') <> 14 THEN
-    RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_field_results must have 14 columns';
+  IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tender_agentic_field_results') <> 11 THEN
+    RAISE EXCEPTION 'Agentic migration postcondition failed: tender_agentic_field_results must have 11 columns';
   END IF;
 
   FOR table_contract IN
@@ -1111,10 +1102,9 @@ BEGIN
           ARRAY[
             'job_id:uuid:NO:none', 'analysis_run_id:uuid:NO:none',
             'field_catalog_version:text:NO:none', 'field_index:int2:NO:none',
-            'field_key:text:NO:none', 'reported_status:text:NO:none',
-            'effective_status:text:NO:none', 'reported_value_text:text:YES:none',
-            'effective_value_text:text:YES:none', 'requires_human_review:bool:NO:none',
-            'validation_level:text:NO:none', 'result_json:jsonb:NO:none',
+            'field_key:text:NO:none', 'status:text:NO:none',
+            'value_text:text:YES:none', 'validation_issues:jsonb:NO:default',
+            'result_json:jsonb:NO:none',
             'created_at:timestamptz:NO:default', 'updated_at:timestamptz:NO:default'
           ]::text[]
         )
@@ -1152,6 +1142,7 @@ BEGIN
         ('tender_agentic_documents', 'status', ARRAY['''pending''::text']::text[]),
         ('tender_agentic_documents', 'created_at', ARRAY['now()']::text[]),
         ('tender_agentic_documents', 'updated_at', ARRAY['now()']::text[]),
+        ('tender_agentic_field_results', 'validation_issues', ARRAY['''[]''::jsonb']::text[]),
         ('tender_agentic_field_results', 'created_at', ARRAY['now()']::text[]),
         ('tender_agentic_field_results', 'updated_at', ARRAY['now()']::text[])
     )
@@ -1192,9 +1183,7 @@ BEGIN
         ('tender_agentic_field_results', 'tender_agentic_field_results_analysis_run_fk', 'f'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_field_index_key', 'u'),
         ('tender_agentic_field_results', 'tender_agentic_field_results_field_index_check', 'c'),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_reported_status_check', 'c'),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_effective_status_check', 'c'),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_validation_level_check', 'c')
+        ('tender_agentic_field_results', 'tender_agentic_field_results_status_check', 'c')
     ),
     actual AS (
       SELECT
@@ -1339,9 +1328,7 @@ BEGIN
       VALUES
         ('tender_agentic_jobs'::text, 'tender_agentic_jobs_status_check'::text, 'status'::text, ARRAY['created', 'staging', 'ready', 'running', 'validating', 'completed', 'failed', 'canceled']::text[]),
         ('tender_agentic_documents', 'tender_agentic_documents_status_check', 'status', ARRAY['pending', 'uploading', 'staged', 'failed']::text[]),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_reported_status_check', 'reported_status', ARRAY['resolved', 'requires_review', 'not_found']::text[]),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_effective_status_check', 'effective_status', ARRAY['resolved', 'requires_review', 'not_found']::text[]),
-        ('tender_agentic_field_results', 'tender_agentic_field_results_validation_level_check', 'validation_level', ARRAY['pass', 'warning', 'downgraded']::text[])
+        ('tender_agentic_field_results', 'tender_agentic_field_results_status_check', 'status', ARRAY['resolved', 'requires_review', 'not_found']::text[])
     ) AS status_checks(table_name, constraint_name, column_name, expected_values)
   LOOP
     SELECT

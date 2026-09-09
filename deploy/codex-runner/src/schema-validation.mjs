@@ -30,7 +30,7 @@ function parseJson(source, sourcePath) {
 function schemaIssueCode(error) {
   const location = `${error.instancePath} ${error.schemaPath} ${JSON.stringify(error.params)}`;
 
-  if (/\/(?:reported_|effective_)?status\b|missingProperty":"(?:reported_|effective_)?status"/u.test(location)) {
+  if (/\/status\b|missingProperty":"status"/u.test(location)) {
     return 'STATUS_INVALID';
   }
   if (/locator|evidence\/minItems/u.test(location)) {

@@ -386,9 +386,11 @@ test('policy mirrors both catalogs and exposes the acknowledged hash conflict', 
 });
 
 test('validation issue codes are limited to contract, identity, source and file integrity', async () => {
-  const validationSchema = JSON.parse(
-    await readFile(schemaPaths[1], 'utf8'),
-  );
+  const [validationSchemaSource, validationModuleSource] = await Promise.all([
+    readFile(schemaPaths[1], 'utf8'),
+    readFile(new URL(validationModuleUrl), 'utf8'),
+  ]);
+  const validationSchema = JSON.parse(validationSchemaSource);
   assert.deepEqual(validationSchema.$defs.issueCode.enum, retainedIssueCodes);
   const serialized = JSON.stringify(validationSchema);
   for (const forbidden of [
@@ -406,6 +408,7 @@ test('validation issue codes are limited to contract, identity, source and file 
   ]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
+  assert.doesNotMatch(validationModuleSource, /reported_|effective_/iu);
 });
 
 test('retained source, locator and file-integrity issues round-trip through the envelope', async () => {

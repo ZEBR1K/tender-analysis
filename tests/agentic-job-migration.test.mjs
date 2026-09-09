@@ -309,7 +309,7 @@ test('documents table has the staging barrier keys and bounded status contract',
   }
 });
 
-test('field result table isolates raw and effective exact-27 projections', async () => {
+test('field result table persists the unchanged agent projection and contract issues', async () => {
   const body = getCreateTable(stripSqlComments(await readFile(migrationUrl, 'utf8')), 'tender_agentic_field_results');
   const columns = {
     job_id: 'uuid\\s+NOT\\s+NULL',
@@ -317,12 +317,9 @@ test('field result table isolates raw and effective exact-27 projections', async
     field_catalog_version: 'text\\s+NOT\\s+NULL',
     field_index: 'smallint\\s+NOT\\s+NULL',
     field_key: 'text\\s+NOT\\s+NULL',
-    reported_status: 'text\\s+NOT\\s+NULL',
-    effective_status: 'text\\s+NOT\\s+NULL',
-    reported_value_text: 'text',
-    effective_value_text: 'text',
-    requires_human_review: 'boolean\\s+NOT\\s+NULL',
-    validation_level: 'text\\s+NOT\\s+NULL',
+    status: 'text\\s+NOT\\s+NULL',
+    value_text: 'text',
+    validation_issues: "jsonb\\s+NOT\\s+NULL\\s+DEFAULT\\s+'\\[\\]'::jsonb",
     result_json: 'jsonb\\s+NOT\\s+NULL',
     created_at: 'timestamptz\\s+NOT\\s+NULL\\s+DEFAULT\\s+now\\(\\)',
     updated_at: 'timestamptz\\s+NOT\\s+NULL\\s+DEFAULT\\s+now\\(\\)',
@@ -343,9 +340,12 @@ test('field result table isolates raw and effective exact-27 projections', async
     'FOREIGN\\s+KEY\\s*\\(\\s*analysis_run_id\\s*\\)\\s+REFERENCES\\s+public\\.tender_analysis_runs\\s*\\(\\s*id\\s*\\)\\s+ON\\s+DELETE\\s+CASCADE',
   );
   for (const status of ['resolved', 'requires_review', 'not_found']) {
-    assert.ok((body.match(new RegExp(`'${status}'`, 'gi')) || []).length >= 2, `${status} must be allowed for both status columns`);
+    assert.match(body, new RegExp(`'${status}'`, 'i'));
   }
-  for (const level of ['pass', 'warning', 'downgraded']) assert.match(body, new RegExp(`'${level}'`, 'i'));
+  assert.doesNotMatch(
+    body,
+    /reported_status|effective_status|reported_value_text|effective_value_text|requires_human_review|validation_level|downgraded/iu,
+  );
 });
 
 test('implementation plan records same-run and field-catalog database ownership', async () => {
@@ -421,7 +421,7 @@ test('postconditions validate exact shadow columns, constraints, FKs and indexes
     assert.match(postconditions, new RegExp(escapeRegExp(catalog), 'i'));
   }
   assert.match(postconditions, /relkind\s*<>\s*'r'/i, 'shadow objects must remain ordinary tables');
-  for (const count of [29, 16, 14]) assert.match(postconditions, new RegExp(`<>\\s*${count}\\b`, 'i'));
+  for (const count of [29, 16, 11]) assert.match(postconditions, new RegExp(`<>\\s*${count}\\b`, 'i'));
   for (const name of [
     'tender_agentic_jobs_pkey',
     'tender_agentic_jobs_analysis_run_fk',
@@ -1186,7 +1186,7 @@ test('real PostgreSQL applies empty, populated and documented-variant fixtures t
             (SELECT count(*) FROM pg_catalog.pg_constraint c JOIN pg_catalog.pg_class t ON t.oid=c.conrelid JOIN pg_catalog.pg_namespace n ON n.oid=t.relnamespace WHERE n.nspname='public' AND t.relname='tender_agentic_field_results'),
             (SELECT count(*) FROM pg_catalog.pg_indexes WHERE schemaname='public' AND indexname LIKE 'idx_tender_agentic_jobs_%');
         `)),
-        '29|16|14|10|6|8|3',
+        '29|16|11|10|6|6|3',
         `${fixture.name}: shadow catalog counts differ`,
       );
     }
@@ -1249,12 +1249,11 @@ test('real PostgreSQL applies empty, populated and documented-variant fixtures t
         sql: String.raw`
           INSERT INTO public.tender_agentic_field_results (
             job_id, analysis_run_id, field_catalog_version, field_index, field_key,
-            reported_status, effective_status, requires_human_review,
-            validation_level, result_json
+            status, result_json
           ) VALUES (
             '50000000-0000-4000-8000-000000000001',
             '10000000-0000-4000-8000-000000000002', 'tender_fields_v1',
-            1, 'procurement_subject', 'not_found', 'not_found', false, 'pass', '{}'::jsonb
+            1, 'procurement_subject', 'not_found', '{}'::jsonb
           );
         `,
         constraint: /tender_agentic_field_results_job_run_catalog_fk/i,
@@ -1264,12 +1263,11 @@ test('real PostgreSQL applies empty, populated and documented-variant fixtures t
         sql: String.raw`
           INSERT INTO public.tender_agentic_field_results (
             job_id, analysis_run_id, field_catalog_version, field_index, field_key,
-            reported_status, effective_status, requires_human_review,
-            validation_level, result_json
+            status, result_json
           ) VALUES (
             '50000000-0000-4000-8000-000000000001',
             '10000000-0000-4000-8000-000000000001', 'tender_fields_v2',
-            1, 'procurement_subject', 'not_found', 'not_found', false, 'pass', '{}'::jsonb
+            1, 'procurement_subject', 'not_found', '{}'::jsonb
           );
         `,
         constraint: /tender_agentic_field_results_job_run_catalog_fk/i,
