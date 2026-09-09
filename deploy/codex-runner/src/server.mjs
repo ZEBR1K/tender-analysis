@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import http from 'node:http';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -11,6 +11,8 @@ import { normalizeRunnerError, RunnerError, toSafeError } from './errors.mjs';
 import { createHeaderAuthenticator } from './http-auth.mjs';
 import { createJobStore } from './job-store.mjs';
 import { permissionBoundaryContractReady } from './permissions.mjs';
+import { runCodexAttempt, shouldRetryCodexAttempt } from './codex-command.mjs';
+import { createAgentResultValidator } from './result-validator.mjs';
 
 const execFileAsync = promisify(execFile);
 const DOCUMENT_STREAM_LIFECYCLE = Symbol('documentStreamLifecycle');
@@ -251,11 +253,11 @@ export function createSingleProcessQueue({ maxQueuedJobs }) {
     run(task) {
       if (typeof task !== 'function') return Promise.reject(new TypeError('task must be a function'));
       if (active !== 0 && pending.length >= maxQueuedJobs) {
-        return Promise.reject(new RunnerError(
+        throw new RunnerError(
           'RUNNER_QUEUE_FULL',
           'Runner queue has reached its configured limit',
           503,
-        ));
+        );
       }
       return new Promise((resolve, reject) => {
         pending.push({ task, resolve, reject });
@@ -448,9 +450,103 @@ function decodeRoutePart(value, label) {
   }
 }
 
-export function createManifestRouteHandler({ jobStore }) {
+async function executionResultBytes(execution) {
+  if (Buffer.isBuffer(execution?.raw_result)) return execution.raw_result;
+  if (typeof execution?.raw_result === 'string') {
+    return Buffer.from(execution.raw_result, 'utf8');
+  }
+  if (typeof execution?.artifacts?.result === 'string') {
+    return readFile(execution.artifacts.result);
+  }
+  throw new RunnerError('RUNNER_INTERNAL', 'Codex result artifact is unavailable', 500);
+}
+
+function transportFailure(error) {
+  return {
+    ok: false,
+    code: 'CODEX_TRANSPORT_ERROR',
+    valid_json_result: false,
+    events: { usage: {} },
+    artifacts: {},
+    internal_error: error,
+  };
+}
+
+export async function executeAgentJobLifecycle({
+  jobStore,
+  resultValidator,
+  executeAttempt,
+  jobId,
+  initialAttempt,
+} = {}) {
+  let attempt = initialAttempt;
+  while (attempt <= 2) {
+    let execution;
+    try {
+      execution = await executeAttempt({ jobId, attempt });
+    } catch (error) {
+      execution = transportFailure(error);
+    }
+
+    if (!execution?.ok) {
+      if (attempt === 1 && shouldRetryCodexAttempt(execution)) {
+        const retry = await jobStore.beginAutomaticRetry(jobId, { attempt, execution });
+        attempt = retry.attempt;
+        continue;
+      }
+      return jobStore.failAttempt(jobId, {
+        attempt,
+        code: execution?.code ?? 'CODEX_TRANSPORT_ERROR',
+        retryable: false,
+        execution,
+      });
+    }
+
+    await jobStore.markValidating(jobId, { attempt, execution });
+    let rawResult;
+    try {
+      rawResult = await executionResultBytes(execution);
+    } catch {
+      return jobStore.failAttempt(jobId, {
+        attempt,
+        code: 'CODEX_RESULT_INVALID',
+        retryable: false,
+        execution,
+      });
+    }
+    const validation = await resultValidator.validate({ jobId, rawResult });
+    if (!validation.valid) {
+      return jobStore.failAttempt(jobId, {
+        attempt,
+        code: 'CODEX_CONTRACT_INVALID',
+        retryable: false,
+        execution,
+      });
+    }
+    return jobStore.completeAttempt(jobId, {
+      attempt,
+      execution,
+      rawResult,
+      validationEnvelope: validation.envelope,
+    });
+  }
+  throw new RunnerError('RUNNER_INTERNAL', 'Codex attempt bound was exceeded', 500);
+}
+
+export function createManifestRouteHandler({
+  jobStore,
+  executeAttempt,
+  resultValidator,
+} = {}) {
   if (!jobStore) throw new TypeError('jobStore is required');
-  return async ({ requestMetadata, url, bodyKind, rawBody, bodyStream }) => {
+  return async ({
+    requestMetadata,
+    url,
+    bodyKind,
+    rawBody,
+    bodyStream,
+    queue,
+  }) => {
     if (url.pathname === '/v1/jobs') {
       routeMethod(requestMetadata, 'PUT');
       if (bodyKind !== 'json') {
@@ -488,6 +584,61 @@ export function createManifestRouteHandler({ jobStore }) {
       };
     }
 
+    const startRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/start$/u);
+    if (startRoute) {
+      routeMethod(requestMetadata, 'POST');
+      if (bodyKind !== 'none') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Start does not accept a request body', 400);
+      }
+      if (
+        typeof executeAttempt !== 'function'
+        || typeof resultValidator?.validate !== 'function'
+        || typeof queue?.run !== 'function'
+      ) {
+        throw new RunnerError('RUNNER_INTERNAL', 'Runner execution lifecycle is unavailable', 500);
+      }
+      const jobId = decodeRoutePart(startRoute[1], 'job_id');
+      const claim = await jobStore.claimStart(jobId);
+      const { should_execute: shouldExecute, ...body } = claim;
+      if (shouldExecute) {
+        let scheduled;
+        try {
+          scheduled = queue.run(() => executeAgentJobLifecycle({
+            jobStore,
+            resultValidator,
+            executeAttempt,
+            jobId,
+            initialAttempt: claim.attempt,
+          }));
+        } catch (error) {
+          await jobStore.releaseUnstartedClaim(jobId, { attempt: claim.attempt });
+          throw error;
+        }
+        void scheduled.catch(async () => {
+          const current = await jobStore.getJob(jobId).catch(() => null);
+          if (!current || !['running', 'validating'].includes(current.status)) return;
+          await jobStore.failAttempt(jobId, {
+            attempt: current.attempt,
+            code: 'CODEX_TRANSPORT_ERROR',
+            retryable: false,
+          }).catch(() => {});
+        });
+      }
+      return { statusCode: shouldExecute ? 202 : 200, body };
+    }
+
+    const resultRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/result$/u);
+    if (resultRoute) {
+      routeMethod(requestMetadata, 'GET');
+      if (bodyKind !== 'none') {
+        throw new RunnerError('RUNNER_REQUEST_INVALID', 'Result does not accept a request body', 400);
+      }
+      return {
+        statusCode: 200,
+        body: await jobStore.getResult(decodeRoutePart(resultRoute[1], 'job_id')),
+      };
+    }
+
     const statusRoute = url.pathname.match(/^\/v1\/jobs\/([^/]+)$/u);
     if (statusRoute) {
       routeMethod(requestMetadata, 'GET');
@@ -505,12 +656,32 @@ export function createManifestRouteHandler({ jobStore }) {
 }
 
 function createDefaultV1Handler() {
-  return createManifestRouteHandler({
-    jobStore: createJobStore({
-      rootDirectory: config.rootDirectory,
-      fieldCatalogPath: config.fieldCatalogPath,
+  const jobStore = createJobStore({
+    rootDirectory: config.rootDirectory,
+    fieldCatalogPath: config.fieldCatalogPath,
+  });
+  const startup = Promise.all([
+    jobStore.recoverOrphanedJobs(),
+    jobStore.cleanupExpiredJobs(),
+  ]);
+  const validatorPromise = createAgentResultValidator({ jobStore });
+  const handler = createManifestRouteHandler({
+    jobStore,
+    resultValidator: {
+      validate: async (request) => (await validatorPromise).validate(request),
+    },
+    executeAttempt: ({ jobId, attempt }) => runCodexAttempt({
+      jobId,
+      attempt,
+      jobsRoot: config.rootDirectory,
+      runnerRoot: '/app',
+      secretValues: [config.authToken],
     }),
   });
+  return async (request) => {
+    await startup;
+    return handler(request);
+  };
 }
 
 export function createServer({

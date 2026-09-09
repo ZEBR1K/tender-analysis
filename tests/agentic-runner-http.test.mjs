@@ -556,7 +556,7 @@ test('single-process queue never overlaps work and rejects beyond its bound', as
   await firstEntered;
   const queued = task();
   await assert.rejects(
-    task(),
+    Promise.resolve().then(() => task()),
     (error) => error instanceof RunnerError && error.code === 'RUNNER_QUEUE_FULL',
   );
   assert.deepEqual(queue.snapshot(), { active: 1, queued: 1, max_concurrent: 1, max_queued: 1 });

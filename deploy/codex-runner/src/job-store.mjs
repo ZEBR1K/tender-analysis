@@ -28,6 +28,11 @@ const CATALOG_FILE_NAME = 'FIELD_CATALOG.md';
 const RESIDUE_PATTERN = /^\.upload-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
 const CREATE_RESIDUE_PATTERN = /^\.create-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.tmp$/iu;
 const WRITE_RESIDUE_PATTERN = /^\.write-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
+const JOB_DIRECTORY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed']);
+const RESULT_FILE_NAME = 'result.json';
+const VALIDATION_FILE_NAME = 'validation.json';
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SEALED_JOB_STATUSES = new Set([
   'ready',
   'running',
@@ -143,8 +148,85 @@ function publicJobState(state, { idempotent } = {}) {
     staged_documents: Object.keys(state.uploads).length,
     input_manifest_sha256: state.input_manifest_sha256 ?? null,
   };
+  if (Number.isSafeInteger(state.attempt) && state.attempt > 0) {
+    response.attempt = state.attempt;
+  }
+  if (Array.isArray(state.prior_attempts) && state.prior_attempts.length > 0) {
+    response.prior_attempts = structuredClone(state.prior_attempts);
+  }
+  if (state.failure) response.failure = structuredClone(state.failure);
+  if (state.execution?.usage) response.usage = structuredClone(state.execution.usage);
+  if (state.status === 'completed') response.result_available = true;
   if (idempotent !== undefined) response.idempotent = idempotent;
   return response;
+}
+
+function resultBytes(value) {
+  const bytes = Buffer.isBuffer(value)
+    ? value
+    : typeof value === 'string'
+      ? Buffer.from(value, 'utf8')
+      : null;
+  if (!bytes || bytes.length === 0 || bytes.length > 2 * 1024 * 1024) {
+    throw storeError('RUNNER_REQUEST_INVALID', 'Validated result bytes are missing or exceed the limit');
+  }
+  return bytes;
+}
+
+function sha256Bytes(bytes) {
+  return createHash('sha256').update(bytes).digest('hex').toUpperCase();
+}
+
+function parseResultObject(bytes) {
+  let value;
+  try {
+    value = JSON.parse(bytes.toString('utf8'));
+  } catch {
+    throw storeError('RUNNER_REQUEST_INVALID', 'Validated result bytes are not valid JSON');
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw storeError('RUNNER_REQUEST_INVALID', 'Validated result must be a JSON object');
+  }
+  return value;
+}
+
+async function assertOrWriteExactFile(filePath, bytes) {
+  const metadata = await lstat(filePath).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!metadata) {
+    await atomicWriteFile(filePath, bytes);
+    return;
+  }
+  if (!metadata.isFile() || metadata.isSymbolicLink()) {
+    throw storeError('RUNNER_INTERNAL', 'Runner result target is invalid', 500);
+  }
+  const current = await readFile(filePath);
+  if (!current.equals(bytes)) {
+    throw storeError('RUNNER_INTERNAL', 'Runner result changed between validation and persistence', 500);
+  }
+}
+
+async function readBoundedRegularFile(filePath, maxBytes = 2 * 1024 * 1024) {
+  const metadata = await lstat(filePath).catch((error) => {
+    if (error?.code === 'ENOENT') {
+      throw storeError('RUNNER_INTERNAL', 'Runner result artifact is missing', 500);
+    }
+    throw error;
+  });
+  if (
+    !metadata.isFile()
+    || metadata.isSymbolicLink()
+    || metadata.size > maxBytes
+  ) {
+    throw storeError('RUNNER_INTERNAL', 'Runner result artifact is invalid or exceeds its bound', 500);
+  }
+  const bytes = await readFile(filePath);
+  if (bytes.length > maxBytes) {
+    throw storeError('RUNNER_INTERNAL', 'Runner result artifact exceeds its bound', 500);
+  }
+  return bytes;
 }
 
 async function readState(jobPath) {
@@ -175,6 +257,55 @@ async function ensureRegularDirectory(directory, missingCode = 'RUNNER_JOB_NOT_F
   if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
     throw storeError('RUNNER_INTERNAL', 'Runner job directory is invalid', 500);
   }
+}
+
+async function ensureOrCreateRegularDirectory(parent, name) {
+  const directory = exactChild(parent, name);
+  const metadata = await lstat(directory).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (metadata) {
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw storeError('RUNNER_INTERNAL', 'Runner workspace directory is invalid', 500);
+    }
+    return directory;
+  }
+  await mkdir(directory, { mode: 0o700 });
+  return directory;
+}
+
+function boundedCode(value, fallback = 'RUNNER_INTERNAL') {
+  const normalized = String(value || '');
+  return /^[A-Z0-9_]{1,80}$/u.test(normalized) ? normalized : fallback;
+}
+
+function tokenUsage(value) {
+  const result = {};
+  for (const key of [
+    'input_tokens',
+    'cached_input_tokens',
+    'output_tokens',
+    'reasoning_output_tokens',
+  ]) {
+    result[key] = Number.isSafeInteger(value?.[key]) && value[key] >= 0 ? value[key] : 0;
+  }
+  return result;
+}
+
+function executionSummary(execution) {
+  return {
+    code: boundedCode(execution?.code, 'CODEX_TRANSPORT_ERROR'),
+    thread_id: typeof execution?.events?.thread_id === 'string'
+      ? execution.events.thread_id.slice(0, 200)
+      : null,
+    usage: tokenUsage(execution?.events?.usage),
+    artifacts: Object.fromEntries(
+      Object.entries(execution?.artifacts ?? {})
+        .filter(([, value]) => typeof value === 'string')
+        .map(([key, value]) => [key, path.basename(value).slice(0, 255)]),
+    ),
+  };
 }
 
 async function cleanupCrashResidue(temporaryDirectory) {
@@ -213,6 +344,7 @@ export function createJobStore({
   fieldCatalogPath,
   expectedCatalogSha256 = fieldPolicy.expected_catalog_sha256,
   faultInjector = async () => {},
+  now = () => new Date(),
 } = {}) {
   if (typeof rootDirectory !== 'string' || rootDirectory.length === 0) {
     throw new TypeError('rootDirectory is required');
@@ -224,11 +356,20 @@ export function createJobStore({
     throw new TypeError('expectedCatalogSha256 must be a SHA-256 value');
   }
   if (typeof faultInjector !== 'function') throw new TypeError('faultInjector must be a function');
+  if (typeof now !== 'function') throw new TypeError('now must be a function');
 
   const resolvedRoot = path.resolve(rootDirectory);
   const resolvedCatalogPath = path.resolve(fieldCatalogPath);
   const normalizedCatalogSha256 = expectedCatalogSha256.toUpperCase();
   const lockTails = new Map();
+
+  function timestamp() {
+    const value = now();
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+      throw new TypeError('now must return a valid Date');
+    }
+    return value.toISOString();
+  }
 
   async function withJobLock(jobId, task) {
     const normalizedJobId = assertJobId(jobId);
@@ -408,11 +549,19 @@ export function createJobStore({
         await mkdir(inputDirectory, { mode: 0o700 });
         await mkdir(documentsDirectory, { mode: 0o700 });
         await mkdir(temporaryDirectory, { mode: 0o700 });
+        const createdAt = timestamp();
         const state = {
           manifest,
           status: 'staging',
           uploads: {},
           input_manifest_sha256: null,
+          attempt: 0,
+          prior_attempts: [],
+          failure: null,
+          execution: null,
+          created_at: createdAt,
+          updated_at: createdAt,
+          finished_at: null,
         };
         await writeState(createPath, state);
         await rename(createPath, jobPath);
@@ -506,6 +655,7 @@ export function createJobStore({
           byte_size: stored.byteSize,
           sha256: stored.sha256,
         };
+        job.state.updated_at = timestamp();
         await writeState(job.jobPath, job.state);
         return {
           job_id: normalizedJobId,
@@ -522,6 +672,7 @@ export function createJobStore({
         byte_size: incoming.byteSize,
         sha256: incoming.sha256,
       };
+      job.state.updated_at = timestamp();
       await writeState(job.jobPath, job.state);
       return {
         job_id: normalizedJobId,
@@ -593,9 +744,335 @@ export function createJobStore({
       );
       job.state.status = 'ready';
       job.state.input_manifest_sha256 = manifestSha256;
+      job.state.updated_at = timestamp();
       await writeState(job.jobPath, job.state);
       return publicJobState(job.state, { idempotent: false });
     });
+  }
+
+  async function claimStart(jobId) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (['running', 'validating', 'completed'].includes(job.state.status)) {
+        return {
+          ...publicJobState(job.state, { idempotent: true }),
+          should_execute: false,
+        };
+      }
+      const retrying = job.state.status === 'failed'
+        && job.state.failure?.retryable === true
+        && Number(job.state.attempt || 0) < 2;
+      if (job.state.status !== 'ready' && !retrying) {
+        if (job.state.status === 'failed') {
+          return {
+            ...publicJobState(job.state, { idempotent: true }),
+            should_execute: false,
+          };
+        }
+        throw storeError('RUNNER_JOB_NOT_READY', 'Job must be sealed before execution', 409);
+      }
+
+      await verifySealedJob(job);
+      const workspaceDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'workspace');
+      await ensureOrCreateRegularDirectory(workspaceDirectory, 'output');
+      await ensureOrCreateRegularDirectory(workspaceDirectory, '.tmp');
+      await ensureOrCreateRegularDirectory(job.jobPath, 'audit');
+
+      if (retrying) {
+        job.state.prior_attempts = Array.isArray(job.state.prior_attempts)
+          ? job.state.prior_attempts
+          : [];
+        job.state.prior_attempts.push({
+          attempt: Number(job.state.attempt),
+          code: boundedCode(job.state.failure?.code),
+          retryable: true,
+          at: job.state.failure?.at ?? timestamp(),
+        });
+      }
+      job.state.attempt = retrying ? Number(job.state.attempt) + 1 : 1;
+      job.state.status = 'running';
+      job.state.failure = null;
+      job.state.execution = null;
+      job.state.updated_at = timestamp();
+      job.state.finished_at = null;
+      await writeState(job.jobPath, job.state);
+      return {
+        ...publicJobState(job.state, { idempotent: false }),
+        should_execute: true,
+      };
+    });
+  }
+
+  async function beginAutomaticRetry(jobId, { attempt, execution } = {}) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (
+        job.state.status !== 'running'
+        || job.state.attempt !== attempt
+        || attempt !== 1
+      ) {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Automatic retry transition is invalid', 409);
+      }
+      await verifySealedJob(job);
+      job.state.prior_attempts = Array.isArray(job.state.prior_attempts)
+        ? job.state.prior_attempts
+        : [];
+      job.state.prior_attempts.push({
+        attempt,
+        code: boundedCode(execution?.code, 'CODEX_TRANSPORT_ERROR'),
+        retryable: true,
+        at: timestamp(),
+      });
+      job.state.attempt = 2;
+      job.state.execution = null;
+      job.state.updated_at = timestamp();
+      await writeState(job.jobPath, job.state);
+      return {
+        ...publicJobState(job.state),
+        should_execute: true,
+      };
+    });
+  }
+
+  async function releaseUnstartedClaim(jobId, { attempt } = {}) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (
+        job.state.status !== 'running'
+        || job.state.attempt !== attempt
+        || job.state.execution !== null
+      ) {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Unstarted claim release is invalid', 409);
+      }
+      if (attempt === 1) {
+        job.state.status = 'ready';
+        job.state.attempt = 0;
+        job.state.failure = null;
+        job.state.finished_at = null;
+      } else if (attempt === 2) {
+        const prior = Array.isArray(job.state.prior_attempts)
+          ? job.state.prior_attempts.pop()
+          : null;
+        if (!prior || prior.attempt !== 1 || prior.retryable !== true) {
+          throw storeError('RUNNER_INTERNAL', 'Retry audit cannot restore the unstarted claim', 500);
+        }
+        job.state.status = 'failed';
+        job.state.attempt = 1;
+        job.state.failure = {
+          code: boundedCode(prior.code),
+          retryable: true,
+          at: prior.at,
+        };
+        job.state.finished_at = prior.at;
+      } else {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Unstarted claim attempt is invalid', 409);
+      }
+      job.state.updated_at = timestamp();
+      await writeState(job.jobPath, job.state);
+      return publicJobState(job.state);
+    });
+  }
+
+  async function markValidating(jobId, { attempt, execution } = {}) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (job.state.status !== 'running' || job.state.attempt !== attempt) {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Validation transition is invalid', 409);
+      }
+      job.state.status = 'validating';
+      job.state.execution = executionSummary(execution);
+      job.state.updated_at = timestamp();
+      await writeState(job.jobPath, job.state);
+      return publicJobState(job.state);
+    });
+  }
+
+  async function completeAttempt(jobId, {
+    attempt,
+    execution,
+    rawResult,
+    validationEnvelope,
+  } = {}) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (job.state.status !== 'validating' || job.state.attempt !== attempt) {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Completion transition is invalid', 409);
+      }
+      if (validationEnvelope?.valid !== true || validationEnvelope?.job_id !== normalizedJobId) {
+        throw storeError('RUNNER_REQUEST_INVALID', 'Only a valid matching envelope can complete a job');
+      }
+      await verifySealedJob(job);
+      const bytes = resultBytes(rawResult);
+      const parsedResult = parseResultObject(bytes);
+      const rawResultSha256 = sha256Bytes(bytes);
+      const validatedResultSha256 = sha256Bytes(Buffer.from(canonicalJson(parsedResult), 'utf8'));
+      if (
+        validationEnvelope.raw_result_sha256 !== rawResultSha256
+        || validationEnvelope.validated_result_sha256 !== validatedResultSha256
+      ) {
+        throw storeError(
+          'RUNNER_REQUEST_INVALID',
+          'Validation envelope hashes do not match the result bytes',
+        );
+      }
+      const workspaceDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'workspace');
+      const outputDirectory = await ensureOrCreateRegularDirectory(workspaceDirectory, 'output');
+      await assertOrWriteExactFile(exactChild(outputDirectory, RESULT_FILE_NAME), bytes);
+      const validationBytes = Buffer.from(`${canonicalJson(validationEnvelope)}\n`, 'utf8');
+      await atomicWriteFile(
+        exactChild(outputDirectory, VALIDATION_FILE_NAME),
+        validationBytes,
+      );
+      job.state.status = 'completed';
+      job.state.failure = null;
+      job.state.execution = executionSummary(execution);
+      job.state.result = {
+        raw_result_sha256: validationEnvelope.raw_result_sha256,
+        validated_result_sha256: validationEnvelope.validated_result_sha256,
+        validation_file_sha256: sha256Bytes(validationBytes),
+      };
+      job.state.updated_at = timestamp();
+      job.state.finished_at = job.state.updated_at;
+      await writeState(job.jobPath, job.state);
+      return publicJobState(job.state);
+    });
+  }
+
+  async function failAttempt(jobId, {
+    attempt,
+    code,
+    retryable = false,
+    execution,
+  } = {}) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (
+        !['running', 'validating'].includes(job.state.status)
+        || job.state.attempt !== attempt
+      ) {
+        throw storeError('RUNNER_JOB_STATE_INVALID', 'Failure transition is invalid', 409);
+      }
+      job.state.status = 'failed';
+      job.state.failure = {
+        code: boundedCode(code),
+        retryable: Boolean(retryable && attempt < 2),
+        at: timestamp(),
+      };
+      if (execution) job.state.execution = executionSummary(execution);
+      job.state.updated_at = job.state.failure.at;
+      job.state.finished_at = job.state.failure.at;
+      await writeState(job.jobPath, job.state);
+      return publicJobState(job.state);
+    });
+  }
+
+  async function getResult(jobId) {
+    return withJobLock(jobId, async (normalizedJobId) => {
+      const job = await loadJob(normalizedJobId);
+      if (job.state.status !== 'completed') {
+        throw storeError('RUNNER_RESULT_NOT_READY', 'Validated result is not available', 409);
+      }
+      const workspaceDirectory = exactChild(job.jobPath, 'workspace');
+      const outputDirectory = exactChild(workspaceDirectory, 'output');
+      await Promise.all([
+        ensureRegularDirectory(workspaceDirectory),
+        ensureRegularDirectory(outputDirectory),
+      ]);
+      const [rawBytes, validationBytes] = await Promise.all([
+        readBoundedRegularFile(exactChild(outputDirectory, RESULT_FILE_NAME)),
+        readBoundedRegularFile(exactChild(outputDirectory, VALIDATION_FILE_NAME)),
+      ]);
+      let result;
+      let validation;
+      try {
+        result = JSON.parse(rawBytes.toString('utf8'));
+        validation = JSON.parse(validationBytes.toString('utf8'));
+      } catch {
+        throw storeError('RUNNER_INTERNAL', 'Runner result artifact is unreadable', 500);
+      }
+      const rawResultSha256 = sha256Bytes(rawBytes);
+      const validatedResultSha256 = sha256Bytes(Buffer.from(canonicalJson(result), 'utf8'));
+      if (
+        rawResultSha256 !== job.state.result?.raw_result_sha256
+        || validatedResultSha256 !== job.state.result?.validated_result_sha256
+        || sha256Bytes(validationBytes) !== job.state.result?.validation_file_sha256
+        || validation?.job_id !== normalizedJobId
+        || validation?.valid !== true
+        || validation?.raw_result_sha256 !== rawResultSha256
+        || validation?.validated_result_sha256 !== validatedResultSha256
+      ) {
+        throw storeError('RUNNER_INTERNAL', 'Runner result artifact failed integrity verification', 500);
+      }
+      return { job_id: normalizedJobId, result, validation };
+    });
+  }
+
+  async function recoverOrphanedJobs() {
+    await mkdir(resolvedRoot, { recursive: true, mode: 0o700 });
+    const entries = await readdir(resolvedRoot, { withFileTypes: true });
+    const recovered = [];
+    for (const entry of entries) {
+      if (!JOB_DIRECTORY_PATTERN.test(entry.name) || !entry.isDirectory() || entry.isSymbolicLink()) {
+        continue;
+      }
+      await withJobLock(entry.name, async (normalizedJobId) => {
+        const job = await loadJob(normalizedJobId);
+        if (!['running', 'validating'].includes(job.state.status)) return;
+        const attempt = Number.isSafeInteger(job.state.attempt) ? job.state.attempt : 1;
+        const at = timestamp();
+        job.state.status = 'failed';
+        job.state.failure = {
+          code: 'RUNNER_ORPHANED_EXECUTION',
+          retryable: attempt < 2,
+          at,
+        };
+        job.state.updated_at = at;
+        job.state.finished_at = at;
+        await writeState(job.jobPath, job.state);
+        recovered.push(normalizedJobId);
+      });
+    }
+    recovered.sort();
+    return { recovered_jobs: recovered.length, job_ids: recovered };
+  }
+
+  async function cleanupExpiredJobs({ ttlMs = DEFAULT_TTL_MS } = {}) {
+    if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) {
+      throw new TypeError('ttlMs must be a positive integer');
+    }
+    await mkdir(resolvedRoot, { recursive: true, mode: 0o700 });
+    const current = now();
+    if (!(current instanceof Date) || Number.isNaN(current.getTime())) {
+      throw new TypeError('now must return a valid Date');
+    }
+    const cutoff = current.getTime() - ttlMs;
+    const entries = await readdir(resolvedRoot, { withFileTypes: true });
+    const deleted = [];
+    for (const entry of entries) {
+      if (!JOB_DIRECTORY_PATTERN.test(entry.name) || !entry.isDirectory() || entry.isSymbolicLink()) {
+        continue;
+      }
+      await withJobLock(entry.name, async (normalizedJobId) => {
+        const jobPath = resolveJobPath(resolvedRoot, normalizedJobId);
+        await ensureRegularDirectory(jobPath);
+        const state = await readState(jobPath);
+        const finishedAt = Date.parse(state.finished_at ?? '');
+        if (
+          !TERMINAL_JOB_STATUSES.has(state.status)
+          || !Number.isFinite(finishedAt)
+          || finishedAt > cutoff
+        ) {
+          return;
+        }
+        if (path.dirname(path.resolve(jobPath)) !== resolvedRoot) {
+          throw storeError('RUNNER_INTERNAL', 'Cleanup target escaped runner root', 500);
+        }
+        await rm(jobPath, { recursive: true, force: false });
+        deleted.push(normalizedJobId);
+      });
+    }
+    deleted.sort();
+    return { deleted_jobs: deleted.length, deleted_job_ids: deleted };
   }
 
   async function getJob(jobId) {
@@ -626,9 +1103,18 @@ export function createJobStore({
   }
 
   return Object.freeze({
+    beginAutomaticRetry,
+    claimStart,
+    cleanupExpiredJobs,
+    completeAttempt,
     createJob,
+    failAttempt,
     getJob,
+    getResult,
+    markValidating,
     readVerifiedInputManifest,
+    recoverOrphanedJobs,
+    releaseUnstartedClaim,
     sealJob,
     uploadDocument,
     verifySealedInput,
