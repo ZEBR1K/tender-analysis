@@ -4,14 +4,16 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–10 — repository GREEN, deployment closed
+## Agentic shadow foundation Tasks 0–12 — repository workflows implemented, deployment closed
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
 pipeline while adding isolated shadow tables/migration, source-only manifest
 staging, a focused agent skill, audited non-interactive execution,
 contract/source-identity validation, and an asynchronous restart-safe runner
-lifecycle.
+lifecycle. Tasks 11–12 add inactive, identity-neutral Dispatch and Monitor
+exports with exact DB ownership, source staging, runner polling, and atomic
+27-row shadow persistence. They are not wired to Orchestrator/Intake.
 
 Runtime validation is intentionally restricted to security, file/artifact
 integrity, and the closed JSON contract. Page/OOXML/XLSX indexing, quote
@@ -23,9 +25,11 @@ complete removal/retention inventory and open gates are recorded in
 Local verification at the final Tasks 0–10 review point completed `670 passed`,
 `0 failed`, `2 skipped`. The skips are explicit deployment/runtime gates, not
 silent passes. Task 6 still has one procurement with four repeats, so its
-multi-procurement gate remains `awaiting_additional_procurements`. Tasks 11–17,
-n8n wiring, production migration, runner deployment, and paid canaries were not
-performed.
+multi-procurement gate remains `awaiting_additional_procurements`. Task 13 and
+later, n8n wiring, production migration, runner deployment, and paid canaries
+were not performed. Task 11/12 focused tests are locally GREEN; the full suite
+in the restricted Codex sandbox retains pre-existing environment-only failures
+where tests require loopback listeners, subprocess behavior, or Docker.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

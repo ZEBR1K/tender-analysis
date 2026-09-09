@@ -1,0 +1,901 @@
+{
+  "name": "TENDER — Агентский анализ — Запуск",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "analysis_run_id",
+              "type": "string"
+            },
+            {
+              "name": "pipeline_version",
+              "type": "string"
+            },
+            {
+              "name": "replicate_index",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1400,
+        0
+      ],
+      "id": "11000000-0000-4000-8000-000000000001",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const input = $input.first().json;\nconst analysisRunId = String(input.analysis_run_id ?? '').trim();\nconst pipelineVersion = String(input.pipeline_version ?? '').trim();\nconst replicateIndex = Number(input.replicate_index);\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(analysisRunId)) throw new Error('[AGENTIC_INPUT_INVALID] analysis_run_id must be a UUID');\nif (pipelineVersion !== 'tender_agentic_pipeline_v1') throw new Error('[AGENTIC_INPUT_INVALID] pipeline_version must be tender_agentic_pipeline_v1');\nif (!Number.isInteger(replicateIndex) || replicateIndex < 1) throw new Error('[AGENTIC_INPUT_INVALID] replicate_index must be an integer >= 1');\nreturn [{json:{analysis_run_id:analysisRunId,pipeline_version:pipelineVersion,replicate_index:replicateIndex}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1180,
+        0
+      ],
+      "id": "11000000-0000-4000-8000-000000000002",
+      "name": "Проверить вход"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input AS (\n SELECT $1::uuid analysis_run_id,$2::text pipeline_version,$3::smallint replicate_index,$4::text owner\n), locked AS (\n SELECT pg_advisory_xact_lock(hashtextextended((SELECT analysis_run_id::text||':'||pipeline_version||':'||replicate_index FROM input),0))\n), run_state AS (\n SELECT i.analysis_run_id,r.documents_total,count(d.id)::int registered_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx'))::int processable_count,\n  count(*) FILTER (WHERE d.status='failed')::int failed_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx')\n    AND (coalesce(d.file_name,'')='' OR coalesce(d.mime_type,'')='' OR d.file_size IS NULL OR d.file_size<0 OR d.file_size>52428800\n      OR coalesce(d.ingestion_metadata->>'content_sha256','') !~* '^[0-9a-f]{64}$'))::int invalid_identity_count\n FROM input i CROSS JOIN locked LEFT JOIN public.tender_analysis_runs r ON r.id=i.analysis_run_id\n LEFT JOIN public.tender_analysis_documents d ON d.analysis_run_id=r.id\n GROUP BY i.analysis_run_id,r.documents_total\n), inserted_job AS (\n INSERT INTO public.tender_agentic_jobs(analysis_run_id,pipeline_version,replicate_index,status,model,reasoning_effort,\n field_catalog_version,field_catalog_sha256,expected_documents,dispatch_execution_id)\n SELECT rs.analysis_run_id,i.pipeline_version,i.replicate_index,'staging','gpt-5.6-sol','high','tender_fields_v1','ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',rs.processable_count,i.owner\n FROM run_state rs,input i WHERE rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total\n AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n ON CONFLICT (analysis_run_id,pipeline_version,replicate_index) DO NOTHING RETURNING *,'dispatch'::text claim_mode\n), existing_job AS (\n SELECT j.* FROM public.tender_agentic_jobs j,input i\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n), claimed_existing AS (\n UPDATE public.tender_agentic_jobs j SET\n  dispatch_execution_id=i.owner,\n  status=CASE WHEN j.status='failed' THEN 'ready' ELSE 'staging' END,\n  error_code=CASE WHEN j.status='failed' THEN NULL ELSE j.error_code END,\n  error_message=CASE WHEN j.status='failed' THEN NULL ELSE j.error_message END,\n  updated_at=now()\n FROM input i,run_state rs\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n AND j.dispatch_execution_id IS NULL\n AND rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n AND (j.status='created' OR (j.status='failed' AND j.attempts<2 AND coalesce(j.error_code,'') IN ('CODEX_TRANSPORT_ERROR','CODEX_TIMEOUT','RUNNER_RESTART_RECOVERABLE')))\n RETURNING j.*,CASE WHEN j.status='ready' THEN 'retry' ELSE 'dispatch' END claim_mode\n), owned AS (\n SELECT * FROM inserted_job UNION ALL SELECT * FROM claimed_existing\n), selected AS (\n SELECT o.* FROM owned o\n UNION ALL\n SELECT e.*,\n  CASE WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='staging' THEN 'dispatch'\n       WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='ready' THEN 'retry'\n       ELSE 'noop' END claim_mode\n FROM existing_job e WHERE NOT EXISTS(SELECT 1 FROM owned)\n LIMIT 1\n), source_docs AS (\n SELECT d.*,row_number() over(order by d.document_index,d.id)::int stable_index\n FROM public.tender_analysis_documents d,selected j\n WHERE d.analysis_run_id=j.analysis_run_id AND d.status IN ('pending','processing','completed')\n AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx')\n), inserted_docs AS (\n INSERT INTO public.tender_agentic_documents(job_id,analysis_run_id,source_document_id,artifact_key,document_index,file_name,mime_type,source_sha256,byte_size,status)\n SELECT j.id,j.analysis_run_id,d.id,'doc-'||lpad(d.stable_index::text,4,'0'),d.stable_index,d.file_name,d.mime_type,\n upper(d.ingestion_metadata->>'content_sha256'),d.file_size,'pending' FROM source_docs d CROSS JOIN selected j\n WHERE j.claim_mode='dispatch'\n ON CONFLICT (job_id,source_document_id) DO NOTHING RETURNING 1\n)\nSELECT s.id job_id,s.analysis_run_id,s.pipeline_version,s.replicate_index,s.status,s.attempts,s.field_catalog_version,s.field_catalog_sha256,\n s.input_manifest_sha256,s.dispatch_execution_id,rs.documents_total,rs.registered_count,rs.processable_count,rs.failed_count,rs.invalid_identity_count,\n CASE WHEN rs.documents_total IS NULL OR rs.registered_count<>rs.documents_total OR rs.processable_count<=0 OR rs.failed_count>0 OR rs.invalid_identity_count>0 THEN 'reject'\n      ELSE coalesce(s.claim_mode,'noop') END action,\n coalesce((SELECT jsonb_agg(jsonb_build_object('source_document_id',d.id,'artifact_key','doc-'||lpad(d.stable_index::text,4,'0'),\n 'document_index',d.stable_index,'file_name',d.file_name,'file_name_base64',encode(convert_to(d.file_name,'UTF8'),'base64'),'mime_type',d.mime_type,'source_sha256',upper(d.ingestion_metadata->>'content_sha256'),\n 'byte_size',d.file_size,'download_url',d.download_url) ORDER BY d.stable_index) FROM source_docs d),'[]'::jsonb) documents\nFROM run_state rs LEFT JOIN selected s ON true;",
+        "options": {
+          "queryReplacement": "={{ [$json.analysis_run_id, $json.pipeline_version, $json.replicate_index, $execution.id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -940,
+        0
+      ],
+      "id": "11000000-0000-4000-8000-000000000003",
+      "name": "Создать или загрузить job и manifest",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const value=$input.first().json;\nif (!['dispatch','retry','noop','reject'].includes(value.action)) throw new Error('[AGENTIC_PREFLIGHT_FAILED] preflight returned no bounded action');\nif (value.action==='reject') throw new Error('[AGENTIC_MANIFEST_INCOMPLETE] registered manifest is missing, failed, incomplete, or has zero processable documents');\nreturn [{json:value}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -700,
+        0
+      ],
+      "id": "11000000-0000-4000-8000-000000000004",
+      "name": "Разобрать решение"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "110-if",
+              "leftValue": "={{ ['dispatch','retry'].includes($json.action) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -480,
+        0
+      ],
+      "id": "11000000-0000-4000-8000-000000000005",
+      "name": "Нужно запускать?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{json:{schema_version:'tender_agentic_dispatch_v1',success:true,no_op:true,job_id:$json.job_id,status:$json.status}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        220
+      ],
+      "id": "11000000-0000-4000-8000-000000000006",
+      "name": "Вернуть no-op"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "http://tender-codex-runner:8080/v1/jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({manifest_version:'tender_source_manifest_v1',job_id:$json.job_id,analysis_run_id:$json.analysis_run_id,pipeline_version:$json.pipeline_version,field_catalog_version:'tender_fields_v1',field_catalog_sha256:'ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',expected_documents:$json.documents.length,documents:$json.documents.map(({download_url,file_name_base64,...document})=>document)}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -240,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000007",
+      "name": "Создать job в runner",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "documents",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000008",
+      "name": "Развернуть документы"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        220,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000009",
+      "name": "Документы по одному"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.documents.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000010",
+      "name": "Скачать оригинал",
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($('Документы по одному').item.json.job_id) + '/documents/' + encodeURIComponent($('Документы по одному').item.json.documents.artifact_key) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Content-SHA256",
+              "value": "={{ $('Документы по одному').item.json.documents.source_sha256 }}"
+            },
+            {
+              "name": "X-Source-Document-Id",
+              "value": "={{ $('Документы по одному').item.json.documents.source_document_id }}"
+            },
+            {
+              "name": "X-File-Name-Base64",
+              "value": "={{ $('Документы по одному').item.json.documents.file_name_base64 }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        },
+        "rawContentType": "application/octet-stream"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000011",
+      "name": "Загрузить оригинал в runner",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tender_agentic_documents\nSET status='staged', staged_sha256=$3::text, runner_storage_key=$4::text, error_code=NULL,error_message=NULL,updated_at=now()\nWHERE job_id=$1::uuid AND source_document_id=$2::uuid\n  AND $3::text=source_sha256 AND $4::text=artifact_key\nRETURNING job_id,source_document_id,artifact_key;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id, $json.source_document_id, $json.sha256, $json.artifact_key] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000012",
+      "name": "Зафиксировать staged документ",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH counts AS (\n SELECT j.id,j.expected_documents,\n count(d.*)::int total_count,\n count(*) FILTER (WHERE d.status='staged')::int staged_count,\n count(*) FILTER (WHERE d.status IN ('pending','uploading','failed'))::int incomplete_count,\n COUNT(DISTINCT d.artifact_key)::int artifact_count,\n COUNT(DISTINCT d.document_index)::int index_count\n FROM public.tender_agentic_jobs j LEFT JOIN public.tender_agentic_documents d ON d.job_id=j.id\n WHERE j.id=$1::uuid GROUP BY j.id\n), updated AS (\n UPDATE public.tender_agentic_jobs j SET status='ready',staged_documents=c.staged_count,updated_at=now()\n FROM counts c WHERE j.id=c.id AND c.total_count=c.expected_documents AND c.staged_count=c.expected_documents\n AND c.incomplete_count=0 AND c.artifact_count=c.expected_documents AND c.index_count=c.expected_documents\n RETURNING j.*\n)\nSELECT *, (total_count=expected_documents AND staged_count=expected_documents AND incomplete_count=0\n AND artifact_count=expected_documents AND index_count=expected_documents) barrier_ok FROM counts JOIN updated ON updated.id=counts.id;",
+        "options": {
+          "queryReplacement": "={{ [$('Разобрать решение').first().json.job_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        120
+      ],
+      "id": "11000000-0000-4000-8000-000000000013",
+      "name": "Проверить staging barrier",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.id) + '/seal' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        120
+      ],
+      "id": "11000000-0000-4000-8000-000000000014",
+      "name": "Запечатать job",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json; const expected=$('Разобрать решение').first().json;\nconst body=response.body??response;\nif (body.job_id!==expected.job_id || body.field_catalog_sha256!=='ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843' || !/^[0-9a-f]{64}$/u.test(String(body.input_manifest_sha256??''))) throw new Error('[AGENTIC_SEAL_IDENTITY_MISMATCH] runner seal identity/hash mismatch');\nreturn [{json:{...expected,input_manifest_sha256:body.input_manifest_sha256}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        120
+      ],
+      "id": "11000000-0000-4000-8000-000000000015",
+      "name": "Проверить seal identity",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.job_id) + '/start' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        120
+      ],
+      "id": "11000000-0000-4000-8000-000000000016",
+      "name": "Запустить Codex",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tender_agentic_jobs SET status='running',dispatch_execution_id=$2::text,input_manifest_sha256=$3::text,\nattempts=GREATEST(attempts,$4::smallint),runner_started_at=coalesce(runner_started_at,now()),heartbeat_at=now(),updated_at=now()\nWHERE id=$1::uuid AND status IN ('ready','running') AND staged_documents=expected_documents\nRETURNING 'tender_agentic_dispatch_v1' schema_version,true success,false no_op,id job_id,status;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id, $execution.id, $json.input_manifest_sha256, $json.runner_attempt] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1320,
+        120
+      ],
+      "id": "11000000-0000-4000-8000-000000000017",
+      "name": "Зафиксировать running",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const source=$input.first().json; const context=$('Разобрать решение').first().json;\nlet document=null; try { document=$('Документы по одному').item.json.documents??null; } catch {}\nreturn [{json:{job_id:context.job_id,source_document_id:document?.source_document_id??null,\nerror_code:String(source.error_code??source.body?.error?.code??'AGENTIC_DISPATCH_FAILED').slice(0,80),\nerror_message:String(source.error_message??source.body?.error?.message??'Agentic dispatch step failed').slice(0,500)}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        340
+      ],
+      "id": "11000000-0000-4000-8000-000000000018",
+      "name": "Сформировать typed failure"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH failed_document AS (\n UPDATE public.tender_agentic_documents d SET status='failed',error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n FROM public.tender_agentic_jobs j\n WHERE d.job_id=$1::uuid AND d.source_document_id=NULLIF($5::text,'')::uuid\n AND j.id=d.job_id AND j.dispatch_execution_id=$4::text AND j.status IN ('created','staging','ready')\n RETURNING d.source_document_id\n), failed_job AS (\n UPDATE public.tender_agentic_jobs SET status='failed',error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$4::text AND status IN ('created','staging','ready')\n RETURNING *\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,false success,id job_id,status,error_code,error_message,\n (SELECT count(*) FROM failed_document)::int failed_documents FROM failed_job;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.error_code,$json.error_message,$execution.id,$json.source_document_id ?? ''] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1100,
+        340
+      ],
+      "id": "11000000-0000-4000-8000-000000000019",
+      "name": "Сохранить typed failure",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "110-retry-if",
+              "leftValue": "={{ $json.action === 'dispatch' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -240,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000012000100",
+      "name": "Нужен staging?"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const job=$input.first().json;\nif (job.action!=='retry' || !/^[0-9a-f]{64}$/iu.test(String(job.input_manifest_sha256??''))) throw new Error('[AGENTIC_RETRY_CONTRACT_INVALID] retry requires sealed manifest identity');\nreturn [{json:job}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "id": "12000000-0000-4000-8000-000012000101",
+      "name": "Подготовить retry start"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json; const document=$('Документы по одному').item.json; const body=response.body??response;\nif (Number(response.statusCode??200)!==200 || body.job_id!==document.job_id || body.artifact_key!==document.documents.artifact_key ||\n String(body.sha256??'').toUpperCase()!==String(document.documents.source_sha256??'').toUpperCase() || Number(body.byte_size)!==Number(document.documents.byte_size)) {\n throw new Error('[AGENTIC_UPLOAD_IDENTITY_MISMATCH] runner upload identity/hash mismatch');\n}\nreturn [{json:{job_id:document.job_id,source_document_id:document.documents.source_document_id,artifact_key:document.documents.artifact_key,sha256:body.sha256}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000012000102",
+      "name": "Проверить upload identity",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json; const expected=$('Разобрать решение').first().json; const body=response.body??response;\nif (![200,202].includes(Number(response.statusCode??200)) || body.job_id!==expected.job_id || body.analysis_run_id!==expected.analysis_run_id ||\n body.pipeline_version!==expected.pipeline_version || body.field_catalog_version!=='tender_fields_v1' ||\n body.field_catalog_sha256!==expected.field_catalog_sha256 || body.input_manifest_sha256!==expected.input_manifest_sha256 ||\n !['running','validating','completed'].includes(body.status)) throw new Error('[AGENTIC_START_IDENTITY_MISMATCH] runner start identity/hash mismatch');\nreturn [{json:{...expected,runner_status:body.status,runner_attempt:Number(body.attempt??expected.attempts??1)}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        120
+      ],
+      "id": "12000000-0000-4000-8000-000012000103",
+      "name": "Проверить start identity",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json; const expected=$('Разобрать решение').first().json; const body=response.body??response;\nif (![200,201].includes(Number(response.statusCode??200)) || body.job_id!==expected.job_id || body.analysis_run_id!==expected.analysis_run_id ||\n body.pipeline_version!==expected.pipeline_version || body.field_catalog_version!==expected.field_catalog_version ||\n body.field_catalog_sha256!==expected.field_catalog_sha256 || body.expected_documents!==expected.documents.length ||\n !['staging','ready'].includes(body.status)) throw new Error('[AGENTIC_RUNNER_JOB_IDENTITY_MISMATCH] runner job identity mismatch');\nreturn [{json:expected}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "11000000-0000-4000-8000-000000000120",
+      "name": "Восстановить manifest context",
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Проверить вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить вход": {
+      "main": [
+        [
+          {
+            "node": "Создать или загрузить job и manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать или загрузить job и manifest": {
+      "main": [
+        [
+          {
+            "node": "Разобрать решение",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разобрать решение": {
+      "main": [
+        [
+          {
+            "node": "Нужно запускать?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нужно запускать?": {
+      "main": [
+        [
+          {
+            "node": "Нужен staging?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Вернуть no-op",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать job в runner": {
+      "main": [
+        [
+          {
+            "node": "Восстановить manifest context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Развернуть документы": {
+      "main": [
+        [
+          {
+            "node": "Документы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Документы по одному": {
+      "main": [
+        [
+          {
+            "node": "Проверить staging barrier",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Скачать оригинал",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скачать оригинал": {
+      "main": [
+        [
+          {
+            "node": "Загрузить оригинал в runner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Загрузить оригинал в runner": {
+      "main": [
+        [
+          {
+            "node": "Проверить upload identity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Зафиксировать staged документ": {
+      "main": [
+        [
+          {
+            "node": "Документы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить staging barrier": {
+      "main": [
+        [
+          {
+            "node": "Запечатать job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запечатать job": {
+      "main": [
+        [
+          {
+            "node": "Проверить seal identity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить seal identity": {
+      "main": [
+        [
+          {
+            "node": "Запустить Codex",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запустить Codex": {
+      "main": [
+        [
+          {
+            "node": "Проверить start identity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать typed failure": {
+      "main": [
+        [
+          {
+            "node": "Сохранить typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нужен staging?": {
+      "main": [
+        [
+          {
+            "node": "Создать job в runner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Подготовить retry start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить upload identity": {
+      "main": [
+        [
+          {
+            "node": "Зафиксировать staged документ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить retry start": {
+      "main": [
+        [
+          {
+            "node": "Запустить Codex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить start identity": {
+      "main": [
+        [
+          {
+            "node": "Зафиксировать running",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Восстановить manifest context": {
+      "main": [
+        [
+          {
+            "node": "Развернуть документы",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "AGENTIC_ERROR_WORKFLOW_ID"
+  },
+  "versionId": "00000000-0000-4000-8000-000000000111",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
