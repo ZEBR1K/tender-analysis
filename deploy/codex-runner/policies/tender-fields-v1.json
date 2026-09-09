@@ -4,7 +4,7 @@
   "expected_catalog_sha256": "ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843",
   "catalog_snapshot_source": "evaluations/codex-agentic-blind-test-2026-09-08/inputs/FIELD_CATALOG.md",
   "root_catalog_source": "FIELD_CATALOG.md",
-  "root_catalog_sha256_observed": "6A480E2D32F177BEE60BB454CF85F8A6964D34E251065A71A16BF88EF3B522E9",
+  "root_catalog_sha256_observed": "F44681985CB0078A531D46AC608ABACA9DEA817C0AA98AE9C1916A490F30B394",
   "root_catalog_reconciliation_required": true,
   "fields": {
     "procurement_subject": { "field_index": 1 },

@@ -511,7 +511,7 @@ tests/fixtures/agentic/results/*.json
 - [ ] Pin `ajv@8.20.0` and `ajv-formats@3.0.1` exactly, commit the lockfile and compile both Draft 2020-12 schemas through the reusable strict Ajv boundary used later by Task 9.
 - [ ] Implement the two JSON Schemas with `additionalProperties=false` at every controlled object level.
 - [ ] Build `tender-fields-v1.json` as only the catalog identity plus exact 27 `field_key`/`field_index` mapping. Do not encode field types, arithmetic, completeness, negative-answer or control-selection rules.
-- [ ] Pin the user-confirmed blind-test catalog SHA-256 `ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843`, record its snapshot source and retain the observed repository-catalog SHA-256 `6A480E2D32F177BEE60BB454CF85F8A6964D34E251065A71A16BF88EF3B522E9` with `root_catalog_reconciliation_required=true`.
+- [ ] Pin the user-confirmed blind-test catalog SHA-256 `ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843`, record its snapshot source and retain the canonical-LF repository-catalog SHA-256 `F44681985CB0078A531D46AC608ABACA9DEA817C0AA98AE9C1916A490F30B394` with `root_catalog_reconciliation_required=true`. Root `FIELD_CATALOG.md` is checked out as LF on every platform; the pinned blind-test snapshot remains byte-preserved.
 - [ ] Add a test proving exact one-to-one key/index mapping with both catalog files and proving their hash mismatch is explicit. A missing/extra key or an unacknowledged identity change is a hard failure; deployment stays gated until reconciliation.
 
 Run:
