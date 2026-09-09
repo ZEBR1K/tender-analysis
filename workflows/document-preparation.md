@@ -4,7 +4,7 @@
 
 **Workflow ID в n8n:** `0scTZu1aBKsMd6AM`
 
-**Статус:** inactive draft; не подключён к production Orchestrator
+**Статус:** inactive repository candidate; подключён в inactive canonical Orchestrator export, production deployment не выполнен
 
 **Repository export:** `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 
@@ -15,14 +15,15 @@ Workflow принимает metadata всех вложений одного `ana
 ```text
 analysis_run_id + attachments
 → классификация всех source attachments
-→ прямые PDF/DOCX/XLSX без скачивания
+→ последовательная загрузка прямых PDF/DOCX/XLSX
+→ byte size + MIME + SHA-256 исходных bytes
 → последовательная загрузка и распаковка архивов
 → обычные extracted files
 → skipped records для неподдерживаемых файлов и контейнеров
 → единый manifest либо typed failure
 ```
 
-Он расположен логически между TenderPlan FullInfo и текущей нодой Orchestrator `Зарегистрировать документы`. До подключения caller-контракт Orchestrator остаётся без изменений.
+В canonical repository export Orchestrator вызывает workflow один раз после TenderPlan normalization и до единственного atomic run/document INSERT. Caller синхронно ждёт полный manifest; typed failure или invalid contract останавливают путь до создания run и до первого Worker. Это repository-only изменение: live deployment и runtime verification не выполнялись.
 
 ## Входной контракт
 
@@ -62,7 +63,7 @@ nested archive depth: 3
 deadline per source archive: 5 minutes
 ```
 
-Архивы обрабатываются последовательно через `Loop Over Items`, чтобы ограничить нагрузку и прекратить run на первой ошибке. Реальная распаковка выполняется внутренним сервисом `deploy/archive-extractor`; binary обычных файлов этот workflow не скачивает.
+Прямые документы и архивы обрабатываются отдельными последовательными `Loop Over Items` с `batchSize=1`, чтобы ограничить нагрузку и прекратить run на первой ошибке. Для прямого документа HTTP Request держит тело только в `binary.data`; Code node читает bytes только для размера, а native Crypto node вычисляет SHA-256. Binary не переносится в JSON/manifest. Реальная распаковка архивов выполняется внутренним сервисом `deploy/archive-extractor`.
 
 Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, control/NUL paths, normalized collisions, symlink, hardlink и special entries. Антивирусная проверка не предусмотрена по принятому scope.
 
@@ -81,7 +82,7 @@ Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, co
 }
 ```
 
-Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped`; только PDF/DOCX/XLSX получают `pending`.
+Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Каждый `pending` PDF/DOCX/XLSX обязан иметь непустые `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped` и не dispatch-ятся.
 
 Ошибка:
 
@@ -97,7 +98,7 @@ Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, co
 }
 ```
 
-`failure` также содержит `source_attachment_index` и `extractor_job_id`. Любая ошибка одного архива завершает preparation до регистрации manifest и до запуска первого Worker. Частичный manifest не возвращается.
+`failure` также содержит `source_attachment_index` и `extractor_job_id`. Любая ошибка direct download/hash или одного архива завершает preparation до регистрации manifest и до запуска первого Worker. Частичный manifest не возвращается.
 
 ## Проверка
 
@@ -113,7 +114,7 @@ MCP pin-tests на live n8n:
 - execution `14673`: ZIP с двумя PDF одинакового basename в разных путях + TXT, success;
 - execution `14674`: typed `ARCHIVE_TOTAL_TOO_LARGE`, fail-closed output.
 
-В этих execution HTTP Request nodes были заменены pin data. Поэтому они подтверждают Code/IF/Split Out/Loop topology и output contracts, но сами по себе не подтверждают сетевую доступность или реальную распаковку внутренним 7-Zip сервисом.
+Эти executions относятся к предыдущему archive-only draft: HTTP Request nodes были заменены pin data. Они не подтверждают новый direct download/hash path, текущую Orchestrator integration или сетевую доступность внутреннего 7-Zip сервиса.
 
 Production extractor runtime-check от 2026-09-08:
 
@@ -125,14 +126,11 @@ Production extractor runtime-check от 2026-09-08:
 - IDs, `StartedAt` и restart counts всех восьми существовавших до deployment контейнеров не изменились;
 - RAR/TAR/GZIP и реальный TenderPlan archive ещё не проходили runtime-canary; это остаётся отдельным verification gate и не отменяет local regression coverage.
 
-## Следующий интеграционный шаг
-
-После завершения параллельных изменений Orchestrator:
+## Оставшиеся rollout-шаги
 
 1. применить additive migration `deploy/postgres/migrations/2026-09-07-add-document-ingestion-metadata.sql`;
-2. вызвать этот workflow после нормализации TenderPlan attachments;
-3. регистрировать все `manifest.documents` одной DB-операцией;
-4. запускать Workers только для зарегистрированных документов со статусом `pending`;
-5. на `success=false` завершать run как failed и не запускать Workers;
-6. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback;
-7. выполнить bounded runtime-canary на реальном TenderPlan archive до production activation.
+2. импортировать согласованные inactive Orchestrator, Preparation, Worker и Intake Resume exports;
+3. оставить вызов preparation синхронным и запускать Workers только для зарегистрированных документов со статусом `pending`;
+4. на `success=false` не создавать run и не запускать Workers;
+5. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback;
+6. выполнить bounded runtime-canary для direct file и реального TenderPlan archive до production activation.

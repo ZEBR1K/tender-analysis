@@ -601,7 +601,9 @@ test('normalization rejects a mismatched TenderPlan identity', () => {
   const validation = validationNodes[0];
 
   const normalizationNodes = nodesOfType('n8n-nodes-base.code').filter((node) =>
-    canReach(fullInfoHttp.name, node.name) && canReach(node.name, creation.name),
+    canReach(fullInfoHttp.name, node.name)
+    && canReach(node.name, creation.name)
+    && /TenderPlan response tender\._id is required/u.test(codeSource(node)),
   );
   assert.equal(normalizationNodes.length, 1, 'expected exactly one FullInfo normalization node');
   const normalizationCode = codeSource(normalizationNodes[0]);
@@ -651,7 +653,9 @@ test('normalization preserves validated intake provenance through run creation',
     codeChecksTypedInput(codeSource(node)),
   );
   const normalization = nodesOfType('n8n-nodes-base.code').find((node) =>
-    canReach(fullInfoHttp.name, node.name) && canReach(node.name, creation.name),
+    canReach(fullInfoHttp.name, node.name)
+    && canReach(node.name, creation.name)
+    && /TenderPlan response tender\._id is required/u.test(codeSource(node)),
   );
   assert.ok(validation && normalization, 'expected validation and normalization nodes');
   const normalizationCode = codeSource(normalization);
@@ -670,7 +674,7 @@ test('normalization preserves validated intake provenance through run creation',
   }
   assert.match(
     String(creation.parameters?.options?.queryReplacement ?? ''),
-    /\$json\.source\b/,
+    /\$\('Проверить результат подготовки'\)\.first\(\)\.json\.source\b/u,
     'run creation must bind source from the preserved validated input',
   );
 });
@@ -809,7 +813,7 @@ test('created and concurrent paths return one symmetric structured result', () =
   );
 });
 
-test('zero supported documents bypass Split Out and return the shared structured result', () => {
+test('only pending supported documents reach Split Out and the legacy Worker', () => {
   const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
     /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
   );
@@ -826,11 +830,12 @@ test('zero supported documents bypass Split Out and return the shared structured
     (node) => node.type === 'n8n-nodes-base.filter' && canReach(attachmentSplit.name, node.name),
   );
   assert.ok(extensionFilter, 'expected supported-extension filter downstream of Split Out');
-  const supportedExtensions = (extensionFilter.parameters?.conditions?.conditions ?? [])
-    .map((condition) => String(condition.rightValue ?? '').trim().toLowerCase())
-    .filter(Boolean)
-    .filter((value, index, values) => values.indexOf(value) === index);
+  const extensionFilterSource = stringsIn(extensionFilter.parameters).join('\n').toLowerCase();
+  const supportedExtensions = ['pdf', 'docx', 'xlsx'].filter((extension) =>
+    extensionFilterSource.includes(`'${extension}'`),
+  );
   assert.ok(supportedExtensions.length > 0, 'extension filter must declare supported extensions');
+  assert.match(extensionFilterSource, /status\s*===\s*'pending'/u);
 
   const supportedDocumentGates = nodesOfType('n8n-nodes-base.if').filter((node) => {
     if (node.name === createdNewRunIf.name) return false;
@@ -850,6 +855,7 @@ test('zero supported documents bypass Split Out and return the shared structured
     'new runs must pass through one pre-Split gate that checks for supported attachments',
   );
   const gate = supportedDocumentGates[0];
+  assert.match(stringsIn(gate.parameters).join('\n'), /status\s*===\s*'pending'/u);
   const terminalNodes = structuredTerminalCodeNodes();
   assert.equal(terminalNodes.length, 1, 'expected one shared structured terminal result');
   const terminal = terminalNodes[0];

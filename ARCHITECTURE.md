@@ -132,7 +132,7 @@ tender_analysis_facts
 tender_analysis_field_results
 ```
 
-Подготовлен, но пока не подключён к production data flow, восьмой reusable workflow `TENDER — Подготовить документацию` (`0scTZu1aBKsMd6AM`). Он должен стать preprocessing boundary между TenderPlan attachments и массовой регистрацией документов: прямые PDF/DOCX/XLSX проходят как metadata, архивы раскрываются внутренним bounded extractor, а Orchestrator получает полный manifest либо typed failure до запуска Workers. До отдельной интеграции текущая production-архитектура из семи workflow выше не меняется.
+Восьмой reusable workflow `TENDER — Подготовить документацию` (`0scTZu1aBKsMd6AM`) подключён в inactive canonical Orchestrator export как синхронная preprocessing boundary до atomic run/document INSERT. Прямые PDF/DOCX/XLSX последовательно скачиваются только для byte size, MIME и SHA-256, архивы раскрываются внутренним bounded extractor, а Orchestrator принимает только полный manifest либо останавливается до создания run. Это repository candidate-only состояние: production import/activation и runtime verification не выполнялись.
 
 ---
 
@@ -374,7 +374,7 @@ failed
 processing
 ```
 
-`skipped` существует в DB schema, но текущая readiness semantics не считает его эквивалентом completed.
+`skipped` является terminal status для readiness вместе с `completed`; `failed` остаётся блокирующим fail path. Worker и Intake Resume используют одинаковый barrier `completed + skipped = documents_total`.
 
 ---
 
@@ -1037,7 +1037,8 @@ processing
 ```text
 documents_total > 0
 registered = documents_total
-completed = documents_total
+failed = 0
+completed + skipped = documents_total
 ```
 
 ---

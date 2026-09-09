@@ -513,6 +513,7 @@ Migration намеренно не добавляет trigger для `updated_at`
 | 19 | `updated_at` | timestamptz | NO | `now()` |
 | 20 | `started_at` | timestamptz | YES | — |
 | 21 | `completed_at` | timestamptz | YES | — |
+| 22 | `ingestion_metadata` | jsonb | NO | `'{}'::jsonb` |
 
 ---
 

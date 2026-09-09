@@ -1,7 +1,7 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
 **Статус:** inactive repository candidate / offline-tested / pre-DB runtime smoke GREEN
-**Последнее обновление:** 2026-09-08
+**Последнее обновление:** 2026-09-10
 **Тип:** reusable new-run-only sub-workflow
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`
 **Canonical export:** `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
@@ -10,7 +10,7 @@
 **Error Workflow:** не настроен
 **Основной источник:** TenderPlan FullInfo API
 
-Этот документ описывает текущий canonical JSON в repository. Export содержит 14 нод, включая Sticky Note, имеет `active=false`, `availableInMCP=false` и `executionOrder=v1`.
+Этот документ описывает текущий canonical JSON в repository. Export содержит 17 нод, включая Sticky Note, имеет `active=false`, `availableInMCP=false` и `executionOrder=v1`.
 
 Canonical export сам по себе не доказывает live installation, публикацию,
 корректность credentials или production runtime. Task 3 подтверждён offline
@@ -18,6 +18,10 @@ tests и bounded pre-DB runtime smoke: exact input validation, TenderPlan FullIn
 identity и normalization выполнены, после чего execution остановлен до DB
 registration. DB registration, Worker dispatch, complete runtime и promotion
 остаются непроверенными.
+
+Archive-aware preparation, direct-file identity collection и skipped-aware
+readiness подтверждены только local regression tests; production runtime ими не
+подтверждён.
 
 ---
 
@@ -30,9 +34,11 @@ typed intake input
 → TenderPlan FullInfo
 → validate response identity
 → normalize tender metadata and attachments
+→ generate one analysis_run_id
+→ synchronously prepare and validate the complete manifest
 → atomically create run as processing
-→ register every attachment as pending
-→ asynchronously dispatch supported documents
+→ register all pending/skipped manifest rows
+→ asynchronously dispatch only pending PDF/DOCX/XLSX
 → return one structured result
 ```
 
@@ -69,7 +75,7 @@ Manual Trigger и hardcoded `tender_id` в canonical candidate отсутств�
 
 ---
 
-# 3. Текущий 14-node graph
+# 3. Текущий 17-node graph
 
 Исполняемый путь:
 
@@ -78,6 +84,9 @@ When Executed by Another Workflow
 → Проверить вход Orchestrator
 → получить полную информацию о тендере
 → нормализовать карточку
+→ Сформировать analysis_run_id
+→ Подготовить документацию
+→ Проверить результат подготовки
 → Создать запуск и зарегистрировать документы
 → Создан новый запуск?
 ```
@@ -105,7 +114,7 @@ created_new_run=false
 → Вернуть результат Orchestrator
 ```
 
-Четырнадцатая нода — `Sticky Note`; она не участвует в execution graph.
+Семнадцатая нода — `Sticky Note`; она не участвует в execution graph.
 
 ---
 
@@ -165,6 +174,8 @@ raw_source
 
 Orchestrator также сохраняет существующий normalized `tender_meta` contract: идентификаторы, основные данные, даты, всех customers и `primary_customer`, platform, structured guarantees, classifiers и `documents_count`. Валюта не додумывается: если TenderPlan её не сообщил, используется `null`.
 
+После normalization native Crypto создаёт `analysis_run_id`. Нода `Подготовить документацию` получает этот ID и полный `attachments[]` ровно один раз, работает в `mode=all` и синхронно ждёт sub-workflow. `Проверить результат подготовки` fail-closed проверяет `success=true`, schema/run identity, полные counts и последовательные document indices. Каждый `pending` документ обязан иметь `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Typed failure, partial manifest или identity defect останавливают execution до DB INSERT.
+
 ---
 
 # 6. Snapshot-safe atomic run creation
@@ -182,8 +193,8 @@ input_documents
 
 Основные свойства:
 
-1. `inserted_run` сразу вставляет run со `status='processing'`.
-2. `registered_documents` вставляет все normalized attachments из `input_documents` со `status='pending'` и ссылается только на новый `inserted_run`.
+1. `inserted_run` использует заранее созданный `analysis_run_id` и сразу вставляет run со `status='processing'`.
+2. `registered_documents` вставляет все подготовленные `manifest.documents` и сохраняет их `status`, `mime_type`, `file_size`, `error_message` и полное `ingestion_metadata` с hash/provenance.
 3. `(analysis_run_id, document_index)` остаётся document UPSERT boundary.
 4. `document_stats` считает зарегистрированные строки и собирает их обратно в `attachments` с внутренними `document_id`.
 5. Ошибка statement откатывает и run, и регистрацию документов вместе.
@@ -254,7 +265,7 @@ Conflict branch не регистрирует документы повторн�
 
 # 8. Supported-document dispatch
 
-Перед `Split Out` нода `Есть поддерживаемые документы?` проверяет, содержит ли зарегистрированный массив хотя бы один документ с расширением:
+Перед `Split Out` нода `Есть поддерживаемые документы?` проверяет, содержит ли зарегистрированный массив хотя бы один документ со статусом `pending` и расширением:
 
 ```text
 pdf
@@ -262,12 +273,12 @@ docx
 xlsx
 ```
 
-Если поддерживаемых документов нет, путь обходит `Split Out` и всё равно возвращает structured result с `documents_dispatched=0`.
+Успешный preparation contract гарантирует хотя бы один processable документ; false-ветка остаётся defense-in-depth и обходит `Split Out` с `documents_dispatched=0`.
 
 Если поддерживаемый документ есть:
 
 1. `разделить документы` создаёт один item на attachment и сохраняет `analysis_run_id`, `tender_meta`, `created_new_run`.
-2. `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` пропускает только `pdf`, `docx`, `xlsx`.
+2. `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` пропускает только `pending` `pdf`, `docx`, `xlsx`; `skipped` audit rows до Worker не доходят.
 3. `Запустить обработку документа` работает в `mode=each`.
 4. Child workflow получает один зарегистрированный document item с внутренним `document_id` и общим `analysis_run_id`.
 5. `waitForSubWorkflow=false`: вызовы fire-and-forget, Orchestrator не ждёт Worker output.
@@ -335,8 +346,7 @@ documents_dispatched
 
 | Исход | `created_new_run` | `action` | `documents_dispatched` |
 |---|---:|---|---:|
-| Новый run, есть supported documents | `true` | `created_new_run` | число `pdf/docx/xlsx` |
-| Новый run, нет supported documents | `true` | `created_new_run` | `0` |
+| Новый run, preparation success | `true` | `created_new_run` | число `pending` `pdf/docx/xlsx` |
 | Concurrent active run | `false` | `concurrent_existing_run` | `0` |
 
 `status` и `next_state` оба отражают фактический текущий run status. `next_state` не содержит action label.
@@ -347,17 +357,17 @@ Malformed identity, неожиданный zero/multiple conflict result или 
 
 # 11. Открытые границы
 
-## OR-0 — unsupported documents
+## OR-0 — unsupported documents (локально закрыт)
 
-Все attachments регистрируются до dispatch, но только `pdf/docx/xlsx` получают Worker call. Unsupported document остаётся `pending`. Даже при смешанном наборе supported и unsupported документов это может навсегда удержать run в `processing`.
+Все source attachments представлены в подготовленном manifest. Unsupported files и archive containers регистрируются как `skipped`; Worker получает только `pending` PDF/DOCX/XLSX.
 
-Structured Orchestrator output устраняет silent zero-item return, но не решает lifecycle unsupported document. Нужны явный terminal status/reason и согласованное изменение readiness semantics.
+Canonical Worker и Intake Resume используют согласованный terminal barrier `completed + skipped = documents_total`; `failed` остаётся блокирующим. Изменение подтверждено offline tests, но не production runtime.
 
-## OR-1 — zero documents / zero supported documents
+## OR-1 — zero documents / zero supported documents (локально закрыт)
 
-Новый run без supported documents теперь возвращает structured result с `documents_dispatched=0`; caller не теряет `analysis_run_id`.
+Preparation возвращает typed `NO_PROCESSABLE_DOCUMENTS` до DB INSERT, если во всём manifest нет processable PDF/DOCX/XLSX.
 
-Но run уже имеет `status='processing'`, а Worker completion не произойдёт. Поэтому run всё ещё может остаться в `processing`. Выбор terminal semantics (`failed`, metadata-only path или другой явный outcome) остаётся открытым.
+Поэтому zero-processable вход не создаёт `analysis_run` и не dispatch-ит Worker. Runtime verification остаётся rollout gate.
 
 ## OR-4 — limited formats
 
@@ -401,6 +411,7 @@ Offline contract test:
 
 ```text
 tests/tender-orchestrator-input.test.mjs
+tests/intake-agentic-shadow-routing.test.mjs
 ```
 
 Он проверяет:
@@ -415,7 +426,7 @@ tests/tender-orchestrator-input.test.mjs
 - регистрацию всех документов до первого Worker;
 - `mode=each`, passthrough Worker input и `waitForSubWorkflow=false`;
 - единый structured terminal result;
-- прямой terminal path при zero supported documents.
+- synchronous preparation dominance, fail-closed manifest identity и pending-only Worker dispatch.
 
 Read-only execution `14678` отдельно подтвердил exact input validation,
 TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke был
@@ -429,7 +440,7 @@ TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke 
 2. импортировать/read back inactive workflow и проверить connections/settings;
 3. подтвердить credentials и выбранный Worker package;
 4. выполнить new-run, concurrent conflict, mixed unsupported и zero-document scenarios;
-5. отдельно решить `OR-0`, `OR-1`, `OR-5`, `OR-6`;
+5. отдельно решить `OR-5`, `OR-6` и production rollout gates;
 6. только после этого принимать решение о promotion.
 
 ---

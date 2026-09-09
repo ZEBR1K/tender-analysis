@@ -1528,10 +1528,11 @@ processing
 ```text
 documents_total > 0
 registered_documents_count = documents_total
-completed_documents_count = documents_total
+failed_documents_count = 0
+completed_documents_count + skipped_documents_count = documents_total
 ```
 
-Это означает, что текущая readiness semantics требует **все documents = completed**.
+`completed` и `skipped` являются terminal document statuses для barrier; `failed` остаётся fail path и не разрешает Aggregator claim.
 
 ---
 
@@ -1540,9 +1541,9 @@ completed_documents_count = documents_total
 Пример трёх Workers:
 
 ```text
-Worker 1 → 1/3 completed → false
-Worker 2 → 2/3 completed → false
-Worker 3 → 3/3 completed
+Worker 1 → 1/3 terminal → false
+Worker 2 → 2/3 terminal → false
+Worker 3 → 3/3 terminal (`completed` или `skipped`)
           → atomic UPDATE processing→ready_for_aggregation
           → should_start_aggregation=true
 ```
@@ -1556,13 +1557,12 @@ Worker 3 → 3/3 completed
 Текущие reason codes:
 
 ```text
-all_documents_completed
+all_documents_terminal
 documents_count_mismatch
 failed_documents_exist
 documents_still_processing
 documents_still_pending
-skipped_documents_exist
-not_all_documents_completed
+not_all_documents_terminal
 run_not_claimed
 ```
 
@@ -1664,31 +1664,29 @@ TENDER — Ошибка обработки документа
 
 ---
 
-## 38. Cross-workflow issue: skipped documents
+## 38. Cross-workflow contract: skipped documents
 
-Будущий fix Orchestrator:
+Canonical repository exports используют:
 
 ```text
 unsupported → skipped
 ```
 
-нельзя внедрять изолированно.
-
-Текущий readiness требует:
+и согласованный readiness barrier:
 
 ```text
-completed_documents_count = documents_total
+failed_documents_count = 0
+completed_documents_count + skipped_documents_count = documents_total
 ```
 
 Поэтому:
 
 ```text
-2 completed + 1 skipped
+2 completed + 1 skipped → ready
+2 completed + 1 failed → blocked
 ```
 
-не считается ready.
-
-Если `skipped` станет допустимым terminal status, readiness semantics Worker нужно менять одновременно.
+Worker и Intake Resume содержат byte-semantically equivalent readiness SQL. Это локальный repository contract; production runtime ещё не проверен.
 
 ---
 

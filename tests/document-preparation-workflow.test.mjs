@@ -84,7 +84,7 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   const workflow = await loadWorkflow();
   assert.equal(workflow.name, 'TENDER — Подготовить документацию');
   assert.equal(workflow.active, false);
-  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 14);
+  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 23);
   assert.equal(workflow.nodes.filter((node) => node.type === 'n8n-nodes-base.stickyNote').length, 1);
 
   const trigger = findNode(workflow, 'When Executed by Another Workflow');
@@ -99,6 +99,18 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   assert.equal(download.parameters.options.response.response.outputPropertyName, 'archive');
   assert.equal(download.retryOnFail, false);
   assert.equal(download.onError, 'continueErrorOutput');
+
+  const directDownload = findNode(workflow, 'Скачать прямой документ');
+  assert.equal(directDownload.parameters.options.response.response.responseFormat, 'file');
+  assert.equal(directDownload.parameters.options.response.response.outputPropertyName, 'data');
+  assert.equal(directDownload.retryOnFail, false);
+  assert.equal(directDownload.onError, 'continueErrorOutput');
+
+  const directLoop = findNode(workflow, 'Обработать прямые документы по одному');
+  assert.equal(directLoop.parameters.batchSize, 1);
+  const directHash = findNode(workflow, 'Вычислить SHA-256 прямого документа');
+  assert.equal(directHash.parameters.binaryData, true);
+  assert.equal(directHash.parameters.type, 'SHA256');
 
   const extract = findNode(workflow, 'Распаковать архив');
   assert.equal(extract.parameters.contentType, 'binaryData');
@@ -118,9 +130,15 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   assert.deepEqual(c['Распаковать архив'].main[1].map(({ node }) => node), ['Нормализовать распаковку']);
   assert.deepEqual(c['Архив обработан?'].main[0].map(({ node }) => node), ['Обработать архивы по одному']);
   assert.deepEqual(c['Архив обработан?'].main[1].map(({ node }) => node), ['Сформировать ошибку подготовки']);
+  assert.deepEqual(c['Обработать прямые документы по одному'].main[0].map(({ node }) => node), ['Есть архивы?']);
+  assert.deepEqual(c['Обработать прямые документы по одному'].main[1].map(({ node }) => node), ['Скачать прямой документ']);
+  assert.deepEqual(c['Скачать прямой документ'].main[1].map(({ node }) => node), ['Нормализовать скачивание прямого документа']);
+  assert.deepEqual(c['Вычислить SHA-256 прямого документа'].main[1].map(({ node }) => node), ['Зафиксировать идентичность прямого документа']);
+  assert.deepEqual(c['Идентичность прямого документа готова?'].main[0].map(({ node }) => node), ['Обработать прямые документы по одному']);
+  assert.deepEqual(c['Идентичность прямого документа готова?'].main[1].map(({ node }) => node), ['Сформировать ошибку подготовки']);
 });
 
-test('no-archive input creates direct and skipped documents without binary download', async () => {
+test('no-archive input hashes direct documents and preserves skipped audit rows', async () => {
   const workflow = await loadWorkflow();
   const classified = await executeCode({
     workflow,
@@ -135,18 +153,55 @@ test('no-archive input creates direct and skipped documents without binary downl
   });
   const context = classified[0].json;
   assert.deepEqual(context.archive_jobs, []);
-  assert.deepEqual(context.base_documents.map((document) => document.status), ['pending', 'skipped']);
+  assert.equal(context.direct_document_jobs.length, 1);
+  assert.deepEqual(context.base_documents.map((document) => document.status), ['skipped']);
+
+  const bytes = Buffer.from('%PDF direct fixture');
+  const normalized = await executeCode({
+    workflow,
+    name: 'Нормализовать скачивание прямого документа',
+    inputItems: [{
+      json: {},
+      binary: { data: { fileName: 'specification.pdf', mimeType: 'application/pdf' } },
+    }],
+    sourceItemsByNode: {
+      'Обработать прямые документы по одному': [{
+        json: { direct_document_jobs: context.direct_document_jobs[0] },
+      }],
+    },
+    binaryBuffers: { '0:data': bytes },
+  });
+  assert.equal(normalized[0].json.file_size, bytes.length);
+  assert.equal(normalized[0].json.mime_type, 'application/pdf');
+
+  const identified = await executeCode({
+    workflow,
+    name: 'Зафиксировать идентичность прямого документа',
+    inputItems: [{ json: { content_sha256: 'a'.repeat(64) } }],
+    sourceItemsByNode: {
+      'Нормализовать скачивание прямого документа': normalized,
+    },
+  });
 
   const result = await executeCode({
     workflow,
     name: 'Сформировать полный manifest',
     inputItems: classified,
-    sourceItemsByNode: { 'Проверить и классифицировать вход': classified },
+    sourceItemsByNode: {
+      'Проверить и классифицировать вход': classified,
+      'Зафиксировать идентичность прямого документа': identified,
+    },
   });
   assert.equal(result[0].json.success, true);
   assert.equal(result[0].json.manifest.processable_document_count, 1);
   assert.equal(result[0].json.manifest.skipped_document_count, 1);
   assert.deepEqual(result[0].json.manifest.documents.map((document) => document.document_index), [1, 2]);
+  const directDocument = result[0].json.manifest.documents[0];
+  assert.equal(directDocument.file_name, 'specification.pdf');
+  assert.equal(directDocument.mime_type, 'application/pdf');
+  assert.equal(directDocument.file_size, bytes.length);
+  assert.equal(directDocument.status, 'pending');
+  assert.equal(directDocument.ingestion_metadata.content_sha256, 'a'.repeat(64));
 });
 
 test('archive manifest keeps root container, stable paths and duplicate basenames', async () => {
@@ -177,7 +232,10 @@ test('archive manifest keeps root container, stable paths and duplicate basename
     workflow,
     name: 'Сформировать полный manifest',
     inputItems: [{ json: { job, extractor_result: extractorResult } }],
-    sourceItemsByNode: { 'Проверить и классифицировать вход': classified },
+    sourceItemsByNode: {
+      'Проверить и классифицировать вход': classified,
+      'Нормализовать распаковку': [{ json: { job, extractor_result: extractorResult } }],
+    },
   });
   const documents = result[0].json.manifest.documents;
   assert.deepEqual(documents.map((document) => document.ingestion_metadata.entry_path), [null, 'a/report.pdf', 'b/report.pdf']);

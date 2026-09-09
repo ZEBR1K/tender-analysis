@@ -1526,7 +1526,16 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   );
   assert.match(dispatcherReadinessSql, /documents_total\s*>\s*0/iu);
   assert.match(dispatcherReadinessSql, /registered_documents_count\s*=\s*s\.documents_total/iu);
-  assert.match(dispatcherReadinessSql, /completed_documents_count\s*=\s*s\.documents_total/iu);
+  assert.match(
+    dispatcherReadinessSql,
+    /\(\s*s\.completed_documents_count\s*\+\s*s\.skipped_documents_count\s*\)\s*=\s*s\.documents_total/iu,
+    'completed and skipped documents must both satisfy the terminal readiness barrier',
+  );
+  assert.match(
+    dispatcherReadinessSql,
+    /s\.failed_documents_count\s*=\s*0/iu,
+    'failed documents must remain outside the terminal readiness barrier',
+  );
   assert.match(dispatcherReadinessSql, /status\s*=\s*'ready_for_aggregation'/iu);
 
   const splitDispatch = requireNode(workflow, 'Split Dispatch Documents');

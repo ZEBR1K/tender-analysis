@@ -4700,7 +4700,7 @@ test('immutable beta Worker snapshot retains its reviewed packaging hash', () =>
   );
 });
 
-test('production import candidate preserves beta packaging outside reviewed DW-8, DW-18 and DW-23 changes', () => {
+test('production import candidate preserves beta packaging outside reviewed Worker and readiness changes', () => {
   const workflow = loadWorkflow();
   const betaWorkflow = loadBetaWorkflow();
   const expectedRemovedNodes = [
@@ -4775,6 +4775,7 @@ test('production import candidate preserves beta packaging outside reviewed DW-8
     'Собрать факты документа1',
     'Обработать evidence units по одной',
     'Собрать units после evidence validation',
+    'Проверить готовность к агрегации',
   ]);
   const expectedChangedRuntimeNodes = new Set(['AI Extractor v1.0', 'AI Validator v1']);
   const betaNodesByName = new Map(betaWorkflow.nodes.map((node) => [node.name, node]));

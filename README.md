@@ -123,7 +123,7 @@ independent AI Validator
     ↓
 save facts
     ↓
-all documents completed
+all documents terminal (`completed` / `skipped`)
     ↓
 TENDER — Агрегация закупки
     ↓

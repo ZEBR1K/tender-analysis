@@ -536,7 +536,7 @@ P0
 
 \---
 
-## B3 — `OR-0`
+## B3 — `OR-0` (локально закрыт, runtime gate pending)
 
 ### Проблема
 
@@ -548,7 +548,7 @@ register ALL docs
 → Worker only pdf/docx/xlsx
 ```
 
-Unsupported document остаётся:
+До prerequisite fix unsupported document оставался:
 
 ```text
 pending
@@ -560,7 +560,7 @@ pending
 
 Потому что это скрывает реальный документ закупки.
 
-### Нужна terminal semantics
+### Реализованная terminal semantics
 
 Варианты:
 
@@ -574,13 +574,13 @@ unsupported → skipped
 unsupported → failed
 ```
 
-Но текущий readiness требует:
+До prerequisite fix readiness требовал:
 
 ```text
 completed = documents\\\\\\\\\\\\\\\_total
 ```
 
-поэтому `skipped` надо проектировать вместе с readiness.
+Canonical Orchestrator теперь сохраняет unsupported/container rows как `skipped`, dispatch-ит только `pending` PDF/DOCX/XLSX, а Worker и Intake Resume используют `failed=0` и `completed+skipped=documents_total`. Offline tests GREEN; production runtime pending.
 
 ### Приоритет
 
