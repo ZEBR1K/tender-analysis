@@ -30,8 +30,6 @@ const CREATE_RESIDUE_PATTERN = /^\.create-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]
 const WRITE_RESIDUE_PATTERN = /^\.write-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.tmp$/iu;
 const JOB_DIRECTORY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed']);
-const RESULT_FILE_NAME = 'result.json';
-const VALIDATION_FILE_NAME = 'validation.json';
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const SEALED_JOB_STATUSES = new Set([
   'ready',
@@ -173,6 +171,20 @@ function resultBytes(value) {
   return bytes;
 }
 
+function validatedResultArtifactName(attempt) {
+  if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 2) {
+    throw storeError('RUNNER_JOB_STATE_INVALID', 'Result attempt is invalid', 409);
+  }
+  return `validated-result.attempt-${attempt}.json`;
+}
+
+function validationArtifactName(attempt) {
+  if (!Number.isSafeInteger(attempt) || attempt < 1 || attempt > 2) {
+    throw storeError('RUNNER_JOB_STATE_INVALID', 'Validation attempt is invalid', 409);
+  }
+  return `validation.attempt-${attempt}.json`;
+}
+
 function sha256Bytes(bytes) {
   return createHash('sha256').update(bytes).digest('hex').toUpperCase();
 }
@@ -188,6 +200,16 @@ function parseResultObject(bytes) {
     throw storeError('RUNNER_REQUEST_INVALID', 'Validated result must be a JSON object');
   }
   return value;
+}
+
+function parseJsonObjectOrNull(bytes) {
+  if (!bytes) return null;
+  try {
+    const value = JSON.parse(bytes.toString('utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 async function assertOrWriteExactFile(filePath, bytes) {
@@ -227,6 +249,15 @@ async function readBoundedRegularFile(filePath, maxBytes = 2 * 1024 * 1024) {
     throw storeError('RUNNER_INTERNAL', 'Runner result artifact exceeds its bound', 500);
   }
   return bytes;
+}
+
+async function readOptionalBoundedRegularFile(filePath) {
+  const metadata = await lstat(filePath).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!metadata) return null;
+  return readBoundedRegularFile(filePath);
 }
 
 async function readState(jobPath) {
@@ -943,16 +974,21 @@ export function createJobStore({
         );
       }
       const auditDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'audit');
-      await assertOrWriteExactFile(exactChild(auditDirectory, RESULT_FILE_NAME), bytes);
+      const resultArtifact = validatedResultArtifactName(attempt);
+      const validationArtifact = validationArtifactName(attempt);
+      await assertOrWriteExactFile(exactChild(auditDirectory, resultArtifact), bytes);
+      await faultInjector('after-terminal-result-artifact');
       const validationBytes = Buffer.from(`${canonicalJson(validationEnvelope)}\n`, 'utf8');
       await assertOrWriteExactFile(
-        exactChild(auditDirectory, VALIDATION_FILE_NAME),
+        exactChild(auditDirectory, validationArtifact),
         validationBytes,
       );
+      await faultInjector('after-terminal-validation-artifact');
       job.state.status = 'completed';
       job.state.failure = null;
       job.state.execution = executionSummary(execution);
       job.state.result = {
+        attempt,
         raw_result_sha256: validationEnvelope.raw_result_sha256,
         validated_result_sha256: validationEnvelope.validated_result_sha256,
         validation_file_sha256: sha256Bytes(validationBytes),
@@ -994,11 +1030,12 @@ export function createJobStore({
           envelope: validationEnvelope,
           issues: validationIssues,
         });
-        const artifact = `validation.attempt-${attempt}.json`;
+        const artifact = validationArtifactName(attempt);
         await assertOrWriteExactFile(
           exactChild(auditDirectory, artifact),
           validationAudit.bytes,
         );
+        await faultInjector('after-failure-validation-artifact');
         job.state.failure.validation = {
           artifact,
           sha256: sha256Bytes(validationAudit.bytes),
@@ -1021,9 +1058,16 @@ export function createJobStore({
       }
       const auditDirectory = exactChild(job.jobPath, 'audit');
       await ensureRegularDirectory(auditDirectory);
+      const resultAttempt = job.state.result?.attempt;
       const [rawBytes, validationBytes] = await Promise.all([
-        readBoundedRegularFile(exactChild(auditDirectory, RESULT_FILE_NAME)),
-        readBoundedRegularFile(exactChild(auditDirectory, VALIDATION_FILE_NAME)),
+        readBoundedRegularFile(exactChild(
+          auditDirectory,
+          validatedResultArtifactName(resultAttempt),
+        )),
+        readBoundedRegularFile(exactChild(
+          auditDirectory,
+          validationArtifactName(resultAttempt),
+        )),
       ]);
       let result;
       let validation;
@@ -1063,6 +1107,89 @@ export function createJobStore({
         if (!['running', 'validating'].includes(job.state.status)) return;
         const attempt = Number.isSafeInteger(job.state.attempt) ? job.state.attempt : 1;
         const at = timestamp();
+        try {
+          await verifySealedJob(job);
+        } catch (error) {
+          job.state.status = 'failed';
+          job.state.failure = {
+            code: boundedCode(error?.code, 'RUNNER_MANIFEST_MISMATCH'),
+            retryable: false,
+            at,
+          };
+          job.state.updated_at = at;
+          job.state.finished_at = at;
+          await writeState(job.jobPath, job.state);
+          recovered.push(normalizedJobId);
+          return;
+        }
+
+        const auditDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'audit');
+        const validationArtifact = validationArtifactName(attempt);
+        const validationBytes = await readOptionalBoundedRegularFile(
+          exactChild(auditDirectory, validationArtifact),
+        );
+        const validation = parseJsonObjectOrNull(validationBytes);
+
+        if (
+          validation?.schema_version === 'tender_agent_validation_v1'
+          && validation.job_id === normalizedJobId
+          && validation.valid === true
+        ) {
+          const rawBytes = await readOptionalBoundedRegularFile(exactChild(
+            auditDirectory,
+            validatedResultArtifactName(attempt),
+          ));
+          const parsedResult = parseJsonObjectOrNull(rawBytes);
+          const rawResultSha256 = rawBytes ? sha256Bytes(rawBytes) : null;
+          const validatedResultSha256 = parsedResult
+            ? sha256Bytes(Buffer.from(canonicalJson(parsedResult), 'utf8'))
+            : null;
+          if (
+            rawResultSha256 === validation.raw_result_sha256
+            && validatedResultSha256 === validation.validated_result_sha256
+          ) {
+            job.state.status = 'completed';
+            job.state.failure = null;
+            job.state.result = {
+              attempt,
+              raw_result_sha256: rawResultSha256,
+              validated_result_sha256: validatedResultSha256,
+              validation_file_sha256: sha256Bytes(validationBytes),
+            };
+            job.state.updated_at = at;
+            job.state.finished_at = at;
+            await writeState(job.jobPath, job.state);
+            recovered.push(normalizedJobId);
+            return;
+          }
+        }
+
+        if (
+          validation?.job_id === normalizedJobId
+          && validation.valid === false
+          && [
+            'tender_agent_validation_v1',
+            'tender_agent_validation_failure_v1',
+          ].includes(validation.schema_version)
+        ) {
+          job.state.status = 'failed';
+          job.state.failure = {
+            code: 'CODEX_CONTRACT_INVALID',
+            retryable: false,
+            at,
+            validation: {
+              artifact: validationArtifact,
+              sha256: sha256Bytes(validationBytes),
+              envelope_available: validation.schema_version === 'tender_agent_validation_v1',
+            },
+          };
+          job.state.updated_at = at;
+          job.state.finished_at = at;
+          await writeState(job.jobPath, job.state);
+          recovered.push(normalizedJobId);
+          return;
+        }
+
         job.state.status = 'failed';
         job.state.failure = {
           code: 'RUNNER_ORPHANED_EXECUTION',
