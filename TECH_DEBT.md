@@ -204,7 +204,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |-|-|-|
 |`OR-2`|⚠ Local Task 3 implementation complete; inactive 14-node repository candidate использует typed sub-workflow input без Manual Trigger/hardcoded tender ID. Import/runtime/promotion не выполнены.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|⚠ Inactive Intake Resume, Manual Resume, Recovery Scan, Intake Error и TenderPlan Mark Intake repository candidates offline-tested. Notification type-5 plan superseded runtime-proven mark relation contract `14683`. Relation pagination/order/cursor и exhaustive-result semantics не документированы; deployment/runtime promotion и production migration pending.|Orchestrator / Intake Resume|
+|`OR-7`|⚠ Production migration `14688` applied and verified; isolated inactive Intake Resume, Manual Resume, Recovery Scan and TenderPlan Mark Intake copies imported. NO-WORKER idempotency and retry/stale/manual/CAS/API-outage matrix GREEN. New inactive/unpublished DW-8 Worker `YX7RBDdy0fnTvoSV` and Orchestrator `TRLYuU7mVyE1bjjr` are wired into the Intake draft, while Worker/Aggregator/Finalization dispatch remains disabled. Worker runtime retry canary, import-default parity, downstream routes and activation remain pending.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|
@@ -2003,7 +2003,8 @@ Inactive canonical repository candidate больше не содержит Manua
 
 ## `OR-7` — repeated-run policy
 
-**Status:** Inactive dispatcher family implemented/offline-tested; deployment and runtime gates open.
+**Status:** Migration applied; inactive isolated dispatcher family imported and
+NO-WORKER idempotency canary GREEN; production activation/runtime matrix open.
 
 Task 3 добавил conflict-aware new-run INSERT и fresh SELECT существующего unfinished run без Worker dispatch. Partial unique index/migration существует как repository candidate.
 
@@ -2015,15 +2016,23 @@ offline-test repeated-event/resume boundary. Dispatcher сохраняет то�
 Stale `processing` после одного часа требует read-only observation execution и
 guarded CAS; unavailable API не мутирует state.
 
-Debt не закрыт: current full DB preflight execution `14684` is migration
-`NO-GO`. It found `3` duplicate unfinished `(source, tender_id)` groups, absent
-intake ledger/indexes, and an inherited diagnostic credential running as
-`postgres` with `transaction_read_only=off` and SSL disabled. That credential
-must not be used again; a CA-verified `tender_codex_ro` preflight and an
-owner-approved duplicate reconciliation policy are required before migration.
-Inactive candidates are not promoted and have not passed the runtime matrix.
-Task 9 relation poller is implemented offline; its exhaustive coverage and
-runtime behavior remain open gates.
+Exact-body rollback dry-run `14686`, preflight `14687`, production migration
+`14688`, and postflights `14689/14690/14703` are GREEN. Exactly `86/86` approved
+legacy runs are `superseded`, no active duplicate group remains, and children
+are preserved. Isolated canaries `14691/14694/14697/14700` prove one active run
+per test tender, same-run reuse, stable mark-key duplicate no-op and zero Worker
+executions. Executions `14704`-`14742` prove the retry/stale/manual/CAS/API-outage,
+scoped Recovery Scan, production-mode Error Workflow and same-event retry matrix.
+Current-state Mark Intake execution `14743` exposed the live TenderPlan `_id`
+contract; after the minimal normalizer correction, `14744` dispatched Intake
+execution `14745`, which returned `duplicate_event` with the existing run ID.
+The global inventories confirm zero Worker, Aggregator, Finalization or production
+Orchestrator executions in both windows. Debt remains open because downstream
+Aggregator/Finalization runtime and controlled production activation are outside
+the approved no-Worker canary boundary, and all entry candidates remain inactive.
+The repository export stores the non-secret self-hosted origin directly because
+Custom Variables are unavailable on the current plan; it keeps the credential
+reference unbound for secret-safe packaging.
 
 \---
 

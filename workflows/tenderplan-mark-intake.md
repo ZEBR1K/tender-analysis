@@ -10,7 +10,13 @@ The configured mark is `6a732cd00c61629cf1d3c144`, label «Проверить».
 GET /api/tenders/v2/getlist?type=1&id=6a732cd00c61629cf1d3c144
 ```
 
-A tender may be present both at `tender.id` and `tenders[].id`. Normalization validates 24-character hexadecimal IDs, deduplicates them, and emits no source payload.
+A tender may be present both at `tender._id` and `tenders[]._id`. Execution `14743` confirmed that `_id` is the internal 24-character TenderPlan identifier used by FullInfo, while `tender.id` may instead contain an external value such as a procurement number plus type suffix. Normalization validates `_id`, deduplicates it, and emits no source payload.
+
+After that fail-closed diagnostic run, corrected inactive-candidate execution
+`14744` completed successfully and asynchronously started Intake execution
+`14745`. The stable event was already present, so Intake returned
+`duplicate_event` with the existing `analysis_run_id`; the canary window contained
+no Orchestrator, Document Worker, Aggregator or Finalization execution.
 
 ## Output contract
 
@@ -35,4 +41,8 @@ Notification type `5` is documented as “tender marked”, but executions `1467
 
 ## Packaging gates
 
-The export is inactive and offline-only. Before activation an operator must bind the TenderPlan Header Auth credential and imported dispatcher, import/publish `TENDER — Ошибка Intake Resume`, set its real ID in `settings.errorWorkflow`, validate/read back the import, and run a controlled current-state canary. No production workflow, credential, database or external state was changed here.
+The portable export is inactive and keeps credential/workflow IDs unbound. The
+isolated live candidate has the existing TenderPlan Header Auth credential,
+Intake target and published Error Workflow bound and read back; its controlled
+current-state canary is GREEN through Intake. Production activation remains a
+separate owner decision, and no existing production workflow was changed.

@@ -956,6 +956,11 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const loadEventSql = normalizeSql(requireNode(workflow, 'Load Intake Event').parameters.query);
   assert.match(loadEventSql, /where .*source\s*=\s*\$1/iu);
   assert.match(loadEventSql, /event_key\s*=\s*\$2/iu);
+  assert.match(
+    loadEventSql,
+    /processing_started_at::text\s+as\s+processing_started_at_cas/iu,
+    'event reclaim must preserve PostgreSQL microseconds outside the JavaScript Date conversion',
+  );
   for (const contextField of [
     'run_authoritative',
     'manual_override',
@@ -1030,6 +1035,11 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(eventReclaimSql, /processing_started_at\s*=\s*\$\d+::timestamptz/iu);
   assert.match(eventReclaimSql, /processing_started_at\s*<=\s*\$\d+::timestamptz/iu);
   assert.match(eventReclaimSql, /attempts\s*=\s*[^,]+attempts\s*\+\s*1/iu);
+  assert.match(
+    eventReclaim.parameters.options.queryReplacement,
+    /processing_started_at_cas/u,
+    'event reclaim must compare the exact PostgreSQL timestamp token, not a millisecond-truncated Date',
+  );
   assert.match(eventReclaim.parameters.options.queryReplacement, /\$execution\.id/u);
   assert.ok(canReach(workflow, 'Read Intake Event Owner Execution', 'Reclaim Stale Intake Event'));
   const eventReclaimGate = requireNode(workflow, 'Is Intake Event Owner Reclaimable?');
@@ -1299,11 +1309,11 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     assert.equal(node.parameters.authentication, 'genericCredentialType');
     assert.equal(node.parameters.genericAuthType, 'httpHeaderAuth');
     assert.equal(Object.hasOwn(node, 'credentials'), false, `${node.name} must remain unbound in repository packaging`);
-    assert.match(node.parameters.url, /\$vars\.N8N_TENDER_BASE_URL/u);
+    assert.match(node.parameters.url, /https:\/\/n8nworkup\.ru\/api\/v1\/executions\//u);
     assert.match(node.parameters.url, /\/api\/v1\/executions\//u);
     assert.match(node.parameters.url, /includeData=false/u);
+    assert.doesNotMatch(node.parameters.url, /\$vars\./u);
     assert.doesNotMatch(node.parameters.url, /\$env\./u);
-    assert.doesNotMatch(node.parameters.url, /https?:\/\/[a-z0-9]/iu);
     assert.equal(node.parameters.options.response.response.fullResponse, true);
     assert.equal(node.parameters.options.response.response.neverError, true);
     assert.equal(node.parameters.options.response.response.responseFormat, 'json');
@@ -1319,24 +1329,30 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     'Classify Document Execution Observations',
   );
   const executionObservationCases = [
-    ...['new', 'running', 'waiting'].map((status) => ({
-      name: status,
-      input: {
-        owner_id: `owner-${status}`,
-        statusCode: 200,
-        body: { id: `execution-${status}`, status, finished: false },
-      },
-      expected: { execution_state: status, execution_observation: 'owned', reclaimable: false },
-    })),
-    ...['success', 'error', 'canceled', 'crashed'].map((status) => ({
-      name: status,
-      input: {
-        owner_id: `owner-${status}`,
-        statusCode: 200,
-        body: { id: `execution-${status}`, status, finished: true },
-      },
-      expected: { execution_state: status, execution_observation: 'reclaimable', reclaimable: true },
-    })),
+    ...['new', 'running', 'waiting'].map((status) => {
+      const ownerId = `owner-${status}`;
+      return {
+        name: status,
+        input: {
+          owner_id: ownerId,
+          statusCode: 200,
+          body: { id: ownerId, status, finished: false },
+        },
+        expected: { execution_state: status, execution_observation: 'owned', reclaimable: false },
+      };
+    }),
+    ...['success', 'error', 'canceled', 'crashed'].map((status) => {
+      const ownerId = `owner-${status}`;
+      return {
+        name: status,
+        input: {
+          owner_id: ownerId,
+          statusCode: 200,
+          body: { id: ownerId, status, finished: true },
+        },
+        expected: { execution_state: status, execution_observation: 'reclaimable', reclaimable: true },
+      };
+    }),
     {
       name: 'confirmed HTTP 404',
       input: {
@@ -1385,11 +1401,20 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
       },
       expected: { execution_observation: 'unavailable', reclaimable: false },
     },
+    {
+      name: 'mismatched execution id',
+      input: {
+        owner_id: 'expected-owner',
+        statusCode: 200,
+        body: { id: 'different-execution', status: 'success', finished: true },
+      },
+      expected: { execution_observation: 'unavailable', reclaimable: false },
+    },
   ];
   const unknownExecutionStatus = {
     owner_id: 'owner-unknown-status',
     statusCode: 200,
-    body: { id: 'execution-unknown', status: 'mystery', finished: true },
+    body: { id: 'owner-unknown-status', status: 'mystery', finished: true },
   };
   for (const normalizer of [eventObservationNormalizer, documentObservationNormalizer]) {
     assert.match(normalizer.parameters.jsCode, /\$\(['"]/u);
@@ -1660,7 +1685,8 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(packagingNotes, /PACKAGING REQUIRED/u);
   assert.match(packagingNotes, /httpHeaderAuth|Header Auth/u);
   assert.match(packagingNotes, /X-N8N-API-KEY/u);
-  assert.match(packagingNotes, /N8N_TENDER_BASE_URL/u);
+  assert.match(packagingNotes, /https:\/\/n8nworkup\.ru/u);
+  assert.doesNotMatch(packagingNotes, /N8N_TENDER_BASE_URL/u);
   assert.match(packagingNotes, /TENDER — Ошибка Intake Resume/u);
   assert.match(packagingNotes, /read back|real ID|actual ID/iu);
   assert.match(packagingNotes, /settings\.errorWorkflow/u);

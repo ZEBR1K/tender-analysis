@@ -138,7 +138,7 @@ the production Orchestrator and its workflows were not changed. The next
 integration gate is the reviewed additive migration and minimal Orchestrator
 wiring after the concurrent Orchestrator work is reconciled, followed by one
 bounded real-archive canary before activation.
-## TenderPlan intake/resume checkpoint — superseded reconciliation candidate GREEN, production pending
+## TenderPlan intake/resume checkpoint — automatic mark path GREEN in isolated NO-WORKER contour, activation pending
 
 Starting feature commit before documentation integration: `4c32d0b`. `main` is
 not changed.
@@ -163,38 +163,103 @@ not changed.
   remove/reassign no-repeat semantics are unchanged.
 - A `processing` document becomes stale after one hour. Reclaim requires
   read-only n8n execution observation plus guarded CAS; unavailable API,
-  malformed observation and unknown status do not mutate state.
+  malformed/mismatched-ID observation and unknown status do not mutate state.
 - Read-only pre-DB smoke execution `14678` in workflow
   `yocBDh0nCvPPxItn` verified exact Orchestrator input validation, TenderPlan
   FullInfo identity and normalization for both test tender IDs. It stopped before
   DB registration, contained no PostgreSQL/Execute Workflow node, performed no
   DB writes and invoked no Worker. Evidence:
   `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
-- Current superseded focused gate: `35/35 PASS` across migration, dispatcher,
-  Orchestrator and Recovery Scan tests. Fresh current full suite is
-  `526/526 PASS`.
+- Current intake/resume focused gate: `42/42 PASS` across migration, dispatcher,
+  Orchestrator, Mark Intake, Manual Resume, Recovery Scan and Error Workflow
+  tests. Fresh current full suite is `526/526 PASS`.
+- Exact-body rollback dry-run execution `14686` completed with `ROLLBACK`; the
+  follow-up snapshots showed the schema and all bounded rows unchanged.
+  Immediate full-quiescence verification was zero `new`/`running`/`waiting`
+  executions. Fresh preflight `14687` reproduced the approved `24 + 50 + 12`
+  legacy shape immediately before application.
+- Production migration execution `14688` succeeded. Read-only postflights
+  `14689`, `14690` and `14703` confirm the intake ledger, superseded audit
+  columns, superseded-aware status CHECK and partial unique index. Exactly
+  `86/86` bounded legacy runs are `superseded`, active duplicate groups are
+  zero, and the 26-field run `18f3eaee-528d-4bc1-8d72-a1ea2f313df2` is included.
+  All related data remains present: `273` documents, `577` units, `756` facts
+  and `29` field results.
+- New isolated n8n copies were created without modifying the existing live
+  workflows: Error `kff8KIrSHzo5Mmt1`, NO-WORKER Orchestrator
+  `thE9gLyNTvxLWt8I`, Intake Resume `VO8Ml0sfO65w2Jiz`, Mark Intake
+  `biYC4OvWBlfJRmnj`, Recovery Scan `lwcHHdmmNd5YE6cw` and Manual Resume
+  `z8nynFC12H9WOM9s`. Entry workflows remain inactive/unpublished. The new Error
+  workflow is published only so the inactive candidates can reference it.
+- NO-WORKER Orchestrator canaries `14691` and `14694` created/reused exactly one
+  active run for each approved test tender. Intake ledger canaries `14697` and
+  `14700` used stable mark+tender keys: the first delivery completed both ledger
+  rows, the second returned `duplicate_event` for both and preserved the same
+  `analysis_run_id`. Postflight `14703` shows both ledger rows at `attempts=1`.
+- The two canary runs contain `6` and `5` registered documents respectively;
+  every document remains `pending`, `attempts=0`, with no owner execution.
+  Searches across all 14 workflows named `Обработать документ` found zero Worker
+  executions after the canary start. In this disabled test topology the returned
+  `documents_dispatched=6/5` is queue cardinality, not actual Worker dispatch.
+- The isolated Intake runtime matrix is GREEN. Credential smoke `14704` returned
+  HTTP 200. Post-fix stale-event executions `14707/14708` preserved the same run,
+  incremented the event to attempt 2 and queued 6 pending documents. Automatic
+  attempt-cap executions `14711`-`14716` excluded a failed document at attempt 2
+  while manual override included it. Terminal-owner reclaim `14719/14720` moved
+  the stale processing document to `failed` with a guarded increment; cleanup
+  `14721` restored the approved canary state.
+- A live waiting owner was not reclaimed in `14726/14727`; an intentional
+  Execution API outage failed closed in `14729/14730`; corrected CAS-race canary
+  `14734` returned `cas_rows=0` after a competing owner update. Recovery Scan
+  `14736/14737` reused the same run. Production-mode Error Workflow executions
+  `14738/14739` marked the exact event failed, and `14740/14741` retried that
+  same event/run to `completed`, attempts 2. Read-only verifier `14742` found all
+  6 documents pending and no processing/failed documents.
+- The global execution inventory for `14722`-`14742` contains only isolated test,
+  Intake, Recovery and Error workflows. No Document Worker, Aggregator,
+  Finalization or production Orchestrator execution was created.
+- Post-review hardening now requires an HTTP 200 execution-read body ID to match
+  the requested owner exactly; a mismatch fails closed as unavailable. The same
+  two-node patch was applied only to inactive candidate `VO8Ml0sfO65w2Jiz` and
+  read back at draft version `3b46d3ac-bdc6-4e73-9201-37e3f4fae15e` with both
+  guards present, no active version, and Worker/Aggregator/Finalization disabled.
+- Current-state Mark Intake execution `14743` exposed the first incorrect state:
+  TenderPlan returns its internal 24-character identifier in `tender._id` /
+  `tenders[]._id`, while `tender.id` may be an external procurement identifier.
+  The repository and inactive candidate normalizer now validate and deduplicate
+  `_id`. Repeat execution `14744` succeeded and launched only Intake execution
+  `14745`; that child returned `duplicate_event` with the existing
+  `analysis_run_id=d29195fd-13af-49cc-a1a5-6c7a3f44a8cf`. The global execution
+  inventory for the canary window contains only `14744` and `14745`: no
+  Orchestrator, Document Worker, Aggregator or Finalization execution was created.
 - Read-only local/live audit found that Orchestrator and both plausible Worker
   targets differ. Document Error Workflow, Aggregator and Finalization have exact
   normalized config and connections parity under the documented comparison
   boundary. Sanitized evidence:
   `evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`.
+- A fresh read-only live check on 2026-09-09 found additional Orchestrator drift:
+  `Q1RWSrB0jaTA6Dmx` now targets inactive Worker `W4mNOUkdsFtNENpI`, whereas the
+  earlier checked-in preflight recorded `URFdslUfULtOLv9B`. None of the existing
+  live Worker candidates checked (`1Pw61ZY3HgBSvcUr`, `URFdslUfULtOLv9B`,
+  `csnDg78NzN1nIjUT`) contains the DW-8 scoped retry-persistence contract.
+- Two new isolated, inactive and unpublished candidates were therefore created
+  without changing existing workflows. Worker `YX7RBDdy0fnTvoSV` has 85 nodes,
+  the canonical Cloudflare Extractor configuration, the DW-8
+  `current_unit_ids` / `deleted_stale_units` query, existing credential
+  references, document Error Workflow `jYzQ8RtNmnTM2PGz`, and canonical
+  Aggregator target `ftvmrEHoMbPOAqZG`; the Aggregator call remains disabled for
+  the bounded Worker canary. Orchestrator `TRLYuU7mVyE1bjjr` has 14 nodes and
+  calls only this new Worker. Read-back confirms both have `active=false` and
+  `activeVersionId=null`.
+- Inactive Intake Resume candidate `VO8Ml0sfO65w2Jiz` was wired in draft to
+  Orchestrator `TRLYuU7mVyE1bjjr` and Worker `YX7RBDdy0fnTvoSV`; direct Worker,
+  Aggregator and Finalization dispatch nodes remain disabled. Read-back version
+  is `58ee1a87-3a74-4b61-ab2c-642882a0fc7f` with zero validation warnings. The
+  temporary import artifacts were scanned before upload: no embedded API keys,
+  tokens, passwords, Authorization values or pin data were found. Fresh full
+  repository suite remains `526/526 PASS`.
 
 ### Not verified / blocked
-
-- Fresh SELECT-only preflight execution `14685` confirms the migration remains
-  unapplied: intake table/index and superseded columns are absent. The session
-  reported `current_user=postgres`, `transaction_read_only=off`; no write was
-  performed. The authoritative run-status CHECK is
-  `tender_analysis_runs_status_check` with exactly `created`, `processing`,
-  `ready_for_aggregation`, `aggregating`, `completed`, `failed`. The three
-  approved active legacy groups are exactly `24`, `50`, and `12` rows, with
-  exact maxima `2026-09-07T05:59:14.629399+00:00`,
-  `2026-08-17T18:50:41.678699+00:00`, and
-  `2026-08-23T16:29:52.779826+00:00`. The production-candidate migration
-  validates CHECK semantics without relying on its name, reconciles only those
-  bounded 86 rows atomically, leaves newer rows untouched, and fail-closes on
-  every other duplicate shape. Runtime application is still pending explicit
-  operator approval.
 - Historical Task 8 TenderPlan type-5 event contract was not established and is
   superseded, not a current poller blocker. Probe workflow
   `oCXpDbO3Xz1qrCBf`, execution `14677`, returned an empty type-5 list;
@@ -206,30 +271,39 @@ not changed.
   type-5 feed remained empty. Execution `14683` proved the read-only relation
   contract for mark `6a732cd00c61629cf1d3c144` («Проверить»), including
   duplicate `tender`/`tenders` placement and one unique tender.
-- Task 9 is implemented as an inactive offline repository candidate. Its own
-  imported/runtime behavior is not GREEN; pagination/order/cursor and
-  exhaustive-result semantics remain undocumented.
-- Existing live workflows were not changed. New workflows are inactive and
-  unpublished; production promotion and the runtime matrix remain pending.
-- Controlled migration requires quiescence, not low traffic. Immediately before
-  both the mandatory rollback dry-run and any real application, all autonomous
-  and new-run producers must be inactive/absent, system-wide n8n executions in
-  `new`/`running`/`waiting` must be zero, and no execution may target any of the
-  86 bounded runs. Any active execution aborts the operation. Entry workflows
-  must remain inactive and producers must not be run manually until migration
-  postconditions and updated candidate import/read-back are complete.
-- Read-only evidence on 2026-09-08 recorded Orchestrator
-  `Q1RWSrB0jaTA6Dmx` inactive, Intake/Recovery not live, and zero active n8n
-  executions. This is not an application-time gate result and must be repeated
-  immediately before execution.
-- The exact committed migration still requires an executable rollback dry-run
-  against the real PostgreSQL catalog, followed by proof that catalog objects,
-  all 86 run rows, their child rows and bounded counts/cutoffs are unchanged.
-  Source-regex tests are not runtime proof. Neither that dry-run nor the real
-  migration application has been performed yet.
+- Task 9 Mark Intake is imported and read back with the real TenderPlan
+  credential and the isolated Intake target. Its manual current-state poll is
+  runtime GREEN through Intake duplicate/no-op (`14744` → `14745`), but the
+  ten-minute schedule is intentionally not activated. Pagination/order/cursor
+  and exhaustive-result semantics remain undocumented.
+- The isolated Intake retry/stale/manual/CAS/API-outage runtime matrix is GREEN.
+  Both execution-read HTTP nodes are bound in the isolated live candidate to the
+  owner-created read-only Header Auth credential and use the explicit non-secret
+  self-hosted origin `https://n8nworkup.ru`; no API key is embedded. The portable
+  repository export intentionally keeps the credential reference unbound.
+- Exact execution-response ID correlation is offline-tested and present in the
+  inactive live candidate, but has not required an additional runtime canary.
+- Aggregator and Finalization routes remain unverified in this change because the
+  approved canary boundary required stopping before Document Worker. Their
+  controlled end-to-end runtime test is a separate promotion gate.
+- Existing live workflows were not changed. Mark Intake, Recovery Scan, Manual
+  Resume and Intake Resume remain inactive/unpublished; production activation
+  remains a separate owner decision.
+- The new Worker has not been executed because the approved runtime boundary
+  still stops before Document Worker. Therefore DW-8 controlled retry behavior,
+  paid AI calls, production-DB writes, Aggregator/Finalization and schedule
+  activation remain unverified. Publication/activation must not proceed until a
+  separately approved bounded Worker canary is GREEN.
+- n8n import preserved all `101/101` Worker connection edges and the critical
+  claim/persistence SQL, but normalized away eleven explicitly exported default
+  parameter paths across ten nodes. The current HTTP Request type definition
+  documents omitted `batchInterval` as default `1000`; the other omissions are
+  likewise default-shaped. Exact installed-runtime equivalence is intentionally
+  not claimed until node-schema review and the bounded canary are complete.
 - MCP ignored requested folder placement for created test workflows and returned
   `parentFolderId=null`; this is recorded as tooling/packaging drift. The safe
-  no-worker Orchestrator `thE9gLyNTvxLWt8I` remains unexecuted.
+  no-worker Orchestrator `thE9gLyNTvxLWt8I` was executed only by the bounded
+  canaries above.
 
 Controlled activation order remains:
 

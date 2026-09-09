@@ -255,17 +255,17 @@ technical review: PASS
 
 ---
 
-# 9. Pending runtime gates
+# 9. Remaining runtime gates
 
 До production claim необходимо отдельно:
 
-1. применить `migrations/2026-09-07_tender_intake_resume.sql` в non-production и проверить ledger schema;
-2. импортировать inactive export и выполнить read-back topology, settings и credential binding;
-3. назначить этот workflow через Error Workflow setting целевых intake workflows после определения окончательного wiring;
-4. подтвердить runtime post-claim failure: одна owned processing строка становится failed;
-5. подтвердить runtime pre-claim/unknown execution: данные не создаются, result содержит `event_updated=false`;
-6. подтвердить в rollback-safe non-production scenario, что duplicate owners дают cardinality error без частичной мутации;
-7. проверить message precedence/bounds и сохранение audit fields;
-8. только после этих gates принимать решение об активации/promotion.
+1. подтвердить runtime post-claim failure: одна owned processing строка становится failed;
+2. подтвердить runtime pre-claim/unknown execution: данные не создаются, result содержит `event_updated=false`;
+3. подтвердить в rollback-safe isolated scenario, что duplicate owners дают cardinality error без частичной мутации;
+4. проверить message precedence/bounds и сохранение audit fields;
+5. только после этих gates принимать решение об активации/promotion.
 
-На текущем этапе migration application, import, Error Workflow setting, wiring и runtime verification остаются pending.
+Production migration `14688` применена и проверена. Новая Error Workflow copy
+`kff8KIrSHzo5Mmt1` опубликована только как error handler и привязана к новым
+inactive candidates; существующие live workflows не изменялись. Перечисленные
+failure-path runtime gates остаются pending.
