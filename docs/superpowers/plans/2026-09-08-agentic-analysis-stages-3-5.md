@@ -419,7 +419,7 @@ Lane A не редактирует существующие workflow и поэт
 | 9 | local complete and reviewed | only JSON/source/file-integrity validation |
 | 10 | local complete | asynchronous lifecycle, bounded retry, restart recovery, runner-owned validated audit, and exact-job TTL |
 | 11 | local corrective candidate; reviewed | inactive identity-neutral Dispatch export; pre-start dispatch ownership, complete source-identity barrier, sequential binary staging and ambiguous-start reconciliation |
-| 12 | local corrective candidate; reviewed | inactive identity-neutral minute Monitor export; two-job SKIP LOCKED claim, non-terminal monitor audit, explicit runner failure, and atomic exact-27 shadow persistence |
+| 12 | local corrective candidate; reviewed | inactive identity-neutral minute Monitor export; two-job SKIP LOCKED claim, bounded ambiguous-start reconciliation, type-safe polling audit, and atomic exact-27 shadow persistence |
 
 Task 13 and later, live n8n/DB mutation, production deployment, and paid canaries
 remain outside this checkpoint. The detailed simplification inventory is in

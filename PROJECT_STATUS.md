@@ -28,8 +28,9 @@ silent passes. Task 6 still has one procurement with four repeats, so its
 multi-procurement gate remains `awaiting_additional_procurements`. Task 13 and
 later, n8n wiring, production migration, runner deployment, and paid canaries
 were not performed. The initial Tasks 11–12 review was rejected for lifecycle
-and ownership defects; the corrected local candidate subsequently passed a
-fresh independent final-bytes review. The full suite in the
+and ownership defects; a second review then found two remaining Task 11–12
+blockers. The current corrective candidate subsequently passed a new
+independent final-bytes review. The full suite in the
 restricted Codex sandbox retains pre-existing environment-only failures where
 tests require loopback listeners, subprocess behavior, or Docker.
 

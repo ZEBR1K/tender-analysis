@@ -24,7 +24,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "BEGIN;\nWITH candidates AS (\n SELECT id FROM public.tender_agentic_jobs\n WHERE status IN ('ready','running','validating')\n   AND dispatch_execution_id IS NULL\n   AND (poll_owner_execution_id IS NULL OR poll_claimed_at < now() - interval '5 minutes')\n ORDER BY coalesce(heartbeat_at,created_at),id\n FOR UPDATE SKIP LOCKED\n LIMIT 2\n), claimed AS (\n UPDATE public.tender_agentic_jobs j\n SET poll_owner_execution_id=$1::text,poll_claimed_at=now(),updated_at=now()\n FROM candidates c WHERE j.id=c.id\n RETURNING j.id,j.analysis_run_id,j.pipeline_version,j.replicate_index,j.status,j.field_catalog_version,\n j.field_catalog_sha256,j.input_manifest_sha256,j.poll_owner_execution_id\n)\nSELECT * FROM claimed;\nCOMMIT;",
+        "query": "BEGIN;\nWITH candidates AS (\n SELECT id FROM public.tender_agentic_jobs\n WHERE status IN ('ready','running','validating')\n   AND dispatch_execution_id IS NULL\n   AND (poll_owner_execution_id IS NULL OR poll_claimed_at < now() - interval '5 minutes')\n ORDER BY coalesce(heartbeat_at,created_at),id\n FOR UPDATE SKIP LOCKED\n LIMIT 2\n), claimed AS (\n UPDATE public.tender_agentic_jobs j\n SET poll_owner_execution_id=$1::text,poll_claimed_at=now(),updated_at=now()\n FROM candidates c WHERE j.id=c.id\n RETURNING j.id,j.analysis_run_id,j.pipeline_version,j.replicate_index,j.status,j.field_catalog_version,\n j.field_catalog_sha256,j.input_manifest_sha256,j.poll_owner_execution_id,j.error_code\n)\nSELECT * FROM claimed;\nCOMMIT;",
         "options": {
           "queryReplacement": "={{ [$execution.id] }}"
         }
@@ -257,7 +257,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const claimed=$('Нормализовать runner status').item.json;const response=$input.first().json;\nfunction resultFailure(outcome,code,message){return [{json:{...claimed,outcome,error_code:String(code).slice(0,80),error_message:String(message).slice(0,500)}}];}\nif(Number(response.statusCode??200)!==200)return resultFailure('monitor_failure','MONITOR_RESULT_HTTP_FAILED','Runner result request failed');\nconst body=response.body??response;const envelope=body.validation;const result=body.result;\nif(!envelope||envelope.schema_version!=='tender_agent_validation_v1'||envelope.valid!==true)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation envelope is invalid');\nif(String(body.job_id??'')!==claimed.job_id||String(envelope.job_id??'')!==claimed.job_id)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result job identity mismatch');\nif(!result||result.schema_version!=='tender_agent_result_v1'||result.field_catalog_version!==claimed.field_catalog_version||result.field_catalog_sha256!==claimed.field_catalog_sha256||result.input_manifest_sha256!==claimed.input_manifest_sha256)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result source identity mismatch');\nif(!/^[0-9a-f]{64}$/iu.test(String(envelope.raw_result_sha256??''))||!/^[0-9a-f]{64}$/iu.test(String(envelope.validated_result_sha256??'')))return resultFailure('contract_invalid','RESULT_HASH_INVALID','Result artifact hash is invalid');\nif(!Array.isArray(envelope.fields)||envelope.fields.length!==27||!Array.isArray(result.fields)||result.fields.length!==27)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result must contain exactly 27 fields');\nconst fields=[];for(let index=0;index<27;index++){const field=result.fields[index];const validation=envelope.fields[index];if(validation.field_index!==field.field_index||validation.field_key!==field.field_key||validation.status!==field.status||validation.value_text!==field.value_text)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation field identity mismatch');fields.push({...field,issues:validation.issues,result_json:field});}\nreturn [{json:{...claimed,outcome:'completed_valid',raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,fields,\nvalidation_summary:{valid:true,raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,job_issue_codes:(envelope.job_issues??[]).slice(0,100).map(issue=>String(issue.code??'SCHEMA_INVALID').slice(0,80))},\nartifacts:{raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256}}}];"
+        "jsCode": "const claimed=$('Нормализовать runner status').item.json;const response=$input.first().json;\nfunction resultFailure(outcome,code,message){return [{json:{...claimed,outcome,error_code:String(code).slice(0,80),error_message:String(message).slice(0,500)}}];}\nif(Number(response.statusCode??200)!==200)return resultFailure('monitor_failure','MONITOR_RESULT_HTTP_FAILED','Runner result request failed');\nconst body=response.body??response;const envelope=body?.validation;const result=body?.result;\nif(!envelope||typeof envelope!=='object'||Array.isArray(envelope)||envelope.schema_version!=='tender_agent_validation_v1'||envelope.valid!==true)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation envelope is invalid');\nif(String(body?.job_id??'')!==claimed.job_id||String(envelope.job_id??'')!==claimed.job_id)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result job identity mismatch');\nif(!result||typeof result!=='object'||Array.isArray(result)||result.schema_version!=='tender_agent_result_v1'||result.field_catalog_version!==claimed.field_catalog_version||result.field_catalog_sha256!==claimed.field_catalog_sha256||result.input_manifest_sha256!==claimed.input_manifest_sha256)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result source identity mismatch');\nif(!/^[0-9a-f]{64}$/iu.test(String(envelope.raw_result_sha256??''))||!/^[0-9a-f]{64}$/iu.test(String(envelope.validated_result_sha256??'')))return resultFailure('contract_invalid','RESULT_HASH_INVALID','Result artifact hash is invalid');\nif(!Array.isArray(envelope.fields)||envelope.fields.length!==27||!Array.isArray(result.fields)||result.fields.length!==27||!Array.isArray(envelope.job_issues))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result must contain exact typed arrays');\nconst fields=[];for(let index=0;index<27;index++){const field=result.fields[index];const validation=envelope.fields[index];if(!field||typeof field!=='object'||Array.isArray(field)||!validation||typeof validation!=='object'||Array.isArray(validation))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result field entry is invalid');if(!Number.isInteger(field.field_index)||typeof field.field_key!=='string'||typeof field.status!=='string'||(field.value_text!==null&&typeof field.value_text!=='string')||!Number.isInteger(validation.field_index)||typeof validation.field_key!=='string'||typeof validation.status!=='string'||(validation.value_text!==null&&typeof validation.value_text!=='string')||!Array.isArray(validation.issues))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result field property type is invalid');if(validation.field_index!==field.field_index||validation.field_key!==field.field_key||validation.status!==field.status||validation.value_text!==field.value_text)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation field identity mismatch');fields.push({...field,issues:validation.issues,result_json:field});}\nconst jobIssueCodes=[];for(const issue of envelope.job_issues.slice(0,100)){if(!issue||typeof issue!=='object'||Array.isArray(issue))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation job issue is invalid');jobIssueCodes.push(String(issue.code??'SCHEMA_INVALID').slice(0,80));}\nreturn [{json:{...claimed,outcome:'completed_valid',raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,fields,\nvalidation_summary:{valid:true,raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,job_issue_codes:jobIssueCodes},\nartifacts:{raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256}}}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -453,6 +453,161 @@
           "name": "Postgres (package at import)"
         }
       }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const status=$input.first().json;const claimed=$('Jobs по одному').item.json;\nreturn [{json:{...status,outcome:status.status==='ready'&&claimed.error_code==='START_OUTCOME_UNKNOWN'?'reconcile_start':status.outcome}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        -20
+      ],
+      "id": "12000000-0000-4000-8000-000000000305",
+      "name": "Классифицировать start reconciliation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "start-reconciliation",
+              "leftValue": "={{ $json.outcome === 'reconcile_start' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        -20
+      ],
+      "id": "12000000-0000-4000-8000-000000000306",
+      "name": "Start reconciliation?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.job_id) + '/start' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        600,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000307",
+      "name": "Reconcile runner start",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json;const context=$('Классифицировать start reconciliation').item.json;\nfunction failure(code){return [{json:{...context,outcome:'monitor_failure',error_code:code,error_message:'Runner start reconciliation failed'}}];}\nif(![200,202].includes(Number(response.statusCode??200)))return failure('MONITOR_START_HTTP_FAILED');const body=response.body??response;\nfor(const key of ['job_id','analysis_run_id','pipeline_version','field_catalog_version','field_catalog_sha256','input_manifest_sha256']){if(String(body?.[key]??'')!==String(context[key]??''))return failure('MONITOR_START_IDENTITY_INVALID');}\nconst attempt=Number(body.attempt);if(body.status!=='running'||!Number.isInteger(attempt)||attempt<1||attempt>2)return failure('MONITOR_START_CONTRACT_INVALID');\nreturn [{json:{...context,outcome:'reconciled_running',runner_attempt:attempt}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000308",
+      "name": "Проверить reconciled start"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reconciled-running",
+              "leftValue": "={{ $json.outcome === 'reconciled_running' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000309",
+      "name": "Reconciled start valid?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',attempts=$3::smallint,error_code=NULL,error_message=NULL,heartbeat_at=now(),\n validation_summary=validation_summary||jsonb_build_object('start_reconciled',true,'runner_attempt',$3::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status='ready' AND error_code='START_OUTCOME_UNKNOWN'\n AND $3::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status,max(attempts)::int attempts FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.runner_attempt] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1140,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000310",
+      "name": "Синхронизировать reconciled running",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -633,7 +788,7 @@
       "main": [
         [
           {
-            "node": "Runner completed?",
+            "node": "Классифицировать start reconciliation",
             "type": "main",
             "index": 0
           }
@@ -695,6 +850,93 @@
       ]
     },
     "Сохранить terminal contract failure": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Классифицировать start reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Start reconciliation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start reconciliation?": {
+      "main": [
+        [
+          {
+            "node": "Reconcile runner start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile runner start": {
+      "main": [
+        [
+          {
+            "node": "Проверить reconciled start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить reconciled start": {
+      "main": [
+        [
+          {
+            "node": "Reconciled start valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconciled start valid?": {
+      "main": [
+        [
+          {
+            "node": "Синхронизировать reconciled running",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Синхронизировать reconciled running": {
       "main": [
         [
           {

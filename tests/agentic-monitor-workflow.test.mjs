@@ -24,12 +24,12 @@ const reaches = (workflow, source, target) => {
   }
   return false;
 };
-const runCode = async (source, response, claimed) => {
+const runCode = async (source, response, claimed, sourceNode = 'Jobs по одному') => {
   const script = new vm.Script(`(async()=>{${source}})()`);
   return script.runInNewContext({
     $input: { first: () => ({ json: response }) },
     $: (name) => {
-      assert.equal(name, 'Jobs по одному');
+      assert.equal(name, sourceNode);
       return { item: { json: claimed } };
     },
     Number,
@@ -217,6 +217,71 @@ test('status Code node executes the transport, identity, and explicit runner-fai
   const invalidAttempt = (await runCode(source, { statusCode: 200, body: { ...failedBody, attempt: 3 } }, claimed))[0].json;
   assert.equal(invalidAttempt.outcome, 'monitor_failure');
   assert.equal(invalidAttempt.error_code, 'MONITOR_STATUS_ATTEMPT_INVALID');
+});
+
+test('repeated ready polling of an ambiguous Dispatch start routes one idempotent start call per owned poll', async () => {
+  const workflow = await load();
+  const normalizeSource = find(workflow, 'Нормализовать runner status').parameters.jsCode;
+  const classifySource = find(workflow, 'Классифицировать start reconciliation').parameters.jsCode;
+  const claimed = {
+    id: '11111111-1111-4111-8111-111111111111', analysis_run_id: '22222222-2222-4222-8222-222222222222',
+    pipeline_version: 'tender_agentic_pipeline_v1', field_catalog_version: 'catalog-v1',
+    field_catalog_sha256: 'A'.repeat(64), input_manifest_sha256: 'B'.repeat(64),
+    poll_owner_execution_id: 'poll-17', error_code: 'START_OUTCOME_UNKNOWN',
+  };
+  const body = {
+    job_id: claimed.id, analysis_run_id: claimed.analysis_run_id, pipeline_version: claimed.pipeline_version,
+    field_catalog_version: claimed.field_catalog_version, field_catalog_sha256: claimed.field_catalog_sha256,
+    input_manifest_sha256: claimed.input_manifest_sha256, status: 'ready',
+  };
+  for (let poll = 0; poll < 2; poll++) {
+    const normalized = (await runCode(normalizeSource, { statusCode: 200, body }, claimed))[0].json;
+    const classified = (await runCode(classifySource, normalized, claimed))[0].json;
+    assert.equal(classified.outcome, 'reconcile_start');
+  }
+  assert.ok(reaches(workflow, 'Start reconciliation?', 'Reconcile runner start'));
+  assert.equal(find(workflow, 'Reconcile runner start').parameters.method, 'POST');
+  assert.match(find(workflow, 'Reconcile runner start').parameters.url, /\/start/u);
+  const sync = find(workflow, 'Синхронизировать reconciled running').parameters.query;
+  assert.match(sync, /poll_owner_execution_id\s*=\s*\$2/iu);
+  assert.match(sync, /status='ready'/iu);
+  assert.match(sync, /error_code='START_OUTCOME_UNKNOWN'/iu);
+  assert.match(sync, /attempts\s*=\s*\$3::smallint/iu);
+  assert.match(sync, /ownership_lost|update_count/iu);
+});
+
+test('completed-envelope checker never throws on malformed closed-contract values', async () => {
+  const workflow = await load();
+  const source = find(workflow, 'Проверить envelope identity').parameters.jsCode;
+  const claimed = {
+    job_id: '11111111-1111-4111-8111-111111111111', analysis_run_id: '22222222-2222-4222-8222-222222222222',
+    pipeline_version: 'tender_agentic_pipeline_v1', field_catalog_version: 'catalog-v1',
+    field_catalog_sha256: 'A'.repeat(64), input_manifest_sha256: 'B'.repeat(64), poll_owner_execution_id: 'poll-17',
+  };
+  const fields = Array.from({ length: 27 }, (_, field_index) => ({ field_index, field_key: `field_${field_index}`, status: 'resolved', value_text: 'x' }));
+  const validationFields = fields.map(({ field_index, field_key, status, value_text }) => ({ field_index, field_key, status, value_text, issues: [] }));
+  const base = { statusCode: 200, body: {
+    job_id: claimed.job_id,
+    result: { schema_version: 'tender_agent_result_v1', field_catalog_version: claimed.field_catalog_version,
+      field_catalog_sha256: claimed.field_catalog_sha256, input_manifest_sha256: claimed.input_manifest_sha256, fields },
+    validation: { schema_version: 'tender_agent_validation_v1', valid: true, job_id: claimed.job_id,
+      raw_result_sha256: 'C'.repeat(64), validated_result_sha256: 'D'.repeat(64), job_issues: [], fields: validationFields },
+  } };
+  const malformed = [
+    { ...base, body: { ...base.body, validation: { ...base.body.validation, fields: [null, ...validationFields.slice(1)] } } },
+    { ...base, body: { ...base.body, validation: { ...base.body.validation, job_issues: {} } } },
+    { ...base, body: { ...base.body, result: { ...base.body.result, fields: [null, ...fields.slice(1)] } } },
+    { ...base, body: { ...base.body, validation: { ...base.body.validation, fields: 'not-an-array' } } },
+    { ...base, body: { ...base.body,
+      result: { ...base.body.result, fields: fields.map((v, i) => i === 3 ? { ...v, field_index: '3' } : v) },
+      validation: { ...base.body.validation, fields: validationFields.map((v, i) => i === 3 ? { ...v, field_index: '3' } : v) } } },
+    { ...base, body: { ...base.body, validation: { ...base.body.validation, fields: validationFields.map((v, i) => i === 4 ? { ...v, field_key: 'mismatch' } : v) } } },
+  ];
+  for (const response of malformed) {
+    const output = await runCode(source, response, claimed, 'Нормализовать runner status');
+    assert.equal(output[0].json.outcome, 'contract_invalid');
+  }
+  assert.ok(reaches(workflow, 'Проверить envelope identity', 'Сохранить terminal contract failure'));
 });
 
 test('bounded technical metadata is normalized before every JSONB write', async () => {
