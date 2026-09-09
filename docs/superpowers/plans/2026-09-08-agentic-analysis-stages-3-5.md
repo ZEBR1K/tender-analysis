@@ -941,11 +941,11 @@ workflows/agentic-analysis-error.md
 tests/agentic-error-workflow.test.mjs
 ```
 
-- [ ] Write failing tests for Dispatch owner failure, Monitor owner failure, missing execution identity and already-terminal job.
-- [ ] For Dispatch failure in `created/staging/ready`, guarded-update only jobs owned by that exact execution to `failed`; preserve staged document rows and runner artifacts.
-- [ ] For Monitor failure, release only the exact poll lease and increment bounded monitor error audit. Do not mark a still-running Codex job failed merely because polling failed.
-- [ ] Never alter completed/canceled jobs.
-- [ ] Configure both new workflows with the real imported error-workflow ID only during packaging; repository exports remain inactive until that binding is verified.
+- [x] Write failing tests for Dispatch owner failure, Monitor owner failure, missing execution identity and already-terminal job.
+- [x] For Dispatch failure in `created/staging/ready`, guarded-update only jobs owned by that exact execution to `failed`; preserve staged document rows and runner artifacts.
+- [x] For Monitor failure, release only the exact poll lease and increment bounded monitor error audit. Do not mark a still-running Codex job failed merely because polling failed.
+- [x] Never alter completed/canceled jobs.
+- [x] Configure both new workflows with the real imported error-workflow ID only during packaging; repository exports remain inactive until that binding is verified.
 
 Run:
 

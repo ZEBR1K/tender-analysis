@@ -1,0 +1,86 @@
+{
+  "name": "TENDER — Ошибка агентского анализа",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "agentic-error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payload = $input.first()?.json;\nconst execution = payload && typeof payload === 'object' && !Array.isArray(payload) && payload.execution && typeof payload.execution === 'object' && !Array.isArray(payload.execution) ? payload.execution : {};\nconst workflow = payload && typeof payload === 'object' && !Array.isArray(payload) && payload.workflow && typeof payload.workflow === 'object' && !Array.isArray(payload.workflow) ? payload.workflow : {};\nconst rawId = typeof execution.id === 'string' ? execution.id.trim() : '';\nconst validId = rawId.length > 0 && rawId.length <= 4096;\nconst workflowName = typeof workflow.name === 'string' ? workflow.name.trim() : '';\nlet sourceKind = workflowName === 'TENDER — Агентский анализ — Запуск' ? 'dispatch' : workflowName === 'TENDER — Агентский анализ — Монитор' ? 'monitor' : 'unsupported_workflow';\nif (!validId) sourceKind = 'invalid_identity';\nconst error = execution.error && typeof execution.error === 'object' && !Array.isArray(execution.error) ? execution.error : {};\nconst candidate = [error.message, error.description].find((value) => typeof value === 'string' && value.trim()) || '';\nconst unsafe = /https?:\\/\\/|(?:authorization|cookie|password|secret|api[\\s_-]*key|access[_-]?token|bearer|token)(?:\\s*(?::|=|\\bis\\b)|\\s+)/iu.test(candidate);\nconst cleaned = candidate.replace(/[\\u0000-\\u001F\\u007F]/gu, ' ').replace(/\\s+/gu, ' ').trim();\nconst fallback = sourceKind === 'monitor' ? 'Agentic monitor workflow failed' : sourceKind === 'dispatch' ? 'Agentic dispatch workflow failed' : 'Agentic workflow error was not attributable';\nconst errorMessage = unsafe || !cleaned ? fallback : cleaned.slice(0, 500);\nconst errorCode = sourceKind === 'dispatch' ? 'DISPATCH_WORKFLOW_FAILED' : sourceKind === 'monitor' ? 'MONITOR_WORKFLOW_FAILED' : sourceKind === 'invalid_identity' ? 'AGENTIC_ERROR_IDENTITY_INVALID' : 'AGENTIC_ERROR_WORKFLOW_UNSUPPORTED';\nreturn [{ json: { source_kind: sourceKind, execution_id: validId ? rawId : null, error_code: errorCode, error_message: errorMessage } }];"
+      },
+      "id": "normalize-agentic-error",
+      "name": "Нормализовать agentic error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input AS (\n  SELECT\n    $1::text AS source_kind,\n    NULLIF($2::text, '') AS execution_id,\n    left($3::text, 80) AS error_code,\n    left($4::text, 500) AS error_message\n),\ndispatch_target AS (\n  SELECT job.id\n  FROM public.tender_agentic_jobs AS job\n  CROSS JOIN input\n  WHERE input.source_kind = 'dispatch'\n    AND input.execution_id IS NOT NULL\n    AND job.dispatch_execution_id = input.execution_id\n    AND job.status IN ('created', 'staging', 'ready')\n),\ndispatch_update AS (\n  UPDATE public.tender_agentic_jobs AS job\n  SET status = 'failed',\n      dispatch_execution_id = NULL,\n      error_code = input.error_code,\n      error_message = input.error_message,\n      updated_at = now()\n  FROM input\n  WHERE job.id = (SELECT target.id FROM dispatch_target AS target)\n  RETURNING job.id\n),\nmonitor_target AS (\n  SELECT job.id\n  FROM public.tender_agentic_jobs AS job\n  CROSS JOIN input\n  WHERE input.source_kind = 'monitor'\n    AND input.execution_id IS NOT NULL\n    AND job.poll_owner_execution_id = input.execution_id\n    AND job.status IN ('ready', 'running', 'validating')\n),\nmonitor_update AS (\n  UPDATE public.tender_agentic_jobs AS job\n  SET poll_owner_execution_id = NULL,\n      poll_claimed_at = NULL,\n      validation_summary = jsonb_set(\n        jsonb_set(\n          job.validation_summary,\n          '{monitor_error}',\n          jsonb_build_object(\n            'code', input.error_code,\n            'message', input.error_message,\n            'recorded_at', now()\n          ),\n          true\n        ),\n        '{monitor_error_count}',\n        to_jsonb(LEAST(\n          CASE\n            WHEN job.validation_summary ->> 'monitor_error_count' ~ '^[0-9]{1,7}$'\n              THEN (job.validation_summary ->> 'monitor_error_count')::integer\n            ELSE 0\n          END + 1,\n          1000000\n        )),\n        true\n      ),\n      updated_at = now()\n  FROM input\n  WHERE job.id IN (SELECT target.id FROM monitor_target AS target)\n  RETURNING job.id\n),\nmutation_stats AS (\n  SELECT\n    (SELECT count(*) FROM dispatch_update) + (SELECT count(*) FROM monitor_update) AS update_count,\n    COALESCE((\n      SELECT jsonb_agg(changed.id ORDER BY changed.id)\n      FROM (\n        SELECT id FROM dispatch_update\n        UNION ALL\n        SELECT id FROM monitor_update\n      ) AS changed\n    ), '[]'::jsonb) AS job_ids\n),\nresult AS (\n  SELECT\n    CASE\n      WHEN input.execution_id IS NULL OR input.source_kind = 'invalid_identity' THEN 'invalid_identity'\n      WHEN input.source_kind NOT IN ('dispatch', 'monitor') THEN 'unsupported_workflow'\n      WHEN EXISTS (SELECT 1 FROM dispatch_update) THEN 'dispatch_failed'\n      WHEN EXISTS (SELECT 1 FROM monitor_update) THEN 'monitor_lease_released'\n      WHEN EXISTS (\n        SELECT 1\n        FROM public.tender_agentic_jobs AS job\n        WHERE (\n          (input.source_kind = 'dispatch' AND job.dispatch_execution_id = input.execution_id)\n          OR (input.source_kind = 'monitor' AND job.poll_owner_execution_id = input.execution_id)\n        )\n          AND job.status IN ('completed', 'canceled', 'failed')\n      ) THEN 'terminal_no_op'\n      ELSE 'ownership_lost'\n    END AS outcome,\n    mutation_stats.update_count,\n    mutation_stats.job_ids,\n    input.source_kind,\n    input.execution_id\n  FROM input\n  CROSS JOIN mutation_stats\n)\nSELECT outcome, update_count, job_ids, source_kind, execution_id\nFROM result;",
+        "options": {
+          "queryReplacement": "={{ [$json.source_kind, $json.execution_id, $json.error_code, $json.error_message] }}"
+        }
+      },
+      "id": "apply-agentic-ownership-guard",
+      "name": "Применить ownership guard",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        520,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "KITATEH Tenders"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать agentic error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать agentic error": {
+      "main": [
+        [
+          {
+            "node": "Применить ownership guard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

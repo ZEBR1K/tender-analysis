@@ -50,7 +50,7 @@
 
 ## Workflow documentation
 
-`workflows/orchestrator.md`, `workflows/document-preparation.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/intake-error-workflow.md`, `workflows/intake-resume.md`, `workflows/manual-resume.md`, `workflows/recovery-scan.md`, `workflows/tenderplan-mark-intake.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
+`workflows/orchestrator.md`, `workflows/document-preparation.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/intake-error-workflow.md`, `workflows/intake-resume.md`, `workflows/manual-resume.md`, `workflows/recovery-scan.md`, `workflows/tenderplan-mark-intake.md`, `workflows/agentic-analysis-dispatch.md`, `workflows/agentic-analysis-monitor.md`, `workflows/agentic-analysis-error.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
 
 ## Workflow exports
 
@@ -70,6 +70,9 @@ Canonical exports:
 Repository candidates, которые не считаются production без отдельного import/read-back/runtime promotion:
 
 * Intake Error — `workflows/n8n-exports/TENDER — Ошибка Intake Resume.json`
+* Agentic Dispatch — `workflows/n8n-exports/TENDER — Агентский анализ — Запуск.json`
+* Agentic Monitor — `workflows/n8n-exports/TENDER — Агентский анализ — Монитор.json`
+* Agentic Error — `workflows/n8n-exports/TENDER — Ошибка агентского анализа.json`
 
 `workflows/n8n-exports/beta/*.json` — isolated test, calibration и beta snapshots; они не production без packaging/promotion.
 

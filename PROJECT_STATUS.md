@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–12 — repository workflows implemented, deployment closed
+## Agentic shadow foundation Tasks 0–13 — repository workflows implemented, deployment closed
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
@@ -13,7 +13,11 @@ staging, a focused agent skill, audited non-interactive execution,
 contract/source-identity validation, and an asynchronous restart-safe runner
 lifecycle. Tasks 11–12 add inactive, identity-neutral Dispatch and Monitor
 exports with exact DB ownership, source staging, runner polling, and atomic
-27-row shadow persistence. They are not wired to Orchestrator/Intake.
+27-row shadow persistence. Task 13 adds an inactive, identity-neutral Error
+Workflow candidate: Dispatch crashes can fail only their exact pre-start owner;
+Monitor crashes only release their exact poll lease and append bounded technical
+audit without failing a running job. These workflows are not imported, bound to
+a real Error Workflow ID, or wired to Orchestrator/Intake.
 
 Runtime validation is intentionally restricted to security, file/artifact
 integrity, and the closed JSON contract. Page/OOXML/XLSX indexing, quote
@@ -25,7 +29,7 @@ complete removal/retention inventory and open gates are recorded in
 Local verification at the final Tasks 0–10 review point completed `670 passed`,
 `0 failed`, `2 skipped`. The skips are explicit deployment/runtime gates, not
 silent passes. Task 6 still has one procurement with four repeats, so its
-multi-procurement gate remains `awaiting_additional_procurements`. Task 13 and
+multi-procurement gate remains `awaiting_additional_procurements`. Task 14 and
 later, n8n wiring, production migration, runner deployment, and paid canaries
 were not performed. The initial Tasks 11–12 review was rejected for lifecycle
 and ownership defects; a second review then found two remaining Task 11–12
