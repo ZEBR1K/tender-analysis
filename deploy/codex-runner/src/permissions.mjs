@@ -43,6 +43,8 @@ export function buildCodexPermissionBoundary({
   const workspaceDirectory = path.posix.join(jobRoot, 'workspace');
   const inputDirectory = path.posix.join(jobRoot, 'input');
   const workspaceTempDirectory = path.posix.join(workspaceDirectory, '.tmp');
+  const agentInstructionsPath = path.posix.join(workspaceDirectory, 'AGENTS.md');
+  const agentSkillsDirectory = path.posix.join(workspaceDirectory, '.agents');
 
   const entries = [
     override('default_permissions', tomlString(PROFILE_NAME)),
@@ -53,6 +55,8 @@ export function buildCodexPermissionBoundary({
     override(`permissions.${PROFILE_NAME}.filesystem.:slash_tmp`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedJobsRoot}`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem.${workspaceDirectory}`, tomlString('write')),
+    override(`permissions.${PROFILE_NAME}.filesystem.${agentInstructionsPath}`, tomlString('read')),
+    override(`permissions.${PROFILE_NAME}.filesystem.${agentSkillsDirectory}`, tomlString('read')),
     override(`permissions.${PROFILE_NAME}.filesystem.${inputDirectory}`, tomlString('read')),
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedAuthRoot}`, tomlString('deny')),
     override(`permissions.${PROFILE_NAME}.filesystem.${normalizedSecretsRoot}`, tomlString('deny')),
@@ -74,6 +78,7 @@ export function buildCodexPermissionBoundary({
     profileName: PROFILE_NAME,
     workspaceDirectory,
     readOnlyDirectories: Object.freeze([inputDirectory]),
+    readOnlyInstructionPaths: Object.freeze([agentInstructionsPath, agentSkillsDirectory]),
     deniedRoots: Object.freeze([
       normalizedJobsRoot,
       normalizedAuthRoot,
@@ -115,7 +120,8 @@ export function permissionBoundaryContractReady() {
     });
     return boundary.cliArgs.includes('--ignore-user-config')
       && !boundary.cliArgs.includes('--sandbox')
-      && boundary.readOnlyDirectories.length === 1;
+      && boundary.readOnlyDirectories.length === 1
+      && boundary.readOnlyInstructionPaths.length === 2;
   } catch {
     return false;
   }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -18,6 +19,7 @@ import {
   runCodexAttempt,
   sanitizeCodexEnvironment,
   shouldRetryCodexAttempt,
+  stageAgentTemplate,
 } from '../deploy/codex-runner/src/codex-command.mjs';
 import {
   createCodexEventAccumulator,
@@ -170,11 +172,43 @@ test('Codex argv is fixed, shell-free and includes the exact per-job permission 
   assert.equal(command.args.includes('-s'), false);
   assert.equal(command.args.some((entry) => entry.includes('sandbox_workspace_write')), false);
   assert.equal(command.shell, false);
+  assert.ok(boundary.readOnlyInstructionPaths.includes(
+    `/data/jobs/${fixtureJobId}/workspace/AGENTS.md`,
+  ));
+  assert.ok(boundary.readOnlyInstructionPaths.includes(
+    `/data/jobs/${fixtureJobId}/workspace/.agents`,
+  ));
 
   assert.throws(
     () => buildCodexCommand({ jobId: fixtureJobId, extraArgs: ['--sandbox', 'workspace-write'] }),
     /unsupported option|caller arguments/iu,
   );
+});
+
+test('agent template staging copies only trusted instructions and rejects drift', async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'agentic-template-stage-'));
+  try {
+    const workspaceDirectory = path.join(temporaryRoot, 'workspace');
+    await mkdir(workspaceDirectory);
+    await stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot });
+    assert.deepEqual(await listRelativeFiles(workspaceDirectory), [
+      '.agents/skills/tender-document-analysis/SKILL.md',
+      'AGENTS.md',
+    ]);
+    assert.equal(
+      await readFile(path.join(workspaceDirectory, 'AGENTS.md'), 'utf8'),
+      await readFile(agentInstructionsPath, 'utf8'),
+    );
+
+    await chmod(path.join(workspaceDirectory, 'AGENTS.md'), 0o600);
+    await writeFile(path.join(workspaceDirectory, 'AGENTS.md'), 'drift', 'utf8');
+    await assert.rejects(
+      stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot }),
+      /instruction.*changed|trusted.*instruction/iu,
+    );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test('Codex event parser accepts audited terminals and sums exact usage', () => {
@@ -227,7 +261,11 @@ test('Codex process environment is allowlisted and strips secret-like keys', () 
   });
 });
 
-async function runFake(mode, { timeoutMs = 2_000, killGraceMs = 100 } = {}) {
+async function runFake(mode, {
+  timeoutMs = 2_000,
+  killGraceMs = 100,
+  secretValues = [],
+} = {}) {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'agentic-codex-command-'));
   const workspaceDirectory = path.join(temporaryRoot, 'workspace');
   const outputDirectory = path.join(workspaceDirectory, 'output');
@@ -252,6 +290,7 @@ async function runFake(mode, { timeoutMs = 2_000, killGraceMs = 100 } = {}) {
       OPENAI_API_KEY: 'must-not-reach-fake',
       TENDER_CODEX_RUNNER_AUTH_TOKEN: 'must-not-reach-fake',
     },
+    secretValues,
   });
   return { temporaryRoot, execution };
 }
@@ -283,6 +322,32 @@ test('fake Codex success preserves JSONL audit, usage and parsed result without 
       JSON.parse(await readFile(execution.artifacts.result, 'utf8')).schema_version,
       'fake_result_v1',
     );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('JSONL audit redacts exact secrets while remaining parseable', async () => {
+  const { temporaryRoot, execution } = await runFake('stdout-secret', {
+    secretValues: ['event-secret-value'],
+  });
+  try {
+    assert.equal(execution.ok, true);
+    const source = await readFile(execution.artifacts.events, 'utf8');
+    assert.equal(source.includes('event-secret-value'), false);
+    assert.match(source, /\[REDACTED\]/u);
+    for (const line of source.trim().split('\n')) JSON.parse(line);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('malformed result bytes are retained in the immutable attempt audit', async () => {
+  const { temporaryRoot, execution } = await runFake('malformed-result');
+  try {
+    assert.equal(execution.ok, false);
+    assert.equal(execution.code, 'CODEX_RESULT_INVALID');
+    assert.equal(await readFile(execution.artifacts.result, 'utf8'), '{"schema_version":');
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
@@ -389,6 +454,33 @@ test('wall-clock timeout terminates the spawned subprocess tree', async () => {
       (error) => error?.code === 'ESRCH',
     );
   } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('forced timeout kill still runs after the main process exits on SIGTERM', {
+  skip: process.platform === 'win32' ? 'POSIX process-group signal regression' : false,
+}, async () => {
+  const { temporaryRoot, execution } = await runFake('child-ignore-term', {
+    timeoutMs: 300,
+    killGraceMs: 80,
+  });
+  let childPid;
+  try {
+    assert.equal(execution.code, 'CODEX_TIMEOUT');
+    childPid = Number((await readFile(
+      path.join(temporaryRoot, 'workspace', 'child.pid'),
+      'utf8',
+    )).trim());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.throws(
+      () => process.kill(childPid, 0),
+      (error) => error?.code === 'ESRCH',
+    );
+  } finally {
+    if (Number.isSafeInteger(childPid)) {
+      try { process.kill(childPid, 'SIGKILL'); } catch {}
+    }
     await rm(temporaryRoot, { recursive: true, force: true });
   }
 });
