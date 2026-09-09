@@ -9,8 +9,10 @@ with the exact dispatch execution ID, creates or loads its shadow job, verifies
 the registered manifest and source-identity barrier, and inserts all processable
 document ownership rows before any runner side effect. Existing
 `running`, `validating`, `completed`, and `canceled` jobs are structured no-ops.
-A failed job is eligible only for the migration's bounded second attempt and
-only for the explicitly recoverable process/transport error codes.
+A failed job is eligible only when the synchronized runner audit says the
+failure is retryable, the runner attempt is below two, and its code is one of
+`RUNNER_ORPHANED_EXECUTION`, `CODEX_PROCESS_FAILED`,
+`CODEX_TRANSPORT_ERROR`, or `CODEX_TIMEOUT`. Contract failures cannot retry.
 
 Documents are processed by `Loop Over Items` with batch size 1. The source HTTP
 node returns the file in n8n binary property `data`; the next HTTP node streams
@@ -21,10 +23,17 @@ placeholder (`RUNNER_HEADER_AUTH_CREDENTIAL_ID`); the export contains no token.
 After every upload response matches the owned artifact/hash, PostgreSQL marks
 that document staged. An exact DB barrier requires the expected total, all
 staged, no incomplete state, and unique document indexes and artifact keys.
-Only then does the workflow call runner `/seal`, verify catalog/manifest/job
-identity, call `/start`, and guardedly mark the DB job `running` with the n8n
-dispatch execution ID. Errors are reduced to bounded typed code/message fields;
-source URLs and binary content are never persisted in the error record.
+The job remains `staging` and dispatch-owned through that barrier and runner
+`/seal`; only the verified seal moves it to `ready`. Monitor therefore cannot
+claim a pre-start job. A verified `/start` response guardedly moves the exact
+owned job from `ready` to `running` and synchronizes the runner attempt. If the
+start response is lost or cannot be identified, the workflow records bounded
+`START_OUTCOME_UNKNOWN`, releases dispatch ownership, and leaves the job
+`ready` so Monitor can reconcile the idempotent runner job without issuing a
+second paid start. Every guarded update emits an explicit updated/no-op or
+ownership-lost result; a zero-row CAS cannot silently end the branch. Other
+errors are reduced to bounded typed code/message fields; source URLs and binary
+content are never persisted in the error record.
 
 The export is identity-neutral, inactive, and has empty `pinData`. The pinned
 shadow-v0 catalog hash is repository-known and included in the closed manifest.

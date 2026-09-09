@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const path = new URL('../workflows/n8n-exports/TENDER — Агентский анализ — Запуск.json', import.meta.url);
 
@@ -118,7 +119,7 @@ test('dispatch verifies exact staging barrier before one seal and one start', as
   assert.match(start.parameters.url, /\/start/u);
   const mark = nodeByName(value, 'Зафиксировать running').parameters.query;
   assert.match(mark, /dispatch_execution_id/iu);
-  assert.match(mark, /status\s+IN\s*\(\s*'ready'\s*,\s*'running'\s*\)/iu);
+  assert.match(mark, /status\s*=\s*'ready'/iu);
   assert.match(mark, /staged_documents\s*=\s*expected_documents/iu);
   assert.ok(nodeByName(value, 'Проверить start identity').onError === 'continueErrorOutput');
 });
@@ -133,4 +134,73 @@ test('dispatch errors are typed and bounded without source URL or binary', async
   assert.match(failureSql, /source_document_id\s*=\s*NULLIF\(\$5/iu);
   assert.doesNotMatch(failureSql, /download_url|binary|base64/iu);
   assert.doesNotMatch(JSON.stringify(value.credentials ?? {}), /token|secret|password/iu);
+});
+
+test('dispatch failure formatter cannot copy a signed URL from an untrusted transport error', async () => {
+  const value = await workflow();
+  const source = nodeByName(value, 'Сформировать typed failure').parameters.jsCode;
+  const output = await new vm.Script(`(async()=>{${source}})()`).runInNewContext({
+    $input: { first: () => ({ json: { error_code: 'HTTP_FAILED', error_message: 'GET https://signed.example/file?token=super-secret failed' } }) },
+    $: (name) => name === 'Разобрать решение'
+      ? { first: () => ({ json: { job_id: '11111111-1111-4111-8111-111111111111' } }) }
+      : { item: { json: { documents: { source_document_id: 'doc-1' } } } },
+    String,
+  });
+  assert.equal(output[0].json.error_code, 'HTTP_FAILED');
+  assert.equal(output[0].json.error_message, 'Agentic dispatch step failed');
+  assert.doesNotMatch(JSON.stringify(output), /https?:|signed\.example|super-secret/u);
+});
+
+test('pre-start remains dispatch-owned and ambiguous start becomes reconcilable', async () => {
+  const value = await workflow();
+  const barrier = nodeByName(value, 'Проверить staging barrier').parameters.query;
+  assert.doesNotMatch(barrier, /SET\s+status\s*=\s*'ready'/iu);
+  assert.match(barrier, /dispatch_execution_id\s*(?:=|<>)\s*\$2/iu);
+
+  const sealReady = nodeByName(value, 'Зафиксировать sealed ready').parameters.query;
+  assert.match(sealReady, /status='ready'/iu);
+  assert.match(sealReady, /dispatch_execution_id\s*=\s*\$2/iu);
+  assert.match(sealReady, /input_manifest_sha256\s*=\s*\$3/iu);
+  assert.match(sealReady, /count\(\*\)[^;]+status='staged'[^;]+expected_documents/isu);
+
+  const ambiguous = nodeByName(value, 'Сохранить ambiguous start').parameters.query;
+  assert.match(ambiguous, /START_OUTCOME_UNKNOWN/u);
+  assert.match(ambiguous, /dispatch_execution_id=NULL/iu);
+  assert.doesNotMatch(ambiguous, /status='failed'/iu);
+  assert.deepEqual(
+    value.connections['Запустить Codex'].main[1].map(({ node }) => node),
+    ['Сформировать ambiguous start'],
+  );
+  assert.deepEqual(
+    value.connections['Проверить start identity'].main[1].map(({ node }) => node),
+    ['Сформировать ambiguous start'],
+  );
+});
+
+test('retry claim uses synchronized runner retryability and actual runner codes', async () => {
+  const value = await workflow();
+  const sql = nodeByName(value, 'Создать или загрузить job и manifest').parameters.query;
+  for (const code of ['RUNNER_ORPHANED_EXECUTION', 'CODEX_PROCESS_FAILED', 'CODEX_TRANSPORT_ERROR', 'CODEX_TIMEOUT']) {
+    assert.match(sql, new RegExp(code, 'u'));
+  }
+  assert.match(sql, /validation_summary[^\n]*runner_retryable/iu);
+  assert.match(sql, /poll_owner_execution_id\s+IS\s+NULL/iu);
+  assert.match(sql, /attempts\s*<\s*2/iu);
+  assert.match(nodeByName(value, 'Зафиксировать running').parameters.query, /attempts\s*=\s*\$4::smallint/iu);
+});
+
+test('every guarded dispatch update returns one explicit outcome row', async () => {
+  const value = await workflow();
+  for (const name of [
+    'Зафиксировать staged документ',
+    'Проверить staging barrier',
+    'Зафиксировать sealed ready',
+    'Зафиксировать running',
+    'Сохранить typed failure',
+    'Сохранить ambiguous start',
+  ]) {
+    const sql = nodeByName(value, name).parameters.query;
+    assert.match(sql, /ownership_lost|update_count|barrier_failed/iu, `${name} needs explicit zero-row outcome`);
+    assert.match(sql, /SELECT/iu, `${name} must always select an outcome row`);
+  }
 });

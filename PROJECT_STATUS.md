@@ -27,9 +27,11 @@ Local verification at the final Tasks 0–10 review point completed `670 passed`
 silent passes. Task 6 still has one procurement with four repeats, so its
 multi-procurement gate remains `awaiting_additional_procurements`. Task 13 and
 later, n8n wiring, production migration, runner deployment, and paid canaries
-were not performed. Task 11/12 focused tests are locally GREEN; the full suite
-in the restricted Codex sandbox retains pre-existing environment-only failures
-where tests require loopback listeners, subprocess behavior, or Docker.
+were not performed. The initial Tasks 11–12 review was rejected for lifecycle
+and ownership defects; the corrected local candidate subsequently passed a
+fresh independent final-bytes review. The full suite in the
+restricted Codex sandbox retains pre-existing environment-only failures where
+tests require loopback listeners, subprocess behavior, or Docker.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

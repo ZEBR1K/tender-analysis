@@ -7,16 +7,22 @@ exact poll owner, and a five-minute stale-lease cutoff. It commits before the
 first runner HTTP request, so no database transaction remains open while the
 runner is polled. Claimed jobs are processed sequentially.
 
-Runner `ready`, `running`, and `validating` responses may update only bounded
-heartbeat, usage, validation-summary/artifact metadata and release the exact
-lease. A typed runner failure marks the owned job failed, retains bounded audit
-metadata, releases the lease, and never creates shadow fields or inferred
-`not_found` values.
+Dispatch-owned jobs are excluded from the claim. Runner `ready`, `running`, and
+`validating` responses may update only allow-listed, size-bounded heartbeat,
+usage and technical artifact metadata and release the exact lease. HTTP/network
+poll errors, status identity errors, and result-fetch errors record bounded
+monitor audit and release only that lease without changing job status. Only an
+explicit identity-valid runner `failed` response terminally fails the owned job
+and synchronizes its attempt/retryability audit. No failure path creates shadow
+fields or inferred `not_found` values. Every guarded update returns an explicit
+updated or ownership-lost outcome.
 
 For `completed`, the workflow fetches `/result` and checks the closed validation
 envelope: job, analysis run, pipeline, catalog, sealed manifest and artifact
 hash identities plus exactly 27 fields. It does not inspect or reinterpret
-field meaning. One PostgreSQL transaction locks the exact owned job, verifies
+field meaning. A successfully fetched but contract-invalid completed result has
+a distinct terminal `RESULT_CONTRACT_INVALID` policy and creates no field rows.
+One PostgreSQL transaction locks the exact owned job, verifies
 the exact ordered catalog, UPSERTs the 27 agent-reported shadow rows, rechecks
 the persisted count/catalog set, and only then marks the job completed and
 releases the lease. Any exception rolls back the complete transaction.
