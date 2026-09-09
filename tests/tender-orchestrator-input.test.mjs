@@ -868,10 +868,20 @@ test('only pending supported documents reach Split Out and the legacy Worker', (
   );
   assert.equal(splitOutputs.length, 1, 'supported-document gate must have one dispatch output');
   const supportedOutput = splitOutputs[0];
+  const agenticDispatch = nodesOfType('n8n-nodes-base.executeWorkflow').find(
+    (node) => node.parameters?.workflowId?.cachedResultName === 'TENDER — Агентский анализ — Запуск',
+  );
+  assert.ok(agenticDispatch, 'supported new runs must pass through the synchronous agentic shadow barrier');
   assert.deepEqual(
     outputTargets(gate.name, supportedOutput),
+    [agenticDispatch.name],
+    'supported-document output must enter the agentic shadow barrier before legacy fanout',
+  );
+  const restoreTarget = outputTargets(agenticDispatch.name, 0)[0];
+  assert.deepEqual(
+    outputTargets(restoreTarget, 0),
     [attachmentSplit.name, terminal.name],
-    'supported-document output must fan out directly to Split Out first and terminal result second',
+    'restored run context must fan out to Split Out first and terminal result second',
   );
 
   const noDocumentOutput = supportedOutput === 0 ? 1 : 0;

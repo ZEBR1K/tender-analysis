@@ -235,7 +235,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "return { json: { success: true, action: $json.action, analysis_run_id: $json.analysis_run_id ?? null, tender_id: $json.tender_id ?? null } };"
+        "jsCode": "return { json: { success: true, action: $json.action, analysis_run_id: $json.analysis_run_id ?? null, tender_id: $json.tender_id ?? null, source_event_key: $json.source_event_key ?? null, agentic_shadow: { schema_version: 'tender_agentic_dispatch_v1', attempted: false, dispatched: false, acknowledged: false, no_op: false, success: null, job_id: null, status: null, outcome: null, action: null, error_code: null, reason: $json.action ?? 'event_no_op' } } };"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -998,9 +998,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE tender_analysis_intake_events SET status='completed', analysis_run_id=COALESCE(NULLIF($3,'')::uuid,analysis_run_id), processed_at=now(), action=left($4,200), error_message=left($5,2000) WHERE source=$1 AND event_key=$2 AND n8n_execution_id=$6 RETURNING *, true AS completion_applied, $7::integer AS documents_dispatched, NULLIF($8,'')::text AS run_status;",
+        "query": "UPDATE tender_analysis_intake_events SET status='completed', analysis_run_id=COALESCE(NULLIF($3,'')::uuid,analysis_run_id), processed_at=now(), action=left($4,200), error_message=left($5,2000) WHERE source=$1 AND event_key=$2 AND n8n_execution_id=$6 RETURNING *, true AS completion_applied, $7::integer AS documents_dispatched, NULLIF($8,'')::text AS run_status, $2::text AS source_event_key, NULLIF($9,'')::jsonb AS agentic_shadow;",
         "options": {
-          "queryReplacement": "={{ [ $('Classify Intake Event').first().json.source, $('Classify Intake Event').first().json.source_event_key, $json.analysis_run_id ?? $('Classify Intake Event').first().json.analysis_run_id ?? '', $json.action === 'call_finalization' ? 'finalization_started' : ($json.action ?? ($json.created_new_run === true ? 'created_new_run' : 'waiting_for_workers')), $json.error_message ?? '', $execution.id, $json.documents_dispatched ?? $json.attachments?.length ?? 0, $json.run_status ?? $json.status ?? '' ] }}"
+          "queryReplacement": "={{ [ $('Classify Intake Event').first().json.source, $('Classify Intake Event').first().json.source_event_key, $json.analysis_run_id ?? $('Classify Intake Event').first().json.analysis_run_id ?? '', $json.action === 'call_finalization' ? 'finalization_started' : ($json.action ?? ($json.created_new_run === true ? 'created_new_run' : 'waiting_for_workers')), $json.error_message ?? '', $execution.id, $json.documents_dispatched ?? $json.attachments?.length ?? 0, $json.run_status ?? $json.status ?? '', JSON.stringify($json.agentic_shadow ?? { schema_version: 'tender_agentic_dispatch_v1', attempted: false, dispatched: false, acknowledged: false, no_op: false, success: null, job_id: null, status: null, outcome: null, action: null, error_code: null, reason: $json.created_new_run === true ? 'handled_by_orchestrator' : 'not_attempted' }) ] }}"
         }
       },
       "type": "n8n-nodes-base.postgres",
@@ -1022,7 +1022,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const allowed=['created_new_run','resumed_documents','waiting_for_workers','aggregation_started','finalization_started','already_completed','superseded_no_op','duplicate_event','manual_attention_required','automatic_attempts_exhausted','execution_status_unavailable']; if($json.completion_applied!==true)throw new Error('Intake event completion ownership mismatch'); const action=$json.action; if(!allowed.includes(action))throw new Error(`Unknown structured outcome action ${String(action)}`); return {json:{success:true,action,analysis_run_id:$json.analysis_run_id??null,tender_id:$json.tender_id??null,documents_dispatched:Number($json.documents_dispatched??0),next_state:$json.run_status??null}};"
+        "jsCode": "const allowed=['created_new_run','resumed_documents','waiting_for_workers','aggregation_started','finalization_started','already_completed','superseded_no_op','duplicate_event','manual_attention_required','automatic_attempts_exhausted','execution_status_unavailable']; if($json.completion_applied!==true)throw new Error('Intake event completion ownership mismatch'); const action=$json.action; if(!allowed.includes(action))throw new Error(`Unknown structured outcome action ${String(action)}`); return {json:{success:true,action,analysis_run_id:$json.analysis_run_id??null,tender_id:$json.tender_id??null,source_event_key:$json.source_event_key??null,documents_dispatched:Number($json.documents_dispatched??0),next_state:$json.run_status??null,agentic_shadow:$json.agentic_shadow??null}};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1085,6 +1085,60 @@
       "name": "Reload Run Snapshot After Recovery",
       "executeOnce": true,
       "credentials": { "postgres": { "id": "RFpUr3McElcwyoxy", "name": "KITATEH Tenders" } }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first()?.json ?? {};\nconst documents = Array.isArray(input.documents) ? input.documents : [];\nconst runEntry = $('Apply Run Entry Policy').first().json;\nconst documentsTotal = Number(runEntry.documents_total);\nconst runStatus = String(input.run_status ?? '');\nconst supportedExtensions = new Set(['pdf', 'docx', 'xlsx']);\nconst processableStatuses = new Set(['pending', 'processing', 'completed']);\nconst eligibleStatuses = new Set(['processing', 'ready_for_aggregation', 'aggregating']);\nconst indexes = documents.map((document) => Number(document.document_index));\nconst uniqueIndexes = new Set(indexes);\nconst completeIndexes = Number.isInteger(documentsTotal)\n  && documentsTotal >= 0\n  && documents.length === documentsTotal\n  && uniqueIndexes.size === documentsTotal\n  && indexes.every((index) => Number.isInteger(index) && index >= 1 && index <= documentsTotal);\nconst processable = documents.filter((document) =>\n  processableStatuses.has(String(document.status ?? ''))\n  && supportedExtensions.has(String(document.file_extension ?? '').trim().toLowerCase())\n  && typeof document.download_url === 'string'\n  && document.download_url.trim() !== ''\n);\nconst identityComplete = processable.every((document) =>\n  typeof document.id === 'string'\n  && document.id.trim() !== ''\n  && typeof document.file_name === 'string'\n  && document.file_name.trim() !== ''\n  && typeof document.mime_type === 'string'\n  && document.mime_type.trim() !== ''\n  && Number.isInteger(Number(document.file_size))\n  && Number(document.file_size) >= 0\n  && Number(document.file_size) <= 52428800\n  && /^[0-9a-f]{64}$/iu.test(String(document.ingestion_metadata?.content_sha256 ?? ''))\n);\n\nlet reason = null;\nif (!eligibleStatuses.has(runStatus)) reason = 'terminal_run';\nelse if (!completeIndexes || !identityComplete) reason = 'manifest_incomplete';\nelse if (documents.some((document) => document.status === 'failed')) reason = 'failed_documents';\nelse if (processable.length === 0) reason = 'no_processable_documents';\n\nreturn [{\n  json: {\n    ...input,\n    documents_total: documentsTotal,\n    should_dispatch_agentic_shadow: reason === null,\n    agentic_shadow: {\n      schema_version: 'tender_agentic_dispatch_v1',\n      attempted: false,\n      dispatched: false,\n      acknowledged: false,\n      no_op: false,\n      success: null,\n      job_id: null,\n      status: null,\n      outcome: null,\n      action: null,\n      error_code: null,\n      reason\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4980, 20],
+      "id": "10000000-0000-4000-8000-000000000054",
+      "name": "Prepare Agentic Shadow Dispatch"
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict", "version": 3 }, "conditions": [{ "leftValue": "={{ $('Prepare Agentic Shadow Dispatch').first().json.should_dispatch_agentic_shadow === true }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }], "combinator": "and" }, "options": {} },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [5200, 20],
+      "id": "10000000-0000-4000-8000-000000000055",
+      "name": "Should Dispatch Agentic Shadow?"
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "AGENTIC_DISPATCH_WORKFLOW_ID", "mode": "list", "cachedResultName": "TENDER — Агентский анализ — Запуск" },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $('Prepare Agentic Shadow Dispatch').first().json.analysis_run_id }}",
+            "pipeline_version": "tender_agentic_pipeline_v1",
+            "replicate_index": 1
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "all",
+        "options": { "waitForSubWorkflow": true }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [5420, -60],
+      "id": "10000000-0000-4000-8000-000000000056",
+      "name": "Dispatch Existing Run Agentic Shadow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const dispatch = $input.first()?.json ?? {};\nconst context = $('Prepare Agentic Shadow Dispatch').first().json;\nif (dispatch.schema_version !== 'tender_agentic_dispatch_v1') {\n  throw new Error('[Intake agentic shadow] Unexpected Dispatch contract.');\n}\nif (!context.analysis_run_id || context.source_event_key !== $('Classify Intake Event').first().json.source_event_key) {\n  throw new Error('[Intake agentic shadow] source_event_key or analysis_run_id context mismatch.');\n}\nconst status = typeof dispatch.status === 'string' ? dispatch.status : null;\nconst outcome = typeof dispatch.outcome === 'string' ? dispatch.outcome : null;\nconst action = typeof dispatch.action === 'string' ? dispatch.action : null;\nconst noOp = dispatch.no_op === true;\nconst success = dispatch.success === false ? false : true;\nconst acknowledged = success && (noOp || ['ready', 'running', 'validating', 'completed'].includes(status));\nreturn [{\n  json: {\n    ...context,\n    should_dispatch_agentic_shadow: false,\n    agentic_shadow: {\n      schema_version: 'tender_agentic_dispatch_v1',\n      attempted: true,\n      dispatched: !noOp && status === 'running',\n      acknowledged,\n      no_op: noOp,\n      success,\n      job_id: typeof dispatch.job_id === 'string' ? dispatch.job_id : null,\n      status,\n      outcome,\n      action,\n      error_code: typeof dispatch.error_code === 'string' ? dispatch.error_code : null,\n      reason: noOp ? 'idempotent_no_op' : null\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5640, -60],
+      "id": "10000000-0000-4000-8000-000000000057",
+      "name": "Restore Existing Run Context After Agentic"
     },
     {
       "parameters": { "mode": "runOnceForEachItem", "jsCode": "const decision=$('Decide Document and Stage Action').first().json; const stage_action=$json.should_start_aggregation===true?'call_aggregator':decision.stage_action; return {json:{...decision,...$json,stage_action,should_start_finalization:decision.should_start_finalization===true,action:stage_action==='call_aggregator'?'aggregation_started':decision.action}};" },
@@ -1476,6 +1530,21 @@
       ]
     },
     "Reload Run Snapshot After Recovery": {
+      "main": [[{ "node": "Prepare Agentic Shadow Dispatch", "type": "main", "index": 0 }]]
+    },
+    "Prepare Agentic Shadow Dispatch": {
+      "main": [[{ "node": "Should Dispatch Agentic Shadow?", "type": "main", "index": 0 }]]
+    },
+    "Should Dispatch Agentic Shadow?": {
+      "main": [
+        [{ "node": "Dispatch Existing Run Agentic Shadow", "type": "main", "index": 0 }],
+        [{ "node": "Decide Document and Stage Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dispatch Existing Run Agentic Shadow": {
+      "main": [[{ "node": "Restore Existing Run Context After Agentic", "type": "main", "index": 0 }]]
+    },
+    "Restore Existing Run Context After Agentic": {
       "main": [[{ "node": "Decide Document and Stage Action", "type": "main", "index": 0 }]]
     },
     "Read Document Owner Execution": {

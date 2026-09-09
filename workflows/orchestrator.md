@@ -38,6 +38,7 @@ typed intake input
 → synchronously prepare and validate the complete manifest
 → atomically create run as processing
 → register all pending/skipped manifest rows
+→ synchronously stage/seal/start one additive agentic shadow job
 → asynchronously dispatch only pending PDF/DOCX/XLSX
 → return one structured result
 ```
@@ -97,6 +98,8 @@ When Executed by Another Workflow
 created_new_run=true
 → Есть поддерживаемые документы?
    ├─ true
+   │  → Запустить агентский shadow-анализ
+   │  → Восстановить контекст после agentic dispatch
    │  ├─ разделить документы
    │  │  → ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ
    │  │  → Запустить обработку документа
@@ -259,7 +262,7 @@ created_new_run=false
 action=concurrent_existing_run
 ```
 
-Conflict branch не регистрирует документы повторно и не достигает Worker. Возобновление существующего run остаётся обязанностью `TENDER — Intake Resume`.
+Conflict branch не регистрирует документы повторно и не достигает ни agentic Dispatch, ни Worker. Возобновление существующего run остаётся обязанностью `TENDER — Intake Resume`.
 
 ---
 
@@ -277,11 +280,13 @@ xlsx
 
 Если поддерживаемый документ есть:
 
-1. `разделить документы` создаёт один item на attachment и сохраняет `analysis_run_id`, `tender_meta`, `created_new_run`.
-2. `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` пропускает только `pending` `pdf`, `docx`, `xlsx`; `skipped` audit rows до Worker не доходят.
-3. `Запустить обработку документа` работает в `mode=each`.
-4. Child workflow получает один зарегистрированный document item с внутренним `document_id` и общим `analysis_run_id`.
-5. `waitForSubWorkflow=false`: вызовы fire-and-forget, Orchestrator не ждёт Worker output.
+1. `Запустить агентский shadow-анализ` ровно один раз синхронно вызывает identity-neutral `TENDER — Агентский анализ — Запуск` в `mode=all` с `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, `replicate_index=1`. Ожидание заканчивается после staging/seal/start acknowledgement sub-workflow, а не после завершения Codex.
+2. `Восстановить контекст после agentic dispatch` возвращает исходный run/manifest context и добавляет bounded `agentic_shadow`; bodies документов в metadata не сохраняются.
+3. `разделить документы` создаёт один item на attachment и сохраняет `analysis_run_id`, `tender_meta`, `created_new_run`.
+4. `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` пропускает только `pending` `pdf`, `docx`, `xlsx`; `skipped` audit rows до Worker не доходят.
+5. `Запустить обработку документа` работает в `mode=each`; `waitForSubWorkflow=false`, поэтому legacy calls остаются fire-and-forget.
+
+Вызов shadow стоит после atomic registration и до legacy fan-out. Поэтому archive cleanup, достижимый только через последующие legacy stages, причинно следует за завершением Dispatch; после успешного seal runner владеет независимыми копиями. Concurrent conflict и defense-in-depth zero-processable branch Dispatch не достигают. Export остаётся inactive, а placeholder `AGENTIC_DISPATCH_WORKFLOW_ID` должен быть заменён реальным ID только при отдельном packaging/read-back шаге.
 
 Текущий Execute Workflow node указывает на repository/test candidate `[DW-23 TEST CODEX] TENDER — Обработать документ`. Выбор production Worker ID выполняется только при отдельном packaging/promotion решении.
 
@@ -289,7 +294,7 @@ xlsx
 
 # 9. `executionOrder=v1` и terminal fan-out
 
-На supported branch нода `Есть поддерживаемые документы?` имеет два direct targets в таком порядке на canvas:
+На supported branch нода `Есть поддерживаемые документы?` сначала синхронно проходит agentic shadow barrier. После восстановления исходного run context нода имеет два targets в таком порядке на canvas:
 
 ```text
 верхняя ветка: разделить документы → filter → async Worker dispatch
@@ -298,7 +303,7 @@ xlsx
 
 При `executionOrder=v1` n8n завершает верхнюю ветку до перехода к нижней, потому что ветви выполняются сверху вниз. Поэтому все поддерживаемые items сначала передаются fire-and-forget Worker calls, после чего запускается общий terminal result.
 
-Terminal result не зависит от child Worker output и читает run напрямую из atomic creation node. Это важно: async Workers продолжаются независимо, а caller получает симметричный результат создания/конфликта.
+Terminal result не зависит от child Worker output: новый run берётся из восстановленного atomic creation context, а conflict — из fresh existing-run row. Async Workers продолжаются независимо, а caller получает симметричный результат создания/конфликта с additive `agentic_shadow` metadata.
 
 ---
 
@@ -320,7 +325,15 @@ Terminal result не зависит от child Worker output и читает run
   "next_state": "processing",
   "documents_total": 3,
   "registered_documents_count": 3,
-  "documents_dispatched": 3
+  "documents_dispatched": 3,
+  "agentic_shadow": {
+    "schema_version": "tender_agentic_dispatch_v1",
+    "attempted": true,
+    "dispatched": true,
+    "acknowledged": true,
+    "job_id": "uuid",
+    "status": "running"
+  }
 }
 ```
 
@@ -340,6 +353,7 @@ next_state
 documents_total
 registered_documents_count
 documents_dispatched
+agentic_shadow
 ```
 
 Семантика по исходам:
@@ -426,7 +440,8 @@ tests/intake-agentic-shadow-routing.test.mjs
 - регистрацию всех документов до первого Worker;
 - `mode=each`, passthrough Worker input и `waitForSubWorkflow=false`;
 - единый structured terminal result;
-- synchronous preparation dominance, fail-closed manifest identity и pending-only Worker dispatch.
+- synchronous preparation dominance, fail-closed manifest identity и pending-only Worker dispatch;
+- один synchronous agentic shadow barrier после atomic registration, отсутствие agentic dispatch на conflict/zero-processable path и восстановление legacy run context до fan-out.
 
 Read-only execution `14678` отдельно подтвердил exact input validation,
 TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke был

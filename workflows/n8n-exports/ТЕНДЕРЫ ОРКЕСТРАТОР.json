@@ -397,8 +397,56 @@
     },
     {
       "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "AGENTIC_DISPATCH_WORKFLOW_ID",
+          "mode": "list",
+          "cachedResultName": "TENDER — Агентский анализ — Запуск"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $('Создать запуск и зарегистрировать документы').first().json.analysis_run_id }}",
+            "pipeline_version": "tender_agentic_pipeline_v1",
+            "replicate_index": 1
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "all",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        -64
+      ],
+      "id": "97d8d9aa-f10f-466c-9167-d6601b9a23ef",
+      "name": "Запустить агентский shadow-анализ"
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const request = $('Проверить вход Orchestrator').first().json;\nconst createdRow = $('Создать запуск и зарегистрировать документы').first().json;\nconst inputRow = $input.first()?.json ?? {};\nconst createdNewRun = inputRow.created_new_run === true;\nconst row = createdNewRun ? createdRow : inputRow;\n\nif (!row.analysis_run_id || !row.status) {\n  throw new Error('[Orchestrator result] analysis_run_id and status are required.');\n}\nif (row.source !== request.source || row.tender_id !== request.tender_id) {\n  throw new Error('[Orchestrator result] Run identity does not match validated input.');\n}\n\nconst supportedExtensions = new Set(['pdf', 'docx', 'xlsx']);\nconst documentsDispatched = createdNewRun && Array.isArray(createdRow.attachments)\n  ? createdRow.attachments.filter((attachment) =>\n      attachment?.status === 'pending'\n      && supportedExtensions.has(String(attachment?.file_extension ?? '').trim().toLowerCase()),\n    ).length\n  : 0;\nconst action = createdNewRun ? 'created_new_run' : 'concurrent_existing_run';\nreturn [{\n  json: {\n    success: true,\n    analysis_run_id: row.analysis_run_id,\n    source: request.source,\n    tender_id: request.tender_id,\n    source_event_key: request.source_event_key,\n    trigger_kind: request.trigger_kind,\n    created_new_run: createdNewRun,\n    action,\n    status: row.status,\n    next_state: row.status,\n    documents_total: Number(row.documents_total ?? 0),\n    registered_documents_count: Number(row.registered_documents_count ?? row.documents_total ?? 0),\n    documents_dispatched: documentsDispatched,\n  },\n}];"
+        "jsCode": "const dispatch = $input.first()?.json ?? {};\nconst context = $('Создать запуск и зарегистрировать документы').first().json;\nconst request = $('Проверить вход Orchestrator').first().json;\n\nif (dispatch.schema_version !== 'tender_agentic_dispatch_v1') {\n  throw new Error('[Orchestrator agentic shadow] Unexpected Dispatch contract.');\n}\nif (!context.analysis_run_id || context.analysis_run_id !== $('Создан новый запуск?').first().json.analysis_run_id) {\n  throw new Error('[Orchestrator agentic shadow] analysis_run_id context mismatch.');\n}\n\nconst status = typeof dispatch.status === 'string' ? dispatch.status : null;\nconst outcome = typeof dispatch.outcome === 'string' ? dispatch.outcome : null;\nconst action = typeof dispatch.action === 'string' ? dispatch.action : null;\nconst noOp = dispatch.no_op === true;\nconst success = dispatch.success === false ? false : true;\nconst acknowledged = success && (noOp || ['ready', 'running', 'validating', 'completed'].includes(status));\n\nreturn [{\n  json: {\n    ...context,\n    source_event_key: request.source_event_key,\n    agentic_shadow: {\n      schema_version: 'tender_agentic_dispatch_v1',\n      attempted: true,\n      dispatched: !noOp && status === 'running',\n      acknowledged,\n      no_op: noOp,\n      success,\n      job_id: typeof dispatch.job_id === 'string' ? dispatch.job_id : null,\n      status,\n      outcome,\n      action,\n      error_code: typeof dispatch.error_code === 'string' ? dispatch.error_code : null\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -64
+      ],
+      "id": "ef668305-d6f4-4424-bdca-44c4a09131aa",
+      "name": "Восстановить контекст после agentic dispatch"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Проверить вход Orchestrator').first().json;\nconst createdRow = $('Создать запуск и зарегистрировать документы').first().json;\nconst inputRow = $input.first()?.json ?? {};\nconst createdNewRun = inputRow.created_new_run === true;\nconst row = createdNewRun ? createdRow : inputRow;\n\nif (!row.analysis_run_id || !row.status) {\n  throw new Error('[Orchestrator result] analysis_run_id and status are required.');\n}\nif (row.source !== request.source || row.tender_id !== request.tender_id) {\n  throw new Error('[Orchestrator result] Run identity does not match validated input.');\n}\n\nconst supportedExtensions = new Set(['pdf', 'docx', 'xlsx']);\nconst documentsDispatched = createdNewRun && Array.isArray(createdRow.attachments)\n  ? createdRow.attachments.filter((attachment) =>\n      attachment?.status === 'pending'\n      && supportedExtensions.has(String(attachment?.file_extension ?? '').trim().toLowerCase()),\n    ).length\n  : 0;\nconst action = createdNewRun ? 'created_new_run' : 'concurrent_existing_run';\nconst agenticShadow = inputRow.agentic_shadow ?? {\n  schema_version: 'tender_agentic_dispatch_v1',\n  attempted: false,\n  dispatched: false,\n  acknowledged: false,\n  no_op: false,\n  success: null,\n  job_id: null,\n  status: null,\n  outcome: null,\n  action: null,\n  error_code: null,\n  reason: createdNewRun ? 'no_processable_documents' : 'concurrent_existing_run'\n};\nreturn [{\n  json: {\n    success: true,\n    analysis_run_id: row.analysis_run_id,\n    source: request.source,\n    tender_id: request.tender_id,\n    source_event_key: request.source_event_key,\n    trigger_kind: request.trigger_kind,\n    created_new_run: createdNewRun,\n    action,\n    status: row.status,\n    next_state: row.status,\n    documents_total: Number(row.documents_total ?? 0),\n    registered_documents_count: Number(row.registered_documents_count ?? row.documents_total ?? 0),\n    documents_dispatched: documentsDispatched,\n    agentic_shadow: agenticShadow\n  },\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -571,17 +619,39 @@
       "main": [
         [
           {
-            "node": "разделить документы",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Вернуть результат Orchestrator",
+            "node": "Запустить агентский shadow-анализ",
             "type": "main",
             "index": 0
           }
         ],
         [
+          {
+            "node": "Вернуть результат Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запустить агентский shadow-анализ": {
+      "main": [
+        [
+          {
+            "node": "Восстановить контекст после agentic dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Восстановить контекст после agentic dispatch": {
+      "main": [
+        [
+          {
+            "node": "разделить документы",
+            "type": "main",
+            "index": 0
+          },
           {
             "node": "Вернуть результат Orchestrator",
             "type": "main",

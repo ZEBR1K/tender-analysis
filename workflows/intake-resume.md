@@ -25,6 +25,10 @@ The intake-event compare-and-set carries `processing_started_at` twice: the norm
 
 The dispatcher uses PostgreSQL for the long-lived barrier. Worker readiness SQL is copied from the canonical Worker. Finalization is called only when the complete 27-field FINAL barrier is valid for `tender_fields_v1` / `tender_field_final_v1`.
 
+After document-owner recovery, an existing run may enter the additive agentic shadow path only when its lifecycle is `processing`, `ready_for_aggregation`, or `aggregating`, the registered document set exactly matches authoritative `documents_total`, every processable PDF/DOCX/XLSX has full byte identity, at least one processable document exists, and no document is `failed`. `failed`, `completed`, `superseded`, incomplete, or zero-processable runs skip Dispatch. The synchronous `mode=all` call uses the identity-neutral contract `TENDER — Агентский анализ — Запуск` with the same `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, and `replicate_index=1`; the child owns idempotent new-job/recoverable-retry/no-op resolution.
+
+The new-run route path does not call Dispatch again: `created_new_run=true` from Orchestrator still goes directly to intake-event completion because Orchestrator already passed the shadow barrier. Both new and existing paths preserve `source_event_key`, `analysis_run_id`, all legacy `action` / `next_state` meanings, and return bounded additive `agentic_shadow` metadata. The existing document decision, Worker, Aggregator, and Finalization routes are unchanged. Because existing-run recovery enters legacy routing only after the synchronous Dispatch response, downstream archive cleanup cannot overtake staging/seal acknowledgement; runner-owned copies are independent after seal.
+
 ## Runtime verification
 
 Isolated no-Worker executions `14704`-`14742` verify same-run retry, the automatic
@@ -45,6 +49,7 @@ Before controlled import:
 1. Bind both execution-read HTTP nodes to the real read-only Header Auth credential with `X-N8N-API-KEY`.
 2. Confirm that both nodes target the intended self-hosted origin `https://n8nworkup.ru`; this non-secret origin is stored directly because Custom Variables are unavailable on the current self-hosted plan.
 3. Import and publish `TENDER — Ошибка Intake Resume`, read back its real workflow ID, and set that actual value in `settings.errorWorkflow`.
-4. Read back the imported dispatcher and validate node configuration before activation.
+4. Import `TENDER — Агентский анализ — Запуск`, read back its real workflow ID, and replace `AGENTIC_DISPATCH_WORKFLOW_ID`; the repository export intentionally remains identity-neutral.
+5. Read back the imported dispatcher and validate node configuration before activation.
 
-No API key, fake credential, or placeholder Error Workflow ID is stored in the repository export. The only instance-specific literal is the non-secret HTTPS origin.
+No API key, fake credential, or real Dispatch/Error Workflow ID is stored in the repository export. The only instance-specific literal is the non-secret HTTPS origin.
