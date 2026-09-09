@@ -750,6 +750,10 @@ test('created and concurrent paths return one symmetric structured result', () =
     'created and concurrent paths must share exactly one structured terminal-result Code node',
   );
   const terminal = terminalNodes[0];
+  assert.doesNotThrow(
+    () => new Function('$', '$input', codeSource(terminal)),
+    'shared terminal-result Code node must compile as JavaScript',
+  );
   assert.equal(
     terminal.parameters?.mode,
     'runOnceForAllItems',
