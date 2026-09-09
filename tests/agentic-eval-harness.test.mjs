@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
+  mkdir,
   mkdtemp,
   readFile,
   rm,
@@ -140,6 +141,134 @@ function buildFutureJson(adjudication) {
       rationale: 'Evaluator adapter fixture only.',
     })),
   };
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) =>
+      `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function fixtureUuid(identity) {
+  const bytes = createHash('sha256').update(identity, 'utf8').digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function sha256Bytes(bytes) {
+  return createHash('sha256').update(bytes).digest('hex').toUpperCase();
+}
+
+async function writeEvaluationReplicate({
+  replicateDirectory,
+  result,
+  batchId,
+  caseId,
+  procurementKey,
+  replicateIndex,
+}) {
+  const jobId = fixtureUuid(`${batchId}:${caseId}:${replicateIndex}:job`);
+  const analysisRunId = fixtureUuid(`${batchId}:${caseId}:${replicateIndex}:run`);
+  const rawResultBytes = Buffer.from(`${JSON.stringify(result)}\n`, 'utf8');
+  const validation = {
+    schema_version: 'tender_agent_validation_v1',
+    job_id: jobId,
+    valid: true,
+    job_issues: [],
+    fields: result.fields.map((field) => ({
+      field_index: field.field_index,
+      field_key: field.field_key,
+      status: field.status,
+      value_text: field.value_text,
+      issues: [],
+    })),
+    raw_result_sha256: sha256Bytes(rawResultBytes),
+    validated_result_sha256: sha256Bytes(Buffer.from(canonicalJson(result), 'utf8')),
+  };
+  const validationBytes = Buffer.from(`${canonicalJson(validation)}\n`, 'utf8');
+  const stateBytes = Buffer.from(`${JSON.stringify({
+    manifest: {
+      job_id: jobId,
+      analysis_run_id: analysisRunId,
+    },
+    status: 'completed',
+    result: {
+      attempt: 1,
+      raw_result_sha256: validation.raw_result_sha256,
+      validated_result_sha256: validation.validated_result_sha256,
+      validation_file_sha256: sha256Bytes(validationBytes),
+    },
+  })}\n`, 'utf8');
+  const eventsBytes = Buffer.from('{"type":"fixture"}\n', 'utf8');
+  const auditDirectory = path.join(replicateDirectory, 'job', 'audit');
+  await mkdir(auditDirectory, { recursive: true });
+  const archivedFiles = [
+    ['audit/codex-events.attempt-1.jsonl', eventsBytes],
+    ['audit/validated-result.attempt-1.json', rawResultBytes],
+    ['audit/validation.attempt-1.json', validationBytes],
+    ['state.json', stateBytes],
+  ];
+  for (const [relativePath, bytes] of archivedFiles) {
+    await writeFile(path.join(replicateDirectory, 'job', ...relativePath.split('/')), bytes);
+  }
+  await writeFile(path.join(replicateDirectory, 'result.json'), rawResultBytes);
+  await writeFile(
+    path.join(replicateDirectory, 'validation.json'),
+    `${JSON.stringify(validation)}\n`,
+    'utf8',
+  );
+  await writeFile(
+    path.join(replicateDirectory, 'terminal-status.json'),
+    `${JSON.stringify({
+      job_id: jobId,
+      status: 'completed',
+      attempt: 1,
+      input_manifest_sha256: result.input_manifest_sha256,
+    })}\n`,
+    'utf8',
+  );
+  await writeFile(
+    path.join(replicateDirectory, 'run-metadata.json'),
+    `${JSON.stringify({
+      schema_version: 'agentic_shadow_run_metadata_v1',
+      batch_id: batchId,
+      case_id: caseId,
+      procurement_key: procurementKey,
+      replicate_index: replicateIndex,
+      job_id: jobId,
+      analysis_run_id: analysisRunId,
+      pipeline_version: 'tender_agentic_pipeline_v1',
+      input_manifest_sha256: result.input_manifest_sha256,
+      controls: {
+        field_catalog_sha256: result.field_catalog_sha256,
+      },
+      terminal_status: 'completed',
+    })}\n`,
+    'utf8',
+  );
+  const files = archivedFiles
+    .map(([relativePath, bytes]) => ({
+      path: relativePath,
+      byte_size: bytes.length,
+      sha256: sha256Bytes(bytes),
+    }))
+    .sort((left, right) => left.path.localeCompare(right.path, 'en'));
+  await writeFile(
+    path.join(replicateDirectory, 'archive-sha256.json'),
+    `${JSON.stringify({
+      schema_version: 'agentic_shadow_archive_inventory_v1',
+      job_id: jobId,
+      file_count: files.length,
+      files,
+    })}\n`,
+    'utf8',
+  );
+  return jobId;
 }
 
 test('multi-procurement blind gate is explicit, immutable and nonblocking', async () => {
@@ -565,6 +694,188 @@ test('unexpected input returns a typed unsupported-format error and nonzero exit
         message: 'Input is neither tender_agent_result_v1 JSON nor supported legacy Markdown.',
       },
     });
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('evaluation root supports multiple procurements, independent adjudications and replicates', async () => {
+  const baseline = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(
+    path.join(os.tmpdir(), 'agentic-evaluation-root-'),
+  );
+  const cases = [
+    { caseId: 'procurement-02', replicateCount: 2, acceptedSubjectStatus: 'resolved' },
+    { caseId: 'procurement-03', replicateCount: 3, acceptedSubjectStatus: 'requires_review' },
+  ];
+
+  try {
+    const index = {
+      schema_version: 'agentic_shadow_evaluation_index_v1',
+      batch_id: 'offline-multi-case-fixture',
+      cases: [],
+    };
+    for (const item of cases) {
+      const caseDirectory = path.join(temporaryDirectory, 'cases', item.caseId);
+      await mkdir(caseDirectory, { recursive: true });
+      const adjudication = structuredClone(baseline);
+      adjudication.baseline_version = `${item.caseId}-manual-v1`;
+      adjudication.fields[0].accepted_statuses = [item.acceptedSubjectStatus];
+      await writeFile(
+        path.join(caseDirectory, 'adjudication.json'),
+        `${JSON.stringify(adjudication)}\n`,
+        'utf8',
+      );
+      const replicates = [];
+      for (let replicateIndex = 1; replicateIndex <= item.replicateCount; replicateIndex += 1) {
+        const replicateDirectory = path.join(
+          caseDirectory,
+          `replicate-${String(replicateIndex).padStart(2, '0')}`,
+        );
+        await mkdir(replicateDirectory, { recursive: true });
+        const result = buildFutureJson(adjudication);
+        result.fields[0].status = item.acceptedSubjectStatus;
+        result.fields[0].value_text = 'fixture';
+        const jobId = await writeEvaluationReplicate({
+          replicateDirectory,
+          result,
+          batchId: index.batch_id,
+          caseId: item.caseId,
+          procurementKey: item.caseId,
+          replicateIndex,
+        });
+        replicates.push({
+          replicate_index: replicateIndex,
+          job_id: jobId,
+          terminal_status: 'completed',
+          result: `cases/${item.caseId}/replicate-${String(replicateIndex).padStart(2, '0')}/result.json`,
+        });
+      }
+      index.cases.push({
+        case_id: item.caseId,
+        procurement_key: item.caseId,
+        adjudication: `cases/${item.caseId}/adjudication.json`,
+        replicates,
+      });
+    }
+    await writeFile(
+      path.join(temporaryDirectory, 'evaluation-index.json'),
+      `${JSON.stringify(index)}\n`,
+      'utf8',
+    );
+
+    const evaluated = runEvaluator(temporaryDirectory);
+    assert.equal(evaluated.status, 0, evaluated.stderr);
+    assert.equal(evaluated.output.ok, true);
+    assert.equal(
+      evaluated.output.evaluation_format,
+      'agentic_shadow_evaluation_index_v1',
+    );
+    assert.equal(evaluated.output.case_count, 2);
+    assert.equal(evaluated.output.replicate_count, 5);
+    assert.equal(evaluated.output.all_structural_pass, true);
+    assert.equal(evaluated.output.all_cases_adjudicated, true);
+    assert.deepEqual(
+      evaluated.output.cases.map(({ case_id: caseId, replicate_count: count }) => [caseId, count]),
+      [['procurement-02', 2], ['procurement-03', 3]],
+    );
+    assert.deepEqual(
+      evaluated.output.cases.map(({ adjudication_version: version }) => version),
+      ['procurement-02-manual-v1', 'procurement-03-manual-v1'],
+    );
+    assert.ok(
+      evaluated.output.cases.every(({ replicates }) =>
+        replicates.every(({ evaluation }) => evaluation.status_agreement.matched_fields === 27)),
+    );
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('evaluation root never substitutes baseline v0 when a case has no adjudication', async () => {
+  const baseline = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(
+    path.join(os.tmpdir(), 'agentic-evaluation-unadjudicated-'),
+  );
+
+  try {
+    const resultDirectory = path.join(temporaryDirectory, 'cases', 'new-case', 'replicate-01');
+    await mkdir(resultDirectory, { recursive: true });
+    const jobId = await writeEvaluationReplicate({
+      replicateDirectory: resultDirectory,
+      result: buildFutureJson(baseline),
+      batchId: 'unadjudicated-fixture',
+      caseId: 'new-case',
+      procurementKey: 'new-procurement',
+      replicateIndex: 1,
+    });
+    await writeFile(
+      path.join(temporaryDirectory, 'evaluation-index.json'),
+      `${JSON.stringify({
+        schema_version: 'agentic_shadow_evaluation_index_v1',
+        batch_id: 'unadjudicated-fixture',
+        cases: [{
+          case_id: 'new-case',
+          procurement_key: 'new-procurement',
+          adjudication: null,
+          replicates: [{
+            replicate_index: 1,
+            job_id: jobId,
+            terminal_status: 'completed',
+            result: 'cases/new-case/replicate-01/result.json',
+          }],
+        }],
+      })}\n`,
+      'utf8',
+    );
+
+    const evaluated = runEvaluator(temporaryDirectory);
+    assert.equal(evaluated.status, 0, evaluated.stderr);
+    assert.equal(evaluated.output.all_structural_pass, true);
+    assert.equal(evaluated.output.all_cases_adjudicated, false);
+    const caseResult = evaluated.output.cases[0];
+    assert.equal(caseResult.adjudication_version, null);
+    assert.equal(caseResult.replicates[0].evaluation.baseline_version, null);
+    assert.equal(caseResult.replicates[0].evaluation.status_agreement, null);
+    assert.equal(caseResult.replicates[0].evaluation.critical_false_resolved_count, null);
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('evaluation index requires an explicit job identity for every replicate', async () => {
+  const baseline = await loadAdjudication();
+  const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'agentic-evaluation-job-id-'));
+  try {
+    const resultDirectory = path.join(temporaryDirectory, 'cases', 'missing-job', 'replicate-01');
+    await mkdir(resultDirectory, { recursive: true });
+    await writeFile(
+      path.join(resultDirectory, 'result.json'),
+      `${JSON.stringify(buildFutureJson(baseline))}\n`,
+      'utf8',
+    );
+    await writeFile(
+      path.join(temporaryDirectory, 'evaluation-index.json'),
+      `${JSON.stringify({
+        schema_version: 'agentic_shadow_evaluation_index_v1',
+        batch_id: 'missing-job-fixture',
+        cases: [{
+          case_id: 'missing-job',
+          procurement_key: 'missing-job',
+          adjudication: null,
+          replicates: [{
+            replicate_index: 1,
+            terminal_status: 'completed',
+            result: 'cases/missing-job/replicate-01/result.json',
+          }],
+        }],
+      })}\n`,
+      'utf8',
+    );
+
+    const evaluated = runEvaluator(temporaryDirectory);
+    assert.notEqual(evaluated.status, 0);
+    assert.equal(evaluated.output.error.code, 'EVALUATION_INDEX_INVALID');
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
