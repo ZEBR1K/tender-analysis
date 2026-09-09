@@ -231,12 +231,18 @@ test('Intake Resume dispatches agentic shadow only for complete eligible existin
   assert.equal(dispatch.parameters.workflowInputs.value.replicate_index, 1);
 
   const reload = nodeByName(workflow, 'Reload Run Snapshot After Recovery');
+  const runEntry = nodeByName(workflow, 'Apply Run Entry Policy');
   const prepare = nodeByName(workflow, 'Prepare Agentic Shadow Dispatch');
   const gate = nodeByName(workflow, 'Should Dispatch Agentic Shadow?');
   const restore = nodeByName(workflow, 'Restore Existing Run Context After Agentic');
   const decide = nodeByName(workflow, 'Decide Document and Stage Action');
   const complete = nodeByName(workflow, 'Complete Intake Event');
   const prepareCode = String(prepare.parameters?.jsCode ?? '');
+  assert.match(
+    String(runEntry.parameters?.query ?? ''),
+    /COALESCE\(u\.documents_total\s*,\s*s\.documents_total\)\s+AS\s+documents_total/iu,
+    'Apply Run Entry Policy must project documents_total for the existing-run eligibility contract',
+  );
   assert.match(prepareCode, /documents_total/u);
   assert.match(prepareCode, /Apply Run Entry Policy/u);
   assert.match(prepareCode, /manifest_incomplete/u);
