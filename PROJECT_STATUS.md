@@ -1,10 +1,10 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-09
+**Snapshot date:** 2026-09-10
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–13 — repository workflows implemented, deployment closed
+## Agentic shadow foundation Tasks 0–14 — repository workflows implemented, deployment closed
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
@@ -17,7 +17,11 @@ exports with exact DB ownership, source staging, runner polling, and atomic
 Workflow candidate: Dispatch crashes can fail only their exact pre-start owner;
 Monitor crashes only release their exact poll lease and append bounded technical
 audit without failing a running job. These workflows are not imported, bound to
-a real Error Workflow ID, or wired to Orchestrator/Intake.
+a real Error Workflow ID, or deployed. Task 14 now wires the inactive,
+identity-neutral Dispatch candidate additively into the repository Orchestrator
+new-run path and Intake Resume existing-run recovery path. The complete manifest
+is registered first; legacy Worker fan-out and downstream FINAL routing remain
+unchanged.
 
 Runtime validation is intentionally restricted to security, file/artifact
 integrity, and the closed JSON contract. Page/OOXML/XLSX indexing, quote
@@ -26,17 +30,25 @@ rules, and PRICE/VAT/NEGATIVE/CONFLICT-style business checks are absent. The
 complete removal/retention inventory and open gates are recorded in
 `evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
 
-Local verification at the final Tasks 0–10 review point completed `670 passed`,
-`0 failed`, `2 skipped`. The skips are explicit deployment/runtime gates, not
-silent passes. Task 6 still has one procurement with four repeats, so its
-multi-procurement gate remains `awaiting_additional_procurements`. Task 14 and
-later, n8n wiring, production migration, runner deployment, and paid canaries
-were not performed. The initial Tasks 11–12 review was rejected for lifecycle
-and ownership defects; a second review then found two remaining Task 11–12
-blockers. The current corrective candidate subsequently passed a new
-independent final-bytes review. The full suite in the
-restricted Codex sandbox retains pre-existing environment-only failures where
-tests require loopback listeners, subprocess behavior, or Docker.
+The archive-aware prerequisite and Task 14 wiring passed RED→GREEN graph,
+contract and Code-node compilation tests plus independent final-bytes review.
+Direct PDF/DOCX/XLSX documents are downloaded sequentially only to establish
+MIME, byte size and SHA-256; no page, OOXML or semantic parser was added.
+Archive/container and unsupported rows remain in the manifest for audit, while
+only pending supported documents reach the legacy Worker.
+
+Task 15 now has a fail-closed offline multi-procurement batch harness for
+`procurement-02` and `procurement-03`, each configured for two identical
+replicates. It provides deterministic resume, unique run identity per replicate,
+external-root guards and a SHA-256 chain over the terminal runner archive,
+result and validation envelope. Fake-run coverage and the full agentic test
+suite are green. The four real Codex runs have not started: the current runner
+does not yet expose a runner-owned execution profile and has not passed the
+Linux isolation canary. Those are Task 16 gates and must not be bypassed.
+
+No production n8n workflow, production PostgreSQL state, credential or server
+deployment was changed. Repository candidates remain inactive and use
+identity-neutral workflow placeholders until packaging/promotion.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

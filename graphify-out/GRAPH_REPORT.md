@@ -1,15 +1,16 @@
-# Graph Report - agentic-analysis-integration  (2026-09-09)
+# Graph Report - agentic-analysis-integration  (2026-09-10)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- 287 files · ~1,142,037 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2499 nodes · 3471 edges · 201 communities (184 shown, 14 thin omitted)
+- 2714 nodes · 3760 edges · 209 communities (193 shown, 16 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 66 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `52da04dd`
+- Built from commit: `546215f3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -51,16 +52,16 @@
 - document-worker-validator-runtime-contract.test.mjs
 - aggregator-e2e-pin-controller.sdk.ts
 - document-worker-validator-semantic-oracle.test.mjs
-- DB-Backed 27/27 Finalization Barrier
+- Tender Report Generation Workflow
 - aggregator-e2e-pin-replay-report.sdk.ts
 - Lossless Fact Partition
 - aggregator-application-documents-execution-14254.test.mjs
 - job-store.mjs
-- Current Tender Analysis Project State
+- run-agentic-shadow-batch.mjs
 - Structural DOCX Option Owner
 - AGENTS.md Project File Index Design
 - Batch-First Runtime Gate Green
-- Verified Live E2E Baseline
+- enum
 - document-worker-extractor-recovery-barrier-14373.test.mjs
 - Paired-Item Ancestry Defect
 - Route-Aware Semantic Oracle
@@ -100,13 +101,13 @@
 - Hermes Collaboration Checkpoint — 2026-09-08
 - document-worker-client-confirmed-semantics.test.mjs
 - $defs
-- inspectedDocument
+- properties
 - properties
 - $defs
 - tender-intake-error-workflow.test.mjs
 - intake-error-workflow.md
-- fields
-- properties
+- tender-agent-validation-v1.schema.json
+- enum
 - archive-extractor/package.json
 - agentic-runner-deployment.test.mjs
 - targeted-recheck-application-documents-execution-14173.test.mjs
@@ -121,9 +122,9 @@
 - 6. Детальное описание полей
 - 2. `nm_price_with_vat`
 - TenderPlan Orchestrator pre-DB smoke — execution 14678
-- tender-agent-result-v1.schema.json
-- properties
-- tender-agent-validation-v1.schema.json
+- required
+- evidence
+- codex-runner/package.json
 - Agentic analysis Tasks 0–10 handoff
 - Handoff для Hermes Agent
 - tender-intake-migration.test.mjs
@@ -132,7 +133,7 @@
 - 25. `analog_allowed`
 - 27. `application_documents`
 - 3. `platform`
-- evidence
+- agentic-shadow-batch.test.mjs
 - Internal Gotenberg service
 - 1. `procurement_subject`
 - 25. `analog_allowed`
@@ -159,8 +160,8 @@
 - 5. `application_deadline`
 - 8. `customer`
 - 9. `customer_contacts`
-- field
-- fields
+- required
+- intake-agentic-shadow-routing.test.mjs
 - 10. `participation_cost`
 - 11. `participation_guarantee`
 - 15. `special_account_or_treasury`
@@ -210,8 +211,19 @@
 - archive-ingestion-migration.test.mjs
 - fake-codex.mjs
 - mark-relation-contract.md
-- public.tender_analysis_documents
-- public.tender_analysis_runs
+- enum
+- required
+- AI Prompt Artifacts Registry
+- Tender Document Worker Workflow
+- Tender Intake migration and NO-WORKER canary — 2026-09-08
+- inspectedDocument
+- agentic-error-workflow.test.mjs
+- enum
+- agentic-monitor-workflow.test.mjs
+- TENDER — Ошибка агентского анализа
+- agentic-dispatch-workflow.test.mjs
+- agentic-analysis-dispatch.md
+- agentic-analysis-monitor.md
 
 ## God Nodes (most connected - your core abstractions)
 1. `executeWorkflowCodeNode()` - 34 edges
@@ -219,10 +231,10 @@
 3. `Независимый анализ закупочной документации` - 30 edges
 4. `createJobStore()` - 29 edges
 5. `ArchiveError` - 28 edges
-6. `6. Детальное описание полей` - 28 edges
-7. `6. Детальное описание полей` - 28 edges
-8. `Независимый анализ закупки` - 28 edges
-9. `Независимый анализ закупки по `FIELD_CATALOG.md`` - 28 edges
+6. `enum` - 28 edges
+7. `enum` - 28 edges
+8. `6. Детальное описание полей` - 28 edges
+9. `6. Детальное описание полей` - 28 edges
 10. `Независимый анализ закупки` - 28 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -251,7 +263,7 @@
 - **E2E PIN Canary and Confirmation Sequence** — evaluations_tender_e2e_pin_canary_14259_2026_08_31_canary, evaluations_tender_e2e_pin_canary_14279_2026_08_31_canary, evaluations_tender_e2e_pin_canary_14294_2026_08_31_canary, evaluations_tender_e2e_pin_confirmations_2026_08_31_confirmation_series [INFERRED 0.95]
 - **Reference-Only Evidence Repair Safety Architecture** — docs_superpowers_specs_2026_09_02_dw17_reference_only_evidence_repair_design_canonical_evidence_catalog, docs_superpowers_specs_2026_09_02_dw17_reference_only_evidence_repair_design_reference_only_selection_protocol, docs_superpowers_specs_2026_09_02_dw17_reference_only_evidence_repair_design_strict_catalog_rebuild_parity, docs_superpowers_specs_2026_09_05_dw_evidence_catalog_overflow_design_target_ranked_windows, docs_superpowers_specs_2026_09_05_dw_evidence_catalog_overflow_design_overflow_audit_parity [INFERRED 0.95]
 
-## Communities (201 total, 14 thin omitted)
+## Communities (209 total, 16 thin omitted)
 
 ### Community 0 - "document-worker-docx-option-state.test.mjs"
 Cohesion: 0.05
@@ -274,8 +286,8 @@ Cohesion: 0.15
 Nodes (24): evaluateApplicationDocumentsOracle(), ambiguousCandidateRoles(), baseReport(), checkerRejectionResult(), evaluateHttpRequestBody(), evaluateLiveBetaModelResponse(), evaluateOfflineModelResponse(), evaluatePreparedModelResponse() (+16 more)
 
 ### Community 5 - "Targeted Recheck Workflow"
-Cohesion: 0.11
-Nodes (38): GPT-5.4 Nano Low Extractor Evaluation, GPT-5.6 Luna Pro Low Extractor Evaluation, DeepSeek Targeted Recheck Evaluation, Targeted Recheck 14389–14391 Forensic Report, GLM Gemini Gemini Targeted Recheck Evaluation, GLM Gemini GLM Targeted Recheck Evaluation, Tender E2E PIN Canary 14259, Tender E2E PIN Canary 14279 (+30 more)
+Cohesion: 0.30
+Nodes (15): DeepSeek Targeted Recheck Evaluation, Targeted Recheck 14389–14391 Forensic Report, GLM Gemini Gemini Targeted Recheck Evaluation, GLM Gemini GLM Targeted Recheck Evaluation, Tender E2E PIN Canary 14259, Tender E2E PIN Canary 14279, Tender E2E PIN Canary 14294, Tender E2E PIN Three-Run Confirmation Series (+7 more)
 
 ### Community 6 - "aggregator-procurement-subject-runtime-eval.mjs"
 Cohesion: 0.16
@@ -366,8 +378,8 @@ Cohesion: 0.14
 Nodes (8): currentPromptArtifactPath, fixture, fixturePath, immutableLiveWorkflowPath, routeGuardAddedNodeNames, routeGuardChangedNodeNames, testDirectory, workflowPath
 
 ### Community 28 - "End-to-End Tender Analysis Pipeline"
-Cohesion: 0.21
-Nodes (13): Core Architecture Invariants, Tender Analysis Project Operating Rules, Project Source-of-Truth Hierarchy, End-to-End Tender Analysis Pipeline, Exactly 27 Field Items, Tender Analysis System Architecture, Tender Analysis Data Model, tender_analysis_documents (+5 more)
+Cohesion: 0.11
+Nodes (23): Core Architecture Invariants, Tender Analysis Project Operating Rules, Project Source-of-Truth Hierarchy, End-to-End Tender Analysis Pipeline, Exactly 27 Field Items, DB-Backed 27/27 Finalization Barrier, PostgreSQL-Backed Synchronization, Tender Analysis System Architecture (+15 more)
 
 ### Community 29 - "document-worker-live-test-overlay.test.mjs"
 Cohesion: 0.19
@@ -386,8 +398,8 @@ Cohesion: 0.19
 Nodes (13): Targeted Recheck, AG-11 National-Regime Applicability Containment, DW-18 and AG-11 DOCX Option-State Plan, application_documents Field, Fields Requiring Business Confirmation, Canonical 27-Field Catalog, national_regime Field, not_found Is Unknown, Not Negative (+5 more)
 
 ### Community 33 - "Fact-Selective AI Validator Retry"
-Cohesion: 0.17
-Nodes (12): Project State Consolidation Plan, Contract-Owned Integration Branch Strategy, DW-23 Validator Selective Retry Plan, Fact-Selective AI Validator Retry, DW-23 ActiveX Reconciliation Plan, Superseded Reconciliation Plan, Three-Way ActiveX Integration Redirect, DW-23 Selective Retry Runtime Canary (+4 more)
+Cohesion: 0.29
+Nodes (7): DW-23 Validator Selective Retry Plan, Fact-Selective AI Validator Retry, DW-23 Selective Retry Runtime Canary, MVP Critical Path, Retry Correctness, Silent-Stuck Document Paths, Tender Analysis Technical Debt Backlog
 
 ### Community 34 - "document-worker-validator-runtime-contract.test.mjs"
 Cohesion: 0.17
@@ -401,9 +413,9 @@ Nodes (11): n0, n1, n10, n2, n3, n4, n5, n6 (+3 more)
 Cohesion: 0.22
 Nodes (7): findNode(), oraclePath, repositoryRoot, systemPrompt(), testDirectory, validatorBody(), workflowPath
 
-### Community 37 - "DB-Backed 27/27 Finalization Barrier"
-Cohesion: 0.20
-Nodes (10): DB-Backed 27/27 Finalization Barrier, PostgreSQL-Backed Synchronization, Field Results Referential Integrity Gap, tender_analysis_field_results, Tender Analysis MVP Goal, Self-Contained HTML Renderer, Report Adapter, Validated Report Model (+2 more)
+### Community 37 - "Tender Report Generation Workflow"
+Cohesion: 0.16
+Nodes (16): Field Results Referential Integrity Gap, tender_analysis_field_results, Self-Contained HTML Renderer, Report Adapter, Report Generation V2 Architecture, Validated Report Model, Immutable Report Snapshot, Report Generation V2 Executor Prompt (+8 more)
 
 ### Community 38 - "aggregator-e2e-pin-replay-report.sdk.ts"
 Cohesion: 0.20
@@ -421,13 +433,13 @@ Nodes (8): aggregatorWorkflowPath, buildApiResponse(), buildExecution14254Fixtur
 Cohesion: 0.07
 Nodes (91): assertExactDirectoryEntries(), assertFileIdentity(), assertOrWriteExactFile(), atomicWriteFile(), boundedCode(), cleanupAtomicWriteResidue(), cleanupCrashResidue(), cleanupCreateResidue() (+83 more)
 
-### Community 42 - "Current Tender Analysis Project State"
-Cohesion: 0.29
-Nodes (7): Tender Analysis Development History, Execution-Derived Regression Evidence, AGENTS File Index Implementation Plan, Durable Project File Index, Aggregator Live Synchronization, Current Tender Analysis Project State, Promotion and Fresh Runtime Gate
+### Community 42 - "run-agentic-shadow-batch.mjs"
+Cohesion: 0.16
+Nodes (31): assertArchivableTree(), assertRunnerStateIdentity(), assertSafeId(), BatchError, buildArchiveInventory(), walk(), canonicalJson(), copyTerminalJob() (+23 more)
 
 ### Community 43 - "Structural DOCX Option Owner"
-Cohesion: 0.33
-Nodes (6): Deterministic ActiveX Option-State Parsing, Group-Local Option Ownership, ActiveX Local Semantic Ownership Plan, DW-21 Structural Option Ownership Plan, Structural DOCX Option Owner, DW-24 ActiveX GroupName NUL Containment
+Cohesion: 0.18
+Nodes (11): Deterministic ActiveX Option-State Parsing, Group-Local Option Ownership, ActiveX Local Semantic Ownership Plan, DW-21 Structural Option Ownership Plan, Structural DOCX Option Owner, Project State Consolidation Plan, Contract-Owned Integration Branch Strategy, DW-23 ActiveX Reconciliation Plan (+3 more)
 
 ### Community 44 - "AGENTS.md Project File Index Design"
 Cohesion: 0.29
@@ -437,9 +449,9 @@ Nodes (7): Export as Factual Implementation Baseline, Regression Oracle Preserva
 Cohesion: 0.29
 Nodes (7): Batch-First Runtime Gate Green, Document Worker DW-19 Batch-First Canary 14367, Exactly-One Unit Extractor Fallback, Isolated Canary Safety Boundary, Canary Barrier Expected-Identity Source Defect, Document Worker Recovery Canary 14362, Recovery Items Completed
 
-### Community 46 - "Verified Live E2E Baseline"
-Cohesion: 0.67
-Nodes (3): Verified Live E2E Baseline, Historical Report Stub Gap, Technical Review 2026-08-23
+### Community 46 - "enum"
+Cohesion: 0.07
+Nodes (28): enum, advance_contract_guarantee, analog_allowed, analog_definition, application_deadline, application_documents, application_review_date, bank_support (+20 more)
 
 ### Community 47 - "document-worker-extractor-recovery-barrier-14373.test.mjs"
 Cohesion: 0.29
@@ -486,8 +498,8 @@ Cohesion: 0.07
 Nodes (31): AUTOMATIC_TRIGGER_KINDS, classifyDocument(), classifyIntent(), classifyStage(), directClaimAction(), DOCUMENT_STATUSES, evaluateIntakeResumeDecision(), fail() (+23 more)
 
 ### Community 58 - "result-validator.mjs"
-Cohesion: 0.07
-Nodes (34): dependencies, ajv, ajv-formats, engines, node, name, private, scripts (+26 more)
+Cohesion: 0.13
+Nodes (20): buildSchemaValidEnvelope(), createEnvelope(), INTEGRITY_ERROR_CODES, issue(), manifestIdentityIssues(), sha256(), sourceMembershipIssues(), assertSchemaPolicyParity() (+12 more)
 
 ### Community 59 - "codex-runner/src/server.mjs"
 Cohesion: 0.13
@@ -538,8 +550,8 @@ Cohesion: 0.11
 Nodes (18): 10. Текущая граница Round 2, 11. Правило обновления FIELD_CATALOG, 1. Зачем нужен этот документ, 2. Иерархия источников смысла, 3. Статусы, 4. Общие правила для всех полей, 5. Матрица 27 полей, 7. Решения Дмитрия от 2026-09-07 (+10 more)
 
 ### Community 71 - "properties"
-Cohesion: 0.12
-Nodes (19): items, type, $ref, const, $ref, items, type, $ref (+11 more)
+Cohesion: 0.09
+Nodes (24): items, type, $ref, const, items, maxItems, minItems, type (+16 more)
 
 ### Community 72 - "agentic-runner-http.test.mjs"
 Cohesion: 0.18
@@ -570,20 +582,20 @@ Cohesion: 0.12
 Nodes (16): Archive Ingestion Implementation Plan, Production acceptance sequence, Rollback boundary, Task 10: Развернуть сервис и провести изолированный runtime canary, Task 11: Провести n8n test workflow canary, Task 12: Обновить документацию и подготовить promotion gate, Task 1: Зафиксировать regression baseline и контракты, Task 2: Зафиксировать persistence и migration contract (+8 more)
 
 ### Community 79 - "evaluate-agentic-result.mjs"
-Cohesion: 0.22
-Nodes (15): allowedStatuses, baselinePath, evaluateAgenticResult(), evaluateFields(), hasForbiddenValue(), isRecord(), main(), parseInput() (+7 more)
+Cohesion: 0.16
+Nodes (27): allowedStatuses, assertRelativeArtifactPath(), baselinePath, canonicalJson(), evaluateAgenticEvaluationRoot(), evaluateAgenticPath(), evaluateAgenticResult(), evaluateArtifactIntegrity() (+19 more)
 
 ### Community 80 - "agentic-eval-harness.test.mjs"
-Cohesion: 0.12
-Nodes (13): adjudicationPath, archivedRuns, archiveRoot, baselineRoot, blindGateCasesPath, blindGateReadmePath, blindGateRoot, catalogKeys (+5 more)
+Cohesion: 0.11
+Nodes (17): adjudicationPath, archivedRuns, archiveRoot, baselineRoot, blindGateCasesPath, blindGateReadmePath, blindGateRoot, canonicalJson() (+9 more)
 
 ### Community 81 - "Implementation order and safety gates"
 Cohesion: 0.12
 Nodes (15): Approved superseded-run amendment — 2026-09-08, Final acceptance checklist, Implementation order and safety gates, Scope and non-goals, Task 10: Integrate documentation and run deployment gates, Task 1: Add the PostgreSQL concurrency and intake-ledger migration, Task 2: Make Document Worker retries persistence-safe (DW-8), Task 3: Convert Orchestrator into a typed new-run-only sub-workflow (+7 more)
 
 ### Community 82 - "properties"
-Cohesion: 0.13
-Nodes (15): field, additionalProperties, maximum, minimum, type, $ref, properties, required (+7 more)
+Cohesion: 0.15
+Nodes (13): maximum, minimum, type, $ref, properties, null, string, field_index (+5 more)
 
 ### Community 83 - "Hermes Collaboration Checkpoint — 2026-09-08"
 Cohesion: 0.14
@@ -594,20 +606,20 @@ Cohesion: 0.16
 Nodes (10): assertBoth(), extractorField(), extractorSource, repositoryRoot, testDirectory, validatorCheckerSource, validatorField(), validatorSource (+2 more)
 
 ### Community 85 - "$defs"
-Cohesion: 0.15
-Nodes (13): $defs, fieldKey, nonBlankString, sha256, status, enum, type, pattern (+5 more)
+Cohesion: 0.13
+Nodes (15): $defs, fieldKey, nonBlankString, sha256, status, type, not_found, requires_review (+7 more)
 
-### Community 86 - "inspectedDocument"
-Cohesion: 0.15
-Nodes (13): inspectedDocument, items, type, additionalProperties, properties, required, type, items (+5 more)
+### Community 86 - "properties"
+Cohesion: 0.22
+Nodes (9): items, type, properties, items, type, type, inspected_parts, methods (+1 more)
 
 ### Community 87 - "properties"
-Cohesion: 0.15
-Nodes (13): maximum, minimum, type, $ref, properties, field_index, field_key, rationale (+5 more)
+Cohesion: 0.13
+Nodes (15): maximum, minimum, type, $ref, properties, null, string, field_index (+7 more)
 
 ### Community 88 - "$defs"
-Cohesion: 0.15
-Nodes (13): $defs, fieldKey, issueCode, sha256, status, enum, type, enum (+5 more)
+Cohesion: 0.25
+Nodes (8): $defs, fieldKey, issueCode, sha256, type, type, pattern, type
 
 ### Community 89 - "tender-intake-error-workflow.test.mjs"
 Cohesion: 0.17
@@ -617,13 +629,13 @@ Nodes (4): codeInput(), documentErrorWorkflowPath, runCodeNode(), workflowPath
 Cohesion: 0.15
 Nodes (12): 1. Назначение и граница ответственности, 2. Error Trigger contract, 3. Normalize Intake Error, 4. Atomic ownership guard, 5. Zero-row и duplicate-owner semantics, 6. Structured result contract, 7. Изоляция от document Error Workflow, 8. Offline regression evidence (+4 more)
 
-### Community 91 - "fields"
-Cohesion: 0.17
-Nodes (12): items, maxItems, minItems, type, items, type, $ref, items (+4 more)
+### Community 91 - "tender-agent-validation-v1.schema.json"
+Cohesion: 0.05
+Nodes (37): additionalProperties, items, maxItems, minItems, type, $id, items, type (+29 more)
 
-### Community 92 - "properties"
-Cohesion: 0.17
-Nodes (12): format, type, properties, job_id, raw_result_sha256, schema_version, valid, validated_result_sha256 (+4 more)
+### Community 92 - "enum"
+Cohesion: 0.07
+Nodes (28): enum, advance_contract_guarantee, analog_allowed, analog_definition, application_deadline, application_documents, application_review_date, bank_support (+20 more)
 
 ### Community 93 - "archive-extractor/package.json"
 Cohesion: 0.20
@@ -655,7 +667,7 @@ Nodes (4): candidatePath, canonicalPath, repositoryRoot, testsDirectory
 
 ### Community 100 - "TENDER — Подготовить документацию"
 Cohesion: 0.22
-Nodes (8): TENDER — Подготовить документацию, Входной контракт, Выходной контракт, Лимиты и безопасность, Назначение, Поддерживаемые типы, Проверка, Следующий интеграционный шаг
+Nodes (8): TENDER — Подготовить документацию, Входной контракт, Выходной контракт, Лимиты и безопасность, Назначение, Оставшиеся rollout-шаги, Поддерживаемые типы, Проверка
 
 ### Community 101 - "6. Детальное описание полей"
 Cohesion: 0.25
@@ -681,17 +693,17 @@ Nodes (8): 2. `nm_price_with_vat`, TenderMeta, Канонический смыс
 Cohesion: 0.25
 Nodes (7): Mark-notification probe, Production impact, Safe Orchestrator copy, Sanitized results, Scope, TenderPlan Orchestrator pre-DB smoke — execution 14678, Test workflow
 
-### Community 107 - "tender-agent-result-v1.schema.json"
-Cohesion: 0.29
-Nodes (6): additionalProperties, $id, required, $schema, title, type
+### Community 107 - "required"
+Cohesion: 0.13
+Nodes (14): additionalProperties, $id, fields, schema_version, required, $schema, title, type (+6 more)
 
-### Community 108 - "properties"
-Cohesion: 0.29
-Nodes (7): $ref, properties, $ref, artifact_key, locator, quote, $ref
+### Community 108 - "evidence"
+Cohesion: 0.13
+Nodes (15): $ref, evidence, additionalProperties, items, properties, required, type, $ref (+7 more)
 
-### Community 109 - "tender-agent-validation-v1.schema.json"
-Cohesion: 0.29
-Nodes (6): additionalProperties, $id, required, $schema, title, type
+### Community 109 - "codex-runner/package.json"
+Cohesion: 0.13
+Nodes (14): ajv, ajv-formats, dependencies, ajv, ajv-formats, engines, node, name (+6 more)
 
 ### Community 110 - "Agentic analysis Tasks 0–10 handoff"
 Cohesion: 0.29
@@ -725,9 +737,9 @@ Nodes (6): 27. `application_documents`, Канонический смысл, Н�
 Cohesion: 0.33
 Nodes (6): 3. `platform`, Presentation boundary, TenderMeta, Канонический смысл, Не путать, Реализация
 
-### Community 118 - "evidence"
-Cohesion: 0.33
-Nodes (6): evidence, additionalProperties, items, required, type, evidence
+### Community 118 - "agentic-shadow-batch.test.mjs"
+Cohesion: 0.18
+Nodes (11): batchScriptPath, canonicalJson(), collectBody(), defaultExecutionProfile, evaluatorScriptPath, json(), repositoryRoot, resultFixturePath (+3 more)
 
 ### Community 119 - "Internal Gotenberg service"
 Cohesion: 0.33
@@ -829,13 +841,13 @@ Nodes (5): 8. `customer`, TenderMeta, Канонический смысл, Не 
 Cohesion: 0.40
 Nodes (5): 9. `customer_contacts`, Возможные составляющие, Канонический смысл, Не путать, Реализация
 
-### Community 145 - "field"
-Cohesion: 0.40
-Nodes (5): field, additionalProperties, allOf, required, type
+### Community 145 - "required"
+Cohesion: 0.18
+Nodes (11): field, additionalProperties, allOf, required, type, field_index, field_key, status (+3 more)
 
-### Community 146 - "fields"
-Cohesion: 0.40
-Nodes (5): items, maxItems, minItems, type, fields
+### Community 146 - "intake-agentic-shadow-routing.test.mjs"
+Cohesion: 0.20
+Nodes (5): canReach(), directTargets(), intakeResumeUrl, orchestratorUrl, preparationUrl
 
 ### Community 147 - "10. `participation_cost`"
 Cohesion: 0.40
@@ -938,8 +950,8 @@ Cohesion: 0.50
 Nodes (4): 7. `results_date`, Канонический смысл, Не путать, Реализация
 
 ### Community 173 - "issue"
-Cohesion: 0.50
-Nodes (4): issue, additionalProperties, required, type
+Cohesion: 0.29
+Nodes (7): issue, additionalProperties, required, type, code, message, path
 
 ### Community 174 - "Contract-only assessment"
 Cohesion: 0.50
@@ -986,25 +998,61 @@ Cohesion: 0.50
 Nodes (3): composePath, repositoryRoot, testsDirectory
 
 ### Community 186 - "TENDER — Intake Resume"
-Cohesion: 0.50
-Nodes (3): Contract, Packaging required, TENDER — Intake Resume
+Cohesion: 0.40
+Nodes (4): Contract, Packaging required, Runtime verification, TENDER — Intake Resume
+
+### Community 188 - "Agentic blind skill gate v1"
+Cohesion: 0.40
+Nodes (4): Admission sequence, Agentic blind skill gate v1, External multi-procurement batch harness, Isolation gate
+
+### Community 196 - "enum"
+Cohesion: 0.20
+Nodes (10): enum, CATALOG_HASH_MISMATCH, DUPLICATE_FIELD, FIELD_SET_MISMATCH, FILE_INTEGRITY_MISMATCH, LOCATOR_INVALID, MANIFEST_HASH_MISMATCH, SCHEMA_INVALID (+2 more)
+
+### Community 197 - "required"
+Cohesion: 0.22
+Nodes (9): field, additionalProperties, required, type, field_index, field_key, status, value_text (+1 more)
+
+### Community 198 - "AI Prompt Artifacts Registry"
+Cohesion: 0.36
+Nodes (9): AI Validator Prompt v1.1, Universal Semantic Validation Axes, AI Validator Prompt v1.2, AI Validator Prompt v1, AI Prompt Artifacts Registry, Targeted Recheck Extractor Prompt v1.1, Continuous Evidence Quote Invariant, Targeted Recheck Extractor Prompt v1.2 (+1 more)
+
+### Community 199 - "Tender Document Worker Workflow"
+Cohesion: 0.43
+Nodes (8): GPT-5.4 Nano Low Extractor Evaluation, GPT-5.6 Luna Pro Low Extractor Evaluation, Atomic Document Claim, Deterministic Evidence Validation, Tender Document Worker Workflow, Document Processing Error Workflow, Tender Analysis Orchestrator Workflow, TenderPlan FullInfo Source
+
+### Community 200 - "Tender Intake migration and NO-WORKER canary — 2026-09-08"
+Cohesion: 0.25
+Nodes (7): Canary evidence, Intake/resume runtime matrix, Isolated workflow inventory, Migration evidence, Remaining gates, Scope and safety boundary, Tender Intake migration and NO-WORKER canary — 2026-09-08
+
+### Community 201 - "inspectedDocument"
+Cohesion: 0.29
+Nodes (7): inspectedDocument, additionalProperties, required, type, inspected_parts, methods, notes
+
+### Community 203 - "enum"
+Cohesion: 0.33
+Nodes (6): status, not_found, requires_review, resolved, enum, type
+
+### Community 205 - "TENDER — Ошибка агентского анализа"
+Cohesion: 0.33
+Nodes (5): Atomic ownership statement, Packaging и runtime gates, TENDER — Ошибка агентского анализа, Безопасный вход, Ответственность
 
 ## Knowledge Gaps
-- **1241 isolated node(s):** `cfbGateCases`, `fixtureRoot`, `invalidGroupNameFixture`, `manifest`, `nodeNames` (+1236 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1497 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1366 isolated node(s):** `name`, `version`, `private`, `type`, `node` (+1361 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1641 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `$defs` connect `$defs` to `properties`, `issue`?**
+- **Why does `fieldKey` connect `$defs` to `enum`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
-- **Why does `Durable Project File Index` connect `Current Tender Analysis Project State` to `End-to-End Tender Analysis Pipeline`?**
+- **Why does `issue` connect `issue` to `properties`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 15 inferred relationships involving `createJobStore()` (e.g. with `beginAutomaticRetry()` and `claimStart()`) actually correct?**
   _`createJobStore()` has 15 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `cfbGateCases`, `fixtureRoot`, `invalidGroupNameFixture` to the rest of the system?**
-  _1241 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **What connects `name`, `version`, `private` to the rest of the system?**
+  _1366 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `document-worker-docx-option-state.test.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.05450733752620545 - nodes in this community are weakly interconnected._
 - **Should `document-worker-evidence-repair.test.mjs` be split into smaller, more focused modules?**

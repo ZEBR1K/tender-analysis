@@ -4,10 +4,13 @@ This directory defines an offline, skill-first evaluation gate. It does not bloc
 a structurally valid runner result and it does not authorize semantic
 runtime validation.
 
-Only one real procurement is currently available in the repository. Its four
-blind runs are useful as provisional repeatability evidence, but they are not
-cross-procurement evidence and are not a source-grounded gold set. Do not
-fabricate another procurement or promote a one-case observation into code.
+The repository retains only the original sanitized baseline. Two additional
+real procurement packages are available outside Git as `procurement-02` and
+`procurement-03`; their client documents must stay outside the repository.
+Neither package has an employee-authored reference report, so their repeated
+runs provide cross-procurement consistency evidence but not an authoritative
+semantic gold set. Do not promote an unadjudicated observation into runtime
+code.
 
 ## Admission sequence
 

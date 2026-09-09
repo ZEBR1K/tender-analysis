@@ -975,14 +975,14 @@ workflows/intake-resume.md
 tests/intake-agentic-shadow-routing.test.mjs
 ```
 
-- [ ] Start only after Task 0 reconciliation and archive Orchestrator integration are GREEN.
-- [ ] Write failing graph tests proving agentic dispatch is unreachable before the full document manifest commit.
-- [ ] In Orchestrator new-run path, insert one `TENDER — Агентский анализ — Запуск` call after atomic manifest registration and before legacy Worker dispatch. Wait only for staging/seal/start acknowledgement, not Codex completion.
-- [ ] Preserve existing legacy Worker fan-out and downstream contracts unchanged.
-- [ ] In Intake Resume existing-run recovery path, call the same idempotent Dispatch when a registered run has no agentic job or a recoverable technical attempt. Do not dispatch for `failed`, `completed`, `superseded` or structurally incomplete runs unless the documented operator mode explicitly requests a shadow backfill.
-- [ ] Preserve the existing stable intake event key and analysis run identity.
-- [ ] Ensure archive artifacts cannot be cleaned before runner staging is sealed. After sealing, runner owns independent copies and legacy Finalization may clean archive storage safely.
-- [ ] Add `agentic_shadow` outcome metadata to the Intake structured result without changing existing action/status meanings.
+- [x] Start only after Task 0 reconciliation and archive Orchestrator integration are GREEN.
+- [x] Write failing graph tests proving agentic dispatch is unreachable before the full document manifest commit.
+- [x] In Orchestrator new-run path, insert one `TENDER — Агентский анализ — Запуск` call after atomic manifest registration and before legacy Worker dispatch. Wait only for staging/seal/start acknowledgement, not Codex completion.
+- [x] Preserve existing legacy Worker fan-out and downstream contracts unchanged.
+- [x] In Intake Resume existing-run recovery path, call the same idempotent Dispatch when a registered run has no agentic job or a recoverable technical attempt. Do not dispatch for `failed`, `completed`, `superseded` or structurally incomplete runs unless the documented operator mode explicitly requests a shadow backfill.
+- [x] Preserve the existing stable intake event key and analysis run identity.
+- [x] Ensure archive artifacts cannot be cleaned before runner staging is sealed. After sealing, runner owns independent copies and legacy Finalization may clean archive storage safely.
+- [x] Add `agentic_shadow` outcome metadata to the Intake structured result without changing existing action/status meanings.
 
 Run:
 
@@ -992,7 +992,7 @@ node --test tests/intake-agentic-shadow-routing.test.mjs tests/tender-intake-res
 
 Expected: new and resumed paths start at most one agentic job; all pre-existing legacy routing tests remain GREEN.
 
-- [ ] Commit:
+- [x] Commit:
 
 ```text
 feat(n8n): launch agentic analysis in shadow mode

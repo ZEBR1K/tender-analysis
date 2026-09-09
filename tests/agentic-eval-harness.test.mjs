@@ -320,8 +320,10 @@ test('multi-procurement blind gate is explicit, immutable and nonblocking', asyn
 
   assert.match(readme, /skill[- ]first/iu);
   assert.match(readme, /does not block|не блокирует/iu);
-  assert.match(readme, /one real procurement|одна реальная закупка/iu);
-  assert.match(readme, /do not\s+fabricate|не выдум/iu);
+  assert.match(readme, /procurement-02[\s\S]{0,120}procurement-03/iu);
+  assert.match(readme, /outside Git|вне Git/iu);
+  assert.match(readme, /not an authoritative[\s-]+semantic gold set|не является[^\n]+эталон/iu);
+  assert.match(readme, /Do not promote|не перенос/iu);
 });
 
 test('blind gate requires repeated cross-procurement evidence before a runtime semantic rule', async () => {
