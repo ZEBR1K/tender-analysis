@@ -1,8 +1,31 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-08
+**Snapshot date:** 2026-09-09
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
+
+## Agentic shadow foundation Tasks 0–10 — repository GREEN, deployment closed
+
+The additive Codex runner foundation is implemented through Task 10 without
+changing live n8n or production PostgreSQL. It preserves the complete legacy
+pipeline while adding isolated shadow tables/migration, source-only manifest
+staging, a focused agent skill, audited non-interactive execution,
+contract/source-identity validation, and an asynchronous restart-safe runner
+lifecycle.
+
+Runtime validation is intentionally restricted to security, file/artifact
+integrity, and the closed JSON contract. Page/OOXML/XLSX indexing, quote
+verification, evidence sufficiency, semantic status rewriting, field-specific
+rules, and PRICE/VAT/NEGATIVE/CONFLICT-style business checks are absent. The
+complete removal/retention inventory and open gates are recorded in
+`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
+
+Local verification at the Task 10 integration point completed `667 passed`,
+`0 failed`, `2 skipped`. The skips are explicit deployment/runtime gates, not
+silent passes. Task 6 still has one procurement with four repeats, so its
+multi-procurement gate remains `awaiting_additional_procurements`. Tasks 11–17,
+n8n wiring, production migration, runner deployment, and paid canaries were not
+performed.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

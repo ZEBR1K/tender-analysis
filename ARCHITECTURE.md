@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-08
+**Последнее обновление:** 2026-09-09
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -99,6 +99,25 @@ Production baseline описывается семью n8n workflow:
 GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
 `14683` supersedes неподтверждённый notification type-5 plan. Candidate
 offline-only; pagination/exhaustive-result semantics не документированы.
+
+Отдельно подготовлен repository-only агентский shadow-контур Tasks 0–10:
+
+```text
+полный source manifest после commit
+→ immutable job folder
+→ fixed codex exec + focused skill
+→ agent-owned document inspection
+→ exact 27-field JSON
+→ contract/source/file-integrity validation
+→ validated shadow result
+```
+
+Runner не создаёт page/OOXML/XLSX index и не оценивает цитаты, достаточность
+evidence или бизнес-смысл значения. Codex сам выбирает text, visual, OCR или
+OOXML способ исследования. Runtime принимает или отклоняет только по
+безопасности, целостности исходных файлов/артефактов и закрытому JSON-контракту.
+Контур пока не связан с n8n: Tasks 11–17, deployment и activation не
+выполнялись, поэтому production baseline выше не изменён.
 
 И пяти основных PostgreSQL таблиц:
 

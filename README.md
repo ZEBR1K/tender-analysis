@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-08
+**Последнее обновление:** 2026-09-09
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -13,6 +13,13 @@ PROJECT_STATUS.md
 ```
 
 Последний Document Worker handoff: executions `14374/14376` технически GREEN только до `ready_for_aggregation`; semantic applicability gate FAIL. Sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+Дополнительно реализован изолированный repository-only фундамент агентского
+shadow-анализа через Codex (Tasks 0–10). Он не заменяет текущий Worker и не
+подключён к live n8n. Runner принимает только исходные файлы и минимальный
+manifest, а в runtime проверяет только безопасность, целостность файлов и JSON-
+контракт. Текущий handoff и перечень удалённых/оставленных проверок:
+`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
 
 ---
 

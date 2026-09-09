@@ -403,6 +403,26 @@ Tasks 15–17: repeatability eval, isolated deployment, controlled activation
 
 Lane A не редактирует существующие workflow и поэтому может идти параллельно с завершением TenderPlan intake. Lane C не начинается на устаревшем Orchestrator export.
 
+### Repository checkpoint — 2026-09-09
+
+| Task | State | Evidence / remaining gate |
+|---:|---|---|
+| 0 | complete | intake, archive/report, and agentic baselines reconciled in `codex/agentic-analysis-integration` |
+| 1 | complete, provisional | four immutable repeated runs of one procurement; not a gold set |
+| 2 | complete | simplified closed schemas and key/index-only field policy |
+| 3 | local complete | additive migration tests and disposable PostgreSQL 17 evidence; production migration not applied |
+| 4 | local complete | isolated runner shell and fail-closed permission contract; real Linux isolation canary remains a deployment gate |
+| 5 | complete | immutable source-only manifest and atomic staging |
+| 6 | protocol complete, evidence open | only one real procurement exists; state is `awaiting_additional_procurements` |
+| 7 | complete | dedicated workspace, one short skill, and fixed prompt |
+| 8 | local complete and reviewed | auditable non-interactive execution; real container canary remains closed |
+| 9 | local complete and reviewed | only JSON/source/file-integrity validation |
+| 10 | local complete | asynchronous lifecycle, bounded retry, restart recovery, runner-owned validated audit, and exact-job TTL |
+
+Tasks 11–17, live n8n/DB mutation, production deployment, and paid canaries are
+outside this checkpoint. The detailed simplification inventory is in
+`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
+
 ### Task 0: Reconcile the implementation baseline before touching shared workflows
 
 **Files:** no implementation file changes; create the integration branch/worktree only.

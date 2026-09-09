@@ -1,6 +1,6 @@
 # Tender Codex runner
 
-Internal-only service that runs the agentic tender analysis beside n8n, never inside the n8n process. n8n will stage an immutable job through the authenticated HTTP API; later implementation tasks add the job manifest and lifecycle routes.
+Internal-only service that runs the agentic tender analysis beside n8n, never inside the n8n process. n8n stages an immutable job through the authenticated HTTP API and later polls the asynchronous lifecycle.
 
 ## Security and runtime boundary
 
@@ -21,13 +21,15 @@ The authenticated staging API is deliberately small:
 - `PUT /v1/jobs` creates one closed `tender_source_manifest_v1` declaration.
 - `PUT /v1/jobs/{job_id}/documents/{artifact_key}` streams one declared source file.
 - `POST /v1/jobs/{job_id}/seal` rechecks every file hash and size, copies the pinned field catalog, and freezes the input manifest.
+- `POST /v1/jobs/{job_id}/start` idempotently claims an executable job and queues Codex without holding the caller connection.
 - `GET /v1/jobs/{job_id}` returns bounded identity, state, counts, and the sealed manifest hash.
+- `GET /v1/jobs/{job_id}/result` returns the completed result and its validation envelope after persisted artifact hashes are rechecked.
 
 Original file names are metadata only. Physical source names are generated from the validated document index and artifact key, and no caller-supplied name is ever resolved as a path. Uploads are written to a same-filesystem temporary file, hashed while streaming, fsynced, and atomically renamed only when SHA-256 and byte size match the declaration. Exact repeated uploads are idempotent before sealing; conflicting uploads and every post-seal upload are rejected.
 
 An idempotent seal revalidates the pinned catalog copy, every staged source file, and the exact sealed manifest/hash before reporting `ready`. The store exposes the same `verifySealedInput(job_id)` integrity primitive for the future pre-start gate. Recovery removes only exact job-local `.write-<uuid>.tmp`, `.upload-<uuid>.tmp`, and `.create-<job>-<uuid>.tmp` files created by the runner; unknown files and directories are never recursively treated as write residue.
 
-The manifest intentionally contains only job/run/catalog identity and source-file identity (`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256). It does not extract or index pages, sheets, OOXML parts, text, or OCR. Codex chooses how to inspect each source in a later task.
+The manifest intentionally contains only job/run/catalog identity and source-file identity (`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256). It does not extract or index pages, sheets, OOXML parts, text, or OCR. Codex chooses how to inspect each source.
 
 ## Per-job Codex permissions
 
@@ -39,12 +41,27 @@ Spawned shell commands inherit no process environment. The runner supplies only 
 
 Codex receives the immutable originals and chooses its own text, visual, OCR or OOXML inspection methods. The runner does not pre-index documents or verify business meaning. Runtime checks are restricted to security, original-file size/SHA and manifest identity, and the closed JSON contract: exact 27-key/index mapping, allowed statuses, evidence artifact membership, and a nonblank human locator for `resolved` or `requires_review`. `not_found` may have no evidence; agent-reported inspected documents, parts, methods, limitations and constraints remain audit context rather than a completeness claim.
 
-Task 4 provides a structural boundary builder and negative-canary contract only. The real execution entry point, `POST /v1/jobs/{uuid}/start`, carries explicit `requiresExecutionBoundary` route metadata and returns `503 RUNNER_ISOLATION_NOT_READY` until Task 8 runs a real sandbox canary proving that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
+## Execution lifecycle
+
+The persistent states are `staging → ready → running → validating → completed`,
+with typed `failed` terminals. Repeated start while a job is running,
+validating, completed, or terminally failed is a structured no-op. A runner
+restart changes orphaned `running`/`validating` work to a typed recoverable
+failure; the same job may then claim attempt 2. Attempt 1 remains in audit.
+
+Only a typed transport/process failure with no valid JSON can receive one
+automatic second attempt. Schema, source-identity, locator-contract, and file
+integrity failures do not trigger a paid retry. Queue admission failure restores
+an unstarted claim instead of leaving a false `running` state. Completed and
+failed job directories are eligible for exact-job cleanup after seven days;
+active jobs are never TTL-deleted.
+
+The execution entry point carries explicit `requiresExecutionBoundary` route metadata and returns `503 RUNNER_ISOLATION_NOT_READY` until a real container canary proves that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
 
 ## Local checks
 
 ```powershell
-node --test tests/agentic-runner-deployment.test.mjs tests/agentic-runner-http.test.mjs
+node --test tests/agentic-runner-deployment.test.mjs tests/agentic-runner-http.test.mjs tests/agentic-runner-manifest.test.mjs tests/agentic-codex-command.test.mjs tests/agentic-result-validator.test.mjs tests/agentic-runner-lifecycle.test.mjs
 $env:TENDER_CODEX_RUNNER_AUTH_TOKEN = 'local-validation-placeholder'
 docker compose -p tender-codex-runner-test -f deploy/codex-runner/compose.yaml config -q
 ```
