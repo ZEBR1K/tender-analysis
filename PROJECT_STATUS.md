@@ -20,7 +20,7 @@ rules, and PRICE/VAT/NEGATIVE/CONFLICT-style business checks are absent. The
 complete removal/retention inventory and open gates are recorded in
 `evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
 
-Local verification at the Task 10 integration point completed `667 passed`,
+Local verification at the final Tasks 0–10 review point completed `670 passed`,
 `0 failed`, `2 skipped`. The skips are explicit deployment/runtime gates, not
 silent passes. Task 6 still has one procurement with four repeats, so its
 multi-procurement gate remains `awaiting_additional_procurements`. Tasks 11–17,

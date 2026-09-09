@@ -5932,3 +5932,29 @@ three duplicate unfinished groups violate the migration precondition, and the
 inherited diagnostic credential is neither the required `tender_codex_ro` role
 nor read-only/TLS-protected. No duplicate identifiers were retrieved or recorded.
 Evidence: `evaluations/TENDER_INTAKE_FULL_DB_PREFLIGHT_14684_2026-09-08.md`.
+
+---
+
+## 2026-09-09 — Agentic shadow foundation Tasks 0–10
+
+An additive repository-only Codex runner foundation was completed without
+changing live n8n, production PostgreSQL, or the existing legacy analysis lane.
+The runner stages immutable original documents from a source-only manifest,
+uses one focused agent skill, records bounded attempt-local audit, returns an
+exact 27-field JSON result, and validates only security, file/artifact integrity
+and the closed JSON contract.
+
+Final review removed the rejected page/OOXML/XLSX source-index implementation,
+semantic quote/evidence/value checks, field-specific rules, alternate
+`reported_*`/`effective_*` projections, and `validation_level`. The unapplied
+shadow migration now stores the unchanged `status` and `value_text` plus
+contract-only `validation_issues`. A fresh disposable PostgreSQL 17 run passed
+empty/populated fixtures, double application, ownership rejection and drift
+rollback checks.
+
+Lifecycle review also added attempt-local terminal journals and restart
+reconciliation so a crash between immutable audit writes and state persistence
+cannot create a duplicate paid retry or poison attempt 2. The final repository
+suite is `670 passed`, `0 failed`, `2` explicit environment/platform skips.
+Detailed removal/retention inventory and remaining gates are in
+`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
