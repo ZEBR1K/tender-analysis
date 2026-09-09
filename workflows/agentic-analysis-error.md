@@ -1,7 +1,7 @@
 # TENDER — Ошибка агентского анализа
 
-**Статус:** inactive identity-neutral repository candidate; offline verification only  
-**Тип:** n8n Error Workflow  
+**Статус:** inactive identity-neutral repository candidate; offline verification only
+**Тип:** n8n Error Workflow
 **Repository export:** `workflows/n8n-exports/TENDER — Ошибка агентского анализа.json`
 
 ## Ответственность
@@ -25,7 +25,8 @@ Classifier использует только `execution.id`, `execution.error.me
 `execution.error.description` и `workflow.name`. Полный payload, URL, stack,
 binary, headers и произвольные вложенные поля не передаются дальше. Execution ID
 должен быть непустой строкой не длиннее 4096 символов. Сообщение очищается от
-control characters и ограничивается 500 символами; URL и credential-like text
+control characters и ограничивается 500 символами. Любая URI-схема/URL-like
+token, маркированный secret и unlabeled JWT/prefix/long credential-shaped token
 заменяются безопасным generic message.
 
 Ошибки двух owner-workflow распознаются только по точным именам:
@@ -49,13 +50,19 @@ control characters и ограничивается 500 символами; URL �
   `poll_claimed_at` у `ready`, `running` или `validating` job и записать bounded
   `validation_summary.monitor_error` и bounded counter
   `validation_summary.monitor_error_count` (cap 1,000,000). Status не меняется.
+- Оба mutation predicate повторно проверяют exact execution owner и eligible
+  status непосредственно в `UPDATE`, поэтому concurrent owner/status change
+  превращается в explicit zero-update outcome.
 - `completed`, `canceled` и `failed` не изменяются.
 
-Dispatch использует scalar target без `LIMIT 1`, поэтому нарушение его
-single-owner invariant завершает statement до мутации. Один Monitor execution
+Dispatch сначала считает все строки exact owner. Ровно одна eligible строка
+может измениться; ноль даёт no-op, а больше одной даёт
+`ownership_ambiguous` без мутаций или SQL exception. Один Monitor execution
 штатно владеет максимум двумя jobs: handler атомарно освобождает все его exact
 eligible leases, а aggregate `update_count` и `job_ids` не размножают output
-items. Statement всегда возвращает ровно одну строку с одним из исходов:
+items. Corrupt Monitor cardinality больше двух возвращает
+`ownership_ambiguous` и ничего не освобождает. Statement всегда возвращает
+ровно одну строку с одним из исходов:
 
 ```text
 dispatch_failed
@@ -64,6 +71,7 @@ terminal_no_op
 ownership_lost
 invalid_identity
 unsupported_workflow
+ownership_ambiguous
 ```
 
 `alwaysOutputData=true` является дополнительной защитой n8n, но zero-row

@@ -28,11 +28,17 @@ function applyOwnershipModel(rows, event) {
 
   if (event.source_kind === 'dispatch') {
     const owned = next.filter(({ dispatch_execution_id }) => dispatch_execution_id === event.execution_id);
+    if (owned.length > 1) {
+      return { rows: next, outcome: 'ownership_ambiguous', update_count: 0 };
+    }
     if (owned.some(({ status }) => ['completed', 'canceled', 'failed'].includes(status))) {
       return { rows: next, outcome: 'terminal_no_op', update_count: 0 };
     }
     const eligible = owned.filter(({ status }) => ['created', 'staging', 'ready'].includes(status));
-    if (eligible.length !== 1) {
+    if (eligible.length > 1) {
+      return { rows: next, outcome: 'ownership_ambiguous', update_count: 0 };
+    }
+    if (eligible.length === 0) {
       return { rows: next, outcome: 'ownership_lost', update_count: 0 };
     }
     const [row] = eligible;
@@ -45,16 +51,22 @@ function applyOwnershipModel(rows, event) {
 
   if (event.source_kind === 'monitor') {
     const owned = next.filter(({ poll_owner_execution_id }) => poll_owner_execution_id === event.execution_id);
-    if (owned.some(({ status }) => ['completed', 'canceled', 'failed'].includes(status))) {
-      return { rows: next, outcome: 'terminal_no_op', update_count: 0 };
+    if (owned.length > 2) {
+      return { rows: next, outcome: 'ownership_ambiguous', update_count: 0 };
     }
     const eligible = owned.filter(({ status }) => ['ready', 'running', 'validating'].includes(status));
+    if (eligible.length === 0 && owned.some(({ status }) => ['completed', 'canceled', 'failed'].includes(status))) {
+      return { rows: next, outcome: 'terminal_no_op', update_count: 0 };
+    }
     for (const row of eligible) {
       row.poll_owner_execution_id = null;
       row.poll_claimed_at = null;
+      const summary = row.validation_summary && typeof row.validation_summary === 'object' && !Array.isArray(row.validation_summary)
+        ? row.validation_summary
+        : {};
       row.validation_summary = {
-        ...row.validation_summary,
-        monitor_error_count: Math.min((row.validation_summary.monitor_error_count ?? 0) + 1, 1000000),
+        ...summary,
+        monitor_error_count: Math.min((summary.monitor_error_count ?? 0) + 1, 1000000),
         monitor_error: { code: event.error_code, message: event.error_message },
       };
     }
@@ -130,6 +142,41 @@ test('classifier executes documented Error Trigger shapes and emits only bounded
     assert.doesNotMatch(JSON.stringify(redacted), /eyJ|hunter2|sk-private/u);
   }
 
+  for (const unsafeMessage of [
+    'ftp://files.example/private.zip',
+    's3://private-bucket/source.pdf',
+    'file:///srv/private/source.docx',
+    'ssh://private.example/repo',
+    'postgresql://user:private-password@db.example/tenders',
+    'data:text/plain;base64,c2VjcmV0',
+    'urn:example:private',
+    'a:x',
+    'a://host/private',
+    'x:',
+    'private.example/path/to/source.pdf',
+    'files.example/download?id=private',
+    'localhost/private',
+    '127.0.0.1/private',
+    '[::1]/private',
+    'https://signed.example/source?X-Amz-Signature=private',
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwcml2YXRlIn0.signature',
+    'sk_live_51_PRIVATE_CREDENTIAL_VALUE_1234567890',
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    '0123456789abcdef0123456789abcdef',
+    'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXorLzEyMzQ1Njc4OTA=',
+    'pass\u0000word=hunter2',
+    'api\u0000key=sk-private-control-split',
+  ]) {
+    const redacted = (await runClassifier(source, {
+      execution: { id: 'monitor-8', error: { description: unsafeMessage } },
+      workflow: { name: 'TENDER — Агентский анализ — Монитор' },
+      headers: { authorization: unsafeMessage },
+      binary: { data: unsafeMessage },
+    }))[0].json;
+    assert.equal(redacted.error_message, 'Agentic monitor workflow failed');
+    assert.doesNotMatch(JSON.stringify(redacted), new RegExp(unsafeMessage.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  }
+
   const monitor = (await runClassifier(source, {
     execution: { id: 'monitor-8', error: { description: 'socket timeout on internal runner' } },
     workflow: { name: 'TENDER — Агентский анализ — Монитор' },
@@ -186,6 +233,36 @@ test('wrong dispatch owner and running job remain byte-identical', () => {
   }
 });
 
+test('duplicate eligible dispatch owners return ownership_ambiguous without mutating any job', () => {
+  const before = baseRows();
+  before.push({
+    ...structuredClone(before[0]),
+    id: '55555555-5555-4555-8555-555555555555',
+    status: 'ready',
+  });
+  const snapshot = JSON.stringify(before);
+  const result = applyOwnershipModel(before, {
+    source_kind: 'dispatch', execution_id: 'dispatch-17',
+    error_code: 'DISPATCH_WORKFLOW_FAILED', error_message: 'bounded',
+  });
+  assert.equal(result.outcome, 'ownership_ambiguous');
+  assert.equal(result.update_count, 0);
+  assert.equal(JSON.stringify(result.rows), snapshot);
+});
+
+test('mixed eligible and terminal duplicate Dispatch owners are also ambiguous and immutable', () => {
+  const before = baseRows();
+  before[2].dispatch_execution_id = 'dispatch-17';
+  const snapshot = JSON.stringify(before);
+  const result = applyOwnershipModel(before, {
+    source_kind: 'dispatch', execution_id: 'dispatch-17',
+    error_code: 'DISPATCH_WORKFLOW_FAILED', error_message: 'bounded',
+  });
+  assert.equal(result.outcome, 'ownership_ambiguous');
+  assert.equal(result.update_count, 0);
+  assert.equal(JSON.stringify(result.rows), snapshot);
+});
+
 test('monitor crash releases only exact lease, records bounded audit and never fails job', () => {
   const before = baseRows();
   const unrelated = structuredClone([before[0], before[2]]);
@@ -213,6 +290,53 @@ test('one monitor execution atomically releases both of its exact claimed leases
   assert.deepEqual(result.rows.filter(({ id }) => [before[1].id, before[3].id].includes(id)).map(({ poll_owner_execution_id }) => poll_owner_execution_id), [null, null]);
   assert.deepEqual(result.rows[0], before[0]);
   assert.deepEqual(result.rows[2], before[2]);
+});
+
+test('monitor audit normalizes scalar and array validation summaries before updating', () => {
+  for (const validation_summary of ['legacy-scalar', ['legacy-array']]) {
+    const before = baseRows();
+    before[1].validation_summary = validation_summary;
+    const result = applyOwnershipModel(before, {
+      source_kind: 'monitor', execution_id: 'monitor-8',
+      error_code: 'MONITOR_WORKFLOW_FAILED', error_message: 'bounded',
+    });
+    assert.equal(result.outcome, 'monitor_lease_released');
+    assert.deepEqual(result.rows[1].validation_summary.monitor_error, {
+      code: 'MONITOR_WORKFLOW_FAILED', message: 'bounded',
+    });
+    assert.equal(result.rows[1].validation_summary.monitor_error_count, 1);
+  }
+});
+
+test('more than two jobs for one Monitor execution fail closed without releasing any lease', () => {
+  const before = baseRows();
+  before.push(
+    { ...structuredClone(before[1]), id: '66666666-6666-4666-8666-666666666666' },
+    { ...structuredClone(before[1]), id: '77777777-7777-4777-8777-777777777777', status: 'ready' },
+  );
+  const snapshot = JSON.stringify(before);
+  const result = applyOwnershipModel(before, {
+    source_kind: 'monitor', execution_id: 'monitor-8',
+    error_code: 'MONITOR_WORKFLOW_FAILED', error_message: 'bounded',
+  });
+  assert.equal(result.outcome, 'ownership_ambiguous');
+  assert.equal(result.update_count, 0);
+  assert.equal(JSON.stringify(result.rows), snapshot);
+});
+
+test('mixed terminal and eligible Monitor owners release only eligible lease', () => {
+  const before = baseRows();
+  before[2].poll_owner_execution_id = 'monitor-8';
+  before[2].poll_claimed_at = 'terminal-claim';
+  const terminalSnapshot = structuredClone(before[2]);
+  const result = applyOwnershipModel(before, {
+    source_kind: 'monitor', execution_id: 'monitor-8',
+    error_code: 'MONITOR_WORKFLOW_FAILED', error_message: 'bounded',
+  });
+  assert.equal(result.outcome, 'monitor_lease_released');
+  assert.equal(result.update_count, 1);
+  assert.equal(result.rows[1].poll_owner_execution_id, null);
+  assert.deepEqual(result.rows[2], terminalSnapshot);
 });
 
 test('wrong monitor owner, missing identity and terminal rows remain byte-identical', () => {
@@ -247,7 +371,14 @@ test('one parameterized SQL statement guards both owners and always returns one 
   assert.match(sql, /validation_summary/iu);
   assert.match(sql, /monitor_error_count/iu);
   assert.match(sql, /LEAST\([\s\S]+1000000\s*\)/iu);
+  assert.match(sql, /jsonb_typeof\([^)]*validation_summary[^)]*\)\s*=\s*'object'/iu);
   assert.match(sql, /count\(\*\).*monitor_update/isu);
+  assert.match(sql, /ownership_ambiguous/iu);
+  assert.match(sql, /owner_count\s*>\s*1/iu);
+  assert.match(sql, /monitor_cardinality[\s\S]+owner_count\s*>\s*2/iu);
+  assert.match(sql, /UPDATE public\.tender_agentic_jobs[\s\S]+dispatch_execution_id\s*=\s*input\.execution_id[\s\S]+job\.status\s+IN\s*\('created',\s*'staging',\s*'ready'\)/iu);
+  assert.match(sql, /UPDATE public\.tender_agentic_jobs[\s\S]+poll_owner_execution_id\s*=\s*input\.execution_id[\s\S]+job\.status\s+IN\s*\('ready',\s*'running',\s*'validating'\)/iu);
+  assert.doesNotMatch(sql, /job\.id\s*=\s*\(\s*SELECT[\s\S]*dispatch/iu);
   assert.doesNotMatch(sql, /UPDATE\s+public\.tender_agentic_documents/iu);
   assert.doesNotMatch(sql, /DELETE|TRUNCATE|ALTER|DROP/iu);
   assert.match(sql, /dispatch_failed|monitor_lease_released|terminal_no_op|ownership_lost|invalid_identity|unsupported_workflow/iu);
