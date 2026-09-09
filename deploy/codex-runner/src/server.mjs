@@ -521,6 +521,8 @@ export async function executeAgentJobLifecycle({
         code: 'CODEX_CONTRACT_INVALID',
         retryable: false,
         execution,
+        validationEnvelope: validation.envelope,
+        validationIssues: validation.issues,
       });
     }
     return jobStore.completeAttempt(jobId, {
@@ -655,15 +657,24 @@ export function createManifestRouteHandler({
   };
 }
 
+export async function initializeJobStore(jobStore) {
+  if (
+    typeof jobStore?.recoverOrphanedJobs !== 'function'
+    || typeof jobStore?.cleanupExpiredJobs !== 'function'
+  ) {
+    throw new TypeError('jobStore recovery and cleanup methods are required');
+  }
+  const recovery = await jobStore.recoverOrphanedJobs();
+  const cleanup = await jobStore.cleanupExpiredJobs();
+  return { recovery, cleanup };
+}
+
 function createDefaultV1Handler() {
   const jobStore = createJobStore({
     rootDirectory: config.rootDirectory,
     fieldCatalogPath: config.fieldCatalogPath,
   });
-  const startup = Promise.all([
-    jobStore.recoverOrphanedJobs(),
-    jobStore.cleanupExpiredJobs(),
-  ]);
+  const startup = initializeJobStore(jobStore);
   const validatorPromise = createAgentResultValidator({ jobStore });
   const handler = createManifestRouteHandler({
     jobStore,

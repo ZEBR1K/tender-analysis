@@ -11,6 +11,7 @@ import {
   createManifestRouteHandler,
   createServer,
   createSingleProcessQueue,
+  initializeJobStore,
 } from '../deploy/codex-runner/src/server.mjs';
 import { createHeaderAuthenticator } from '../deploy/codex-runner/src/http-auth.mjs';
 
@@ -211,6 +212,18 @@ test('contract failure is terminal and never triggers a paid retry', async (t) =
   assert.equal(failed.failure.code, 'CODEX_CONTRACT_INVALID');
   assert.equal(failed.failure.retryable, false);
   assert.equal(executions, 1);
+  assert.equal(failed.failure.validation.envelope_available, true);
+  const validationAudit = await loadJson(path.join(
+    resolveJobPath(fixture.rootDirectory, fixture.manifest.job_id),
+    'audit',
+    failed.failure.validation.artifact,
+  ));
+  assert.equal(validationAudit.valid, false);
+  assert.equal(
+    validationAudit.fields.flatMap((field) => field.issues)
+      .some((issue) => issue.code === 'LOCATOR_INVALID'),
+    true,
+  );
 });
 
 test('one process failure without valid JSON receives exactly one automatic second attempt', async (t) => {
@@ -227,7 +240,15 @@ test('one process failure without valid JSON receives exactly one automatic seco
           ok: false,
           code: 'CODEX_PROCESS_FAILED',
           valid_json_result: false,
-          events: { usage: {} },
+          events: {
+            thread_id: 'failed-thread-1',
+            usage: {
+              input_tokens: 123,
+              cached_input_tokens: 100,
+              output_tokens: 23,
+              reasoning_output_tokens: 7,
+            },
+          },
           artifacts: { status: 'attempt-1-status.json' },
         };
       }
@@ -247,6 +268,9 @@ test('one process failure without valid JSON receives exactly one automatic seco
   assert.equal(completed.attempt, 2);
   assert.equal(completed.prior_attempts.length, 1);
   assert.equal(completed.prior_attempts[0].code, 'CODEX_PROCESS_FAILED');
+  assert.equal(completed.prior_attempts[0].execution.thread_id, 'failed-thread-1');
+  assert.equal(completed.prior_attempts[0].execution.usage.cached_input_tokens, 100);
+  assert.equal(completed.prior_attempts[0].execution.artifacts.status, 'attempt-1-status.json');
 });
 
 test('restart recovery marks orphaned work as typed retryable failure', async (t) => {
@@ -327,8 +351,7 @@ test('completed artifacts are rechecked against their persisted hashes before re
 
   const resultPath = path.join(
     resolveJobPath(fixture.rootDirectory, fixture.manifest.job_id),
-    'workspace',
-    'output',
+    'audit',
     'result.json',
   );
   const changed = structuredClone(fixture.result);
@@ -338,6 +361,50 @@ test('completed artifacts are rechecked against their persisted hashes before re
     fixture.store.getResult(fixture.manifest.job_id),
     /integrity|hash|changed/iu,
   );
+});
+
+test('startup recovery completes before exact-job TTL cleanup begins', async () => {
+  const calls = [];
+  const result = await initializeJobStore({
+    async recoverOrphanedJobs() {
+      calls.push('recover:start');
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      calls.push('recover:end');
+      return { recovered_jobs: 1 };
+    },
+    async cleanupExpiredJobs() {
+      calls.push('cleanup');
+      return { deleted_jobs: 1 };
+    },
+  });
+  assert.deepEqual(calls, ['recover:start', 'recover:end', 'cleanup']);
+  assert.deepEqual(result, {
+    recovery: { recovered_jobs: 1 },
+    cleanup: { deleted_jobs: 1 },
+  });
+});
+
+test('attempt-2 queue rollback restores prior failure and execution audit', async (t) => {
+  const fixture = await setupReadyJob(t);
+  const claim = await fixture.store.claimStart(fixture.manifest.job_id);
+  const execution = successExecution(fixture.result, claim.attempt);
+  execution.events.thread_id = 'orphaned-validating-thread';
+  await fixture.store.markValidating(fixture.manifest.job_id, {
+    attempt: claim.attempt,
+    execution,
+  });
+  await fixture.store.recoverOrphanedJobs();
+  const before = await fixture.store.getJob(fixture.manifest.job_id);
+  assert.equal(before.usage.input_tokens, 100);
+
+  const retry = await fixture.store.claimStart(fixture.manifest.job_id);
+  assert.equal(retry.attempt, 2);
+  await fixture.store.releaseUnstartedClaim(fixture.manifest.job_id, { attempt: 2 });
+  const restored = await fixture.store.getJob(fixture.manifest.job_id);
+  assert.equal(restored.status, 'failed');
+  assert.equal(restored.failure.code, 'RUNNER_ORPHANED_EXECUTION');
+  assert.equal(restored.usage.input_tokens, 100);
+  assert.equal(restored.prior_attempts, undefined);
 });
 
 test('invalid lifecycle transitions fail closed without changing the job', async (t) => {

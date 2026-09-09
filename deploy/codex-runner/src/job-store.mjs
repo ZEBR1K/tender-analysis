@@ -294,18 +294,44 @@ function tokenUsage(value) {
 }
 
 function executionSummary(execution) {
+  const eventAudit = execution?.events ?? execution;
   return {
     code: boundedCode(execution?.code, 'CODEX_TRANSPORT_ERROR'),
-    thread_id: typeof execution?.events?.thread_id === 'string'
-      ? execution.events.thread_id.slice(0, 200)
+    thread_id: typeof eventAudit?.thread_id === 'string'
+      ? eventAudit.thread_id.slice(0, 200)
       : null,
-    usage: tokenUsage(execution?.events?.usage),
+    usage: tokenUsage(eventAudit?.usage),
     artifacts: Object.fromEntries(
       Object.entries(execution?.artifacts ?? {})
         .filter(([, value]) => typeof value === 'string')
         .map(([key, value]) => [key, path.basename(value).slice(0, 255)]),
     ),
   };
+}
+
+function priorAttemptRecord({ attempt, code, at, execution }) {
+  return {
+    attempt,
+    code: boundedCode(code, 'CODEX_TRANSPORT_ERROR'),
+    retryable: true,
+    at,
+    execution: execution ? executionSummary(execution) : null,
+  };
+}
+
+function validationFailureBytes({ jobId, attempt, envelope, issues }) {
+  const payload = envelope ?? {
+    schema_version: 'tender_agent_validation_failure_v1',
+    job_id: jobId,
+    attempt,
+    valid: false,
+    issues: Array.isArray(issues) ? issues : [],
+  };
+  const bytes = Buffer.from(`${canonicalJson(payload)}\n`, 'utf8');
+  if (bytes.length > 2 * 1024 * 1024) {
+    throw storeError('RUNNER_INTERNAL', 'Validation audit exceeds its bound', 500);
+  }
+  return { bytes, envelopeAvailable: envelope !== null && envelope !== undefined };
 }
 
 async function cleanupCrashResidue(temporaryDirectory) {
@@ -782,12 +808,12 @@ export function createJobStore({
         job.state.prior_attempts = Array.isArray(job.state.prior_attempts)
           ? job.state.prior_attempts
           : [];
-        job.state.prior_attempts.push({
+        job.state.prior_attempts.push(priorAttemptRecord({
           attempt: Number(job.state.attempt),
           code: boundedCode(job.state.failure?.code),
-          retryable: true,
           at: job.state.failure?.at ?? timestamp(),
-        });
+          execution: job.state.execution,
+        }));
       }
       job.state.attempt = retrying ? Number(job.state.attempt) + 1 : 1;
       job.state.status = 'running';
@@ -817,12 +843,12 @@ export function createJobStore({
       job.state.prior_attempts = Array.isArray(job.state.prior_attempts)
         ? job.state.prior_attempts
         : [];
-      job.state.prior_attempts.push({
+      job.state.prior_attempts.push(priorAttemptRecord({
         attempt,
-        code: boundedCode(execution?.code, 'CODEX_TRANSPORT_ERROR'),
-        retryable: true,
+        code: execution?.code,
         at: timestamp(),
-      });
+        execution,
+      }));
       job.state.attempt = 2;
       job.state.execution = null;
       job.state.updated_at = timestamp();
@@ -863,6 +889,7 @@ export function createJobStore({
           retryable: true,
           at: prior.at,
         };
+        job.state.execution = prior.execution;
         job.state.finished_at = prior.at;
       } else {
         throw storeError('RUNNER_JOB_STATE_INVALID', 'Unstarted claim attempt is invalid', 409);
@@ -915,12 +942,11 @@ export function createJobStore({
           'Validation envelope hashes do not match the result bytes',
         );
       }
-      const workspaceDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'workspace');
-      const outputDirectory = await ensureOrCreateRegularDirectory(workspaceDirectory, 'output');
-      await assertOrWriteExactFile(exactChild(outputDirectory, RESULT_FILE_NAME), bytes);
+      const auditDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'audit');
+      await assertOrWriteExactFile(exactChild(auditDirectory, RESULT_FILE_NAME), bytes);
       const validationBytes = Buffer.from(`${canonicalJson(validationEnvelope)}\n`, 'utf8');
-      await atomicWriteFile(
-        exactChild(outputDirectory, VALIDATION_FILE_NAME),
+      await assertOrWriteExactFile(
+        exactChild(auditDirectory, VALIDATION_FILE_NAME),
         validationBytes,
       );
       job.state.status = 'completed';
@@ -943,6 +969,8 @@ export function createJobStore({
     code,
     retryable = false,
     execution,
+    validationEnvelope,
+    validationIssues,
   } = {}) {
     return withJobLock(jobId, async (normalizedJobId) => {
       const job = await loadJob(normalizedJobId);
@@ -958,6 +986,25 @@ export function createJobStore({
         retryable: Boolean(retryable && attempt < 2),
         at: timestamp(),
       };
+      if (validationEnvelope || Array.isArray(validationIssues)) {
+        const auditDirectory = await ensureOrCreateRegularDirectory(job.jobPath, 'audit');
+        const validationAudit = validationFailureBytes({
+          jobId: normalizedJobId,
+          attempt,
+          envelope: validationEnvelope,
+          issues: validationIssues,
+        });
+        const artifact = `validation.attempt-${attempt}.json`;
+        await assertOrWriteExactFile(
+          exactChild(auditDirectory, artifact),
+          validationAudit.bytes,
+        );
+        job.state.failure.validation = {
+          artifact,
+          sha256: sha256Bytes(validationAudit.bytes),
+          envelope_available: validationAudit.envelopeAvailable,
+        };
+      }
       if (execution) job.state.execution = executionSummary(execution);
       job.state.updated_at = job.state.failure.at;
       job.state.finished_at = job.state.failure.at;
@@ -972,15 +1019,11 @@ export function createJobStore({
       if (job.state.status !== 'completed') {
         throw storeError('RUNNER_RESULT_NOT_READY', 'Validated result is not available', 409);
       }
-      const workspaceDirectory = exactChild(job.jobPath, 'workspace');
-      const outputDirectory = exactChild(workspaceDirectory, 'output');
-      await Promise.all([
-        ensureRegularDirectory(workspaceDirectory),
-        ensureRegularDirectory(outputDirectory),
-      ]);
+      const auditDirectory = exactChild(job.jobPath, 'audit');
+      await ensureRegularDirectory(auditDirectory);
       const [rawBytes, validationBytes] = await Promise.all([
-        readBoundedRegularFile(exactChild(outputDirectory, RESULT_FILE_NAME)),
-        readBoundedRegularFile(exactChild(outputDirectory, VALIDATION_FILE_NAME)),
+        readBoundedRegularFile(exactChild(auditDirectory, RESULT_FILE_NAME)),
+        readBoundedRegularFile(exactChild(auditDirectory, VALIDATION_FILE_NAME)),
       ]);
       let result;
       let validation;
