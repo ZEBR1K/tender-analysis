@@ -17,8 +17,25 @@ if (mode === 'hang') {
   });
   await writeFile('child.pid', `${child.pid}\n`, 'utf8');
   setInterval(() => {}, 10_000);
+} else if (mode === 'child-ignore-term') {
+  const child = spawn(process.execPath, [
+    '-e',
+    "process.on('SIGTERM', () => {}); setInterval(() => {}, 10000)",
+  ], { stdio: 'ignore' });
+  await writeFile('child.pid', `${child.pid}\n`, 'utf8');
+  setInterval(() => {}, 10_000);
 } else if (mode === 'terminal-no-result') {
   process.stdout.write('{"type":"turn.completed","usage":{}}\n');
+} else if (mode === 'malformed-result') {
+  process.stdout.write('{"type":"turn.completed","usage":{}}\n');
+  if (resultPath) await writeFile(resultPath, '{"schema_version":', 'utf8');
+} else if (mode === 'stdout-secret') {
+  process.stdout.write(`${JSON.stringify({
+    type: 'item.completed',
+    item: { message: `credential=event-secret-value` },
+  })}\n`);
+  process.stdout.write('{"type":"turn.completed","usage":{}}\n');
+  if (resultPath) await writeFile(resultPath, '{"schema_version":"fake_result_v1"}\n', 'utf8');
 } else if (mode === 'invalid-jsonl') {
   process.stdout.write('not-json\n');
   if (resultPath) await writeFile(resultPath, '{"schema_version":"fake_result_v1"}\n', 'utf8');

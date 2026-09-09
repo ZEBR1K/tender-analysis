@@ -1,5 +1,14 @@
 import { execFile, spawn } from 'node:child_process';
-import { open, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -118,6 +127,16 @@ export function sanitizeCodexEnvironment(baseEnvironment = {}) {
 }
 
 function redactStderr(value, secretValues = []) {
+  let redacted = redactSecretText(value, secretValues);
+  const bytes = Buffer.from(redacted, 'utf8');
+  if (bytes.length <= MAX_STDERR_BYTES) return bytes;
+  return Buffer.concat([
+    bytes.subarray(0, MAX_STDERR_BYTES - 20),
+    Buffer.from('\n[stderr truncated]\n', 'utf8'),
+  ]).subarray(0, MAX_STDERR_BYTES);
+}
+
+function redactSecretText(value, secretValues = []) {
   let redacted = String(value || '');
   for (const secret of secretValues) {
     if (typeof secret === 'string' && secret.length >= 4) {
@@ -128,12 +147,34 @@ function redactStderr(value, secretValues = []) {
     /\b([A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*)\s*[:=]\s*[^\s]+/giu,
     '$1=[REDACTED]',
   );
-  const bytes = Buffer.from(redacted, 'utf8');
-  if (bytes.length <= MAX_STDERR_BYTES) return bytes;
-  return Buffer.concat([
-    bytes.subarray(0, MAX_STDERR_BYTES - 20),
-    Buffer.from('\n[stderr truncated]\n', 'utf8'),
-  ]).subarray(0, MAX_STDERR_BYTES);
+  return redacted;
+}
+
+function redactEventValue(value, secretValues, key = '') {
+  if (/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(key)) return '[REDACTED]';
+  if (typeof value === 'string') return redactSecretText(value, secretValues);
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactEventValue(entry, secretValues));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [
+      entryKey,
+      redactEventValue(entryValue, secretValues, entryKey),
+    ]));
+  }
+  return value;
+}
+
+function sanitizedEventAuditLine(line, secretValues) {
+  try {
+    return JSON.stringify(redactEventValue(JSON.parse(line), secretValues));
+  } catch {
+    return JSON.stringify({
+      type: 'runner.invalid_stdout',
+      byte_size: Buffer.byteLength(line),
+      sha256: createHash('sha256').update(line).digest('hex').toUpperCase(),
+    });
+  }
 }
 
 async function readBoundedJson(filePath) {
@@ -143,15 +184,74 @@ async function readBoundedJson(filePath) {
       return { valid: false, value: null, bytes: null };
     }
     const bytes = await readFile(filePath);
-    const value = JSON.parse(bytes.toString('utf8'));
-    return {
-      valid: value !== null && typeof value === 'object' && !Array.isArray(value),
-      value,
-      bytes,
-    };
+    try {
+      const value = JSON.parse(bytes.toString('utf8'));
+      return {
+        valid: value !== null && typeof value === 'object' && !Array.isArray(value),
+        value,
+        bytes,
+      };
+    } catch {
+      return { valid: false, value: null, bytes };
+    }
   } catch {
     return { valid: false, value: null, bytes: null };
   }
+}
+
+async function ensureRegularDirectory(directory) {
+  await mkdir(directory, { mode: 0o700 }).catch((error) => {
+    if (error?.code !== 'EEXIST') throw error;
+  });
+  const metadata = await lstat(directory);
+  if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+    throw new Error('Trusted agent instruction directory is invalid');
+  }
+}
+
+async function copyExactTrustedFile(sourcePath, targetPath) {
+  const sourceMetadata = await lstat(sourcePath);
+  if (!sourceMetadata.isFile() || sourceMetadata.isSymbolicLink()) {
+    throw new Error('Trusted agent instruction source is invalid');
+  }
+  const expected = await readFile(sourcePath);
+  const targetMetadata = await lstat(targetPath).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!targetMetadata) {
+    await writeFile(targetPath, expected, { flag: 'wx', mode: 0o400 });
+    return;
+  }
+  if (!targetMetadata.isFile() || targetMetadata.isSymbolicLink()) {
+    throw new Error('Trusted agent instruction target is invalid');
+  }
+  const actual = await readFile(targetPath);
+  if (!actual.equals(expected)) {
+    throw new Error('Trusted agent instruction changed in the job workspace');
+  }
+}
+
+export async function stageAgentTemplate({ workspaceDirectory, templateDirectory } = {}) {
+  if (typeof workspaceDirectory !== 'string' || typeof templateDirectory !== 'string') {
+    throw new TypeError('workspaceDirectory and templateDirectory are required');
+  }
+  await ensureRegularDirectory(workspaceDirectory);
+  await ensureRegularDirectory(templateDirectory);
+  const agentsDirectory = path.join(workspaceDirectory, '.agents');
+  const skillsDirectory = path.join(agentsDirectory, 'skills');
+  const skillDirectory = path.join(skillsDirectory, 'tender-document-analysis');
+  await ensureRegularDirectory(agentsDirectory);
+  await ensureRegularDirectory(skillsDirectory);
+  await ensureRegularDirectory(skillDirectory);
+  await copyExactTrustedFile(
+    path.join(templateDirectory, 'AGENTS.md'),
+    path.join(workspaceDirectory, 'AGENTS.md'),
+  );
+  await copyExactTrustedFile(
+    path.join(templateDirectory, '.agents', 'skills', 'tender-document-analysis', 'SKILL.md'),
+    path.join(skillDirectory, 'SKILL.md'),
+  );
 }
 
 function terminateProcessTree(child, signal) {
@@ -232,6 +332,7 @@ export async function executeCodexCommand({
   let stderrCaptured = 0;
   let timedOut = false;
   let forceTimer = null;
+  let forcedKillCompletion = Promise.resolve();
   const terminationTasks = [];
   let child;
 
@@ -250,7 +351,7 @@ export async function executeCodexCommand({
     const stdoutTask = (async () => {
       const lines = createInterface({ input: child.stdout, crlfDelay: Infinity });
       for await (const line of lines) {
-        await eventsHandle.write(`${line}\n`);
+        await eventsHandle.write(`${sanitizedEventAuditLine(line, secretValues)}\n`);
         if (eventError) continue;
         try {
           accumulator.accept(parseCodexEventLine(line));
@@ -272,16 +373,22 @@ export async function executeCodexCommand({
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
       terminationTasks.push(terminateProcessTree(child, 'SIGTERM'));
-      forceTimer = setTimeout(() => {
-        terminationTasks.push(terminateProcessTree(child, 'SIGKILL'));
-      }, killGraceMs);
+      forcedKillCompletion = new Promise((resolve) => {
+        forceTimer = setTimeout(async () => {
+          const forcedKill = terminateProcessTree(child, 'SIGKILL');
+          terminationTasks.push(forcedKill);
+          await forcedKill;
+          resolve();
+        }, killGraceMs);
+      });
     }, timeoutMs);
     child.stdin.on('error', () => {});
     child.stdin.end(prompt);
 
     const closed = await waitForClose(child);
     clearTimeout(timeoutTimer);
-    if (forceTimer) clearTimeout(forceTimer);
+    if (timedOut) await forcedKillCompletion;
+    else if (forceTimer) clearTimeout(forceTimer);
     await Promise.all([stdoutTask, stderrTask]);
     await Promise.all(terminationTasks);
 
@@ -323,7 +430,7 @@ export async function executeCodexCommand({
     });
     return response;
   } finally {
-    if (forceTimer) clearTimeout(forceTimer);
+    if (forceTimer && !timedOut) clearTimeout(forceTimer);
     await Promise.all([
       eventsHandle.close().catch(() => {}),
       stderrHandle.close().catch(() => {}),
@@ -356,6 +463,10 @@ export async function runCodexAttempt({
     'secretValues',
   ]));
   const command = buildCodexCommand({ jobId, jobsRoot, runnerRoot });
+  await stageAgentTemplate({
+    workspaceDirectory: command.cwd,
+    templateDirectory: path.posix.join(runnerRoot, 'agent-template'),
+  });
   const prompt = await readFile(command.promptPath, 'utf8');
   const auditDirectory = path.posix.join(jobsRoot, jobId, 'audit');
   return executeCodexCommand({
