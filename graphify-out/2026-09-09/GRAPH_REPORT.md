@@ -1,7 +1,8 @@
 # Graph Report - agentic-analysis-integration  (2026-09-09)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- 274 files · ~1,115,871 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
 - 2499 nodes · 3471 edges · 201 communities (184 shown, 14 thin omitted)
@@ -990,20 +991,18 @@ Cohesion: 0.50
 Nodes (3): Contract, Packaging required, TENDER — Intake Resume
 
 ## Knowledge Gaps
-- **1241 isolated node(s):** `cfbGateCases`, `fixtureRoot`, `invalidGroupNameFixture`, `manifest`, `nodeNames` (+1236 more)
+- **1241 isolated node(s):** `name`, `version`, `private`, `type`, `node` (+1236 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 1497 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `$defs` connect `$defs` to `properties`, `issue`?**
-  _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Why does `Durable Project File Index` connect `Current Tender Analysis Project State` to `End-to-End Tender Analysis Pipeline`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **Are the 15 inferred relationships involving `createJobStore()` (e.g. with `beginAutomaticRetry()` and `claimStart()`) actually correct?**
   _`createJobStore()` has 15 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `cfbGateCases`, `fixtureRoot`, `invalidGroupNameFixture` to the rest of the system?**
+- **What connects `name`, `version`, `private` to the rest of the system?**
   _1241 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `document-worker-docx-option-state.test.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.05450733752620545 - nodes in this community are weakly interconnected._
@@ -1011,3 +1010,5 @@ _Questions this graph is uniquely positioned to answer:_
   _Cohesion score 0.06219426974143955 - nodes in this community are weakly interconnected._
 - **Should `document-worker-extractor-recovery.test.mjs` be split into smaller, more focused modules?**
   _Cohesion score 0.05587808417997097 - nodes in this community are weakly interconnected._
+- **Should `Target-Ranked Evidence Windows` be split into smaller, more focused modules?**
+  _Cohesion score 0.057692307692307696 - nodes in this community are weakly interconnected._
