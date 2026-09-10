@@ -13,6 +13,12 @@ Orchestrator
 → Targeted Recheck
 → Finalization
 → TENDER — Генерация отчета
+
+или для временного agent-only route:
+
+Agentic Monitor
+→ Finalization (agentic promotion + тот же барьер 27/27)
+→ TENDER — Генерация отчета
 ```
 
 Report Generation начинается только после successful Finalization event. Он не извлекает новые facts, не меняет FINAL status/value и не переинтерпретирует исходные документы AI-моделью.
@@ -92,9 +98,14 @@ tender_analysis_units
 - run существует и имеет `status=completed`;
 - ровно 27 fields, точный порядок `1..27` и ожидаемые `field_key`;
 - exact canonical contract каждого поля:
-  `field_index`, `field_key`, `status`, `value_text`, `confidence`, `requires_human_review`, `result_json`;
+  `field_index`, `field_key`, `status`, `value_text`, `confidence`, `requires_human_review`, `resolution_method`, `result_json`;
 - status/value/review invariants для `resolved`, `requires_review` и `not_found`;
 - существование массивов `documents`, `facts` и `units` в `source_index`.
+
+Для прежних producers у `resolved` по-прежнему обязателен числовой
+`confidence`. Единственное исключение — `resolution_method=codex_agentic_v1`,
+для которого `confidence` обязан быть `null`: агент не выдумывает числовую
+оценку, а Report Generation не вычисляет её самостоятельно.
 
 При нарушении workflow завершает execution с явной ошибкой, например `REPORT_RUN_NOT_COMPLETED`, `REPORT_SNAPSHOT_FIELD_COUNT_INVALID`, `REPORT_ANALYSIS_CONTRACT_CHANGED` или `REPORT_SNAPSHOT_SOURCE_INDEX_INVALID`.
 
@@ -121,6 +132,7 @@ tender_analysis_units
 {
   "kind": "document",
   "document": "Проект договора.pdf",
+  "locator": "раздел 4.2",
   "page": 2,
   "page_to": 2,
   "sheet": null,
@@ -140,6 +152,8 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 1. `candidate_ref: fact:<uuid>` или exact `fact_id`:
    `fact_id → source_index.facts → document_id → source_index.documents → file_name`.
 2. embedded `evidence.document`: имя документа берётся непосредственно из evidence.
+   Agentic promotion добавляет это имя после проверки `artifact_key` по manifest;
+   непрозрачный `locator` переносится рядом без разбора его содержания.
 3. `analysis_unit_id`: unique unit разрешается через `source_index.units` и его `document_id`.
 4. `semantic_block_id`: Adapter ищет unique matching unit в `ai_segments`/provenance и затем его документ.
 5. `source_type=tender_metadata`: возвращается отдельный metadata-source:
@@ -148,6 +162,7 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 {
   "kind": "tender_metadata",
   "document": "TenderPlan — карточка закупки",
+  "locator": null,
   "page": null,
   "page_to": null,
   "sheet": null,
@@ -156,7 +171,12 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 }
 ```
 
-Quote берётся только из evidence. Страницы и sheet берутся из evidence либо source pages unit; если они не установлены, остаются `null`. Workflow не придумывает page, sheet или quote. Неоднозначный document не выбирается молча; diagnostics отражают unresolved/ambiguous reference.
+Quote и locator берутся только из evidence. Locator остаётся непрозрачной
+строкой: workflow не превращает его в page/sheet и не проверяет смысл.
+Страницы и sheet берутся из evidence либо source pages unit; если они не
+установлены, остаются `null`. Workflow не придумывает page, sheet, locator или
+quote. Неоднозначный document не выбирается молча; diagnostics отражают
+unresolved/ambiguous reference.
 
 Для `status=not_found` evidence не обрабатываются и всегда формируется `sources: []`. Sources дедуплицируются только при полном совпадении client-safe source object.
 
@@ -214,7 +234,11 @@ HTML содержит ровно 27 client-facing rows с `data-field-index="1" 
 - отображаются все уже подготовленные `sources[]`;
 - block `attention` содержит только `requires_human_review=true`.
 
-Все динамические values и quotes проходят `escapeHtml`. HTML не выводит UUID, `field_key`, `result_json`, `confidence`, `fact_id`, `semantic_block_id`, `analysis_unit_id`, `candidate_ref` или `analysis_run_id`. Последний остаётся только в техническом JSON output Renderer/Artifact, а не в HTML.
+Все динамические values, locators и quotes проходят `escapeHtml`. HTML не
+выводит UUID, `field_key`, `result_json`, `confidence`, `fact_id`,
+`semantic_block_id`, `analysis_unit_id`, `candidate_ref` или
+`analysis_run_id`. Последний остаётся только в техническом JSON output
+Renderer/Artifact, а не в HTML.
 
 `not_found` не означает отрицательный факт и показывается нейтрально:
 

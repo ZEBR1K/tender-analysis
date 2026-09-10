@@ -15,6 +15,73 @@ const targets = (workflow, source) => (
   workflow.connections[source]?.main?.[0] ?? []
 ).map(({ node }) => node);
 
+const executeCodeNode = (jsCode, json) => {
+  const execute = new Function('$json', '$input', '$', jsCode);
+  return execute(json, { first: () => ({ json }) }, undefined);
+};
+
+const fieldCatalog = [
+  'procurement_subject',
+  'nm_price_with_vat',
+  'platform',
+  'procedure_type',
+  'application_deadline',
+  'application_review_date',
+  'results_date',
+  'customer',
+  'customer_contacts',
+  'participation_cost',
+  'participation_guarantee',
+  'evaluation_criteria',
+  'delivery_term',
+  'payment_terms',
+  'special_account_or_treasury',
+  'bank_support',
+  'government_contract',
+  'rebidding',
+  'national_regime',
+  'advance_contract_guarantee',
+  'warranty_obligations_guarantee',
+  'licenses_certificates',
+  'required_official_certificates',
+  'similar_supply_experience',
+  'analog_allowed',
+  'analog_definition',
+  'application_documents',
+];
+
+const agenticSnapshot = () => ({
+  snapshot_version: 'tender_report_snapshot_v2',
+  analysis_run_id: '00000000-0000-4000-8000-000000000001',
+  analysis_run: {
+    status: 'completed',
+    tender_id: 'fixture',
+    tender_number: null,
+    tender_external_id: null,
+    tender_meta: {},
+  },
+  field_results: fieldCatalog.map((fieldKey, index) => {
+    const status = index === 0 ? 'resolved' : index === 1 ? 'requires_review' : 'not_found';
+    const evidence = status === 'not_found' ? [] : [{
+      artifact_key: 'document-001.docx',
+      document: 'Документ <1>.docx',
+      locator: 'таблица <2>, строка 3',
+      quote: 'цитата <script>alert(1)</script>',
+    }];
+    return {
+      field_index: index + 1,
+      field_key: fieldKey,
+      status,
+      value_text: status === 'not_found' ? null : `Значение ${index + 1}`,
+      confidence: null,
+      requires_human_review: status === 'requires_review',
+      resolution_method: 'codex_agentic_v1',
+      result_json: { evidence },
+    };
+  }),
+  source_index: { documents: [], facts: [], units: [] },
+});
+
 test('Finalization promotes one completed agentic job before its existing 27/27 barrier', async () => {
   const workflow = await load('TENDER — Финализация анализа.json');
   const trigger = byName(workflow, 'When Executed by Another Workflow');
@@ -94,4 +161,48 @@ test('Report accepts agentic null confidence and preserves opaque source locator
   assert.match(validateModel, /locator/u);
   assert.match(render, /source\.locator/u);
   assert.match(render, /escapeHtml\(source\.locator\)/u);
+});
+
+test('agentic Report path executes all Code nodes and escapes an opaque locator', async () => {
+  const workflow = await load('TENDER — Генерация отчета.json');
+  const snapshot = agenticSnapshot();
+  const validated = executeCodeNode(
+    byName(workflow, 'Проверить Report Snapshot4').parameters.jsCode,
+    { report_snapshot: snapshot },
+  )[0].json;
+  const adapted = executeCodeNode(
+    byName(workflow, 'Адаптировать поля отчёта3').parameters.jsCode,
+    validated,
+  )[0].json;
+  const model = executeCodeNode(
+    byName(workflow, 'Собрать Report Model2').parameters.jsCode,
+    adapted,
+  )[0].json;
+  const checkedModel = executeCodeNode(
+    byName(workflow, 'Проверить Report Model2').parameters.jsCode,
+    model,
+  )[0].json;
+  const rendered = executeCodeNode(
+    byName(workflow, 'Сгенерировать HTML1').parameters.jsCode,
+    checkedModel,
+  )[0].json;
+
+  assert.equal(adapted.adapted_fields[0].sources[0].locator, 'таблица <2>, строка 3');
+  assert.match(rendered.html, /таблица &lt;2&gt;, строка 3/u);
+  assert.doesNotMatch(rendered.html, /<script>alert\(1\)<\/script>/u);
+});
+
+test('agentic confidence exception does not weaken the legacy resolved contract', async () => {
+  const workflow = await load('TENDER — Генерация отчета.json');
+  const validator = byName(workflow, 'Проверить Report Snapshot4').parameters.jsCode;
+  const legacySnapshot = agenticSnapshot();
+  legacySnapshot.field_results[0].resolution_method = 'deterministic_metadata';
+
+  assert.throws(
+    () => executeCodeNode(validator, { report_snapshot: legacySnapshot }),
+    /resolved invariant/u,
+  );
+
+  legacySnapshot.field_results[0].confidence = 1;
+  assert.doesNotThrow(() => executeCodeNode(validator, { report_snapshot: legacySnapshot }));
 });
