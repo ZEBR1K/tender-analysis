@@ -44,8 +44,22 @@ the exact ordered catalog, UPSERTs the 27 agent-reported shadow rows, rechecks
 the persisted count/catalog set, and only then marks the job completed and
 releases the lease. Any exception rolls back the complete transaction.
 
-Completed jobs are excluded from claims, making subsequent schedules a
-byte-compatible no-op. The DB stores only bounded hashes, usage, summary and
+After that transaction succeeds, its first result set exposes only the exact
+`analysis_run_id` and `agentic_job_id` handoff identifiers. The synchronous
+`Завершить agentic analysis` node passes that item unchanged to the existing
+Finalization workflow. Finalization owns canonical promotion, the 27/27
+completion barrier and Report Generation; Monitor does not reinterpret field
+meaning after the runner validation envelope has passed. Repeating the same
+run/job pair is handled as an idempotent same-producer replay, while a different
+producer or job fails closed. The repository export keeps the Finalization
+resource locator unbound and binds it to live workflow `cSsh9yjpS7t5p0OO`
+only during controlled deployment.
+
+Completed jobs are excluded from later scheduled claims, making subsequent
+schedules a byte-compatible no-op. The synchronous Finalization handoff is part
+of the successful terminal Monitor execution; any promotion or report error
+fails that execution and reaches the configured Agentic Error workflow instead
+of being swallowed. The DB stores only bounded hashes, usage, summary and
 artifact metadata. Full runner/Codex JSONL remains runner-side and is neither
 fetched nor persisted by this workflow.
 

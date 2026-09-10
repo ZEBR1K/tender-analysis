@@ -148,8 +148,10 @@ test('completed duplicate is byte-compatible no-op and JSONL is never persisted'
   const finalize = find(workflow, 'Завершить agentic analysis');
   assert.equal(finalize.type, 'n8n-nodes-base.executeWorkflow');
   assert.deepEqual(targets(workflow, 'Сохранить ровно 27 shadow rows'), [finalize.name]);
-  assert.match(JSON.stringify(finalize.parameters), /analysis_run_id/u);
-  assert.match(JSON.stringify(finalize.parameters), /agentic_job_id/u);
+  assert.equal(finalize.parameters.workflowInputs, undefined);
+  const saveSql = find(workflow, 'Сохранить ровно 27 shadow rows').parameters.query;
+  assert.match(saveSql, /analysis_run_id/u);
+  assert.match(saveSql, /agentic_job_id/u);
   assert.doesNotMatch(all, /legacy|tender_analysis_facts|Targeted Recheck|Обработать документ/iu);
 });
 

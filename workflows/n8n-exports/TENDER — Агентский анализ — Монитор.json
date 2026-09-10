@@ -271,7 +271,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "BEGIN;\nSELECT set_config('tender.job_id',$1::text,true),set_config('tender.poll_owner',$2::text,true),\n set_config('tender.payload',$3::text,true),set_config('tender.analysis_run_id',$4::text,true),\n set_config('tender.catalog_version',$5::text,true),set_config('tender.validation_summary',$6::text,true),\n set_config('tender.artifacts',$7::text,true);\nDO $agentic$\nDECLARE\n  payload jsonb := current_setting('tender.payload')::jsonb;\n  actual_count integer;\n  actual_keys text[];\n  expected_keys constant text[] := ARRAY['procurement_subject','nm_price_with_vat','platform','procedure_type','application_deadline','application_review_date','results_date','customer','customer_contacts','participation_cost','participation_guarantee','evaluation_criteria','delivery_term','payment_terms','special_account_or_treasury','bank_support','government_contract','rebidding','national_regime','advance_contract_guarantee','warranty_obligations_guarantee','licenses_certificates','required_official_certificates','similar_supply_experience','analog_allowed','analog_definition','application_documents']::text[];\nBEGIN\n  PERFORM 1 FROM public.tender_agentic_jobs\n   WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating')\n   FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_POLL_OWNERSHIP_LOST'; END IF;\n  SELECT count(*),array_agg(field_key ORDER BY field_index)\n    INTO actual_count,actual_keys\n    FROM jsonb_to_recordset(payload) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb);\n  IF actual_count <> 27 OR actual_keys <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_RESULT_FIELD_SET_MISMATCH';\n  END IF;\n  INSERT INTO public.tender_agentic_field_results(\n    job_id,analysis_run_id,field_catalog_version,field_index,field_key,status,value_text,validation_issues,result_json\n  )\n  SELECT current_setting('tender.job_id')::uuid,current_setting('tender.analysis_run_id')::uuid,current_setting('tender.catalog_version'),f.field_index,f.field_key,f.status,f.value_text,coalesce(f.issues,'[]'::jsonb),f.result_json\n  FROM jsonb_array_elements(payload) item\n  CROSS JOIN LATERAL jsonb_to_record(item) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb)\n  ON CONFLICT (job_id, field_key) DO UPDATE SET\n    field_index=EXCLUDED.field_index,status=EXCLUDED.status,value_text=EXCLUDED.value_text,\n    validation_issues=EXCLUDED.validation_issues,result_json=EXCLUDED.result_json,updated_at=now();\n  IF (SELECT count(*) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> 27\n     OR (SELECT array_agg(field_key ORDER BY field_index) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_DB_FIELD_SET_MISMATCH';\n  END IF;\n  UPDATE public.tender_agentic_jobs SET status='completed',completed_at=coalesce(completed_at,now()),\n    validation_summary=current_setting('tender.validation_summary')::jsonb,artifacts=current_setting('tender.artifacts')::jsonb,\n    poll_owner_execution_id=NULL,poll_claimed_at=NULL,error_code=NULL,error_message=NULL,updated_at=now()\n  WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating');\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_COMPLETE_OWNERSHIP_LOST'; END IF;\nEND\n$agentic$;\nCOMMIT;",
+        "query": "BEGIN;\nSELECT\n $4::uuid AS analysis_run_id,\n $1::uuid AS agentic_job_id,\n set_config('tender.job_id',$1::text,true) AS job_setting,\n set_config('tender.poll_owner',$2::text,true) AS poll_owner_setting,\n set_config('tender.payload',$3::text,true) AS payload_setting,\n set_config('tender.analysis_run_id',$4::text,true) AS analysis_run_setting,\n set_config('tender.catalog_version',$5::text,true) AS catalog_setting,\n set_config('tender.validation_summary',$6::text,true) AS validation_setting,\n set_config('tender.artifacts',$7::text,true) AS artifacts_setting;\nDO $agentic$\nDECLARE\n  payload jsonb := current_setting('tender.payload')::jsonb;\n  actual_count integer;\n  actual_keys text[];\n  expected_keys constant text[] := ARRAY['procurement_subject','nm_price_with_vat','platform','procedure_type','application_deadline','application_review_date','results_date','customer','customer_contacts','participation_cost','participation_guarantee','evaluation_criteria','delivery_term','payment_terms','special_account_or_treasury','bank_support','government_contract','rebidding','national_regime','advance_contract_guarantee','warranty_obligations_guarantee','licenses_certificates','required_official_certificates','similar_supply_experience','analog_allowed','analog_definition','application_documents']::text[];\nBEGIN\n  PERFORM 1 FROM public.tender_agentic_jobs\n   WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating')\n   FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_POLL_OWNERSHIP_LOST'; END IF;\n  SELECT count(*),array_agg(field_key ORDER BY field_index)\n    INTO actual_count,actual_keys\n    FROM jsonb_to_recordset(payload) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb);\n  IF actual_count <> 27 OR actual_keys <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_RESULT_FIELD_SET_MISMATCH';\n  END IF;\n  INSERT INTO public.tender_agentic_field_results(\n    job_id,analysis_run_id,field_catalog_version,field_index,field_key,status,value_text,validation_issues,result_json\n  )\n  SELECT current_setting('tender.job_id')::uuid,current_setting('tender.analysis_run_id')::uuid,current_setting('tender.catalog_version'),f.field_index,f.field_key,f.status,f.value_text,coalesce(f.issues,'[]'::jsonb),f.result_json\n  FROM jsonb_array_elements(payload) item\n  CROSS JOIN LATERAL jsonb_to_record(item) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb)\n  ON CONFLICT (job_id, field_key) DO UPDATE SET\n    field_index=EXCLUDED.field_index,status=EXCLUDED.status,value_text=EXCLUDED.value_text,\n    validation_issues=EXCLUDED.validation_issues,result_json=EXCLUDED.result_json,updated_at=now();\n  IF (SELECT count(*) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> 27\n     OR (SELECT array_agg(field_key ORDER BY field_index) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_DB_FIELD_SET_MISMATCH';\n  END IF;\n  UPDATE public.tender_agentic_jobs SET status='completed',completed_at=coalesce(completed_at,now()),\n    validation_summary=current_setting('tender.validation_summary')::jsonb,artifacts=current_setting('tender.artifacts')::jsonb,\n    poll_owner_execution_id=NULL,poll_claimed_at=NULL,error_code=NULL,error_message=NULL,updated_at=now()\n  WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating');\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_COMPLETE_OWNERSHIP_LOST'; END IF;\nEND\n$agentic$;\nCOMMIT;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,JSON.stringify($json.fields),$json.analysis_run_id,$json.field_catalog_version,JSON.stringify($json.validation_summary),JSON.stringify($json.artifacts)] }}"
         }
@@ -290,6 +290,29 @@
           "name": "Postgres (package at import)"
         }
       }
+    },
+    {
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "TENDER — Финализация анализа"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        980,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000311",
+      "name": "Завершить agentic analysis"
     },
     {
       "parameters": {
@@ -763,6 +786,17 @@
       ]
     },
     "Сохранить ровно 27 shadow rows": {
+      "main": [
+        [
+          {
+            "node": "Завершить agentic analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Завершить agentic analysis": {
       "main": [
         [
           {
