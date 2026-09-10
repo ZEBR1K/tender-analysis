@@ -210,6 +210,7 @@ export function validateIsolationEvidence({
   const acceptedCommands = new Set([
     probeCommand,
     `/bin/bash -lc '${probeCommand}'`,
+    `/usr/bin/bash -lc '${probeCommand}'`,
     `/bin/sh -lc '${probeCommand}'`,
   ]);
   if (

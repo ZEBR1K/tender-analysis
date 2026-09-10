@@ -150,6 +150,10 @@ test('isolation evidence passes only for one exact successful probe command even
     jsonl: startedAndCompleted,
     ...expected,
   }).verified, true);
+  assert.equal(validateIsolationEvidence({
+    jsonl: startedAndCompleted.replaceAll('/bin/bash', '/usr/bin/bash'),
+    ...expected,
+  }).verified, true);
 
   const agentClaim = `${JSON.stringify({
     type: 'item.completed',
