@@ -15,6 +15,7 @@ const PROBE_IDS = Object.freeze([
   'sibling_job',
   'jobs_parent',
   'codex_auth',
+  'job_codex_auth',
   'runner_secret',
   'slash_tmp',
   'self_process_environment',
@@ -111,6 +112,12 @@ export async function runIsolationProbe({
   ))));
   record('jobs_parent', await denied(() => io.readdir(plan.protected_jobs_root)));
   record('codex_auth', await denied(() => io.readFile('/run/codex-auth/auth.json')));
+  record('job_codex_auth', await denied(() => io.readFile(path.posix.join(
+    plan.jobs_root,
+    plan.job_id,
+    'codex-home',
+    'auth.json',
+  ))));
   record('runner_secret', await denied(() => io.readFile('/run/secrets/runner-auth-token')));
   record('slash_tmp', await denied(() => io.writeFile(
     '/tmp/tender-codex-runner-isolation-probe.tmp',

@@ -86,6 +86,7 @@ const probeIds = [
   'sibling_job',
   'jobs_parent',
   'codex_auth',
+  'job_codex_auth',
   'runner_secret',
   'slash_tmp',
   'self_process_environment',
@@ -187,6 +188,7 @@ test('probe script executes every declared read, write and environment check its
     `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`,
     '/data/jobs',
     '/run/codex-auth/auth.json',
+    `${jobsRoot}/${jobId}/codex-home/auth.json`,
     '/run/secrets/runner-auth-token',
     '/proc/self/environ',
     '/proc/42/environ',
@@ -234,6 +236,7 @@ test('probe script executes every declared read, write and environment check its
     `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`,
     '/data/jobs',
     '/run/codex-auth/auth.json',
+    `${jobsRoot}/${jobId}/codex-home/auth.json`,
     '/run/secrets/runner-auth-token',
     '/proc/self/environ',
     '/proc/42/environ',
@@ -424,7 +427,10 @@ test('attestation runner stages a fresh probe and persists only after fake Codex
   });
   const challenge = await gate.getChallenge();
   const executionProfile = await buildRunnerExecutionProfile({ runnerRoot });
+  const codexAuthFile = path.join(rootDirectory, 'mounted-auth.json');
+  await writeFile(codexAuthFile, '{"auth":"fixture"}\n', { mode: 0o400 });
   let observedCommand;
+  let stagedAuthDuringExecution;
   let healthCalls = 0;
   const fetchImpl = async () => {
     healthCalls += 1;
@@ -459,10 +465,21 @@ test('attestation runner stages a fresh probe and persists only after fake Codex
       platform: 'linux',
       jobIds: [jobId, siblingJobId],
       now: () => times.shift(),
+      codexAuthFile,
       verifyProtectedTargets: async () => {},
       probeCodexVersion: async () => 'codex-cli 0.153.4',
       executeCommand: async (command) => {
         observedCommand = command;
+        stagedAuthDuringExecution = await readFile(path.join(
+          rootDirectory,
+          '.runner-isolation',
+          'canaries',
+          challengeId,
+          'jobs',
+          jobId,
+          'codex-home',
+          'auth.json',
+        ), 'utf8');
         const jsonl = commandEvent(probePayload({
           challenge_id: challengeId,
           job_id: jobId,
@@ -484,8 +501,25 @@ test('attestation runner stages a fresh probe and persists only after fake Codex
     assert.equal(observedCommand.args.includes('--sandbox'), false);
     assert.equal(observedCommand.shell, false);
     assert.equal(observedCommand.timeoutMs, 10 * 60 * 1000);
+    assert.equal(stagedAuthDuringExecution, '{"auth":"fixture"}\n');
+    assert.equal(
+      observedCommand.baseEnv.CODEX_HOME,
+      `/data/jobs/.runner-isolation/canaries/${challengeId}/jobs/${jobId}/codex-home`,
+    );
     assert.match(observedCommand.prompt, /node \.\.\/input\/isolation-probe\.mjs/u);
     assert.equal((await gate.verify()).verified, true);
+    await assert.rejects(
+      stat(path.join(
+        rootDirectory,
+        '.runner-isolation',
+        'canaries',
+        challengeId,
+        'jobs',
+        jobId,
+        'codex-home',
+      )),
+      { code: 'ENOENT' },
+    );
   } finally {
     await rm(rootDirectory, { recursive: true, force: true });
   }

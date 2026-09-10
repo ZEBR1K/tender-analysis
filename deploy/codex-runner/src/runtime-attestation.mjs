@@ -33,6 +33,7 @@ export const ISOLATION_PROBE_IDS = Object.freeze([
   'sibling_job',
   'jobs_parent',
   'codex_auth',
+  'job_codex_auth',
   'runner_secret',
   'slash_tmp',
   'self_process_environment',

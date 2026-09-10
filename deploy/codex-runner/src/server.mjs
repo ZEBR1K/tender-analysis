@@ -722,6 +722,7 @@ function createDefaultV1Handler() {
       attempt,
       jobsRoot: config.rootDirectory,
       runnerRoot: '/app',
+      codexAuthFile: config.codexAuthFile,
       secretValues: [config.authToken],
     }),
   });

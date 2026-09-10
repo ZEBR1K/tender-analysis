@@ -130,6 +130,7 @@ export function buildIsolationNegativeCanary({
       { id: 'sibling_job', path: path.posix.join(normalizedJobsRoot, sibling, 'input', 'sibling-readable.txt'), expected: 'denied' },
       { id: 'jobs_parent', path: normalizedProtectedJobsRoot, expected: 'denied' },
       { id: 'codex_auth', path: '/run/codex-auth/auth.json', expected: 'denied' },
+      { id: 'job_codex_auth', path: path.posix.join(currentRoot, 'codex-home', 'auth.json'), expected: 'denied' },
       { id: 'runner_secret', path: '/run/secrets/runner-auth-token', expected: 'denied' },
       { id: 'slash_tmp', path: '/tmp/tender-codex-runner-isolation-probe.tmp', expected: 'denied' },
       { id: 'self_process_environment', path: '/proc/self/environ', expected: 'denied' },

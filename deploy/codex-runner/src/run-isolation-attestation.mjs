@@ -12,7 +12,11 @@ import {
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { executeCodexCommand } from './codex-command.mjs';
+import {
+  executeCodexCommand,
+  removeStagedCodexHome,
+  stageCodexHome,
+} from './codex-command.mjs';
 import { config } from './config.mjs';
 import {
   buildIsolationAttestationRecord,
@@ -61,6 +65,8 @@ function canaryPaths({ rootDirectory, containerJobsRoot, challengeId, jobId, sib
     hostJobsRoot,
     containerCanaryJobsRoot,
     protectedJobsRoot: containerJobsRoot,
+    currentJob: path.join(hostJobsRoot, jobId),
+    containerCurrentJob: path.posix.join(containerCanaryJobsRoot, jobId),
     currentInput: path.join(hostJobsRoot, jobId, 'input'),
     currentWorkspace: path.join(hostJobsRoot, jobId, 'workspace'),
     currentAudit: path.join(hostJobsRoot, jobId, 'audit'),
@@ -82,11 +88,11 @@ async function assertDirectory(directory) {
   }
 }
 
-async function defaultVerifyProtectedTargets({ containerJobsRoot }) {
+async function defaultVerifyProtectedTargets({ containerJobsRoot, codexAuthFile }) {
   await Promise.all([
     assertDirectory(containerJobsRoot),
     assertDirectory('/tmp'),
-    assertRegularFile('/run/codex-auth/auth.json'),
+    assertRegularFile(codexAuthFile),
     assertRegularFile('/run/secrets/runner-auth-token'),
     assertRegularFile('/proc/self/environ'),
     assertRegularFile('/proc/1/environ'),
@@ -205,6 +211,7 @@ export async function runIsolationAttestation({
   executeCommand = executeCodexCommand,
   baseEnv = process.env,
   secretValues = [],
+  codexAuthFile = '/run/codex-auth/auth.json',
 } = {}) {
   if (platform !== 'linux') throw new Error('Isolation attestation is Linux-only');
   if (
@@ -243,7 +250,7 @@ export async function runIsolationAttestation({
     jobId,
     siblingJobId,
   });
-  await verifyProtectedTargets({ containerJobsRoot });
+  await verifyProtectedTargets({ containerJobsRoot, codexAuthFile });
   await stageProbe({ paths, runnerRoot, challenge, jobId, siblingJobId });
 
   const command = buildIsolationCanaryCommand({
@@ -251,16 +258,25 @@ export async function runIsolationAttestation({
     jobsRoot: paths.containerCanaryJobsRoot,
   });
   const startedAt = now();
-  const execution = await executeCommand({
-    ...command,
-    prompt: PROBE_PROMPT,
-    auditDirectory: paths.currentAudit,
-    attempt: 1,
-    timeoutMs: CANARY_TIMEOUT_MS,
-    killGraceMs: 30 * 1000,
-    baseEnv,
-    secretValues,
-  });
+  await stageCodexHome({ jobDirectory: paths.currentJob, codexAuthFile });
+  let execution;
+  try {
+    execution = await executeCommand({
+      ...command,
+      prompt: PROBE_PROMPT,
+      auditDirectory: paths.currentAudit,
+      attempt: 1,
+      timeoutMs: CANARY_TIMEOUT_MS,
+      killGraceMs: 30 * 1000,
+      baseEnv: {
+        ...baseEnv,
+        CODEX_HOME: path.posix.join(paths.containerCurrentJob, 'codex-home'),
+      },
+      secretValues,
+    });
+  } finally {
+    await removeStagedCodexHome({ jobDirectory: paths.currentJob });
+  }
   const completedAt = now();
   const expectedEventPath = path.join(paths.currentAudit, 'codex-events.attempt-1.jsonl');
   if (
@@ -303,6 +319,7 @@ if (isMain) {
     runnerRoot: '/app',
     containerJobsRoot: '/data/jobs',
     runnerBaseUrl: `http://127.0.0.1:${config.port}`,
+    codexAuthFile: config.codexAuthFile,
     secretValues: [config.authToken],
   }).then((result) => {
     process.stdout.write(`${JSON.stringify(result)}\n`);

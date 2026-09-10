@@ -6,6 +6,7 @@ import {
   readFile,
   readdir,
   rm,
+  stat,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
@@ -20,6 +21,7 @@ import {
   sanitizeCodexEnvironment,
   shouldRetryCodexAttempt,
   stageAgentTemplate,
+  stageCodexHome,
 } from '../deploy/codex-runner/src/codex-command.mjs';
 import {
   createCodexEventAccumulator,
@@ -211,6 +213,31 @@ test('agent template staging copies only trusted instructions and rejects drift'
       stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot }),
       /instruction.*changed|trusted.*instruction/iu,
     );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test('job-local Codex home stages the mounted auth privately outside the agent workspace', async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'agentic-codex-home-'));
+  try {
+    const jobDirectory = path.join(temporaryRoot, fixtureJobId);
+    const authDirectory = path.join(temporaryRoot, 'mounted-auth');
+    const codexAuthFile = path.join(authDirectory, 'auth.json');
+    await Promise.all([
+      mkdir(jobDirectory, { mode: 0o700 }),
+      mkdir(authDirectory, { mode: 0o700 }),
+    ]);
+    await writeFile(codexAuthFile, '{"auth":"fixture"}\n', { mode: 0o400 });
+
+    const codexHome = await stageCodexHome({ jobDirectory, codexAuthFile });
+    assert.equal(codexHome, path.join(jobDirectory, 'codex-home'));
+    assert.equal(await readFile(path.join(codexHome, 'auth.json'), 'utf8'), '{"auth":"fixture"}\n');
+    assert.equal(path.dirname(codexHome), jobDirectory);
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(codexHome)).mode & 0o777, 0o700);
+      assert.equal((await stat(path.join(codexHome, 'auth.json'))).mode & 0o777, 0o600);
+    }
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }

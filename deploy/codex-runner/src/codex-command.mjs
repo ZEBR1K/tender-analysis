@@ -1,10 +1,12 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmod,
   lstat,
   mkdir,
   open,
   readFile,
+  rm,
   stat,
   unlink,
   writeFile,
@@ -266,6 +268,60 @@ export async function stageAgentTemplate({ workspaceDirectory, templateDirectory
   );
 }
 
+function codexHomePath(jobDirectory) {
+  const normalizedJobDirectory = path.resolve(jobDirectory);
+  const target = path.resolve(normalizedJobDirectory, 'codex-home');
+  if (path.dirname(target) !== normalizedJobDirectory) {
+    throw new Error('Job-local Codex home escaped its job directory');
+  }
+  return target;
+}
+
+export async function removeStagedCodexHome({ jobDirectory } = {}) {
+  if (typeof jobDirectory !== 'string' || jobDirectory.length === 0) {
+    throw new TypeError('jobDirectory is required');
+  }
+  const target = codexHomePath(jobDirectory);
+  const metadata = await lstat(target).catch((error) => {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!metadata) return;
+  if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+    throw new Error('Job-local Codex home is invalid');
+  }
+  await rm(target, { recursive: true, force: false });
+}
+
+export async function stageCodexHome({ jobDirectory, codexAuthFile } = {}) {
+  if (
+    typeof jobDirectory !== 'string'
+    || jobDirectory.length === 0
+    || typeof codexAuthFile !== 'string'
+    || codexAuthFile.length === 0
+  ) throw new TypeError('jobDirectory and codexAuthFile are required');
+
+  await ensureRegularDirectory(jobDirectory);
+  const sourceMetadata = await lstat(codexAuthFile);
+  if (!sourceMetadata.isFile() || sourceMetadata.isSymbolicLink()) {
+    throw new Error('Mounted Codex auth source is invalid');
+  }
+  const authBytes = await readFile(codexAuthFile);
+  const target = codexHomePath(jobDirectory);
+  await removeStagedCodexHome({ jobDirectory });
+  await mkdir(target, { mode: 0o700 });
+  await chmod(target, 0o700);
+  try {
+    const stagedAuthFile = path.join(target, 'auth.json');
+    await writeFile(stagedAuthFile, authBytes, { flag: 'wx', mode: 0o600 });
+    await chmod(stagedAuthFile, 0o600);
+  } catch (error) {
+    await removeStagedCodexHome({ jobDirectory }).catch(() => {});
+    throw error;
+  }
+  return target;
+}
+
 function terminateProcessTree(child, signal) {
   if (!child?.pid) return Promise.resolve();
   if (process.platform === 'win32') {
@@ -459,6 +515,7 @@ export async function runCodexAttempt({
   jobId,
   jobsRoot = '/data/jobs',
   runnerRoot = '/app',
+  codexAuthFile = '/run/codex-auth/auth.json',
   attempt = 1,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   killGraceMs = DEFAULT_KILL_GRACE_MS,
@@ -469,6 +526,7 @@ export async function runCodexAttempt({
     'jobId',
     'jobsRoot',
     'runnerRoot',
+    'codexAuthFile',
     'attempt',
     'timeoutMs',
     'killGraceMs',
@@ -480,14 +538,21 @@ export async function runCodexAttempt({
     templateDirectory: path.posix.join(runnerRoot, 'agent-template'),
   });
   const prompt = await readFile(command.promptPath, 'utf8');
-  const auditDirectory = path.posix.join(jobsRoot, jobId, 'audit');
-  return executeCodexCommand({
-    auditDirectory,
-    attempt,
-    timeoutMs,
-    killGraceMs,
-    secretValues,
-    ...command,
-    prompt,
-  });
+  const jobDirectory = path.posix.join(jobsRoot, jobId);
+  const auditDirectory = path.posix.join(jobDirectory, 'audit');
+  const codexHome = await stageCodexHome({ jobDirectory, codexAuthFile });
+  try {
+    return await executeCodexCommand({
+      auditDirectory,
+      attempt,
+      timeoutMs,
+      killGraceMs,
+      secretValues,
+      baseEnv: { ...process.env, CODEX_HOME: codexHome },
+      ...command,
+      prompt,
+    });
+  } finally {
+    await removeStagedCodexHome({ jobDirectory });
+  }
 }

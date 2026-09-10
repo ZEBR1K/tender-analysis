@@ -304,6 +304,7 @@ test('isolation canary declares the complete positive and negative runtime probe
     { id: 'sibling_job', expected: 'denied' },
     { id: 'jobs_parent', expected: 'denied' },
     { id: 'codex_auth', expected: 'denied' },
+    { id: 'job_codex_auth', expected: 'denied' },
     { id: 'runner_secret', expected: 'denied' },
     { id: 'slash_tmp', expected: 'denied' },
     { id: 'self_process_environment', expected: 'denied' },
