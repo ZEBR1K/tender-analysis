@@ -131,6 +131,14 @@ test('agentic promotion is atomic, producer-isolated and replay-safe', async () 
   assert.match(sql, /COMMIT;/iu);
 });
 
+test('agentic promotion accepts hexadecimal file-integrity hashes independent of letter case', async () => {
+  const workflow = await load('TENDER — Финализация анализа.json');
+  const sql = byName(workflow, 'Продвинуть agentic FINAL').parameters.query;
+
+  assert.doesNotMatch(sql, /\^\[0-9a-f\]\{64\}\$/u);
+  assert.match(sql, /\^\[0-9A-Fa-f\]\{64\}\$/u);
+});
+
 test('Monitor hands a completed exact-27 job to Finalization without restoring the legacy semantic route', async () => {
   const workflow = await load('TENDER — Агентский анализ — Монитор.json');
   const finalize = byName(workflow, 'Завершить agentic analysis');
