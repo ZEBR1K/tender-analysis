@@ -22,13 +22,22 @@ read-only проверка подтвердила exact shadow schema и ист�
 Неактивный n8n canary Dispatch → Monitor успешно сохранил ровно 27 shadow-строк.
 Воспроизведённые несовместимости n8n `2.35.3` с JSON response stream и
 PostgreSQL `max(uuid)` исправлены только на уровне transport/JSON/DB-контракта.
-Исправленные Dispatch и Monitor остаются неактивными кандидатами; временные
-one-shot workflows архивированы. Ни один agentic workflow не активирован,
-существующий legacy-контур не менялся, а production promotion остаётся Task 17.
+Task 17 опубликовал Document Preparation, Orchestrator, Intake Resume, Dispatch,
+Monitor и Agentic Error. В Orchestrator и Intake Resume действует временный
+`TASK17_TEMPORARY_AGENT_ONLY`: legacy-ноды сохранены, но входящие связи к ним
+разорваны. Исходный `.xls` теперь передаётся Codex без parser/indexing наравне с
+PDF/DOCX/XLSX. Реальный job `13b090b5-38fc-432a-a235-90ae43f609fe` обработал
+DOCX+XLS на attempt 1; Monitor execution `15387` принял exact-27 контракт и
+атомарно сохранил 27 shadow-строк. Legacy Worker/Aggregator/Finalization в этом
+прогоне не запускались. После GREEN canary TenderPlan Mark Intake опубликован.
+Финальный review добавил явные outcomes `agentic_dispatched` / `agentic_no_op`
+для успешного Intake handoff и подтвердил, что сохранённый legacy-фильтр не
+принимает `.xls`; это остаётся raw agent-only форматом.
 Подробности:
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
 `evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`, а финальный n8n/DB canary —
-`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md` и
+`evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`.
 
 ---
 
@@ -105,6 +114,11 @@ not_found
 
 # 3. Текущая архитектура
 
+В live Task 17 временно активен только агентский путь от регистрации manifest
+до shadow-результата. Приведённая ниже длинная Worker/Aggregator схема сохранена
+как legacy/canonical baseline для будущего контролируемого объединения; её ноды
+сейчас не достижимы из Orchestrator и Intake Resume.
+
 ```text
 TenderPlan
     ↓
@@ -165,9 +179,13 @@ internal Gotenberg conversion + binary report_pdf
 
 # 4. Основные workflow
 
-## `TENDER — Подготовить документацию` — inactive integration candidate
+## `TENDER — Подготовить документацию` — published agentic prerequisite
 
-Новый reusable sub-workflow принимает metadata всех TenderPlan attachments, последовательно скачивает прямые PDF/DOCX/XLSX для фиксации MIME, размера и SHA-256, а архивы последовательно распаковывает через внутренний bounded extractor. Он возвращает полный manifest либо typed failure. Workflow `0scTZu1aBKsMd6AM` остаётся inactive integration candidate и не подключён к production Orchestrator. Внутренний `archive-extractor` развёрнут отдельным Compose-проектом на production host и прошёл health, ZIP и nested `ZIP → 7Z → file` runtime-canary; существующие контейнеры при deployment не перезапускались.
+Reusable sub-workflow принимает metadata всех TenderPlan attachments,
+последовательно скачивает прямые PDF/DOCX/XLSX/XLS только для фиксации MIME,
+размера и SHA-256, а архивы раскрывает через внутренний bounded extractor. Он
+не индексирует страницы, листы или OOXML. Workflow `0scTZu1aBKsMd6AM`
+опубликован и синхронно вызывается Task 17 Orchestrator до регистрации run.
 
 Документация:
 
@@ -187,7 +205,7 @@ tender_id
 → normalize tender
 → create run
 → register ALL documents
-→ launch Document Workers
+→ launch agentic Dispatch; legacy Worker nodes remain intentionally disconnected
 ```
 
 Документация:
@@ -198,17 +216,20 @@ workflows/orchestrator.md
 
 ---
 
-## `TENDER — Intake Resume` — inactive repository candidate
+## `TENDER — Intake Resume` — isolated runtime-verified candidate
 
 Typed dispatcher для new/existing run: сохраняет тот же `analysis_run_id`, не
 повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
 два Worker claims total. Manual override может повторно запустить exhausted
-failed document. Candidate реализован и offline-tested; deployment/runtime
-promotion pending. Isolated NO-WORKER copy `VO8Ml0sfO65w2Jiz` imported and
-read back; executions `14697/14700` prove stable-key ledger deduplication while
-all Worker/Aggregator/Finalization calls remain disabled.
+failed document. Candidate `VO8Ml0sfO65w2Jiz` is imported, active and
+runtime-verified. Executions `14697/14700` prove stable-key ledger deduplication.
+Real mark canary `14947` created run
+`67494863-22cc-406c-90cc-70c17e7d752a`; Manual Resume `14986` / Intake `14987`
+proved that an unsupported `.doc` is audited as `skipped`, the run fails
+explicitly as `unsupported_documents_skipped`, and no partial Aggregator/report
+or repeated Worker execution occurs.
 
-## `TENDER — TenderPlan Mark Intake` — inactive repository candidate
+## `TENDER — TenderPlan Mark Intake` — published Task 17 entry
 
 Каждые 10 минут читает current members метки
 `6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
@@ -217,8 +238,12 @@ all Worker/Aggregator/Finalization calls remain disabled.
 relation contract `14683`. Initial candidate execution `14743` failed closed on
 the earlier `id` assumption; corrected `14744` → `14745` is runtime GREEN through
 the Intake duplicate/no-op path with the existing `analysis_run_id`.
-Inactive isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan
-credential and the NO-WORKER Intake candidate; its schedule is not activated.
+Isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan credential and
+active Intake candidate. It was published only after real Codex job
+`13b090b5-38fc-432a-a235-90ae43f609fe` reached `completed` and Monitor execution
+`15387` atomically persisted exact 27 shadow rows. Scheduled execution `14947`
+previously captured real marked tender `6aa2388f5b7165804b314ba5` and started its
+new analysis run.
 
 ---
 
@@ -226,9 +251,10 @@ credential and the NO-WORKER Intake candidate; its schedule is not activated.
 
 Operator-only adapter, который принимает существующий `analysis_run_id` и
 вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
-Candidate реализован и offline-tested. Inactive isolated copy
+Candidate реализован и runtime-tested. Inactive isolated copy
 `z8nynFC12H9WOM9s` is imported/read back with a blank operator-supplied run ID;
-manual retry runtime remains pending.
+execution `14986` successfully resumed the same run and the template was cleared
+again after the test.
 
 ---
 
@@ -236,9 +262,8 @@ manual retry runtime remains pending.
 
 Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
 Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
-Candidate реализован и offline-tested. Inactive isolated copy
-`lwcHHdmmNd5YE6cw` is imported/read back; scheduled retry runtime remains
-pending.
+Candidate реализован and active as isolated copy `lwcHHdmmNd5YE6cw`; scheduled
+recovery reuses the same run and does not redispatch terminal documents.
 
 ---
 

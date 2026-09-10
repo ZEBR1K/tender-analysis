@@ -1,6 +1,7 @@
 # TENDER — Intake Resume
 
-Inactive repository candidate for the typed, resumable tender dispatcher.
+Repository export for the typed, resumable tender dispatcher. Live workflow
+`VO8Ml0sfO65w2Jiz` is published in temporary Task 17 agent-only mode.
 
 ## Contract
 
@@ -25,9 +26,21 @@ The intake-event compare-and-set carries `processing_started_at` twice: the norm
 
 The dispatcher uses PostgreSQL for the long-lived barrier. Worker readiness SQL is copied from the canonical Worker. Finalization is called only when the complete 27-field FINAL barrier is valid for `tender_fields_v1` / `tender_field_final_v1`.
 
-After document-owner recovery, an existing run may enter the additive agentic shadow path only when its lifecycle is `processing`, `ready_for_aggregation`, or `aggregating`, the registered document set exactly matches authoritative `documents_total`, every processable PDF/DOCX/XLSX has full byte identity, at least one processable document exists, and no document is `failed`. `failed`, `completed`, `superseded`, incomplete, or zero-processable runs skip Dispatch. The synchronous `mode=all` call uses the identity-neutral contract `TENDER — Агентский анализ — Запуск` with the same `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, and `replicate_index=1`; the child owns idempotent new-job/recoverable-retry/no-op resolution.
+After document-owner recovery, an existing run may enter the additive agentic shadow path only when its lifecycle is `processing`, `ready_for_aggregation`, or `aggregating`, the registered document set exactly matches authoritative `documents_total`, every processable PDF/DOCX/XLSX/XLS has full byte identity, at least one processable document exists, and no document is `failed`. `failed`, `completed`, `superseded`, incomplete, or zero-processable runs skip Dispatch. The synchronous `mode=all` call uses the identity-neutral contract `TENDER — Агентский анализ — Запуск` with the same `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, and `replicate_index=1`; the child owns idempotent new-job/recoverable-retry/no-op resolution.
 
-The new-run route path does not call Dispatch again: `created_new_run=true` from Orchestrator still goes directly to intake-event completion because Orchestrator already passed the shadow barrier. Both new and existing paths preserve `source_event_key`, `analysis_run_id`, all legacy `action` / `next_state` meanings, and return bounded additive `agentic_shadow` metadata. The existing document decision, Worker, Aggregator, and Finalization routes are unchanged. Because existing-run recovery enters legacy routing only after the synchronous Dispatch response, downstream archive cleanup cannot overtake staging/seal acknowledgement; runner-owned copies are independent after seal.
+The new-run route path does not call Dispatch again: `created_new_run=true` from
+Orchestrator goes directly to intake-event completion because Orchestrator
+already passed the shadow barrier. Existing eligible runs go through Dispatch
+and then directly to intake-event completion. Legacy document decision, Worker,
+Aggregator and Finalization nodes remain in the export but are unreachable from
+both routes. The deliberate disconnection is marked
+`TASK17_TEMPORARY_AGENT_ONLY`.
+
+An acknowledged child launch is completed with top-level
+`action=agentic_dispatched`; an acknowledged idempotent child no-op uses
+`action=agentic_no_op`. The original Dispatch action remains nested in
+`agentic_shadow.action` for audit. This prevents a successful agentic handoff
+from being mislabeled `manual_attention_required`.
 
 ## Runtime verification
 
@@ -40,9 +53,25 @@ test window contains no Document Worker, Aggregator, Finalization or production
 Orchestrator execution. Full evidence is recorded in
 `evaluations/TENDER_INTAKE_MIGRATION_AND_NO_WORKER_CANARY_2026-09-08.md`.
 
+Task 17 execution `15296` exercised the live agent-only route for existing run
+`a5e765d7-52a3-42d9-833a-7ab52ec07d10`. It returned
+`manual_attention_required / manifest_incomplete`, created no agentic job and
+did not invoke legacy Worker or Aggregator. This is fail-closed routing evidence;
+the run predates byte-identity preparation and is not a completed Codex canary.
+
+The terminal real-Codex canary used fresh run
+`b731f861-4df6-40df-a8c5-67b8564f3f03`. Controlled Intake execution `15372`
+dispatched replicate 2 through execution `15373`; the temporary replicate input
+was then restored to normal `replicate_index=1`. Job
+`13b090b5-38fc-432a-a235-90ae43f609fe` completed on attempt 1, Monitor `15387`
+committed exact 27 shadow rows, and no legacy Worker/Aggregator/Finalization node
+ran.
+
 ## Packaging required
 
-This export is intentionally inactive and is not production-ready by itself.
+The repository export remains identity-neutral. The live copy and TenderPlan
+Mark Intake are published after the real Codex canary closed the Task 17 gate.
+Post-review Intake version is `51f567d2-4100-4d81-9a17-29b7df7eeb6c`.
 
 Before controlled import:
 

@@ -417,6 +417,17 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
     /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_documents"?[\s\S]*?\bSELECT\b[\s\S]*?\bFROM\s+"?inserted_run"?\b/i,
     'document INSERT must select from inserted_run',
   );
+  const registeredDocuments = cteBody(creationSql, 'registered_documents');
+  assert.match(
+    registeredDocuments.body,
+    /document\.status/i,
+    'registration must preserve the status assigned by the validated preparation manifest',
+  );
+  assert.match(
+    registeredDocuments.body,
+    /document\.error_message/i,
+    'registration must preserve the preparation audit reason for skipped documents',
+  );
   assert.match(
     creationSql,
     /\bTRUE\b\s+AS\s+"?created_new_run"?/i,
@@ -472,13 +483,22 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
   assert.equal(workerNodes.length, 1, 'expected one Worker Execute Workflow downstream of Split Out');
   const worker = workerNodes[0];
 
+  const agenticDispatch = nodesOfType('n8n-nodes-base.executeWorkflow').find(
+    (node) => node.parameters?.workflowId?.cachedResultName === 'TENDER — Агентский анализ — Запуск',
+  );
+  assert.ok(agenticDispatch, 'created_new_run=true must have one agentic Dispatch');
   assert.ok(
+    trueTargets.some((target) => canReach(target, agenticDispatch.name)),
+    'created_new_run=true must reach agentic Dispatch',
+  );
+  assert.equal(
     trueTargets.some((target) => canReach(target, attachmentSplit.name)),
-    'created_new_run=true must reach Split Out',
+    false,
+    'TASK17 temporary agent-only route must not reach legacy Split Out',
   );
   assert.ok(
     canReach(attachmentSplit.name, worker.name),
-    'created_new_run=true must reach Worker after Split Out',
+    'legacy Split Out and Worker nodes must remain internally connected for rollback',
   );
 
   const resumeSelectNodes = nodes.filter((node) => {
@@ -562,10 +582,12 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
       ['analysis_run_id', 'tender_meta'].every((field) => retainedFields.includes(field)),
     'each split attachments item must explicitly retain analysis_run_id and tender_meta',
   );
-  assert.ok(
-    everyPathPassesThrough(trigger.name, worker.name, [attachmentSplit.name]),
-    'Worker must only be reachable downstream of Split Out',
+  assert.equal(
+    canReach(trigger.name, worker.name),
+    false,
+    'TASK17 temporary agent-only entry must not reach the legacy Worker',
   );
+  assert.ok(canReach(attachmentSplit.name, worker.name), 'legacy Split Out must remain connected to Worker');
 
   // 6. No document-registration write exists outside the atomic creation query.
   const documentInsertNodes = nodesOfType('n8n-nodes-base.postgres').filter((node) =>
@@ -576,9 +598,10 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
     [creation.name],
     'all document registration must be inside the atomic creation SQL',
   );
-  assert.ok(
-    everyPathPassesThrough(trigger.name, worker.name, [creation.name]),
-    'atomic document registration must complete before Worker can run',
+  assert.equal(
+    canReach(trigger.name, worker.name),
+    false,
+    'the disconnected legacy Worker cannot bypass atomic registration',
   );
 });
 
@@ -817,7 +840,7 @@ test('created and concurrent paths return one symmetric structured result', () =
   );
 });
 
-test('only pending supported documents reach Split Out and the legacy Worker', () => {
+test('temporary agent-only canary keeps legacy Split Out and Worker nodes but disconnects them', () => {
   const creation = nodesOfType('n8n-nodes-base.postgres').find((node) =>
     /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_runs"?\b/i.test(sqlSource(node)),
   );
@@ -835,20 +858,26 @@ test('only pending supported documents reach Split Out and the legacy Worker', (
   );
   assert.ok(extensionFilter, 'expected supported-extension filter downstream of Split Out');
   const extensionFilterSource = stringsIn(extensionFilter.parameters).join('\n').toLowerCase();
-  const supportedExtensions = ['pdf', 'docx', 'xlsx'].filter((extension) =>
+  const legacyExtensions = ['pdf', 'docx', 'xlsx'].filter((extension) =>
     extensionFilterSource.includes(`'${extension}'`),
   );
-  assert.ok(supportedExtensions.length > 0, 'extension filter must declare supported extensions');
+  assert.equal(legacyExtensions.length, 3, 'preserved legacy filter keeps its existing worker formats');
+  assert.doesNotMatch(
+    extensionFilterSource,
+    /'xls'/u,
+    'legacy XLS must remain agent-only if the preserved Worker route is reconnected',
+  );
   assert.match(extensionFilterSource, /status\s*===\s*'pending'/u);
+
+  const agenticExtensions = ['pdf', 'docx', 'xlsx', 'xls'];
 
   const supportedDocumentGates = nodesOfType('n8n-nodes-base.if').filter((node) => {
     if (node.name === createdNewRunIf.name) return false;
     const parameterStrings = stringsIn(node.parameters);
     return (
       outputTargets(createdNewRunIf.name, 0).some((target) => canReach(target, node.name)) &&
-      canReach(node.name, attachmentSplit.name) &&
       parameterStrings.some((value) => /attachments/i.test(value)) &&
-      supportedExtensions.every((extension) =>
+      agenticExtensions.every((extension) =>
         parameterStrings.some((value) => value.toLowerCase().includes(extension.toLowerCase())),
       )
     );
@@ -863,11 +892,7 @@ test('only pending supported documents reach Split Out and the legacy Worker', (
   const terminalNodes = structuredTerminalCodeNodes();
   assert.equal(terminalNodes.length, 1, 'expected one shared structured terminal result');
   const terminal = terminalNodes[0];
-  const splitOutputs = [0, 1].filter((index) =>
-    outputTargets(gate.name, index).some((target) => canReach(target, attachmentSplit.name)),
-  );
-  assert.equal(splitOutputs.length, 1, 'supported-document gate must have one dispatch output');
-  const supportedOutput = splitOutputs[0];
+  const supportedOutput = 0;
   const agenticDispatch = nodesOfType('n8n-nodes-base.executeWorkflow').find(
     (node) => node.parameters?.workflowId?.cachedResultName === 'TENDER — Агентский анализ — Запуск',
   );
@@ -875,14 +900,20 @@ test('only pending supported documents reach Split Out and the legacy Worker', (
   assert.deepEqual(
     outputTargets(gate.name, supportedOutput),
     [agenticDispatch.name],
-    'supported-document output must enter the agentic shadow barrier before legacy fanout',
+    'supported-document output must enter the agentic analysis barrier',
   );
   const restoreTarget = outputTargets(agenticDispatch.name, 0)[0];
   assert.deepEqual(
     outputTargets(restoreTarget, 0),
-    [attachmentSplit.name, terminal.name],
-    'restored run context must fan out to Split Out first and terminal result second',
+    [terminal.name],
+    'restored run context must terminate without entering legacy fanout',
   );
+  assert.equal(
+    canReach(agenticDispatch.name, attachmentSplit.name),
+    false,
+    'agentic dispatch must not reach the legacy Split Out during the temporary canary',
+  );
+  assert.match(String(nodesByName.get(restoreTarget)?.notes ?? ''), /TASK17_TEMPORARY_AGENT_ONLY/u);
 
   const noDocumentOutput = supportedOutput === 0 ? 1 : 0;
   assert.deepEqual(

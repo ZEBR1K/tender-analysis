@@ -1,6 +1,8 @@
 # TENDER — TenderPlan Mark Intake
 
-Inactive repository candidate for polling the current members of one configured TenderPlan mark every 10 minutes.
+The portable repository export is inactive and identity-neutral. The bound live
+workflow `biYC4OvWBlfJRmnj` is published and polls the current members of one
+configured TenderPlan mark every 10 minutes.
 
 ## Confirmed source contract
 
@@ -42,7 +44,9 @@ Notification type `5` is documented as “tender marked”, but executions `1467
 ## Packaging gates
 
 The portable export is inactive and keeps credential/workflow IDs unbound. The
-isolated live candidate has the existing TenderPlan Header Auth credential,
-Intake target and published Error Workflow bound and read back; its controlled
-current-state canary is GREEN through Intake. Production activation remains a
-separate owner decision, and no existing production workflow was changed.
+live workflow has the existing TenderPlan Header Auth credential, Intake target
+and published Error Workflow bound and read back. After the Task 17 real-Codex
+canary passed, it was published at version
+`3a89a0bd-5fa7-4758-a3f1-a894d8aa232f`. Its first scheduled execution `15393`
+and child Intake executions `15394–15396` all succeeded; each child ended as an
+idempotent event no-op and created no duplicate analysis.

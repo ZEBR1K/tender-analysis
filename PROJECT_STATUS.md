@@ -4,7 +4,49 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–16 — GREEN; Task 17 not started
+## Task 17 — live agent-only routing and real Codex canary GREEN
+
+Document Preparation `0scTZu1aBKsMd6AM`, Orchestrator
+`TRLYuU7mVyE1bjjr`, Intake Resume `VO8Ml0sfO65w2Jiz`, agentic Dispatch
+`gP29fv0rq4MoON9a`, Monitor `CALcBEXvQsO1AcfP` and the ownership-guarded
+Agentic Error workflow `6ccedae778a14176` are published. Dispatch and Monitor
+are linked to the dedicated Agentic Error workflow. The Orchestrator and Intake
+Resume graphs carry `TASK17_TEMPORARY_AGENT_ONLY`: legacy Worker/Aggregator
+nodes remain present but are unreachable from the active agentic route.
+
+Legacy `.xls` is now accepted as an untouched agentic source file; no XLS parser,
+sheet index or semantic validator was added. Fresh run
+`b731f861-4df6-40df-a8c5-67b8564f3f03` registered and staged its DOCX and XLS
+documents with byte identity. Two reproduced contract defects were fixed with
+bounded regression tests: the Document Preparation loop now collects every
+direct-document result, and the Dispatch seal guard accepts the uppercase
+SHA-256 representation returned by the runner while retaining the exact 64-hex
+requirement.
+
+Real Codex job `13b090b5-38fc-432a-a235-90ae43f609fe` completed on attempt 1.
+Monitor execution `15387` validated exactly 27 unique field keys, zero validation
+job issues and atomically committed exactly 27 shadow rows. Both source artifacts
+were reported as inspected; all 14 evidence items reference the manifest and
+have a nonblank locator. Legacy Orchestrator Worker nodes and legacy Intake
+Worker/Aggregator/Finalization nodes had zero runs. Full verification is
+`753 total / 747 pass / 0 fail / 6 skipped`.
+
+After this terminal gate passed, TenderPlan Mark Intake `biYC4OvWBlfJRmnj` was
+published at version `3a89a0bd-5fa7-4758-a3f1-a894d8aa232f`. Its first scheduled
+execution `15393` succeeded; child Intake executions `15394–15396` all ended as
+idempotent event no-ops and created no duplicate analysis. The next system
+boundary is not another parser: it is the separately reviewed promotion of
+validated shadow fields into the canonical FINAL/report path. Evidence:
+`evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`.
+
+Final review then reproduced and fixed two structural issues. Intake now records
+acknowledged child outcomes as `agentic_dispatched` / `agentic_no_op` instead of
+falling through to `manual_attention_required`; live version is
+`51f567d2-4100-4d81-9a17-29b7df7eeb6c`. The disconnected Orchestrator legacy
+filter again accepts only pending PDF/DOCX/XLSX, keeping `.xls` agent-only; live
+version is `e8a085a9-6a7e-4230-9026-2839f48ba359`.
+
+## Agentic shadow foundation Tasks 0–17 — completed baseline
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
@@ -84,7 +126,7 @@ production routing was not changed. Production promotion and error-workflow
 publication/linking are Task 17 and were not started. Full evidence is in
 `evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
 
-## Task 0 baseline reconciliation and live routing audit — 2026-09-08
+## Historical Task 0 baseline reconciliation and live routing audit — 2026-09-08
 
 The integration branch starts from archive/report tip `f596755`, merges the
 current intake tip `2701bc8` (which supersedes the earlier `cec69c0` plan
@@ -102,6 +144,10 @@ contained 100 accessible workflows. `versionId` below is the current draft
 version returned by workflow detail; `activeVersionId` is shown separately when
 it differs or is absent. Live n8n is authoritative where repository exports
 conflict.
+
+The table below is the immutable Task 0 snapshot from 2026-09-08, not current
+live state. Current Task 17 activation and versions are recorded at the top of
+this file and in `evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`.
 
 | Role / live workflow | ID | Active | `versionId` / `activeVersionId` | Nodes | Execute Workflow targets |
 |---|---|---:|---|---:|---|

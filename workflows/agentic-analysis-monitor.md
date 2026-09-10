@@ -1,8 +1,8 @@
 # TENDER — Агентский анализ — Монитор
 
-The Task 12 repository export remains an inactive, identity-neutral candidate.
-The corrected schedule-based inactive live candidate has workflow ID
-`CALcBEXvQsO1AcfP`. The earlier imported `47e6ede6c10349c0` is a pre-fix
+The Task 12 repository export remains identity-neutral and inactive by default.
+The corrected schedule-based live workflow `CALcBEXvQsO1AcfP` is published for
+the temporary Task 17 agent-only route. The earlier imported `47e6ede6c10349c0` is a pre-fix
 inactive copy and must not be promoted. A one-minute Schedule Trigger claims at
 most two `ready`, `running`, or `validating` jobs. The short PostgreSQL claim
 transaction uses `FOR UPDATE SKIP LOCKED`, the current n8n execution ID as the
@@ -55,5 +55,9 @@ nodes and connections and has the exact PostgreSQL/runner credentials bound.
 An archived one-shot clone executed the same corrected graph as execution
 `15258`, validated the runner envelope and atomically committed exactly 27
 shadow rows for job `79149bb3-0028-413a-bbb9-813de64b6052`. The schedule-based
-candidate has not been activated. Publishing/linking the Error Workflow and
-production routing remain Task 17.
+live workflow is now published and linked to ownership-guarded Agentic Error
+workflow `6ccedae778a14176`. Real terminal execution `15387` accepted job
+`13b090b5-38fc-432a-a235-90ae43f609fe`, verified 27 unique fields with zero job
+issues and atomically committed exact 27 shadow rows. Both source artifacts were
+reported as inspected and every evidence entry referenced the manifest with a
+nonblank locator. TenderPlan Mark Intake was published after this gate passed.

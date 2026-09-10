@@ -127,6 +127,11 @@ test('direct processable files are downloaded sequentially and registered with f
   const classifier = nodeByName(workflow, 'Проверить и классифицировать вход');
   const classifierCode = String(classifier.parameters?.jsCode ?? '');
   assert.match(classifierCode, /direct_document_jobs/u);
+  assert.match(
+    classifierCode,
+    /new Set\(\['pdf', 'docx', 'xlsx', 'xls'\]\)/u,
+    'legacy XLS must be staged as an untouched source document for Codex',
+  );
 
   const loop = nodeByName(workflow, 'Обработать прямые документы по одному');
   assert.equal(loop.type, 'n8n-nodes-base.splitInBatches');
@@ -154,10 +159,19 @@ test('direct processable files are downloaded sequentially and registered with f
   }
   assert.match(identityCode, /\/\^\[0-9a-f\]\{64\}\$\/[iu]*/u);
 
+  const downloadNormalizer = nodeByName(workflow, 'Нормализовать скачивание прямого документа');
+  assert.match(
+    String(downloadNormalizer.parameters?.jsCode ?? ''),
+    /xls:\s*'application\/vnd\.ms-excel'/u,
+    'XLS receives only its standard MIME fallback; its contents remain agent-owned',
+  );
+
   const manifest = nodeByName(workflow, 'Сформировать полный manifest');
   const manifestCode = String(manifest.parameters?.jsCode ?? '');
   assert.match(manifestCode, /direct_document_jobs/u);
-  assert.match(manifestCode, /Зафиксировать идентичность прямого документа/u);
+  assert.match(manifestCode, /Собрать результаты прямых документов/u);
+  const directCollector = nodeByName(workflow, 'Собрать результаты прямых документов');
+  assert.match(String(directCollector.parameters?.jsCode ?? ''), /\$input\.all\(\)/u);
   assert.match(manifestCode, /document\.status\s*===\s*'pending'/u);
   assert.match(manifestCode, /document\.file_name/u);
   assert.match(manifestCode, /document\.mime_type/u);
@@ -166,7 +180,7 @@ test('direct processable files are downloaded sequentially and registered with f
   assert.match(manifestCode, /INGESTION_CONTRACT_INVALID/u);
 });
 
-test('Orchestrator dispatches one synchronous agentic shadow only after committed new-run manifest', async () => {
+test('Orchestrator temporary agent-only canary dispatches after manifest and cannot reach legacy Worker', async () => {
   const workflow = await loadWorkflow(orchestratorUrl);
   const registration = nodeByName(workflow, 'Создать запуск и зарегистрировать документы');
   const createdGate = nodeByName(workflow, 'Создан новый запуск?');
@@ -201,18 +215,21 @@ test('Orchestrator dispatches one synchronous agentic shadow only after committe
   assert.deepEqual(outputTargets(workflow, processableGate.name, 0), [dispatch.name]);
   assert.deepEqual(outputTargets(workflow, processableGate.name, 1), [terminal.name]);
   assert.deepEqual(outputTargets(workflow, dispatch.name, 0), [restore.name]);
-  assert.deepEqual(new Set(outputTargets(workflow, restore.name, 0)), new Set([legacySplit.name, terminal.name]));
+  assert.deepEqual(outputTargets(workflow, restore.name, 0), [terminal.name]);
   assert.ok(canReach(workflow, registration.name, dispatch.name));
-  assert.ok(canReach(workflow, dispatch.name, legacySplit.name));
+  assert.equal(canReach(workflow, dispatch.name, legacySplit.name), false);
+  assert.ok(canReach(workflow, dispatch.name, terminal.name));
   assert.equal(canReach(workflow, registration.name, legacySplit.name, new Set([dispatch.name])), false);
   assert.equal(canReach(workflow, 'Загрузить существующий незавершённый запуск', dispatch.name), false);
+  assert.match(String(restore.notes ?? ''), /TASK17_TEMPORARY_AGENT_ONLY/u);
+  assert.match(String(restore.notes ?? ''), /legacy/u);
 
   const terminalCode = String(terminal.parameters?.jsCode ?? '');
   assert.match(terminalCode, /source_event_key/u);
   assert.match(terminalCode, /agentic_shadow/u);
 });
 
-test('Intake Resume dispatches agentic shadow only for complete eligible existing-run recovery', async () => {
+test('Intake Resume temporary agent-only canary terminates after Dispatch without legacy recovery', async () => {
   const workflow = await loadWorkflow(intakeResumeUrl);
   const calls = workflow.nodes.filter(
     (node) => node.type === 'n8n-nodes-base.executeWorkflow'
@@ -237,6 +254,7 @@ test('Intake Resume dispatches agentic shadow only for complete eligible existin
   const restore = nodeByName(workflow, 'Restore Existing Run Context After Agentic');
   const decide = nodeByName(workflow, 'Decide Document and Stage Action');
   const complete = nodeByName(workflow, 'Complete Intake Event');
+  const completeReplacement = String(complete.parameters?.options?.queryReplacement ?? '');
   const prepareCode = String(prepare.parameters?.jsCode ?? '');
   assert.match(
     String(runEntry.parameters?.query ?? ''),
@@ -252,14 +270,22 @@ test('Intake Resume dispatches agentic shadow only for complete eligible existin
   assert.match(prepareCode, /aggregating/u);
   assert.match(prepareCode, /content_sha256/u);
   assert.match(prepareCode, /agentic_shadow/u);
+  assert.match(completeReplacement, /should_dispatch_agentic_shadow\s*===\s*false/u);
+  assert.match(completeReplacement, /manual_attention_required/u);
+  assert.match(completeReplacement, /already_completed/u);
+  assert.match(completeReplacement, /superseded_no_op/u);
 
   assert.deepEqual(outputTargets(workflow, reload.name, 0), [prepare.name]);
   assert.deepEqual(outputTargets(workflow, prepare.name, 0), [gate.name]);
   assert.deepEqual(outputTargets(workflow, gate.name, 0), [dispatch.name]);
-  assert.deepEqual(outputTargets(workflow, gate.name, 1), [decide.name]);
+  assert.deepEqual(outputTargets(workflow, gate.name, 1), [complete.name]);
   assert.deepEqual(outputTargets(workflow, dispatch.name, 0), [restore.name]);
-  assert.deepEqual(outputTargets(workflow, restore.name, 0), [decide.name]);
+  assert.deepEqual(outputTargets(workflow, restore.name, 0), [complete.name]);
   assert.ok(canReach(workflow, dispatch.name, complete.name));
+  assert.equal(canReach(workflow, dispatch.name, decide.name), false);
+  assert.equal(canReach(workflow, gate.name, decide.name), false);
+  assert.match(String(gate.notes ?? ''), /TASK17_TEMPORARY_AGENT_ONLY/u);
+  assert.match(String(restore.notes ?? ''), /TASK17_TEMPORARY_AGENT_ONLY/u);
   assert.deepEqual(outputTargets(workflow, 'Orchestrator Created Run?', 0), [complete.name]);
   assert.equal(
     canReach(workflow, 'Orchestrator Created Run?', dispatch.name, new Set(['Apply Run Entry Policy'])),
@@ -268,9 +294,46 @@ test('Intake Resume dispatches agentic shadow only for complete eligible existin
   );
   assert.match(String(restore.parameters?.jsCode ?? ''), /tender_agentic_dispatch_v1/u);
   assert.match(String(restore.parameters?.jsCode ?? ''), /agentic_shadow/u);
+  const namedContext = {
+    'Prepare Agentic Shadow Dispatch': {
+      analysis_run_id: '20000000-0000-4000-8000-000000000001',
+      source_event_key: 'tenderplan:mark:test:tender:test',
+      run_status: 'processing',
+    },
+    'Classify Intake Event': {
+      source_event_key: 'tenderplan:mark:test:tender:test',
+    },
+  };
+  const [started] = await runAllItemsCode(
+    restore,
+    [{
+      schema_version: 'tender_agentic_dispatch_v1',
+      success: true,
+      no_op: false,
+      job_id: '30000000-0000-4000-8000-000000000001',
+      status: 'running',
+    }],
+    namedContext,
+  );
+  assert.equal(started.json.action, 'agentic_dispatched');
+
+  const [noOp] = await runAllItemsCode(
+    restore,
+    [{
+      schema_version: 'tender_agentic_dispatch_v1',
+      success: true,
+      no_op: true,
+      job_id: '30000000-0000-4000-8000-000000000001',
+      status: 'completed',
+    }],
+    namedContext,
+  );
+  assert.equal(noOp.json.action, 'agentic_no_op');
   const terminalCode = String(nodeByName(workflow, 'Return Structured Outcome').parameters?.jsCode ?? '');
   assert.match(terminalCode, /source_event_key/u);
   assert.match(terminalCode, /agentic_shadow/u);
+  assert.match(terminalCode, /agentic_dispatched/u);
+  assert.match(terminalCode, /agentic_no_op/u);
 });
 
 test('Intake shadow eligibility skips terminal, failed, incomplete and non-processable runs', async () => {
@@ -304,6 +367,17 @@ test('Intake shadow eligibility skips terminal, failed, incomplete and non-proce
   assert.equal(eligible.should_dispatch_agentic_shadow, true);
   assert.equal(eligible.agentic_shadow.reason, null);
   assert.equal(eligible.source_event_key, context.source_event_key);
+
+  const legacyXls = await run({
+    documents: [{
+      ...validDocument,
+      file_name: 'source.xls',
+      file_extension: 'xls',
+      mime_type: 'application/vnd.ms-excel',
+    }],
+  });
+  assert.equal(legacyXls.should_dispatch_agentic_shadow, true);
+  assert.equal(legacyXls.agentic_shadow.reason, null);
 
   for (const runStatus of ['failed', 'completed', 'superseded']) {
     const result = await run({ runStatus });

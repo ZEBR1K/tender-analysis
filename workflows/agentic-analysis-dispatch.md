@@ -1,7 +1,8 @@
 # TENDER — Агентский анализ — Запуск
 
-The Task 11 repository export remains an inactive, identity-neutral candidate.
-The corrected inactive live candidate has workflow ID `gP29fv0rq4MoON9a`.
+The Task 11 repository export remains identity-neutral and inactive by default.
+The corrected live workflow `gP29fv0rq4MoON9a` is published in the temporary
+Task 17 agent-only route.
 The earlier imported `d37251e524754e1f` is a pre-fix inactive copy and must not
 be promoted. The workflow accepts the typed
 `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, and positive
@@ -28,7 +29,9 @@ is recorded in the repository documentation.
 Runner JSON HTTP nodes use response auto-detection because n8n `2.35.3` can
 otherwise leave an explicit-JSON `fullResponse` body as an unresolved stream.
 The binary upload keeps `application/octet-stream` in its header and does not
-use the raw-body-only `rawContentType` parameter. Guarded SQL casts UUID values
+use the raw-body-only `rawContentType` parameter. The source allow-list is
+PDF/DOCX/XLSX/XLS; XLS is staged unchanged and interpreted only by Codex.
+Guarded SQL casts UUID values
 through text before aggregate selection because PostgreSQL has no `max(uuid)`.
 
 After every upload response matches the owned artifact/hash, PostgreSQL marks
@@ -48,10 +51,16 @@ content are never persisted in the error record.
 
 The export is identity-neutral, inactive, and has empty `pinData`. The pinned
 shadow-v0 catalog hash is repository-known and included in the closed manifest.
-Normalized read-back confirms that the corrected inactive candidate matches
+Normalized read-back confirms that the corrected live workflow matches
 the repository nodes and connections and has the exact PostgreSQL/runner
 credentials bound. Integrated execution `15257` staged one verified source,
 sealed the fake-runner manifest and moved shadow job
 `79149bb3-0028-413a-bbb9-813de64b6052` to `running`; the following inactive
-Monitor canary completed it with 27 rows. The workflow has not been activated.
-Publishing/linking the Error Workflow and production routing remain Task 17.
+Monitor canary completed it with 27 rows. The live workflow is now published and
+linked to ownership-guarded Agentic Error workflow `6ccedae778a14176`.
+Real Dispatch execution `15373` staged and sealed both DOCX and raw XLS sources,
+accepted the runner's uppercase 64-hex manifest SHA-256, and started job
+`13b090b5-38fc-432a-a235-90ae43f609fe`. The job completed on attempt 1 and
+TenderPlan Mark Intake was subsequently published. The earlier case-sensitive
+seal check is covered by a regression test; no parser or semantic rule was
+added.

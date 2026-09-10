@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-09
+**Последнее обновление:** 2026-09-10
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -83,8 +83,9 @@ Production baseline описывается семью n8n workflow:
 7. TENDER — Генерация отчета (Report Generation V2)
 ```
 
-Дополнительно реализованы и offline-tested пять inactive repository candidate;
-их deployment и runtime promotion ещё не выполнены:
+Дополнительно реализованы и offline-tested пять intake workflow. Intake Resume
+и TenderPlan Mark Intake сейчас опубликованы в Task 17 agent-only контуре;
+Manual Resume и Recovery Scan остаются операторскими кандидатами:
 
 ```text
 8. TENDER — Intake Resume
@@ -99,11 +100,11 @@ Production baseline описывается семью n8n workflow:
 GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
 `14683` supersedes неподтверждённый notification type-5 plan. Executions
 `14743`-`14745` additionally confirm that the internal tender identity is `_id`
-and that the inactive live candidate reaches Intake duplicate/no-op without any
-downstream execution. Its schedule remains inactive; pagination/exhaustive-result
-semantics не документированы.
+and that the then-inactive live candidate reached Intake duplicate/no-op without
+downstream execution. После успешного Task 17 real-Codex canary schedule
+опубликован; pagination/exhaustive-result semantics не документированы.
 
-Отдельно подготовлен агентский shadow-контур Tasks 0–16:
+Отдельно подготовлен агентский shadow-контур Tasks 0–17:
 
 ```text
 полный source manifest после commit
@@ -122,10 +123,17 @@ OOXML способ исследования. Runtime принимает или �
 Изолированный runner развёрнут. Аддитивная PostgreSQL-миграция и точная shadow
 schema подтверждены read-only проверкой. Неактивный Dispatch → Monitor canary
 прошёл весь transport/ownership/JSON-contract путь и одной транзакцией сохранил
-ровно 27 shadow-строк. Исправленные live candidates остаются неактивными;
-временный fake runner и one-shot workflows удалены/архивированы после проверки.
-Production activation и error-workflow publication не выполнялись, поэтому
-legacy routing выше не изменён.
+ровно 27 shadow-строк. Task 17 опубликовал Document Preparation, Orchestrator,
+Intake Resume, Dispatch, Monitor и ownership-guarded Agentic Error. Временный
+режим `TASK17_TEMPORARY_AGENT_ONLY` сохраняет legacy-ноды, но делает их
+недостижимыми из Orchestrator и Intake Resume. Реальный job
+`13b090b5-38fc-432a-a235-90ae43f609fe` обработал DOCX и legacy XLS на attempt 1.
+Monitor execution `15387` принял exact-27 контракт и атомарно сохранил 27 shadow
+rows; legacy Worker/Aggregator/Finalization не запускались. После этого
+TenderPlan Mark Intake был опубликован. `.xls` передаётся как неизменённый
+source artifact; Codex сам выбирает способ исследования, а runtime не добавляет
+XLS parser или semantic validation. Сохранённый legacy Worker-фильтр `.xls` не
+принимает.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -137,11 +145,22 @@ tender_analysis_facts
 tender_analysis_field_results
 ```
 
-Восьмой reusable workflow `TENDER — Подготовить документацию` (`0scTZu1aBKsMd6AM`) подключён в inactive canonical Orchestrator export как синхронная preprocessing boundary до atomic run/document INSERT. Прямые PDF/DOCX/XLSX последовательно скачиваются только для byte size, MIME и SHA-256, архивы раскрываются внутренним bounded extractor, а Orchestrator принимает только полный manifest либо останавливается до создания run. Это repository candidate-only состояние: production import/activation и runtime verification не выполнялись.
+Восьмой reusable workflow `TENDER — Подготовить документацию`
+(`0scTZu1aBKsMd6AM`) опубликован и подключён как синхронная preprocessing
+boundary до atomic run/document INSERT. Прямые PDF/DOCX/XLSX/XLS последовательно
+скачиваются только для byte size, MIME и SHA-256; страницы, листы и OOXML не
+разбираются. Архивы раскрываются внутренним bounded extractor. Orchestrator
+принимает только полный manifest либо останавливается до создания run.
 
 ---
 
 # 4. Общая архитектура
+
+Временный live Task 17 route после source-manifest registration идёт в Agentic
+Dispatch → Codex runner → Agentic Monitor → 27 shadow rows. Показанный ниже
+Worker/Aggregator контур остаётся canonical legacy baseline, но его входы из
+Orchestrator и Intake Resume намеренно отключены и помечены
+`TASK17_TEMPORARY_AGENT_ONLY`.
 
 ```text
                 ┌─────────────────────┐
@@ -425,7 +444,7 @@ typed tender_id / source / source_event_key / trigger_kind
 → require response tender._id === requested tender_id
 → one snapshot-safe SQL:
    insert run directly as processing
-   + register all documents as pending
+   + register supported documents as pending and unsupported documents as skipped
 → created_new_run?
    ├─ true: async Worker dispatch for pdf/docx/xlsx
    └─ false: fresh active-run SELECT + exactly-one guard
@@ -442,7 +461,11 @@ docx
 xlsx
 ```
 
-Это временное ограничение. Unsupported и zero-document lifecycle не закрыты: structured output возвращается, но run всё ещё может остаться `processing` (`OR-0`, `OR-1`). Export и offline tests не доказывают import, live wiring или production runtime.
+Legacy `.doc` parsing is intentionally unsupported. Such attachments remain in
+the audit as terminal `skipped`; Intake returns
+`unsupported_documents_skipped` and fails the run instead of aggregating a
+partial document set. This boundary is runtime-verified in candidate Intake
+execution `14987`. Zero-document lifecycle remains separate (`OR-1`).
 
 ---
 
@@ -1765,8 +1788,8 @@ Error Workflow = TENDER — Ошибка обработки документа
 
 ```text
 OR-0
-unsupported document registered pending
-but Worker not started
+unsupported document is preserved as skipped;
+the run fails explicitly and partial aggregation is blocked
 ```
 
 ## Worker error handling

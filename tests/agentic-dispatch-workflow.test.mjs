@@ -53,6 +53,11 @@ test('dispatch validates input and uses one atomic database preflight', async ()
   assert.match(sql, /ON CONFLICT\s*\(analysis_run_id,\s*pipeline_version,\s*replicate_index\)/iu);
   assert.match(sql, /(?:rs\.)?registered_count\s*=\s*(?:rs\.)?documents_total/iu);
   assert.match(sql, /processable_count\s*>\s*0/iu);
+  assert.match(
+    sql,
+    /file_extension\s+IN\s*\(\s*'pdf'\s*,\s*'docx'\s*,\s*'xlsx'\s*,\s*'xls'\s*\)/iu,
+    'Dispatch must stage legacy XLS as a raw source file',
+  );
   assert.match(sql, /tender_agentic_documents/iu);
   assert.match(sql, /jsonb_agg/iu);
   assert.match(sql, /completed|running/iu);
@@ -138,6 +143,34 @@ test('dispatch verifies exact staging barrier before one seal and one start', as
   assert.match(mark, /status\s*=\s*'ready'/iu);
   assert.match(mark, /staged_documents\s*=\s*expected_documents/iu);
   assert.ok(nodeByName(value, 'Проверить start identity').onError === 'continueErrorOutput');
+});
+
+test('seal identity accepts the uppercase SHA-256 representation returned by the runner', async () => {
+  const value = await workflow();
+  const source = nodeByName(value, 'Проверить seal identity').parameters.jsCode;
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  const inputManifestSha256 = 'A'.repeat(64);
+  const output = await new vm.Script(`(async()=>{${source}})()`).runInNewContext({
+    $input: {
+      first: () => ({
+        json: {
+          body: {
+            job_id: jobId,
+            field_catalog_sha256: 'ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',
+            input_manifest_sha256: inputManifestSha256,
+          },
+        },
+      }),
+    },
+    $: (name) => {
+      assert.equal(name, 'Разобрать решение');
+      return { first: () => ({ json: { job_id: jobId } }) };
+    },
+    String,
+  });
+
+  assert.equal(output[0].json.job_id, jobId);
+  assert.equal(output[0].json.input_manifest_sha256, inputManifestSha256);
 });
 
 test('dispatch errors are typed and bounded without source URL or binary', async () => {

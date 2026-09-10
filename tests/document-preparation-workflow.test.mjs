@@ -84,7 +84,7 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   const workflow = await loadWorkflow();
   assert.equal(workflow.name, 'TENDER — Подготовить документацию');
   assert.equal(workflow.active, false);
-  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 23);
+  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 24);
   assert.equal(workflow.nodes.filter((node) => node.type === 'n8n-nodes-base.stickyNote').length, 1);
 
   const trigger = findNode(workflow, 'When Executed by Another Workflow');
@@ -130,12 +130,88 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   assert.deepEqual(c['Распаковать архив'].main[1].map(({ node }) => node), ['Нормализовать распаковку']);
   assert.deepEqual(c['Архив обработан?'].main[0].map(({ node }) => node), ['Обработать архивы по одному']);
   assert.deepEqual(c['Архив обработан?'].main[1].map(({ node }) => node), ['Сформировать ошибку подготовки']);
-  assert.deepEqual(c['Обработать прямые документы по одному'].main[0].map(({ node }) => node), ['Есть архивы?']);
+  assert.deepEqual(c['Обработать прямые документы по одному'].main[0].map(({ node }) => node), ['Собрать результаты прямых документов']);
+  assert.deepEqual(c['Собрать результаты прямых документов'].main[0].map(({ node }) => node), ['Есть архивы?']);
   assert.deepEqual(c['Обработать прямые документы по одному'].main[1].map(({ node }) => node), ['Скачать прямой документ']);
   assert.deepEqual(c['Скачать прямой документ'].main[1].map(({ node }) => node), ['Нормализовать скачивание прямого документа']);
   assert.deepEqual(c['Вычислить SHA-256 прямого документа'].main[1].map(({ node }) => node), ['Зафиксировать идентичность прямого документа']);
   assert.deepEqual(c['Идентичность прямого документа готова?'].main[0].map(({ node }) => node), ['Обработать прямые документы по одному']);
   assert.deepEqual(c['Идентичность прямого документа готова?'].main[1].map(({ node }) => node), ['Сформировать ошибку подготовки']);
+});
+
+test('direct loop done output keeps every processed document for the manifest', async () => {
+  const workflow = await loadWorkflow();
+  const classified = await executeCode({
+    workflow,
+    name: 'Проверить и классифицировать вход',
+    inputItems: [{ json: {
+      analysis_run_id: RUN_ID,
+      attachments: [
+        sourceAttachment(),
+        sourceAttachment({
+          document_index: 2,
+          file_name: 'prices.xls',
+          file_extension: 'xls',
+          download_url: 'https://tender.example/file/2',
+        }),
+      ],
+    } }],
+  });
+  const context = classified[0].json;
+  const doneItems = context.direct_document_jobs.map((job, offset) => ({
+    json: {
+      direct_ok: true,
+      direct_document: {
+        source_attachment_index: job.source_attachment_index,
+        sort_path: '',
+        file_name: job.source_attachment.file_name,
+        file_extension: job.source_attachment.file_extension,
+        display_name: job.source_attachment.display_name,
+        download_url: job.download_url,
+        publication_at: job.source_attachment.publication_at,
+        source_size: job.source_attachment.source_size,
+        mime_type: offset === 0 ? 'application/pdf' : 'application/vnd.ms-excel',
+        file_size: 100 + offset,
+        status: 'pending',
+        error_message: null,
+        ingestion_metadata: {
+          source_attachment_index: job.source_attachment_index,
+          artifact_kind: 'direct_document',
+          archive_chain: [],
+          entry_path: null,
+          archive_depth: 0,
+          content_sha256: String(offset + 1).repeat(64),
+          extractor_job_id: null,
+          skip_reason: null,
+        },
+      },
+    },
+  }));
+
+  const collected = await executeCode({
+    workflow,
+    name: 'Собрать результаты прямых документов',
+    inputItems: doneItems,
+    sourceItemsByNode: { 'Проверить и классифицировать вход': classified },
+  });
+  assert.equal(collected.length, 1);
+  assert.equal(collected[0].json.direct_results.length, 2);
+  assert.equal(collected[0].json.archive_jobs.length, 0);
+
+  const result = await executeCode({
+    workflow,
+    name: 'Сформировать полный manifest',
+    inputItems: collected,
+    sourceItemsByNode: {
+      'Проверить и классифицировать вход': classified,
+      'Собрать результаты прямых документов': collected,
+    },
+  });
+  assert.equal(result[0].json.success, true);
+  assert.deepEqual(
+    result[0].json.manifest.documents.map((document) => document.file_name),
+    ['specification.pdf', 'prices.xls'],
+  );
 });
 
 test('no-archive input hashes direct documents and preserves skipped audit rows', async () => {
@@ -182,14 +258,20 @@ test('no-archive input hashes direct documents and preserves skipped audit rows'
       'Нормализовать скачивание прямого документа': normalized,
     },
   });
+  const collected = await executeCode({
+    workflow,
+    name: 'Собрать результаты прямых документов',
+    inputItems: identified,
+    sourceItemsByNode: { 'Проверить и классифицировать вход': classified },
+  });
 
   const result = await executeCode({
     workflow,
     name: 'Сформировать полный manifest',
-    inputItems: classified,
+    inputItems: collected,
     sourceItemsByNode: {
       'Проверить и классифицировать вход': classified,
-      'Зафиксировать идентичность прямого документа': identified,
+      'Собрать результаты прямых документов': collected,
     },
   });
   assert.equal(result[0].json.success, true);

@@ -35,7 +35,7 @@ test('mark relation fixture is sanitized and preserves the confirmed duplicate s
   assert.doesNotMatch(fixtureText, /https?:|token|authorization|password|customer|client/iu);
 });
 
-test('TenderPlan Mark Intake is an inactive GET-only ten-minute relation poller', () => {
+test('portable Mark Intake export remains inactive and defines the live ten-minute poller', () => {
   assert.ok(fs.existsSync(exportPath), 'TENDER — TenderPlan Mark Intake workflow export is absent');
   const text = fs.readFileSync(exportPath, 'utf8');
   const workflow = JSON.parse(text);

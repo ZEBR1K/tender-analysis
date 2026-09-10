@@ -1,16 +1,19 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
-**Статус:** inactive repository candidate / offline-tested / pre-DB runtime smoke GREEN
+**Статус:** published Task 17 temporary agent-only route; real Codex canary GREEN
 **Последнее обновление:** 2026-09-10
 **Тип:** reusable new-run-only sub-workflow
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`
 **Canonical export:** `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
 **Точка входа:** `Execute Sub-workflow Trigger`
-**Вызывает:** текущий выбранный repository/test candidate `TENDER — Обработать документ`
-**Error Workflow:** не настроен
+**Вызывает:** `TENDER — Подготовить документацию` и `TENDER — Агентский анализ — Запуск`
+**Error Workflow:** live shared handler `kff8KIrSHzo5Mmt1`; repository export identity-neutral
 **Основной источник:** TenderPlan FullInfo API
 
-Этот документ описывает текущий canonical JSON в repository. Export содержит 17 нод, включая Sticky Note, имеет `active=false`, `availableInMCP=false` и `executionOrder=v1`.
+Этот документ описывает текущий canonical JSON в repository. Export содержит
+19 нод, включая Sticky Note, имеет `active=false`, `availableInMCP=false` и
+`executionOrder=v1`. Live workflow `TRLYuU7mVyE1bjjr` опубликован с тем же
+19-node graph; instance IDs и credentials в canonical export не сохраняются.
 
 Canonical export сам по себе не доказывает live installation, публикацию,
 корректность credentials или production runtime. Task 3 подтверждён offline
@@ -38,8 +41,8 @@ typed intake input
 → synchronously prepare and validate the complete manifest
 → atomically create run as processing
 → register all pending/skipped manifest rows
-→ synchronously stage/seal/start one additive agentic shadow job
-→ asynchronously dispatch only pending PDF/DOCX/XLSX
+→ synchronously stage/seal/start one additive agentic shadow job over PDF/DOCX/XLSX/XLS
+→ keep legacy Worker fan-out nodes present but unreachable
 → return one structured result
 ```
 
@@ -76,7 +79,7 @@ Manual Trigger и hardcoded `tender_id` в canonical candidate отсутств�
 
 ---
 
-# 3. Текущий 17-node graph
+# 3. Текущий 19-node graph
 
 Исполняемый путь:
 
@@ -100,10 +103,7 @@ created_new_run=true
    ├─ true
    │  → Запустить агентский shadow-анализ
    │  → Восстановить контекст после agentic dispatch
-   │  ├─ разделить документы
-   │  │  → ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ
-   │  │  → Запустить обработку документа
-   │  └─ Вернуть результат Orchestrator
+   │  → Вернуть результат Orchestrator
    └─ false
       → Вернуть результат Orchestrator
 ```
@@ -274,6 +274,7 @@ Conflict branch не регистрирует документы повторн�
 pdf
 docx
 xlsx
+xls
 ```
 
 Успешный preparation contract гарантирует хотя бы один processable документ; false-ветка остаётся defense-in-depth и обходит `Split Out` с `documents_dispatched=0`.
@@ -282,11 +283,20 @@ xlsx
 
 1. `Запустить агентский shadow-анализ` ровно один раз синхронно вызывает identity-neutral `TENDER — Агентский анализ — Запуск` в `mode=all` с `analysis_run_id`, `pipeline_version=tender_agentic_pipeline_v1`, `replicate_index=1`. Ожидание заканчивается после staging/seal/start acknowledgement sub-workflow, а не после завершения Codex.
 2. `Восстановить контекст после agentic dispatch` возвращает исходный run/manifest context и добавляет bounded `agentic_shadow`; bodies документов в metadata не сохраняются.
-3. `разделить документы` создаёт один item на attachment и сохраняет `analysis_run_id`, `tender_meta`, `created_new_run`.
-4. `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` пропускает только `pending` `pdf`, `docx`, `xlsx`; `skipped` audit rows до Worker не доходят.
-5. `Запустить обработку документа` работает в `mode=each`; `waitForSubWorkflow=false`, поэтому legacy calls остаются fire-and-forget.
+3. `Восстановить контекст после agentic dispatch` идёт только в
+   `Вернуть результат Orchestrator`. Legacy-ноды `разделить документы`,
+   `ВРЕМЕННЫЙ ФИЛЬТР РАСШИРЕНИЯ` и `Запустить обработку документа` сохранены,
+   но не имеют достижимого входа.
 
-Вызов shadow стоит после atomic registration и до legacy fan-out. Поэтому archive cleanup, достижимый только через последующие legacy stages, причинно следует за завершением Dispatch; после успешного seal runner владеет независимыми копиями. Concurrent conflict и defense-in-depth zero-processable branch Dispatch не достигают. Export остаётся inactive, а placeholder `AGENTIC_DISPATCH_WORKFLOW_ID` должен быть заменён реальным ID только при отдельном packaging/read-back шаге.
+Сохранённый legacy-фильтр допускает только pending PDF/DOCX/XLSX. `.xls`
+остаётся raw agent-only форматом и не попадёт в старый Worker даже при будущем
+контролируемом восстановлении связи.
+
+Временная граница помечена `TASK17_TEMPORARY_AGENT_ONLY`. Вызов shadow стоит
+после atomic registration; legacy fan-out не выполняется. Concurrent conflict и
+defense-in-depth zero-processable branch Dispatch не достигают. Live packaging
+подставляет Dispatch `gP29fv0rq4MoON9a`; repository export сохраняет
+identity-neutral placeholder.
 
 Текущий Execute Workflow node указывает на repository/test candidate `[DW-23 TEST CODEX] TENDER — Обработать документ`. Выбор production Worker ID выполняется только при отдельном packaging/promotion решении.
 
@@ -294,16 +304,17 @@ xlsx
 
 # 9. `executionOrder=v1` и terminal fan-out
 
-На supported branch нода `Есть поддерживаемые документы?` сначала синхронно проходит agentic shadow barrier. После восстановления исходного run context нода имеет два targets в таком порядке на canvas:
+На supported branch нода `Есть поддерживаемые документы?` синхронно проходит
+agentic shadow barrier. После восстановления исходного run context есть ровно
+один target:
 
 ```text
-верхняя ветка: разделить документы → filter → async Worker dispatch
-нижняя ветка: Вернуть результат Orchestrator
+Вернуть результат Orchestrator
 ```
 
-При `executionOrder=v1` n8n завершает верхнюю ветку до перехода к нижней, потому что ветви выполняются сверху вниз. Поэтому все поддерживаемые items сначала передаются fire-and-forget Worker calls, после чего запускается общий terminal result.
-
-Terminal result не зависит от child Worker output: новый run берётся из восстановленного atomic creation context, а conflict — из fresh existing-run row. Async Workers продолжаются независимо, а caller получает симметричный результат создания/конфликта с additive `agentic_shadow` metadata.
+Terminal result берётся из восстановленного atomic creation context, а conflict
+— из fresh existing-run row. Legacy Workers не запускаются, а caller получает
+симметричный результат создания/конфликта с additive `agentic_shadow` metadata.
 
 ---
 
@@ -360,7 +371,7 @@ agentic_shadow
 
 | Исход | `created_new_run` | `action` | `documents_dispatched` |
 |---|---:|---|---:|
-| Новый run, preparation success | `true` | `created_new_run` | число `pending` `pdf/docx/xlsx` |
+| Новый run, preparation success | `true` | `created_new_run` | число `pending` `pdf/docx/xlsx/xls` agentic sources |
 | Concurrent active run | `false` | `concurrent_existing_run` | `0` |
 
 `status` и `next_state` оба отражают фактический текущий run status. `next_state` не содержит action label.
@@ -373,19 +384,21 @@ Malformed identity, неожиданный zero/multiple conflict result или 
 
 ## OR-0 — unsupported documents (локально закрыт)
 
-Все source attachments представлены в подготовленном manifest. Unsupported files и archive containers регистрируются как `skipped`; Worker получает только `pending` PDF/DOCX/XLSX.
+Все source attachments представлены в подготовленном manifest. Unsupported files и archive containers регистрируются как `skipped`; agentic Dispatch получает `pending` PDF/DOCX/XLSX/XLS. Legacy Worker получает только PDF/DOCX/XLSX, но его текущий вход недостижим.
 
 Canonical Worker и Intake Resume используют согласованный terminal barrier `completed + skipped = documents_total`; `failed` остаётся блокирующим. Изменение подтверждено offline tests, но не production runtime.
 
 ## OR-1 — zero documents / zero supported documents (локально закрыт)
 
-Preparation возвращает typed `NO_PROCESSABLE_DOCUMENTS` до DB INSERT, если во всём manifest нет processable PDF/DOCX/XLSX.
+Preparation возвращает typed `NO_PROCESSABLE_DOCUMENTS` до DB INSERT, если во всём manifest нет processable PDF/DOCX/XLSX/XLS.
 
 Поэтому zero-processable вход не создаёт `analysis_run` и не dispatch-ит Worker. Runtime verification остаётся rollout gate.
 
 ## OR-4 — limited formats
 
-Поддерживаются только `pdf`, `docx`, `xlsx`. Расширение набора форматов не входит в Task 3.
+Agentic source staging поддерживает `pdf`, `docx`, `xlsx`, `xls`; `.xls`
+передаётся неизменённым без parser/indexing. Сохранённый legacy Worker остаётся
+ограничен `pdf`, `docx`, `xlsx`.
 
 ## OR-5 — no Error Workflow
 
@@ -437,11 +450,11 @@ tests/intake-agentic-shadow-routing.test.mjs
 - один snapshot-safe atomic SQL без sibling run UPDATE;
 - partial-index conflict target и boolean `created_new_run`;
 - fresh active-run SELECT без `LIMIT 1` и exactly-one guard;
-- регистрацию всех документов до первого Worker;
-- `mode=each`, passthrough Worker input и `waitForSubWorkflow=false`;
+- регистрацию всех документов до agentic Dispatch;
+- сохранение legacy Worker nodes без достижимого входа;
 - единый structured terminal result;
 - synchronous preparation dominance, fail-closed manifest identity и pending-only Worker dispatch;
-- один synchronous agentic shadow barrier после atomic registration, отсутствие agentic dispatch на conflict/zero-processable path и восстановление legacy run context до fan-out.
+- один synchronous agentic shadow barrier после atomic registration, отсутствие agentic dispatch на conflict/zero-processable path и восстановление run context без legacy fan-out.
 
 Read-only execution `14678` отдельно подтвердил exact input validation,
 TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke был
@@ -449,14 +462,11 @@ TenderPlan FullInfo identity и normalization для двух tender IDs. Smoke 
 отсутствовали. Evidence:
 `evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
 
-До production нужны отдельные runtime gates:
-
-1. применить migration в non-production и проверить partial unique index;
-2. импортировать/read back inactive workflow и проверить connections/settings;
-3. подтвердить credentials и выбранный Worker package;
-4. выполнить new-run, concurrent conflict, mixed unsupported и zero-document scenarios;
-5. отдельно решить `OR-5`, `OR-6` и production rollout gates;
-6. только после этого принимать решение о promotion.
+Task 17 runtime gate закрыт execution-цепочкой `15355/15356/15373/15387`:
+fresh run зарегистрировал DOCX+XLS, real Codex job завершился на attempt 1,
+Monitor атомарно сохранил exact 27 shadow rows, legacy nodes имели zero runs.
+После terminal GREEN TenderPlan Mark Intake опубликован. Следующая отдельная
+граница — reviewed promotion shadow fields в canonical FINAL/report path.
 
 ---
 

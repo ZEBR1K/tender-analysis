@@ -6044,3 +6044,46 @@ both n8n containers with zero restarts. Corrected inactive candidates are
 Dispatch `gP29fv0rq4MoON9a` and schedule Monitor `CALcBEXvQsO1AcfP`; their
 normalized graphs match the repository exports and exact credentials are
 bound. No production workflow was activated and Task 17 was not started.
+
+## 10.09.2026 — Task 17 temporary agent-only production route
+
+Published Document Preparation, Orchestrator, Intake Resume, Agentic Dispatch,
+Agentic Monitor and ownership-guarded Agentic Error. Orchestrator and Intake
+Resume retain all legacy Worker/Aggregator/Finalization nodes, but the incoming
+edges are intentionally disconnected and marked `TASK17_TEMPORARY_AGENT_ONLY`.
+
+Added legacy XLS only as an unchanged agentic source format. Preparation records
+file name, MIME, byte size and SHA-256; Codex chooses the inspection method. No
+XLS/page/OOXML parser or semantic runtime validator was added.
+
+Real TenderPlan canary exposed two contract defects. Execution `15333` showed
+that a manifest read from an inner Loop node retained only one of two direct
+documents; the done-output now has one aggregate collector. Dispatch `15357`
+then showed that the seal guard accepted lowercase SHA-256 only while the runner
+returns uppercase hex; the same 64-hex contract is now case-insensitive. Both
+were reproduced by failing tests before the minimal fixes.
+
+Fresh run `b731f861-4df6-40df-a8c5-67b8564f3f03` registered the DOCX and XLS.
+Controlled Dispatch execution `15373` started real Codex job
+`13b090b5-38fc-432a-a235-90ae43f609fe`; Monitor `15387` observed completion,
+validated 27 unique fields and atomically persisted exactly 27 shadow rows.
+Legacy nodes had zero runs. The normal replicate-1 inputs were restored, then
+TenderPlan Mark Intake was published. Final local verification was
+`753 total / 747 pass / 0 fail / 6 skipped`.
+
+The first normal schedule tick after activation also passed: Mark Intake
+execution `15393` invoked Intake Resume executions `15394–15396` for the three
+currently marked tenders. Every child completed at `Return Event No-op`, so the
+event identity contract suppressed duplicates without creating another run or
+agentic job.
+
+Independent final review reproduced two structural regressions before commit.
+The Intake restore output lacked a top-level successful action and could be
+persisted as `manual_attention_required`; it now emits
+`agentic_dispatched` / `agentic_no_op` while retaining the child action in the
+audit object. The disconnected Orchestrator legacy filter briefly admitted
+`.xls`; it now remains pending PDF/DOCX/XLSX only, keeping legacy XLS exclusive
+to raw agentic staging. Focused RED→GREEN coverage was added. Corrected live
+versions are Intake `51f567d2-4100-4d81-9a17-29b7df7eeb6c` and Orchestrator
+`e8a085a9-6a7e-4230-9026-2839f48ba359`; both were published and read back with
+`versionId=activeVersionId`.

@@ -4,7 +4,7 @@
 
 **Workflow ID в n8n:** `0scTZu1aBKsMd6AM`
 
-**Статус:** inactive repository candidate; подключён в inactive canonical Orchestrator export, production deployment не выполнен
+**Статус:** published in the Task 17 temporary agent-only route; real TenderPlan DOCX+XLS canary GREEN
 
 **Repository export:** `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 
@@ -15,7 +15,7 @@ Workflow принимает metadata всех вложений одного `ana
 ```text
 analysis_run_id + attachments
 → классификация всех source attachments
-→ последовательная загрузка прямых PDF/DOCX/XLSX
+→ последовательная загрузка прямых PDF/DOCX/XLSX/XLS
 → byte size + MIME + SHA-256 исходных bytes
 → последовательная загрузка и распаковка архивов
 → обычные extracted files
@@ -23,7 +23,10 @@ analysis_run_id + attachments
 → единый manifest либо typed failure
 ```
 
-В canonical repository export Orchestrator вызывает workflow один раз после TenderPlan normalization и до единственного atomic run/document INSERT. Caller синхронно ждёт полный manifest; typed failure или invalid contract останавливают путь до создания run и до первого Worker. Это repository-only изменение: live deployment и runtime verification не выполнялись.
+Orchestrator вызывает workflow один раз после TenderPlan normalization и до
+единственного atomic run/document INSERT. Caller синхронно ждёт полный manifest;
+typed failure или invalid contract останавливают путь до создания run и до
+agentic Dispatch. Live workflow `0scTZu1aBKsMd6AM` опубликован и runtime-verified.
 
 ## Входной контракт
 
@@ -38,10 +41,10 @@ attachments: array
 
 ## Поддерживаемые типы
 
-Напрямую в Worker:
+Напрямую в agentic source manifest:
 
 ```text
-pdf / docx / xlsx
+pdf / docx / xlsx / xls
 ```
 
 Архивы:
@@ -63,7 +66,7 @@ nested archive depth: 3
 deadline per source archive: 5 minutes
 ```
 
-Прямые документы и архивы обрабатываются отдельными последовательными `Loop Over Items` с `batchSize=1`, чтобы ограничить нагрузку и прекратить run на первой ошибке. Для прямого документа HTTP Request держит тело только в `binary.data`; Code node читает bytes только для размера, а native Crypto node вычисляет SHA-256. Binary не переносится в JSON/manifest. Реальная распаковка архивов выполняется внутренним сервисом `deploy/archive-extractor`.
+Прямые документы и архивы обрабатываются отдельными последовательными `Loop Over Items` с `batchSize=1`, чтобы ограничить нагрузку и прекратить run на первой ошибке. Для прямого документа HTTP Request держит тело только в `binary.data`; Code node читает bytes только для размера, а native Crypto node вычисляет SHA-256. Binary не переносится в JSON/manifest. Done-output прямого цикла собирается одной aggregate Code node, поэтому manifest получает каждый обработанный документ, а не только последнюю итерацию. Реальная распаковка архивов выполняется внутренним сервисом `deploy/archive-extractor`.
 
 Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, control/NUL paths, normalized collisions, symlink, hardlink и special entries. Антивирусная проверка не предусмотрена по принятому scope.
 
@@ -82,7 +85,7 @@ Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, co
 }
 ```
 
-Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Каждый `pending` PDF/DOCX/XLSX обязан иметь непустые `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped` и не dispatch-ятся.
+Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Каждый `pending` PDF/DOCX/XLSX/XLS обязан иметь непустые `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped` и не dispatch-ятся. `.xls` остаётся неизменённым source artifact: workflow не разбирает листы или значения.
 
 Ошибка:
 
@@ -98,7 +101,7 @@ Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, co
 }
 ```
 
-`failure` также содержит `source_attachment_index` и `extractor_job_id`. Любая ошибка direct download/hash или одного архива завершает preparation до регистрации manifest и до запуска первого Worker. Частичный manifest не возвращается.
+`failure` также содержит `source_attachment_index` и `extractor_job_id`. Любая ошибка direct download/hash или одного архива завершает preparation до регистрации manifest и до agentic Dispatch. Частичный manifest не возвращается.
 
 ## Проверка
 
@@ -116,6 +119,15 @@ MCP pin-tests на live n8n:
 
 Эти executions относятся к предыдущему archive-only draft: HTTP Request nodes были заменены pin data. Они не подтверждают новый direct download/hash path, текущую Orchestrator integration или сетевую доступность внутреннего 7-Zip сервиса.
 
+Task 17 live evidence:
+
+- execution `15356` downloaded, normalized, hashed and registered both real
+  TenderPlan files (`МК.docx`, `Расчёт НМЦК Канц+Хоз.тов..xls`);
+- exact result: `documents_total=2`, `registered_documents_count=2`;
+- regression test reproduces the earlier two-direct-document loop loss and
+  proves the aggregate done-output collector retains both results;
+- full repository suite: `753 total / 747 pass / 0 fail / 6 skipped`.
+
 Production extractor runtime-check от 2026-09-08:
 
 - отдельный Compose-проект развёрнут в `/opt/tender-archive-extractor` как контейнер `tender-archive-extractor`, image `tender-archive-extractor:26.03-1`;
@@ -128,9 +140,6 @@ Production extractor runtime-check от 2026-09-08:
 
 ## Оставшиеся rollout-шаги
 
-1. применить additive migration `deploy/postgres/migrations/2026-09-07-add-document-ingestion-metadata.sql`;
-2. импортировать согласованные inactive Orchestrator, Preparation, Worker и Intake Resume exports;
-3. оставить вызов preparation синхронным и запускать Workers только для зарегистрированных документов со статусом `pending`;
-4. на `success=false` не создавать run и не запускать Workers;
-5. очищать artifacts exact-run cleanup после terminal state, сохраняя TTL fallback;
-6. выполнить bounded runtime-canary для direct file и реального TenderPlan archive до production activation.
+Task 17 direct-file rollout закрыт. Отдельными будущими gates остаются реальные
+TenderPlan RAR/TAR/GZIP archives, exact-run cleanup после terminal state и
+reviewed promotion validated shadow fields в canonical FINAL/report path.

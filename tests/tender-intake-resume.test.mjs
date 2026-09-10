@@ -74,6 +74,25 @@ function normalizeSql(sql) {
   return String(sql).replace(/\s+/gu, ' ').trim().toLowerCase();
 }
 
+function assertUnsupportedPendingRepair(sql, nodeName) {
+  assert.match(sql, /update (?:public\.)?tender_analysis_documents/iu, `${nodeName} must repair documents`);
+  assert.match(sql, /status\s*=\s*'skipped'/iu, `${nodeName} must use terminal skipped`);
+  assert.match(
+    sql,
+    /status\s+in\s*\(\s*'pending'\s*,\s*'processing'\s*,\s*'failed'\s*\)/iu,
+    `${nodeName} must repair every non-terminal unsupported document state`,
+  );
+  assert.match(
+    sql,
+    /lower\s*\(\s*coalesce\s*\(\s*file_extension\s*,\s*''\s*\)\s*\)\s+not\s+in\s*\(\s*'pdf'\s*,\s*'docx'\s*,\s*'xlsx'\s*,\s*'xls'\s*\)/iu,
+    `${nodeName} must use the exact supported-extension contract`,
+  );
+  assert.match(sql, /error_message\s*=\s*[^,;]*unsupported/iu, `${nodeName} must preserve an audit reason`);
+  assert.match(sql, /completed_at\s*=\s*coalesce\s*\(\s*completed_at\s*,\s*now\(\)\s*\)/iu, `${nodeName} must timestamp the terminal skip`);
+  assert.doesNotMatch(sql, /finished_at/iu, `${nodeName} must use the documented document schema`);
+  assert.match(sql, /analysis_run_id\s*=\s*\$1::uuid/iu, `${nodeName} must stay scoped to one run`);
+}
+
 function requireNode(workflow, name) {
   const node = workflow.nodes.find((candidate) => candidate.name === name);
   assert.ok(node, `missing node: ${name}`);
@@ -708,6 +727,14 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   const workflow = JSON.parse(exportText);
   const worker = JSON.parse(fs.readFileSync(workerExportPath, 'utf8'));
   const finalization = JSON.parse(fs.readFileSync(finalizationExportPath, 'utf8'));
+
+  for (const snapshotNodeName of [
+    'Load Run Snapshot',
+    'Reload Run Snapshot After Recovery',
+  ]) {
+    const snapshotSql = normalizeSql(requireNode(workflow, snapshotNodeName).parameters.query);
+    assertUnsupportedPendingRepair(snapshotSql, snapshotNodeName);
+  }
 
   for (const node of workflow.nodes) {
     if (node.type === 'n8n-nodes-base.if') {
@@ -1477,7 +1504,13 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.ok(canReach(workflow, recoveryLoop.name, 'Read Document Owner Execution'));
   assert.ok(canReach(workflow, 'CAS Stale Document to Failed', recoveryLoop.name));
   assert.ok(canReach(workflow, reclaimDecision.name, recoveryLoop.name));
-  assert.ok(canReach(workflow, recoveryLoop.name, 'Decide Document and Stage Action'));
+  assert.ok(canReach(workflow, recoveryLoop.name, 'Prepare Agentic Shadow Dispatch'));
+  assert.ok(canReach(workflow, recoveryLoop.name, 'Complete Intake Event'));
+  assert.equal(
+    canReach(workflow, recoveryLoop.name, 'Decide Document and Stage Action'),
+    false,
+    'TASK17 temporary agent-only route must not re-enter legacy document recovery',
+  );
   const recoveryQueueCode = requireNode(
     workflow,
     'Prepare Document Recovery Queue',
@@ -1634,6 +1667,23 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
   assert.match(runFailureSql, /not exists[\s\S]*status\s*=\s*'pending'/iu);
   assert.match(runFailureSql, /not exists[\s\S]*status\s*=\s*'processing'/iu);
   assert.match(runFailureSql, /exists[\s\S]*status\s*=\s*'failed'[\s\S]*attempts\s*>=\s*2/iu);
+  assert.match(
+    runFailureSql,
+    /exists[\s\S]*status\s*=\s*'skipped'/iu,
+    'unsupported skipped documents must make the run terminal instead of waiting forever',
+  );
+  assert.match(
+    requireNode(workflow, 'Guard Exhausted Run Failure').parameters.options.queryReplacement,
+    /unsupported_documents_skipped/u,
+    'the terminal run must retain the unsupported-document audit reason',
+  );
+
+  const postReadinessCode = requireNode(
+    workflow,
+    'Classify Post-Readiness Stage',
+  ).parameters.jsCode;
+  assert.match(postReadinessCode, /skipped_documents_exist/u);
+  assert.match(postReadinessCode, /unsupported_documents_skipped/u);
 
   const completeEvent = requireNode(workflow, 'Complete Intake Event');
   const completeEventSql = normalizeSql(completeEvent.parameters.query);
@@ -1683,7 +1733,10 @@ test('workflow export implements the complete typed Intake Resume dispatcher con
     'duplicate_event',
     'manual_attention_required',
     'automatic_attempts_exhausted',
+    'unsupported_documents_skipped',
     'execution_status_unavailable',
+    'agentic_dispatched',
+    'agentic_no_op',
   ]) assert.match(outcomeCode, new RegExp(`['"]${action}['"]`, 'u'));
   assert.match(outcomeCode, /throw new Error/iu);
 
