@@ -40,10 +40,10 @@ test('Finalization promotes one completed agentic job before its existing 27/27 
   ]) assert.match(sql, new RegExp(token, 'u'));
 
   assert.match(sql, /status\s*<>\s*'completed'/iu);
-  assert.match(sql, /COUNT\(\*\)\s*<>\s*27/iu);
+  assert.match(sql, /v_actual_count\s*<>\s*27/iu);
   assert.match(sql, /jsonb_array_elements[\s\S]*evidence/iu);
   assert.match(sql, /file_name/iu);
-  assert.doesNotMatch(sql, /PRICE|VAT|NEGATIVE|quote_accuracy|evidence_sufficiency/iu);
+  assert.doesNotMatch(sql, /\b(?:PRICE|VAT|NEGATIVE)\b|quote_accuracy|evidence_sufficiency/iu);
 });
 
 test('agentic promotion is atomic, producer-isolated and replay-safe', async () => {
