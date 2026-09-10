@@ -139,6 +139,13 @@ shadow objects were absent:
   are present, expected credential types are bound, and the execution-list
   endpoint returned zero entries for each workflow.
 
+The server container `n8n-postgres-1` is n8n's internal database, not the
+production tender database. A controlled execution of the existing shadow
+migration there stopped at its first `LOCK` because
+`public.tender_analysis_runs` is absent. Only `BEGIN`, `SET`, and `SET` ran; the
+transaction aborted and created no DDL objects. The production tender database
+is external Supabase and was accessible only through the scoped read-only role.
+
 The production schema still lacks
 `tender_analysis_documents.ingestion_metadata`. Because Dispatch requires the
 verified `content_sha256` from that column, the following gates remain open:

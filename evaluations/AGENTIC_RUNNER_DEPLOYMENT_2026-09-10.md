@@ -135,6 +135,13 @@ Fresh authoritative read-only checks superseded the preliminary absence claim:
   repository placeholder remains.
 - The execution-list endpoint returned zero entries for each workflow.
 
+The server container `n8n-postgres-1` is n8n's internal database, not the
+production tender database. A controlled run of the existing shadow migration
+there executed only `BEGIN`, `SET`, and `SET`, then failed at the first `LOCK`
+because `public.tender_analysis_runs` is absent. The transaction aborted and
+created no DDL objects. The production tender database is external Supabase;
+only its scoped read-only role was available for this reconciliation.
+
 The canonical `tender_analysis_documents.ingestion_metadata` prerequisite is
 still absent. Dispatch requires its `content_sha256`, so an inactive workflow
 canary cannot truthfully pass until the existing shadow relations receive an

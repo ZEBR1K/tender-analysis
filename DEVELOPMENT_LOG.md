@@ -6015,3 +6015,11 @@ endpoint returned zero entries for each workflow.
 No workflow was activated, no live Dispatch → Monitor → exact 27-row canary was
 run, and legacy routing remains unchanged. The missing `ingestion_metadata`
 source-hash contract and the unverified exact shadow schema block that canary.
+
+The production tender database is external Supabase, and only its scoped
+read-only role was available. The server container `n8n-postgres-1` is n8n's
+internal database, not the tender database. A controlled execution of the
+existing shadow migration against that internal database ran only `BEGIN`,
+`SET`, and `SET`, then failed at the first `LOCK` because
+`public.tender_analysis_runs` is absent. The transaction aborted and produced no
+DDL; no production migration was attempted.

@@ -78,6 +78,15 @@ reviewed additive `ingestion_metadata` prerequisite migration and a dedicated
 canary source with verified SHA-256 metadata, followed by the inactive
 workflow canary.
 
+The production tender database is external Supabase, and the available scoped
+diagnostic role is strictly read-only. The server container `n8n-postgres-1` is
+n8n's internal database, not the tender database. A controlled run of the
+existing shadow migration there executed only `BEGIN`, `SET`, and `SET`, then
+failed at the first `LOCK` because `public.tender_analysis_runs` is absent. The
+transaction aborted before any DDL and made no change. Completing the Task 16
+database and n8n canary gates therefore requires an operator-executed migration
+on production Supabase, or a separately supplied audited write path.
+
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 
 The integration branch starts from archive/report tip `f596755`, merges the
