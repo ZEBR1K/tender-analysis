@@ -2,6 +2,7 @@ FROM node:24.18.0-bookworm-slim
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
+      "ca-certificates=20250419~deb12u1" \
       "poppler-utils=22.12.0-2+deb12u3" \
       "libreoffice-core=4:7.4.7-1+deb12u14" \
       "libreoffice-writer=4:7.4.7-1+deb12u14" \
