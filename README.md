@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-10
+**Последнее обновление:** 2026-09-11
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -15,7 +15,7 @@ PROJECT_STATUS.md
 Последний Document Worker handoff: executions `14374/14376` технически GREEN только до `ready_for_aggregation`; semantic applicability gate FAIL. Sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
 
 Дополнительно реализован аддитивный фундамент агентского shadow-анализа через
-Codex (Tasks 0–16). Изолированный runner развёрнут, а прямой blind canary из
+Codex (Tasks 0–17). Изолированный runner развёрнут, а прямой blind canary из
 четырёх запусков прошёл проверки изоляции, целостности архивов и JSON-контракта.
 Оператором применена аддитивная PostgreSQL-миграция, после чего независимая
 read-only проверка подтвердила exact shadow schema и источник SHA-256 metadata.
@@ -33,11 +33,25 @@ DOCX+XLS на attempt 1; Monitor execution `15387` принял exact-27 кон�
 Финальный review добавил явные outcomes `agentic_dispatched` / `agentic_no_op`
 для успешного Intake handoff и подтвердил, что сохранённый legacy-фильтр не
 принимает `.xls`; это остаётся raw agent-only форматом.
+
+Следующий terminal boundary также опубликован. Monitor version
+`b45e4a2c-48a1-456e-8556-873dd7b19d71` после exact-27 shadow commit синхронно
+вызывает существующую Finalization. Finalization version
+`e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` переводит agentic rows в неизменённый
+`tender_field_final_v1`, использует прежний DB-backed 27/27 barrier и вызывает
+Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`.
+Контролируемый canary `15662 → 15663` завершил run, сохранил 27 уникальных FINAL
+полей и создал валидные HTML/PDF artifacts; replay `15666` не создал второй
+отчёт. Следующий gate — один свежий end-to-end запуск от метки TenderPlan до
+отчёта и ручная semantic review всех 27 значений.
+
 Подробности:
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
 `evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`, а финальный n8n/DB canary —
 `evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md` и
-`evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`.
+`evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`. Terminal
+promotion/report evidence находится в
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
 
 ---
 
@@ -114,9 +128,23 @@ not_found
 
 # 3. Текущая архитектура
 
-В live Task 17 временно активен только агентский путь от регистрации manifest
-до shadow-результата. Приведённая ниже длинная Worker/Aggregator схема сохранена
-как legacy/canonical baseline для будущего контролируемого объединения; её ноды
+В live Task 17 временно активен агентский путь от регистрации manifest до
+готового HTML/PDF отчёта:
+
+```text
+TenderPlan mark
+→ Orchestrator / Intake Resume
+→ source manifest
+→ Agentic Dispatch
+→ Codex runner
+→ Agentic Monitor
+→ exact 27 shadow rows
+→ Finalization / canonical FINAL 27/27
+→ Report Generation / HTML + PDF
+```
+
+Приведённая ниже длинная Worker/Aggregator схема сохранена как
+legacy/canonical baseline для будущего контролируемого объединения; её ноды
 сейчас не достижимы из Orchestrator и Intake Resume.
 
 ```text

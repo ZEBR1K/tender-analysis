@@ -104,7 +104,7 @@ and that the then-inactive live candidate reached Intake duplicate/no-op without
 downstream execution. После успешного Task 17 real-Codex canary schedule
 опубликован; pagination/exhaustive-result semantics не документированы.
 
-Отдельно подготовлен агентский shadow-контур Tasks 0–17:
+Отдельно подготовлен агентский контур Tasks 0–17 и terminal integration:
 
 ```text
 полный source manifest после commit
@@ -114,6 +114,9 @@ downstream execution. После успешного Task 17 real-Codex canary sc
 → exact 27-field JSON
 → contract/source/file-integrity validation
 → validated shadow result
+→ canonical tender_field_final_v1
+→ DB-backed 27/27 completion
+→ existing HTML/PDF report
 ```
 
 Runner не создаёт page/OOXML/XLSX index и не оценивает цитаты, достаточность
@@ -134,6 +137,15 @@ TenderPlan Mark Intake был опубликован. `.xls` передаётс�
 source artifact; Codex сам выбирает способ исследования, а runtime не добавляет
 XLS parser или semantic validation. Сохранённый legacy Worker-фильтр `.xls` не
 принимает.
+
+На terminal boundary Monitor version `b45e4a2c-…` после успешного shadow commit
+вызывает существующую Finalization. Finalization version `e1aad7e7-…` проверяет
+только identity/JSON/manifest contracts, атомарно продвигает ровно 27 строк в
+canonical FINAL и передаёт управление прежнему completion barrier. Report
+Generation version `e21c7675-…` принимает тот же `tender_field_final_v1` и
+создаёт HTML/PDF без повторного semantic анализа. Canary executions
+`15662/15663` и DB read-back подтвердили `27/27`, `run.status=completed` и PDF
+signature `%PDF-`; idempotent replay `15666` не вызвал второй report.
 
 И пяти основных PostgreSQL таблиц:
 
@@ -157,7 +169,8 @@ boundary до atomic run/document INSERT. Прямые PDF/DOCX/XLSX/XLS пос�
 # 4. Общая архитектура
 
 Временный live Task 17 route после source-manifest registration идёт в Agentic
-Dispatch → Codex runner → Agentic Monitor → 27 shadow rows. Показанный ниже
+Dispatch → Codex runner → Agentic Monitor → 27 shadow rows → Finalization →
+27 canonical FINAL rows → HTML/PDF report. Показанный ниже
 Worker/Aggregator контур остаётся canonical legacy baseline, но его входы из
 Orchestrator и Intake Resume намеренно отключены и помечены
 `TASK17_TEMPORARY_AGENT_ONLY`.
@@ -2386,16 +2399,20 @@ tender_id
 → report_html
 → report_pdf
 
-AG-8 GREEN подтверждён только в test Aggregator. Document Worker production candidate упакован только локально и ещё не promoted. Перед клиентским отчётом текущий milestone:
+Для сохранённой legacy lane AG-8 GREEN подтверждён только в test Aggregator, а
+Document Worker production candidate упакован только локально и ещё не promoted.
+Для активной agentic lane terminal path уже runtime GREEN. Перед клиентским
+отчётом текущий общий milestone:
 
 ```text
-test workflow promotion / wiring clean Document Worker candidate
-→ fresh full run
+fresh agentic run from TenderPlan mark
 → manual review 27/27
 → client report
 ```
 
-Остаются future work: post-promotion PDF runtime canary, DOCX, XLSX, manual upload и automatic delivery.
+Остаются future work: DOCX, XLSX, manual upload и automatic delivery. Legacy
+Worker/Aggregator promotion остаётся отдельным fallback-lane debt и не блокирует
+проверку активного agentic пути.
 ---
 
 # 81. Краткая схема будущего завершённого MVP
@@ -2459,37 +2476,40 @@ Aggregator
 ```text
 1. PostgreSQL как persistent state и synchronization layer.
 
-2. AI как semantic engine,
-   но каждый AI-этап ограничен deterministic validation.
+2. Codex как semantic engine agentic lane;
+   runtime проверяет только безопасность, целостность и JSON-контракт.
 
 3. Финальный анализ строится не напрямую из документов,
    а через контролируемую цепочку:
    document → unit → fact → field → FINAL.
 ```
 
-Система уже имеет достаточно сильную структуру для MVP:
+Система уже имеет полный agentic terminal contour для MVP:
 
 ```text
-registered documents
-atomic claims
-persistent units
-grounded evidence
-independent validation
-field-level recheck
-versioned final contract
+registered source manifest
+restart-safe agentic job
+exact 27-field shadow result
+canonical tender_field_final_v1
+DB-backed completion claim
+HTML/PDF report
 ```
 
-Главная незавершённая архитектурная часть:
-
-```text
-fan-out 27 FINAL fields
-→ single completion/report stage
-```
-
-То есть следующий системный шаг — не новый AI-слой, а корректная DB-backed синхронизация:
+Terminal architecture runtime GREEN:
 
 ```text
 27 / 27
 → completed
+→ report_html + report_pdf
+```
+
+Следующий шаг — не новый parser или validator, а свежая проверка уже собранного
+маршрута:
+
+```text
+TenderPlan mark
+→ Codex
+→ 27 FINAL
 → report
+→ manual semantic review 27/27
 ```

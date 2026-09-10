@@ -361,11 +361,28 @@ Production promotion checkpoint 2026-09-07:
 
 Live production parameters совпадают с tested candidate по исполняемой семантике. UI export production version опускает optional default fields `mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`, `fullResponse=false` и `neverError=false`; official n8n node definitions подтверждают эти defaults. Canonical repository export сохраняет exact live representation.
 
+Agentic production canary checkpoint 2026-09-11:
+
+| Проверка | Результат |
+|---|---:|
+| Published version | `e21c7675-916a-4fd3-8499-e11444484b68` |
+| Active / draft parity | `versionId = activeVersionId` |
+| Parent Finalization execution | `15662`, success |
+| Report execution | `15663`, integrated / success |
+| Snapshot / model fields | `27 / 27` |
+| HTML artifact | `24761` bytes, valid |
+| PDF artifact | `90367` bytes, `%PDF-`, valid |
+| Output binaries | `report_html`, `report_pdf` |
+
+This is the first runtime proof of the published production PDF path. The
+snapshot contained canonical `codex_agentic_v1` rows with null confidence and
+opaque source locators, so the new agentic adapter compatibility was exercised,
+not only the legacy Aggregator format.
+
 ## 10. Limitations and future work
 
 Текущий production workflow **не** включает:
 
-- runtime evidence именно для опубликованной production version после promotion;
 - DOCX generation;
 - automatic delivery, Telegram или email;
 - manual upload workflow;
@@ -373,7 +390,9 @@ Live production parameters совпадают с tested candidate по испо�
 - client-safe projection of internal `review_note`;
 - XLSX artifact.
 
-PDF topology опубликована, но production runtime gate остаётся открытым как `RG-1`. Остальные возможности являются future work/technical debt, а не частью текущего report workflow.
+PDF topology и production runtime gate `RG-1` закрыты execution `15663`.
+Остальные возможности являются future work/technical debt, а не частью текущего
+report workflow.
 
 ## 11. Legacy documentation
 

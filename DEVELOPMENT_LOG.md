@@ -6087,3 +6087,34 @@ to raw agentic staging. Focused RED→GREEN coverage was added. Corrected live
 versions are Intake `51f567d2-4100-4d81-9a17-29b7df7eeb6c` and Orchestrator
 `e8a085a9-6a7e-4230-9026-2839f48ba359`; both were published and read back with
 `versionId=activeVersionId`.
+
+## 11.09.2026 — Agentic FINAL promotion and existing report integration
+
+Published Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`,
+Finalization version `e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` and Monitor version
+`b45e4a2c-48a1-456e-8556-873dd7b19d71`. Finalization now places the bounded
+agentic promotion transaction before the unchanged 27/27 completion barrier.
+Monitor calls this Finalization synchronously after its exact-27 shadow commit.
+Read-only n8n API checks confirmed all three active/draft version pairs and the
+exact live connections. The promotion node uses the existing PostgreSQL
+credential and its parameters exactly match the repository export.
+
+Controlled Finalization execution `15662` used the real Task 17 run/job pair.
+It promoted the 27 shadow rows into `tender_field_final_v1`, returned
+`barrier_ready=true`, claimed completion once and invoked Report execution
+`15663`. Report Snapshot and Report Model both contained 27 fields. HTML
+validation passed at 24761 bytes; PDF validation passed at 90367 bytes with
+signature `%PDF-`; both binary properties were preserved.
+
+A TLS-verified read-only Supabase `SELECT` confirmed `run.status=completed`,
+27 unique FINAL rows, all 27 with `resolution_method=codex_agentic_v1`, and the
+original status distribution `7 resolved / 4 requires_review / 16 not_found`.
+Replay execution `15666` completed with `completion_claimed=false`, stopped at
+the existing `If` and did not run Report Generation again. No semantic quote,
+evidence-sufficiency or field-specific runtime validator was added.
+
+This canary isolates the new terminal boundary by reusing the completed Task 17
+job; it is not a fresh TenderPlan-to-report semantic run. The next gate is one
+new marked procurement through the complete published route and manual review
+of all 27 values. Detailed evidence is in
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.

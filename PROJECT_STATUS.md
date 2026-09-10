@@ -1,8 +1,39 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-10
-**Status:** Active development / test hardening before client report
+**Snapshot date:** 2026-09-11
+**Status:** Agentic terminal path runtime GREEN / fresh end-to-end run pending
 **Branch at snapshot:** `codex/agentic-analysis-integration`
+
+## Agentic FINAL/report integration — live canary GREEN
+
+Report Generation `ckPnP3hRhKu4Mf9u` is published at
+`e21c7675-916a-4fd3-8499-e11444484b68`. Finalization
+`cSsh9yjpS7t5p0OO` is published at
+`e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` with the exact route
+`trigger → Продвинуть agentic FINAL → existing 27/27 barrier → Report`.
+Monitor `CALcBEXvQsO1AcfP` is published at
+`b45e4a2c-48a1-456e-8556-873dd7b19d71`; its exact-27 shadow transaction now
+calls Finalization synchronously before returning to the job loop. All three
+workflows were read back with `versionId=activeVersionId`.
+
+Controlled Finalization execution `15662` promoted the existing real Codex job
+`13b090b5-38fc-432a-a235-90ae43f609fe` for run
+`b731f861-4df6-40df-a8c5-67b8564f3f03`. The existing DB barrier observed 27
+FINAL rows, claimed completion once and invoked Report execution `15663`.
+Report Snapshot and Report Model both contained 27 fields; HTML validation
+passed and PDF validation returned `90367` bytes with `%PDF-`. A TLS-verified
+read-only Supabase `SELECT` confirmed `run.status=completed`, 27 unique
+`tender_field_final_v1` rows, all with `resolution_method=codex_agentic_v1`,
+distributed as `7 resolved / 4 requires_review / 16 not_found`.
+
+Replay execution `15666` returned `completion_claimed=false`, stopped before
+Report Generation and created no duplicate report. This closes the terminal
+promotion/report runtime gate but is not a new semantic blind run: it reused the
+already completed Task 17 job. The next checkpoint is one fresh procurement
+from TenderPlan mark through runner, Monitor, Finalization and report, followed
+by manual review of all 27 values. Full evidence:
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
+Post-canary repository verification: `760 total / 754 pass / 0 fail / 6 skipped`.
 
 ## Task 17 — live agent-only routing and real Codex canary GREEN
 
@@ -34,9 +65,10 @@ Worker/Aggregator/Finalization nodes had zero runs. Full verification is
 After this terminal gate passed, TenderPlan Mark Intake `biYC4OvWBlfJRmnj` was
 published at version `3a89a0bd-5fa7-4758-a3f1-a894d8aa232f`. Its first scheduled
 execution `15393` succeeded; child Intake executions `15394–15396` all ended as
-idempotent event no-ops and created no duplicate analysis. The next system
-boundary is not another parser: it is the separately reviewed promotion of
-validated shadow fields into the canonical FINAL/report path. Evidence:
+idempotent event no-ops and created no duplicate analysis. At that checkpoint
+the next boundary was the separately reviewed promotion of validated shadow
+fields into the canonical FINAL/report path; the section above records its now
+GREEN runtime result. Task 17 route evidence:
 `evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`.
 
 Final review then reproduced and fixed two structural issues. Intake now records
