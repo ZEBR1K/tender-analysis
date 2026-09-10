@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–14 — repository workflows implemented, deployment closed
+## Agentic shadow foundation Tasks 0–16 — runner-direct canary active, live integration closed
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
@@ -42,13 +42,28 @@ Task 15 now has a fail-closed offline multi-procurement batch harness for
 replicates. It provides deterministic resume, unique run identity per replicate,
 external-root guards and a SHA-256 chain over the terminal runner archive,
 result and validation envelope. Fake-run coverage and the full agentic test
-suite are green. The four real Codex runs have not started: the current runner
-does not yet expose a runner-owned execution profile and has not passed the
-Linux isolation canary. Those are Task 16 gates and must not be bypassed.
+suite are green.
 
-No production n8n workflow, production PostgreSQL state, credential or server
-deployment was changed. Repository candidates remain inactive and use
-identity-neutral workflow placeholders until packaging/promotion.
+Task 16 deployed the runner as a separate, non-privileged container on the
+current n8n host. The named AppArmor profile permits only the user namespace
+operation required by the Codex sandbox; the container remains non-root,
+read-only, drops all Linux capabilities, has no published port and keeps
+`no-new-privileges`. Linux isolation attestation and authenticated reachability
+from both n8n containers are GREEN. The runner-owned execution profile is now
+exposed and matches the pinned model, effort, CLI and artifact hashes. Four
+runner-direct blind runs completed under a bounded systemd driver. All four
+returned exactly 27 unique fields and passed structural/archive-integrity
+evaluation. Repeatability differences remain unadjudicated because neither new
+procurement has an employee-authored gold report. Evidence is recorded in the
+2026-09-10 runner/canary evaluations.
+
+The live database preflight found that the required
+`tender_analysis_documents.ingestion_metadata` column and agentic shadow tables
+are absent. No migration or production n8n write was authorized, so the three
+inactive workflow candidates were not imported or bound and the
+Dispatch → Monitor → 27-row live database canary remains closed. No existing
+n8n/PostgreSQL/Redis/archive/report container was recreated or reconfigured;
+the legacy production pipeline remains unchanged.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

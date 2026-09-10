@@ -7,6 +7,7 @@ import {
   lstat,
   mkdir,
   realpath,
+  readlink,
   readFile,
   readdir,
   stat,
@@ -354,7 +355,10 @@ async function pollTerminalJob({
   throw new BatchError('RUNNER_POLL_TIMEOUT', 'Runner job did not reach terminal state in time');
 }
 
-async function assertArchivableTree(directory, counters = { entries: 0, bytes: 0 }) {
+async function assertArchivableTree(
+  directory,
+  { archiveRoot = directory, counters = { entries: 0, bytes: 0 } } = {},
+) {
   const directoryMetadata = await lstat(directory);
   if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink()) {
     throw new BatchError('RUNNER_ARCHIVE_INVALID', 'Runner job archive root must be a regular directory');
@@ -368,10 +372,23 @@ async function assertArchivableTree(directory, counters = { entries: 0, bytes: 0
     const entryPath = path.join(directory, entry.name);
     const metadata = await lstat(entryPath);
     if (metadata.isSymbolicLink()) {
-      throw new BatchError('RUNNER_ARCHIVE_INVALID', 'Runner job archive must not contain symlinks');
+      let resolvedTarget;
+      try {
+        resolvedTarget = await realpath(entryPath);
+      } catch {
+        throw new BatchError('RUNNER_ARCHIVE_INVALID', 'Runner job archive contains a broken symlink');
+      }
+      if (!isPathWithin(archiveRoot, resolvedTarget)) {
+        throw new BatchError('RUNNER_ARCHIVE_INVALID', 'Runner job archive symlink escaped its root');
+      }
+      const targetMetadata = await stat(entryPath);
+      if (!targetMetadata.isFile() && !targetMetadata.isDirectory()) {
+        throw new BatchError('RUNNER_ARCHIVE_INVALID', 'Runner job archive symlink targets a special file');
+      }
+      continue;
     }
     if (metadata.isDirectory()) {
-      await assertArchivableTree(entryPath, counters);
+      await assertArchivableTree(entryPath, { archiveRoot, counters });
     } else if (metadata.isFile()) {
       counters.bytes += metadata.size;
       if (counters.bytes > 2 * 1024 * 1024 * 1024) {
@@ -391,9 +408,15 @@ async function buildArchiveInventory(root) {
       .sort((left, right) => left.name.localeCompare(right.name, 'en'));
     for (const entry of entries) {
       const entryPath = path.join(directory, entry.name);
-      if (entry.isDirectory()) await walk(entryPath);
-      else if (entry.isFile()) {
-        const metadata = await stat(entryPath);
+      const metadata = await lstat(entryPath);
+      if (metadata.isSymbolicLink()) {
+        inventory.push({
+          path: path.relative(root, entryPath).split(path.sep).join('/'),
+          entry_type: 'symlink',
+          link_target: await readlink(entryPath),
+        });
+      } else if (metadata.isDirectory()) await walk(entryPath);
+      else if (metadata.isFile()) {
         inventory.push({
           path: path.relative(root, entryPath).split(path.sep).join('/'),
           byte_size: metadata.size,
@@ -428,8 +451,14 @@ async function copyTerminalJob({ runnerJobsRoot, jobId, replicateDirectory }) {
   if (destinationExists) {
     await assertArchivableTree(destination);
   } else {
-    await cp(source, destination, { recursive: true, errorOnExist: true, force: false });
+    await cp(source, destination, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      verbatimSymlinks: true,
+    });
   }
+  await assertArchivableTree(destination);
   const files = await buildArchiveInventory(destination);
   if (canonicalJson(files) !== canonicalJson(sourceFiles)) {
     throw new BatchError(

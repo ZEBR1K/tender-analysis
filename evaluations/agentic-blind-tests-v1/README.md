@@ -75,11 +75,11 @@ The declared model, effort and CLI version must exactly match the currently
 pinned runner. This prevents an evaluation archive from claiming controls that
 the runner did not use. The driver also requires `/health` to expose a
 runner-owned `tender_codex_runner_execution_profile_v1` matching all four
-pinned artifact hashes. The current repository runner does not expose that
-profile yet, so a real batch deliberately stops with
-`RUNNER_PROVENANCE_NOT_READY`; only the fake-server path is verified in Task
-15. Run the batch only after that fail-closed Task 16 gate is implemented and
-the Linux isolation canary passes:
+pinned artifact hashes. Task 16 deployed that profile and passed the Linux
+isolation attestation before starting the first paid blind run. Deployment and
+runtime evidence are recorded in
+`evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` and
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
 
 ```powershell
 node scripts/run-agentic-shadow-batch.mjs `
@@ -114,4 +114,5 @@ fail-closed with `RUNNER_ISOLATION_NOT_READY` until a real Linux container
 canary proves the exact filesystem, auth, secret and process-environment
 boundaries described in the runner README. A Windows or repository-only fake
 test cannot prove that boundary, so no local bypass or configuration flag is
-provided. That runtime canary remains part of Task 16, before any paid call.
+provided. The deployed Task 16 runner passed this gate before every paid blind
+run recorded in the 2026-09-10 canary report.

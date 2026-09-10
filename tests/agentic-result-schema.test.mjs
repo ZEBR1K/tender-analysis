@@ -411,6 +411,44 @@ test('validation issue codes are limited to contract, identity, source and file 
   assert.doesNotMatch(validationModuleSource, /reported_|effective_/iu);
 });
 
+test('result schema stays inside the OpenAI strict structured-output subset', async () => {
+  const schema = JSON.parse(await readFile(schemaPaths[0], 'utf8'));
+  const unsupportedKeywords = new Set([
+    'allOf',
+    'not',
+    'dependentRequired',
+    'dependentSchemas',
+    'if',
+    'then',
+    'else',
+  ]);
+
+  const visit = (node, pointer = '#') => {
+    if (!node || typeof node !== 'object') return;
+    if (!Array.isArray(node) && Object.hasOwn(node, 'const')) {
+      assert.ok(node.type, `${pointer} const must declare an explicit type`);
+    }
+    if (!Array.isArray(node) && node.type === 'object' && node.properties) {
+      assert.equal(node.additionalProperties, false, `${pointer} must be closed`);
+      assert.deepEqual(
+        [...(node.required ?? [])].sort(),
+        Object.keys(node.properties).sort(),
+        `${pointer} must require every declared property`,
+      );
+    }
+    for (const [key, value] of Object.entries(node)) {
+      assert.equal(
+        unsupportedKeywords.has(key),
+        false,
+        `${pointer}/${key} is not supported by strict Structured Outputs`,
+      );
+      visit(value, `${pointer}/${key}`);
+    }
+  };
+
+  visit(schema);
+});
+
 test('retained source, locator and file-integrity issues round-trip through the envelope', async () => {
   const validators = await getValidators();
   const result = await loadResult();

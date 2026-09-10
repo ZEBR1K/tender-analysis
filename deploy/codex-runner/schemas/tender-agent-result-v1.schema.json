@@ -16,9 +16,11 @@
   ],
   "properties": {
     "schema_version": {
+      "type": "string",
       "const": "tender_agent_result_v1"
     },
     "field_catalog_version": {
+      "type": "string",
       "const": "tender_fields_v1"
     },
     "field_catalog_sha256": {
@@ -138,7 +140,8 @@
       "additionalProperties": false,
       "required": [
         "artifact_key",
-        "locator"
+        "locator",
+        "quote"
       ],
       "properties": {
         "artifact_key": {
@@ -148,70 +151,99 @@
           "$ref": "#/$defs/nonBlankString"
         },
         "quote": {
-          "$ref": "#/$defs/nonBlankString"
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "\\S"
         }
       }
     },
     "field": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "field_index",
-        "field_key",
-        "status",
-        "value_text",
-        "evidence",
-        "rationale"
-      ],
-      "properties": {
-        "field_index": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 27
-        },
-        "field_key": {
-          "$ref": "#/$defs/fieldKey"
-        },
-        "status": {
-          "$ref": "#/$defs/status"
-        },
-        "value_text": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "evidence": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/evidence"
-          }
-        },
-        "rationale": {
-          "type": "string"
-        }
-      },
-      "allOf": [
+      "anyOf": [
         {
-          "if": {
-            "properties": {
-              "status": {
-                "enum": [
-                  "resolved",
-                  "requires_review"
-                ]
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "field_index",
+            "field_key",
+            "status",
+            "value_text",
+            "evidence",
+            "rationale"
+          ],
+          "properties": {
+            "field_index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 27
+            },
+            "field_key": {
+              "$ref": "#/$defs/fieldKey"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "resolved",
+                "requires_review"
+              ]
+            },
+            "value_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidence"
               }
             },
-            "required": [
-              "status"
-            ]
-          },
-          "then": {
-            "properties": {
-              "evidence": {
-                "type": "array",
-                "minItems": 1
+            "rationale": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "field_index",
+            "field_key",
+            "status",
+            "value_text",
+            "evidence",
+            "rationale"
+          ],
+          "properties": {
+            "field_index": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 27
+            },
+            "field_key": {
+              "$ref": "#/$defs/fieldKey"
+            },
+            "status": {
+              "type": "string",
+              "const": "not_found"
+            },
+            "value_text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/evidence"
               }
+            },
+            "rationale": {
+              "type": "string"
             }
           }
         }

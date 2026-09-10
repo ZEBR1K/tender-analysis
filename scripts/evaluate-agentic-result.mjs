@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { lstat, readFile, readdir, stat } from 'node:fs/promises';
+import { lstat, readFile, readlink, readdir, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -97,6 +97,11 @@ function parseLegacyMarkdown(content) {
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPathWithin(parent, candidate) {
+  const relative = path.relative(path.resolve(parent), path.resolve(candidate));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 function parseJsonResult(value) {
@@ -518,8 +523,19 @@ async function inventoryArchiveFiles(root) {
     for (const entry of entries) {
       const filePath = path.join(directory, entry.name);
       const metadata = await lstat(filePath);
-      if (metadata.isSymbolicLink()) throw new Error('archive symlink');
-      if (metadata.isDirectory()) await walk(filePath);
+      if (metadata.isSymbolicLink()) {
+        const resolvedTarget = await realpath(filePath);
+        if (!isPathWithin(root, resolvedTarget)) throw new Error('archive symlink escape');
+        const targetMetadata = await stat(filePath);
+        if (!targetMetadata.isFile() && !targetMetadata.isDirectory()) {
+          throw new Error('archive symlink special target');
+        }
+        files.push({
+          path: path.relative(root, filePath).split(path.sep).join('/'),
+          entry_type: 'symlink',
+          link_target: await readlink(filePath),
+        });
+      } else if (metadata.isDirectory()) await walk(filePath);
       else if (metadata.isFile()) {
         files.push({
           path: path.relative(root, filePath).split(path.sep).join('/'),
@@ -547,7 +563,7 @@ async function evaluateArtifactIntegrity({
       readFile(path.join(replicateDirectory, 'terminal-status.json'), 'utf8').then(JSON.parse),
       readFile(path.join(replicateDirectory, 'validation.json'), 'utf8').then(JSON.parse),
       readFile(path.join(replicateDirectory, 'archive-sha256.json'), 'utf8').then(JSON.parse),
-      readFile(path.join(replicateDirectory, 'job', 'state.json'), 'utf8').then(JSON.parse),
+      readFile(path.join(replicateDirectory, 'job', 'job-state.json'), 'utf8').then(JSON.parse),
     ]);
     if (
       metadata?.job_id !== replicate.job_id

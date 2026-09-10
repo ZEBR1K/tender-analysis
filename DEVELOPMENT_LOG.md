@@ -5958,3 +5958,40 @@ cannot create a duplicate paid retry or poison attempt 2. The final repository
 suite is `670 passed`, `0 failed`, `2` explicit environment/platform skips.
 Detailed removal/retention inventory and remaining gates are in
 `evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
+
+---
+
+## 2026-09-10 — Task 16 isolated runner and runner-direct blind canary
+
+An isolated, resource-bounded Codex runner was deployed without changing the
+legacy n8n or database services. Its permanent boundary is non-root,
+non-privileged and read-only, with all Linux capabilities dropped, no published
+host port, `no-new-privileges`, and a named AppArmor profile that permits the
+runner's user-namespace sandbox. Linux isolation attestation and authenticated
+reachability from both the n8n main and worker containers are GREEN.
+
+The runner-direct blind canary completed four runs: two replicates each for
+`procurement-02` and `procurement-03`. Every result contains 27 unique
+`field_key` values, and structural plus immutable archive-integrity checks are
+GREEN. These runs have no gold truth; repeatability comparison is an offline
+diagnostic only and does not establish semantic correctness.
+
+Aggregate model usage across the four completed runs was:
+
+```text
+input tokens:     10,392,902
+cached tokens:     9,843,584
+output tokens:       125,623
+reasoning tokens:     22,915
+```
+
+Two preliminary batches were rejected by the provider's strict-schema checks
+before model execution and consumed zero tokens.
+
+The live database preflight found that
+`tender_analysis_documents.ingestion_metadata` and the shadow tables are absent.
+Therefore no migration, inactive workflow import, credential binding, or live
+27-row canary was performed; legacy production remains unchanged. Detailed
+evidence is recorded in
+`evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` and
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.

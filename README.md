@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-09
+**Последнее обновление:** 2026-09-10
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -14,12 +14,14 @@ PROJECT_STATUS.md
 
 Последний Document Worker handoff: executions `14374/14376` технически GREEN только до `ready_for_aggregation`; semantic applicability gate FAIL. Sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
 
-Дополнительно реализован изолированный repository-only фундамент агентского
-shadow-анализа через Codex (Tasks 0–10). Он не заменяет текущий Worker и не
-подключён к live n8n. Runner принимает только исходные файлы и минимальный
-manifest, а в runtime проверяет только безопасность, целостность файлов и JSON-
-контракт. Текущий handoff и перечень удалённых/оставленных проверок:
-`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
+Дополнительно реализован аддитивный фундамент агентского shadow-анализа через
+Codex (Tasks 0–16). Изолированный runner развёрнут, а прямой blind canary из
+четырёх запусков прошёл проверки изоляции, целостности архивов и JSON-контракта.
+Agentic-контур пока не подключён к live n8n и PostgreSQL: отсутствует требуемая
+предварительная схема БД, а gate на production write остаётся закрытым.
+Существующий legacy-контур не изменён. Подробности:
+`evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
 
 ---
 

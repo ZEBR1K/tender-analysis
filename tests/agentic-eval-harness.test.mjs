@@ -211,7 +211,7 @@ async function writeEvaluationReplicate({
     ['audit/codex-events.attempt-1.jsonl', eventsBytes],
     ['audit/validated-result.attempt-1.json', rawResultBytes],
     ['audit/validation.attempt-1.json', validationBytes],
-    ['state.json', stateBytes],
+    ['job-state.json', stateBytes],
   ];
   for (const [relativePath, bytes] of archivedFiles) {
     await writeFile(path.join(replicateDirectory, 'job', ...relativePath.split('/')), bytes);

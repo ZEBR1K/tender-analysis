@@ -1,19 +1,26 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import {
   mkdir,
   mkdtemp,
+  lstat,
+  readlink,
   readFile,
   readdir,
   rm,
+  stat,
   symlink,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const execFileAsync = promisify(execFile);
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
@@ -75,6 +82,7 @@ async function startFakeRunner({
   executionProfile = defaultExecutionProfile,
   statusOverrides = {},
   failCreateAfterTerminalJobs = null,
+  archiveSymlink = null,
 }) {
   const jobs = new Map();
   const events = [];
@@ -240,7 +248,7 @@ async function startFakeRunner({
           'utf8',
         );
         await writeFile(
-          path.join(runnerJobsRoot, statusMatch[1], 'state.json'),
+          path.join(runnerJobsRoot, statusMatch[1], 'job-state.json'),
           `${JSON.stringify({
             manifest: job.manifest,
             status,
@@ -259,6 +267,28 @@ async function startFakeRunner({
           })}\n`,
           'utf8',
         );
+        if (archiveSymlink) {
+          const jobRoot = path.join(runnerJobsRoot, statusMatch[1]);
+          const workspaceDirectory = path.join(jobRoot, 'workspace');
+          await mkdir(workspaceDirectory, { recursive: true });
+          const targetPath = archiveSymlink === 'internal'
+            ? path.join(jobRoot, 'audit', 'codex-events.attempt-1.jsonl')
+            : archiveSymlink === 'external'
+              ? path.join(runnerJobsRoot, 'outside-job.txt')
+              : archiveSymlink === 'special'
+                ? path.join(jobRoot, 'audit', 'special-target')
+                : path.join(jobRoot, 'audit', 'missing-target');
+          if (archiveSymlink === 'external') {
+            await writeFile(targetPath, 'outside job\n', 'utf8');
+          } else if (archiveSymlink === 'special') {
+            await execFileAsync('mkfifo', [targetPath]);
+          }
+          await symlink(
+            path.relative(workspaceDirectory, targetPath),
+            path.join(workspaceDirectory, 'source-alias'),
+            'file',
+          );
+        }
       }
       return json(response, 200, publicJobState(job, {
         attempt: 1,
@@ -390,6 +420,11 @@ test('batch driver stages multiple procurements sequentially and archives every 
       assert.ok(entries.includes('run-metadata.json'));
       assert.ok(entries.includes('archive-sha256.json'));
       assert.equal(
+        await stat(path.join(replicateDirectory, 'job', 'job-state.json'))
+          .then((metadata) => metadata.isFile()),
+        true,
+      );
+      assert.equal(
         await readFile(
           path.join(replicateDirectory, 'job', 'audit', 'codex-events.attempt-1.jsonl'),
           'utf8',
@@ -504,6 +539,166 @@ test('batch driver preserves a failed terminal replicate in the evaluation index
     await rm(fixture.root, { recursive: true, force: true });
   }
 });
+
+test(
+  'batch driver preserves and inventories a relative symlink whose target stays inside the terminal job',
+  { skip: process.platform === 'win32' ? 'Windows test host cannot create file symlinks' : false },
+  async () => {
+    const fixture = await prepareFixture();
+    const config = JSON.parse(await readFile(fixture.configPath, 'utf8'));
+    config.cases = [{ ...config.cases[0], replicates: 1 }];
+    await writeFile(fixture.configPath, `${JSON.stringify(config)}\n`, 'utf8');
+    const runner = await startFakeRunner({
+      runnerJobsRoot: fixture.runnerJobsRoot,
+      archiveSymlink: 'internal',
+    });
+    try {
+      const { runAgenticShadowBatch } = await import(pathToFileURL(batchScriptPath).href);
+      await runAgenticShadowBatch({
+        configPath: fixture.configPath,
+        outputRoot: fixture.outputRoot,
+        runnerBaseUrl: runner.baseUrl,
+        runnerJobsRoot: fixture.runnerJobsRoot,
+        authToken,
+        pollIntervalMs: 1,
+        pollTimeoutMs: 5_000,
+      });
+
+      const replicateDirectory = path.join(
+        fixture.outputRoot,
+        'cases',
+        'procurement-02',
+        'replicate-01',
+      );
+      const archivedLink = path.join(replicateDirectory, 'job', 'workspace', 'source-alias');
+      assert.equal((await lstat(archivedLink)).isSymbolicLink(), true);
+      assert.equal(
+        await readlink(archivedLink),
+        path.join('..', 'audit', 'codex-events.attempt-1.jsonl'),
+      );
+      const inventory = JSON.parse(await readFile(
+        path.join(replicateDirectory, 'archive-sha256.json'),
+        'utf8',
+      ));
+      assert.deepEqual(
+        inventory.files.find(({ path: entryPath }) => entryPath === 'workspace/source-alias'),
+        {
+          path: 'workspace/source-alias',
+          entry_type: 'symlink',
+          link_target: '../audit/codex-events.attempt-1.jsonl',
+        },
+      );
+      const { evaluateAgenticEvaluationRoot } = await import(
+        pathToFileURL(evaluatorScriptPath).href
+      );
+      const evaluated = await evaluateAgenticEvaluationRoot(fixture.outputRoot);
+      assert.equal(evaluated.all_structural_pass, true);
+      assert.equal(evaluated.cases[0].replicates[0].evaluation.ok, true);
+    } finally {
+      await runner.close();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'batch driver rejects a terminal job symlink that escapes the runner job root',
+  { skip: process.platform === 'win32' ? 'Windows test host cannot create file symlinks' : false },
+  async () => {
+    const fixture = await prepareFixture();
+    const config = JSON.parse(await readFile(fixture.configPath, 'utf8'));
+    config.cases = [{ ...config.cases[0], replicates: 1 }];
+    await writeFile(fixture.configPath, `${JSON.stringify(config)}\n`, 'utf8');
+    const runner = await startFakeRunner({
+      runnerJobsRoot: fixture.runnerJobsRoot,
+      archiveSymlink: 'external',
+    });
+    try {
+      const { runAgenticShadowBatch } = await import(pathToFileURL(batchScriptPath).href);
+      await assert.rejects(
+        runAgenticShadowBatch({
+          configPath: fixture.configPath,
+          outputRoot: fixture.outputRoot,
+          runnerBaseUrl: runner.baseUrl,
+          runnerJobsRoot: fixture.runnerJobsRoot,
+          authToken,
+          pollIntervalMs: 1,
+          pollTimeoutMs: 5_000,
+        }),
+        (error) => error.code === 'RUNNER_ARCHIVE_INVALID',
+      );
+    } finally {
+      await runner.close();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'batch driver rejects a broken terminal job symlink',
+  { skip: process.platform === 'win32' ? 'Windows test host cannot create file symlinks' : false },
+  async () => {
+    const fixture = await prepareFixture();
+    const config = JSON.parse(await readFile(fixture.configPath, 'utf8'));
+    config.cases = [{ ...config.cases[0], replicates: 1 }];
+    await writeFile(fixture.configPath, `${JSON.stringify(config)}\n`, 'utf8');
+    const runner = await startFakeRunner({
+      runnerJobsRoot: fixture.runnerJobsRoot,
+      archiveSymlink: 'broken',
+    });
+    try {
+      const { runAgenticShadowBatch } = await import(pathToFileURL(batchScriptPath).href);
+      await assert.rejects(
+        runAgenticShadowBatch({
+          configPath: fixture.configPath,
+          outputRoot: fixture.outputRoot,
+          runnerBaseUrl: runner.baseUrl,
+          runnerJobsRoot: fixture.runnerJobsRoot,
+          authToken,
+          pollIntervalMs: 1,
+          pollTimeoutMs: 5_000,
+        }),
+        (error) => error.code === 'RUNNER_ARCHIVE_INVALID',
+      );
+    } finally {
+      await runner.close();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'batch driver rejects a terminal job containing a special-file symlink target',
+  { skip: process.platform === 'win32' ? 'Windows test host cannot create FIFO files' : false },
+  async () => {
+    const fixture = await prepareFixture();
+    const config = JSON.parse(await readFile(fixture.configPath, 'utf8'));
+    config.cases = [{ ...config.cases[0], replicates: 1 }];
+    await writeFile(fixture.configPath, `${JSON.stringify(config)}\n`, 'utf8');
+    const runner = await startFakeRunner({
+      runnerJobsRoot: fixture.runnerJobsRoot,
+      archiveSymlink: 'special',
+    });
+    try {
+      const { runAgenticShadowBatch } = await import(pathToFileURL(batchScriptPath).href);
+      await assert.rejects(
+        runAgenticShadowBatch({
+          configPath: fixture.configPath,
+          outputRoot: fixture.outputRoot,
+          runnerBaseUrl: runner.baseUrl,
+          runnerJobsRoot: fixture.runnerJobsRoot,
+          authToken,
+          pollIntervalMs: 1,
+          pollTimeoutMs: 5_000,
+        }),
+        (error) => error.code === 'RUNNER_ARCHIVE_INVALID',
+      );
+    } finally {
+      await runner.close();
+      await rm(fixture.root, { recursive: true, force: true });
+    }
+  },
+);
 
 test('batch driver rejects control metadata that does not match the pinned runner', async () => {
   const fixture = await prepareFixture();

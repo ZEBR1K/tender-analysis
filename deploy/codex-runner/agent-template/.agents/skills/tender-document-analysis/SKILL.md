@@ -17,8 +17,9 @@ description: Use when analyzing one sealed procurement package into the 27-field
    in `limitations` instead of claiming it was examined.
 4. Use only the meanings in the catalog. For `resolved` and `requires_review`,
    include evidence with the manifest `artifact_key` and a useful human
-   `locator`. A quote is optional audit text. Never invent a quote, source, or
-   locator.
+   `locator`. A quote value is optional audit text, but the JSON key is always
+   present: use `"quote": null` when no honest quote is available. Never invent
+   a quote, source, or locator.
 5. If a value cannot be established after attempting the manifest documents,
    use `not_found`; `value_text` may be null and `evidence` may be empty. Do not
    turn missing information into “no”, “false”, or “not required”.

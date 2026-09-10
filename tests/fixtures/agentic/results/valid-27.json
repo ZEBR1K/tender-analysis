@@ -44,7 +44,8 @@
       "evidence": [
         {
           "artifact_key": "doc-0001",
-          "locator": "page 2, price table"
+          "locator": "page 2, price table",
+          "quote": null
         }
       ],
       "rationale": "The agent requests human review of the price presentation."
