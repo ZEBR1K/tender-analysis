@@ -231,22 +231,31 @@ test('permission builder grants only current job roots and supplies CLI override
   const overrides = boundary.cliArgs.filter((_, index) => boundary.cliArgs[index - 1] === '-c');
   for (const required of [
     'default_permissions="tender-analysis-job"',
-    'permissions.tender-analysis-job.filesystem.:root="deny"',
-    'permissions.tender-analysis-job.filesystem.:minimal="read"',
-    'permissions.tender-analysis-job.filesystem./data/jobs="deny"',
-    `permissions.tender-analysis-job.filesystem./data/jobs/${jobId}/workspace="write"`,
-    `permissions.tender-analysis-job.filesystem./data/jobs/${jobId}/input="read"`,
-    'permissions.tender-analysis-job.filesystem./run/codex-auth="deny"',
-    'permissions.tender-analysis-job.filesystem./run/secrets="deny"',
-    'permissions.tender-analysis-job.filesystem./proc/*/environ="deny"',
-    'permissions.tender-analysis-job.filesystem.:tmpdir="deny"',
-    'permissions.tender-analysis-job.filesystem.:slash_tmp="deny"',
     'permissions.tender-analysis-job.network.enabled=false',
     'shell_environment_policy.inherit="none"',
     'shell_environment_policy.ignore_default_excludes=false',
     'shell_environment_policy.experimental_use_profile=false',
   ]) {
     assert.ok(overrides.includes(required), `missing CLI permission override: ${required}`);
+  }
+  const filesystemOverride = overrides.find(
+    (entry) => entry.startsWith('permissions.tender-analysis-job.filesystem='),
+  );
+  for (const [permissionPath, access] of [
+    [':root', 'deny'],
+    [':minimal', 'read'],
+    [':tmpdir', 'deny'],
+    [':slash_tmp', 'deny'],
+    ['/data/jobs', 'deny'],
+    [`/data/jobs/${jobId}/workspace`, 'write'],
+    [`/data/jobs/${jobId}/input`, 'read'],
+    ['/run/codex-auth', 'deny'],
+    ['/run/secrets', 'deny'],
+    ['/proc/*/environ', 'deny'],
+  ]) {
+    assert.ok(filesystemOverride.includes(
+      `${JSON.stringify(permissionPath)}=${JSON.stringify(access)}`,
+    ));
   }
   assert.equal(
     overrides.some((entry) => entry.includes('/source-index')),
@@ -255,6 +264,31 @@ test('permission builder grants only current job roots and supplies CLI override
   assert.ok(overrides.includes(`shell_environment_policy.set.HOME="/data/jobs/${jobId}/workspace"`));
   assert.ok(overrides.includes(`shell_environment_policy.set.TMPDIR="/data/jobs/${jobId}/workspace/.tmp"`));
   assert.equal(overrides.some((entry) => /KEY|SECRET|TOKEN|CODEX_HOME/u.test(entry)), false);
+});
+
+test('filesystem permission paths are encoded in one TOML map so dots stay literal', () => {
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  const jobsRoot = '/data/jobs/.runner-isolation/canaries/challenge/jobs';
+  const boundary = buildCodexPermissionBoundary({ jobId, jobsRoot });
+  const overrides = boundary.cliArgs.filter((_, index) => boundary.cliArgs[index - 1] === '-c');
+  const filesystemOverrides = overrides.filter(
+    (entry) => entry.startsWith('permissions.tender-analysis-job.filesystem'),
+  );
+
+  assert.equal(filesystemOverrides.length, 1);
+  assert.match(
+    filesystemOverrides[0],
+    /^permissions\.tender-analysis-job\.filesystem=\{/u,
+  );
+  for (const expected of [
+    `${JSON.stringify(jobsRoot)}="deny"`,
+    `${JSON.stringify(`${jobsRoot}/${jobId}/workspace`)}="write"`,
+    `${JSON.stringify(`${jobsRoot}/${jobId}/workspace/AGENTS.md`)}="read"`,
+    `${JSON.stringify(`${jobsRoot}/${jobId}/workspace/.agents`)}="read"`,
+    `${JSON.stringify(`${jobsRoot}/${jobId}/input`)}="read"`,
+  ]) {
+    assert.ok(filesystemOverrides[0].includes(expected));
+  }
 });
 
 test('isolation canary declares the complete positive and negative runtime probe set', () => {

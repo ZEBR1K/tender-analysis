@@ -21,6 +21,12 @@ function tomlString(value) {
   return JSON.stringify(String(value));
 }
 
+function tomlInlineStringMap(entries) {
+  return `{${entries.map(([key, value]) => (
+    `${JSON.stringify(key)}=${tomlString(value)}`
+  )).join(',')}}`;
+}
+
 function override(key, value) {
   return `${key}=${value}`;
 }
@@ -46,23 +52,29 @@ export function buildCodexPermissionBoundary({
   const agentInstructionsPath = path.posix.join(workspaceDirectory, 'AGENTS.md');
   const agentSkillsDirectory = path.posix.join(workspaceDirectory, '.agents');
 
+  const filesystemEntries = [
+    [':root', 'deny'],
+    [':minimal', 'read'],
+    [':tmpdir', 'deny'],
+    [':slash_tmp', 'deny'],
+    [normalizedJobsRoot, 'deny'],
+    [workspaceDirectory, 'write'],
+    [agentInstructionsPath, 'read'],
+    [agentSkillsDirectory, 'read'],
+    [inputDirectory, 'read'],
+    [normalizedAuthRoot, 'deny'],
+    [normalizedSecretsRoot, 'deny'],
+    ['/proc/*/environ', 'deny'],
+    ['/proc/self/environ', 'deny'],
+    ['/proc/thread-self/environ', 'deny'],
+  ];
   const entries = [
     override('default_permissions', tomlString(PROFILE_NAME)),
     override(`permissions.${PROFILE_NAME}.description`, tomlString('Isolated tender analysis job')),
-    override(`permissions.${PROFILE_NAME}.filesystem.:root`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem.:minimal`, tomlString('read')),
-    override(`permissions.${PROFILE_NAME}.filesystem.:tmpdir`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem.:slash_tmp`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${normalizedJobsRoot}`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${workspaceDirectory}`, tomlString('write')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${agentInstructionsPath}`, tomlString('read')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${agentSkillsDirectory}`, tomlString('read')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${inputDirectory}`, tomlString('read')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${normalizedAuthRoot}`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem.${normalizedSecretsRoot}`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem./proc/*/environ`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem./proc/self/environ`, tomlString('deny')),
-    override(`permissions.${PROFILE_NAME}.filesystem./proc/thread-self/environ`, tomlString('deny')),
+    override(
+      `permissions.${PROFILE_NAME}.filesystem`,
+      tomlInlineStringMap(filesystemEntries),
+    ),
     override(`permissions.${PROFILE_NAME}.network.enabled`, 'false'),
     override('shell_environment_policy.inherit', tomlString('none')),
     override('shell_environment_policy.ignore_default_excludes', 'false'),

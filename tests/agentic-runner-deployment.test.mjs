@@ -109,8 +109,9 @@ test('runner uses constant-time Header Auth for protected routes', async () => {
 
 test('runner ships a fail-closed Codex permission boundary rather than legacy sandbox flags', async () => {
   const permissionsSource = await readFile(permissionsSourcePath, 'utf8');
-  assert.match(permissionsSource, /filesystem\.:root/u);
-  assert.match(permissionsSource, /filesystem\.:minimal/u);
+  assert.match(permissionsSource, /\[':root', 'deny'\]/u);
+  assert.match(permissionsSource, /\[':minimal', 'read'\]/u);
+  assert.match(permissionsSource, /tomlInlineStringMap\(filesystemEntries\)/u);
   assert.match(permissionsSource, /--ignore-user-config/u);
   assert.match(permissionsSource, /shell_environment_policy/u);
   assert.doesNotMatch(permissionsSource, /dangerously-bypass/u);
