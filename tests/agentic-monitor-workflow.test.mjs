@@ -10,6 +10,9 @@ const find = (workflow, name) => {
   assert.ok(node, `missing node ${name}`);
   return node;
 };
+const targets = (workflow, source) => (
+  workflow.connections[source]?.main?.[0] ?? []
+).map(({ node }) => node);
 const reaches = (workflow, source, target) => {
   const pending = [source];
   const seen = new Set();
@@ -142,7 +145,12 @@ test('completed duplicate is byte-compatible no-op and JSONL is never persisted'
   assert.doesNotMatch(claim, /status\s*=\s*'completed'/iu);
   const all = JSON.stringify(workflow);
   assert.doesNotMatch(all, /codex-events|runner-events|jsonl/iu);
-  assert.doesNotMatch(all, /legacy|tender_analysis_facts|tender_analysis_field_results/iu);
+  const finalize = find(workflow, 'Завершить agentic analysis');
+  assert.equal(finalize.type, 'n8n-nodes-base.executeWorkflow');
+  assert.deepEqual(targets(workflow, 'Сохранить ровно 27 shadow rows'), [finalize.name]);
+  assert.match(JSON.stringify(finalize.parameters), /analysis_run_id/u);
+  assert.match(JSON.stringify(finalize.parameters), /agentic_job_id/u);
+  assert.doesNotMatch(all, /legacy|tender_analysis_facts|Targeted Recheck|Обработать документ/iu);
 });
 
 test('monitor never claims a dispatch-owned pre-start job', async () => {
