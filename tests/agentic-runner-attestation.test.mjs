@@ -198,7 +198,11 @@ test('probe script executes every declared read, write and environment check its
       reads.push(filePath);
       if (filePath === `${jobsRoot}/${jobId}/input/current-readable.txt`) return currentMarker;
       if (filePath.endsWith('/workspace/isolation-probe-write.tmp')) return Buffer.from('workspace\n');
-      if (deniedReads.has(filePath)) throw Object.assign(new Error('denied'), { code: 'EACCES' });
+      if (deniedReads.has(filePath)) {
+        const hidden = filePath === `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`
+          || filePath === `${jobsRoot}/${jobId}/codex-home/auth.json`;
+        throw Object.assign(new Error('denied'), { code: hidden ? 'ENOENT' : 'EACCES' });
+      }
       throw Object.assign(new Error('unexpected read'), { code: 'ENOENT' });
     },
     async readdir(filePath) {

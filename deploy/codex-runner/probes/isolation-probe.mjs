@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/iu;
-const DENIED_CODES = new Set(['EACCES', 'EPERM', 'EROFS']);
+const DENIED_CODES = new Set(['EACCES', 'ENOENT', 'EPERM', 'EROFS']);
 const PROBE_IDS = Object.freeze([
   'current_input',
   'workspace',
