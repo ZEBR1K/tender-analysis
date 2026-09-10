@@ -11,6 +11,11 @@ const runnerDirectory = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const dockerfilePath = path.join(runnerDirectory, 'Dockerfile');
 const dockerignorePath = path.join(runnerDirectory, '.dockerignore');
 const composePath = path.join(runnerDirectory, 'compose.yaml');
+const appArmorProfilePath = path.join(
+  runnerDirectory,
+  'apparmor',
+  'tender-codex-runner',
+);
 const attributesPath = path.join(repositoryRoot, '.gitattributes');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
 const permissionsSourcePath = path.join(runnerDirectory, 'src', 'permissions.mjs');
@@ -39,8 +44,8 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr=5\.3\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
-  assert.match(dockerfile, /bubblewrap=0\.8\.0-2\+deb12u1/u);
-  assert.match(dockerfile, /chmod u\+s \/usr\/bin\/bwrap/u);
+  assert.doesNotMatch(dockerfile, /apt-get install[^;]*bubblewrap/su);
+  assert.doesNotMatch(dockerfile, /chmod[^\n]*bwrap/u);
   assert.match(dockerfile, /npm ci --omit=dev/u);
   assert.match(dockerfile, /COPY field-catalog \.\/field-catalog/u);
   assert.match(dockerfile, /COPY probes \.\/probes/u);
@@ -55,7 +60,7 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /CMD \["node", "src\/server\.mjs"\]/u);
 });
 
-test('runner Compose exposes only the capabilities required for the inner Codex sandbox', async () => {
+test('runner Compose enables unprivileged Codex namespaces without Linux capabilities or setuid', async () => {
   const compose = await readFile(composePath, 'utf8');
 
   assert.doesNotMatch(compose, /^\s*ports:/mu);
@@ -64,21 +69,10 @@ test('runner Compose exposes only the capabilities required for the inner Codex 
   assert.match(compose, /user:\s*"10001:10001"/u);
   assert.match(compose, /^\s*init:\s*true$/mu);
   assert.match(compose, /cap_drop:\s*\r?\n\s*- ALL/u);
-  const capabilities = [
-    'SYS_ADMIN',
-    'SYS_CHROOT',
-    'SETUID',
-    'SETGID',
-    'SYS_PTRACE',
-    'NET_ADMIN',
-    'NET_RAW',
-  ];
-  for (const capability of capabilities) {
-    assert.match(compose, new RegExp(`^\\s*- ${capability}$`, 'mu'));
-  }
+  assert.doesNotMatch(compose, /^\s*cap_add:/mu);
+  assert.match(compose, /^\s*- no-new-privileges:true$/mu);
   assert.match(compose, /^\s*- seccomp=unconfined$/mu);
-  assert.match(compose, /^\s*- apparmor=unconfined$/mu);
-  assert.doesNotMatch(compose, /no-new-privileges/u);
+  assert.match(compose, /^\s*- apparmor=tender-codex-runner-userns$/mu);
   assert.doesNotMatch(compose, /^\s*privileged:\s*true$/mu);
   assert.doesNotMatch(compose, /docker\.sock/u);
   assert.match(compose, /healthcheck:/u);
@@ -98,6 +92,14 @@ test('runner Compose exposes only the capabilities required for the inner Codex 
   assert.match(compose, /pids_limit:\s*192/u);
   assert.match(compose, /n8n_default:\s*\r?\n\s*external:\s*true/u);
   assert.doesNotMatch(compose, /^\s+(N8N_|POSTGRES|SUPABASE|TENDERPLAN|TELEGRAM)[A-Z0-9_]*:/mu);
+});
+
+test('runner AppArmor profile grants only the explicit Ubuntu user-namespace exception', async () => {
+  const profile = await readFile(appArmorProfilePath, 'utf8');
+
+  assert.match(profile, /profile tender-codex-runner-userns flags=\(unconfined\)/u);
+  assert.match(profile, /^\s*userns,$/mu);
+  assert.doesNotMatch(profile, /^\s*(?:capability|mount|pivot_root|ptrace|network),?$/mu);
 });
 
 test('runner build context is deny-by-default and cannot include runtime state or secrets', async () => {

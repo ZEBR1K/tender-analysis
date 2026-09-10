@@ -5,7 +5,8 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 ## Security and runtime boundary
 
 - The service has no host-published port. n8n reaches `http://tender-codex-runner:8080` through the external `n8n_default` network.
-- The container runs as UID/GID `10001:10001` with a read-only root filesystem. It drops all inherited Linux capabilities, then restores only `SYS_ADMIN`, `SYS_CHROOT`, `SETUID`, `SETGID`, `SYS_PTRACE`, `NET_ADMIN`, and `NET_RAW`; Docker seccomp and AppArmor are unconfined so the inner Codex `bubblewrap` sandbox can create its own namespaces and filters.
+- The container runs as UID/GID `10001:10001` with a read-only root filesystem, all Linux capabilities dropped, and `no-new-privileges` enabled. It does not install or use a setuid `bubblewrap` helper.
+- Docker's outer seccomp profile is unconfined only for this container so the bundled Codex sandbox can create its restricted namespaces and install its own seccomp filter. A named AppArmor profile grants only the `userns` exception required on Ubuntu while the host-wide unprivileged-user-namespace restriction stays enabled.
 - `/opt/tender-codex-runner/jobs` is the only writable host mount and appears as `/data/jobs`. For each invocation the runner creates a private job-local `codex-home`, copies only `auth.json` into it with mode `0600`, keeps it outside the agent workspace, and removes it after the Codex process exits.
 - The runner Header Auth token is mounted read-only at `/run/secrets/runner-auth-token`. The dedicated Codex auth directory is mounted read-only at `/run/codex-auth`; never mount a user's complete Codex home, home directory or the n8n filesystem.
 - The service receives only its own Header Auth token and Codex credential at deployment time. It must never receive TenderPlan, n8n, PostgreSQL, Supabase or Telegram credentials.
@@ -83,6 +84,8 @@ Create `/opt/tender-codex-runner/jobs` with owner `10001:10001` and mode `0700`.
 Start or replace only this Compose project:
 
 ```bash
+install -o root -g root -m 0644 /opt/tender-codex-runner/apparmor/tender-codex-runner /etc/apparmor.d/tender-codex-runner
+apparmor_parser -r /etc/apparmor.d/tender-codex-runner
 docker compose -p tender-codex-runner -f /opt/tender-codex-runner/compose.yaml config -q
 docker compose -p tender-codex-runner -f /opt/tender-codex-runner/compose.yaml build codex-runner
 docker compose -p tender-codex-runner -f /opt/tender-codex-runner/compose.yaml up -d --no-deps codex-runner
