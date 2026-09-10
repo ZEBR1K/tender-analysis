@@ -149,7 +149,7 @@ test('HTTP lifecycle is asynchronous and idempotent from ready through completed
   const secret = 'l'.repeat(32);
   const server = createServer({
     authenticator: createHeaderAuthenticator(secret),
-    executionBoundary: { ready: true },
+    executionBoundary: { verify: async () => ({ verified: true }) },
     healthProvider: async () => ({ schema_version: 'test', status: 'ready' }),
     queue,
     v1Handler: handler,

@@ -12,7 +12,7 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 - Exactly one Codex process may run at a time. The initial queue accepts at most two waiting jobs and fails closed beyond that bound.
 - JSON bodies are limited to 2 MiB and may be buffered. Document bodies are limited to 50 MiB, are exposed to the route handler as a bounded `AsyncIterable`, and are never concatenated in memory. The raw HTTP stream is not exposed to route handlers. The server retains the single global document-upload slot until full EOF, drains an early handler return/error without retaining bytes, and lets an eventual size overflow override apparent success. Overlap is rejected with `503 RUNNER_UPLOAD_BUSY`; Task 5 must consume the stream completely while computing SHA-256 and performing an atomic rename.
 
-`GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions and boolean readiness flags. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
+`GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions, boolean readiness flags, and runner-owned `tender_codex_runner_execution_profile_v1` provenance. The profile pins `gpt-5.6-sol`, reasoning effort `high`, Codex CLI `0.153.4`, and SHA-256 hashes read from the four image files used at execution time: field catalog, prompt, analysis skill, and result schema. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
 
 ## Immutable source staging
 
@@ -58,6 +58,16 @@ active jobs are never TTL-deleted.
 
 The execution entry point carries explicit `requiresExecutionBoundary` route metadata and returns `503 RUNNER_ISOLATION_NOT_READY` until a real container canary proves that a sibling job, `/run/codex-auth`, `/run/secrets` and process environments are unreadable. Do not mark `readiness.execute=true` from configuration alone.
 
+After each container start, wait until `GET /health` reports base `status: "ready"`, then run this command exactly once from the host:
+
+```bash
+docker exec tender-codex-runner npm run attest:isolation
+```
+
+This is a bounded, real Codex call and may consume paid usage. It creates two fresh canary jobs, runs the image-owned hash-pinned probe under the same model, reasoning effort, permission profile, environment policy and no-network controls as production execution, and accepts only Codex JSONL command-execution evidence. Agent prose or an agent-written claim cannot attest the runner. The probe must prove current-input read, workspace write, current-input write denial, sibling/job-parent denial, auth and runner-secret denial, `/tmp` write denial, self/parent environment denial, and absence of credential-like environment names.
+
+Only a successful probe is persisted atomically with restrictive permissions below `/data/jobs/.runner-isolation`. The record contains identifiers, timestamps and hashes only—never credentials, raw auth, host corpus paths or model reasoning. It is bound to the current process challenge, container identity, execution profile, command/permission contract, exact probe set and JSONL audit bytes. Missing, altered, older-than-24-hours, overlong or prior-container evidence keeps `readiness.isolation_canary` and `readiness.execute` false. The running server notices a newly valid record without restart or a configuration toggle; `/v1/jobs/{job_id}/start` remains fail-closed with `503 RUNNER_ISOLATION_NOT_READY` until then. Base health HTTP status semantics are unchanged: a base-ready runner can return HTTP 200 while these execution flags are false.
+
 ## Local checks
 
 ```powershell
@@ -78,4 +88,4 @@ docker compose -p tender-codex-runner -f /opt/tender-codex-runner/compose.yaml b
 docker compose -p tender-codex-runner -f /opt/tender-codex-runner/compose.yaml up -d --no-deps codex-runner
 ```
 
-If auth, the writable store, or a required document tool is unavailable, health returns `503` and the container stays unready. Deployment and paid-call canaries remain separate later gates.
+If auth, the writable store, or a required document tool is unavailable, health returns `503` and the container stays unready. The isolation command is an explicit post-start operator gate; it is not run during image build, startup, health checks or automated tests.

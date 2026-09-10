@@ -21,6 +21,7 @@ COPY policies ./policies
 COPY field-catalog ./field-catalog
 COPY agent-template ./agent-template
 COPY prompts ./prompts
+COPY probes ./probes
 COPY src ./src
 
 RUN mkdir --parents /data/jobs/.tmp \

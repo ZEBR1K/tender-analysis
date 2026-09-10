@@ -74,6 +74,16 @@ test('configuration fixes one Codex process and exact JSON/document request limi
 test('GET /health exposes readiness and tool versions without secrets', async (t) => {
   const secret = 'runner-secret-that-must-never-leak';
   const queue = createSingleProcessQueue({ maxQueuedJobs: 2 });
+  const executionProfile = {
+    schema_version: 'tender_codex_runner_execution_profile_v1',
+    model: 'gpt-5.6-sol',
+    reasoning_effort: 'high',
+    codex_cli_version: '0.153.4',
+    field_catalog_sha256: 'A'.repeat(64),
+    prompt_sha256: 'B'.repeat(64),
+    skill_sha256: 'C'.repeat(64),
+    result_schema_sha256: 'D'.repeat(64),
+  };
   const health = buildHealthReport({
     serviceVersion: '0.1.0',
     authReady: true,
@@ -89,6 +99,7 @@ test('GET /health exposes readiness and tool versions without secrets', async (t
     isolationReady: true,
     codexAuthReady: true,
     isolationCanaryVerified: false,
+    executionProfile,
     queue: queue.snapshot(),
   });
   const server = createServer({
@@ -106,6 +117,7 @@ test('GET /health exposes readiness and tool versions without secrets', async (t
     schema_version: 'tender_codex_runner_health_v1',
     status: 'ready',
     service_version: '0.1.0',
+    execution_profile: executionProfile,
     tools: {
       node: 'v24.18.0',
       codex: 'codex-cli 0.153.4',
@@ -169,6 +181,40 @@ test('tool probes never promote nonzero, timeout or spawn diagnostics into a ver
   assert.equal(report.readiness.tools, false);
 });
 
+test('health cannot promote execution from a configuration boolean alone', () => {
+  const base = {
+    serviceVersion: '0.1.0',
+    authReady: true,
+    storeReady: true,
+    isolationReady: true,
+    codexAuthReady: true,
+    isolationCanaryVerified: true,
+    executionProfile: {
+      schema_version: 'tender_codex_runner_execution_profile_v1',
+      codex_cli_version: '0.153.4',
+    },
+    toolVersions: {
+      node: process.version,
+      codex: 'codex-cli 0.153.4',
+      poppler: '22.12.0',
+      libreoffice: '7.4.7',
+      tesseract: '5.3.0',
+      ocr_languages: ['eng', 'rus'],
+    },
+    queue: { active: 0, queued: 0, max_concurrent: 1, max_queued: 1 },
+  };
+  const configured = buildHealthReport(base);
+  assert.equal(configured.readiness.isolation_canary, false);
+  assert.equal(configured.readiness.execute, false);
+
+  const attested = buildHealthReport({
+    ...base,
+    runtimeAttestation: { verified: true },
+  });
+  assert.equal(attested.readiness.isolation_canary, true);
+  assert.equal(attested.readiness.execute, true);
+});
+
 test('permission builder grants only current job roots and supplies CLI overrides after user-config isolation', () => {
   const jobId = '11111111-1111-4111-8111-111111111111';
   const boundary = buildCodexPermissionBoundary({ jobId });
@@ -211,18 +257,24 @@ test('permission builder grants only current job roots and supplies CLI override
   assert.equal(overrides.some((entry) => /KEY|SECRET|TOKEN|CODEX_HOME/u.test(entry)), false);
 });
 
-test('negative isolation canary covers sibling jobs, Codex auth and process environments', () => {
+test('isolation canary declares the complete positive and negative runtime probe set', () => {
   const canary = buildIsolationNegativeCanary({
     jobId: '11111111-1111-4111-8111-111111111111',
     siblingJobId: '22222222-2222-4222-8222-222222222222',
   });
   assert.equal(canary.schema_version, 'tender_codex_runner_isolation_canary_v1');
   assert.deepEqual(canary.probes.map(({ id, expected }) => ({ id, expected })), [
+    { id: 'current_input', expected: 'readable' },
+    { id: 'workspace', expected: 'writable' },
+    { id: 'current_input_write', expected: 'denied' },
     { id: 'sibling_job', expected: 'denied' },
+    { id: 'jobs_parent', expected: 'denied' },
     { id: 'codex_auth', expected: 'denied' },
     { id: 'runner_secret', expected: 'denied' },
+    { id: 'slash_tmp', expected: 'denied' },
     { id: 'self_process_environment', expected: 'denied' },
     { id: 'parent_process_environment', expected: 'denied' },
+    { id: 'credential_environment', expected: 'absent' },
   ]);
 });
 
@@ -233,7 +285,7 @@ test('POST /v1/jobs/{uuid}/start fails closed until the Task 8 isolation canary 
   const server = createServer({
     authenticator: createHeaderAuthenticator(secret),
     healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
-    executionBoundary: { ready: false },
+    executionBoundary: { verify: async () => ({ verified: false }) },
     v1Handler: async () => {
       handlerCalled = true;
       return { success: true };
@@ -253,6 +305,33 @@ test('POST /v1/jobs/{uuid}/start fails closed until the Task 8 isolation canary 
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, 'RUNNER_ISOLATION_NOT_READY');
   assert.equal(handlerCalled, false);
+});
+
+test('POST /start recognizes a newly valid runtime attestation without restart', async (t) => {
+  const secret = '7'.repeat(32);
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  let verified = false;
+  let handlerCalls = 0;
+  const server = createServer({
+    authenticator: createHeaderAuthenticator(secret),
+    healthProvider: async () => ({ schema_version: 'tender_codex_runner_health_v1', status: 'ready' }),
+    executionBoundary: { verify: async () => ({ verified }) },
+    v1Handler: async () => {
+      handlerCalls += 1;
+      return { success: true };
+    },
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const options = {
+    method: 'POST',
+    headers: { 'x-tender-codex-token': secret },
+  };
+
+  assert.equal((await fetch(`${base}/v1/jobs/${jobId}/start`, options)).status, 503);
+  verified = true;
+  assert.equal((await fetch(`${base}/v1/jobs/${jobId}/start`, options)).status, 200);
+  assert.equal(handlerCalls, 1);
 });
 
 test('/v1/* rejects missing and wrong Header Auth but accepts the exact token', async (t) => {

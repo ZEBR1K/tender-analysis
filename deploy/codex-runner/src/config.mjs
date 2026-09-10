@@ -44,7 +44,6 @@ export function createConfig(env = process.env) {
     maxConcurrentUploads: 1,
     maxQueuedJobs: positiveInteger(env, 'TENDER_CODEX_RUNNER_MAX_QUEUED_JOBS', 2),
     bodyLimits: BODY_LIMITS,
-    isolationCanaryVerified: false,
   });
 }
 

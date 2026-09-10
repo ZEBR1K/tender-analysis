@@ -13,6 +13,7 @@ const composePath = path.join(runnerDirectory, 'compose.yaml');
 const attributesPath = path.join(repositoryRoot, '.gitattributes');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
 const permissionsSourcePath = path.join(runnerDirectory, 'src', 'permissions.mjs');
+const packagePath = path.join(runnerDirectory, 'package.json');
 const implementationPlanPath = path.join(
   repositoryRoot,
   'docs',
@@ -22,9 +23,10 @@ const implementationPlanPath = path.join(
 );
 
 test('runner image pins Node, Codex CLI and every document inspection tool', async () => {
-  const [dockerfile, attributes] = await Promise.all([
+  const [dockerfile, attributes, packageJson] = await Promise.all([
     readFile(dockerfilePath, 'utf8'),
     readFile(attributesPath, 'utf8'),
+    readFile(packagePath, 'utf8').then(JSON.parse),
   ]);
 
   assert.match(dockerfile, /^FROM node:24\.18\.0-bookworm-slim$/mu);
@@ -38,6 +40,8 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
   assert.match(dockerfile, /npm ci --omit=dev/u);
   assert.match(dockerfile, /COPY field-catalog \.\/field-catalog/u);
+  assert.match(dockerfile, /COPY probes \.\/probes/u);
+  assert.equal(packageJson.scripts['attest:isolation'], 'node src/run-isolation-attestation.mjs');
   assert.match(
     attributes,
     /^deploy\/codex-runner\/field-catalog\/FIELD_CATALOG\.md binary$/mu,

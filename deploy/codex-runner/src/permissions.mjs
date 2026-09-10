@@ -95,20 +95,34 @@ export function buildCodexPermissionBoundary({
   });
 }
 
-export function buildIsolationNegativeCanary({ jobId, siblingJobId } = {}) {
+export function buildIsolationNegativeCanary({
+  jobId,
+  siblingJobId,
+  jobsRoot = '/data/jobs',
+  protectedJobsRoot = '/data/jobs',
+} = {}) {
   const current = validatedJobId(jobId);
   const sibling = validatedJobId(siblingJobId, 'siblingJobId');
+  const normalizedJobsRoot = validatedAbsoluteRoot(jobsRoot, 'jobsRoot');
+  const normalizedProtectedJobsRoot = validatedAbsoluteRoot(protectedJobsRoot, 'protectedJobsRoot');
   if (current === sibling) throw new Error('siblingJobId must identify another job');
+  const currentRoot = path.posix.join(normalizedJobsRoot, current);
   return {
     schema_version: 'tender_codex_runner_isolation_canary_v1',
     job_id: current,
     sibling_job_id: sibling,
     probes: [
-      { id: 'sibling_job', path: `/data/jobs/${sibling}/input/canary.txt`, expected: 'denied' },
+      { id: 'current_input', path: path.posix.join(currentRoot, 'input', 'current-readable.txt'), expected: 'readable' },
+      { id: 'workspace', path: path.posix.join(currentRoot, 'workspace', 'isolation-probe-write.tmp'), expected: 'writable' },
+      { id: 'current_input_write', path: path.posix.join(currentRoot, 'input', 'isolation-probe-write.tmp'), expected: 'denied' },
+      { id: 'sibling_job', path: path.posix.join(normalizedJobsRoot, sibling, 'input', 'sibling-readable.txt'), expected: 'denied' },
+      { id: 'jobs_parent', path: normalizedProtectedJobsRoot, expected: 'denied' },
       { id: 'codex_auth', path: '/run/codex-auth/auth.json', expected: 'denied' },
       { id: 'runner_secret', path: '/run/secrets/runner-auth-token', expected: 'denied' },
+      { id: 'slash_tmp', path: '/tmp/tender-codex-runner-isolation-probe.tmp', expected: 'denied' },
       { id: 'self_process_environment', path: '/proc/self/environ', expected: 'denied' },
       { id: 'parent_process_environment', path: '/proc/${PPID}/environ', expected: 'denied' },
+      { id: 'credential_environment', expected: 'absent' },
     ],
   };
 }

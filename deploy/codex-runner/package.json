@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
+    "attest:isolation": "node src/run-isolation-attestation.mjs",
     "test": "node --test ../../tests/agentic-runner-*.test.mjs"
   },
   "dependencies": {

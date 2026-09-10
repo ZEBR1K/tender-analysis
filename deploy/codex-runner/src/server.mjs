@@ -13,6 +13,10 @@ import { createJobStore } from './job-store.mjs';
 import { permissionBoundaryContractReady } from './permissions.mjs';
 import { runCodexAttempt, shouldRetryCodexAttempt } from './codex-command.mjs';
 import { createAgentResultValidator } from './result-validator.mjs';
+import {
+  buildRunnerExecutionProfile,
+  createRuntimeAttestationGate,
+} from './runtime-attestation.mjs';
 
 const execFileAsync = promisify(execFile);
 const DOCUMENT_STREAM_LIFECYCLE = Symbol('documentStreamLifecycle');
@@ -288,16 +292,24 @@ export function buildHealthReport({
   toolVersions,
   isolationReady = false,
   codexAuthReady = false,
-  isolationCanaryVerified = false,
+  executionProfile,
+  runtimeAttestation,
+  attestationChallenge,
   queue,
 }) {
   const toolsReady = requiredToolsReady(toolVersions);
   const ready = Boolean(authReady && storeReady && toolsReady && isolationReady && codexAuthReady);
-  const executeReady = Boolean(ready && isolationCanaryVerified);
+  const isolationCanaryVerified = runtimeAttestation?.verified === true;
+  const profileMatchesRuntime = executionProfile?.schema_version
+      === 'tender_codex_runner_execution_profile_v1'
+    && toolVersions?.codex === `codex-cli ${executionProfile.codex_cli_version}`;
+  const executeReady = Boolean(ready && isolationCanaryVerified && profileMatchesRuntime);
   return {
     schema_version: 'tender_codex_runner_health_v1',
     status: ready ? 'ready' : 'not_ready',
     service_version: serviceVersion,
+    execution_profile: executionProfile,
+    isolation_attestation: attestationChallenge,
     tools: toolVersions,
     readiness: {
       auth: Boolean(authReady),
@@ -305,7 +317,7 @@ export function buildHealthReport({
       tools: toolsReady,
       isolation: Boolean(isolationReady),
       codex_auth: Boolean(codexAuthReady),
-      isolation_canary: Boolean(isolationCanaryVerified),
+      isolation_canary: Boolean(isolationCanaryVerified && profileMatchesRuntime),
       execute: executeReady,
     },
     queue,
@@ -388,14 +400,15 @@ export async function probeToolVersions() {
   };
 }
 
-function createDefaultHealthProvider({
+export function createDefaultHealthProvider({
   authenticator,
   queue,
   rootDirectory,
   codexAuthFile,
-  isolationCanaryVerified,
+  runnerRoot = '/app',
+  toolProbe = probeToolVersions(),
+  runtimeAttestationGate,
 }) {
-  const toolProbe = probeToolVersions();
   return async () => {
     let storeReady = false;
     let codexAuthReady = false;
@@ -411,6 +424,27 @@ function createDefaultHealthProvider({
     } catch {
       codexAuthReady = false;
     }
+    let executionProfile = null;
+    let runtimeAttestation = { verified: false };
+    let challenge = null;
+    try {
+      [executionProfile, runtimeAttestation, challenge] = await Promise.all([
+        buildRunnerExecutionProfile({ runnerRoot }),
+        runtimeAttestationGate.verify(),
+        runtimeAttestationGate.getChallenge(),
+      ]);
+    } catch {
+      executionProfile = null;
+      runtimeAttestation = { verified: false };
+      challenge = null;
+    }
+    const publicChallenge = challenge ? {
+      schema_version: challenge.schema_version,
+      challenge_id: challenge.challenge_id,
+      container_identity_sha256: challenge.container_identity_sha256,
+      execution_profile_sha256: challenge.execution_profile_sha256,
+      probe_script_sha256: challenge.probe_script_sha256,
+    } : null;
     return buildHealthReport({
       serviceVersion: packageMetadata.version,
       authReady: authenticator.ready,
@@ -418,7 +452,9 @@ function createDefaultHealthProvider({
       toolVersions: (await toolProbe).versions,
       isolationReady: permissionBoundaryContractReady(),
       codexAuthReady,
-      isolationCanaryVerified,
+      executionProfile,
+      runtimeAttestation,
+      attestationChallenge: publicChallenge,
       queue: queue.snapshot(),
     });
   };
@@ -700,14 +736,20 @@ export function createServer({
   bodyLimits = config.bodyLimits,
   queue = createSingleProcessQueue({ maxQueuedJobs: config.maxQueuedJobs }),
   uploadGate = createUploadGate({ maxConcurrentUploads: config.maxConcurrentUploads }),
+  runtimeAttestationGate = createRuntimeAttestationGate({
+    rootDirectory: config.rootDirectory,
+    runnerRoot: '/app',
+    containerJobsRoot: '/data/jobs',
+  }),
   healthProvider = createDefaultHealthProvider({
     authenticator,
     queue,
     rootDirectory: config.rootDirectory,
     codexAuthFile: config.codexAuthFile,
-    isolationCanaryVerified: config.isolationCanaryVerified,
+    runnerRoot: '/app',
+    runtimeAttestationGate,
   }),
-  executionBoundary = { ready: config.isolationCanaryVerified },
+  executionBoundary = runtimeAttestationGate,
   v1Handler,
 } = {}) {
   const resolvedV1Handler = v1Handler ?? createDefaultV1Handler();
@@ -724,7 +766,15 @@ export function createServer({
         authenticator.assertAuthorized(request.headers);
         const routeMetadata = buildV1RouteMetadata(request, url);
         const requestMetadata = buildHandlerRequestMetadata(request);
-        if (routeMetadata.requiresExecutionBoundary && executionBoundary.ready !== true) {
+        let executionBoundaryReady = false;
+        if (routeMetadata.requiresExecutionBoundary) {
+          try {
+            executionBoundaryReady = (await executionBoundary.verify())?.verified === true;
+          } catch {
+            executionBoundaryReady = false;
+          }
+        }
+        if (routeMetadata.requiresExecutionBoundary && !executionBoundaryReady) {
           request.resume();
           throw new RunnerError(
             'RUNNER_ISOLATION_NOT_READY',
