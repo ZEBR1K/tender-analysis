@@ -246,7 +246,6 @@ test('permission builder grants only current job roots and supplies CLI override
     [':minimal', 'read'],
     [':tmpdir', 'deny'],
     [':slash_tmp', 'deny'],
-    ['/data/jobs', 'deny'],
     [`/data/jobs/${jobId}/workspace`, 'write'],
     [`/data/jobs/${jobId}/input`, 'read'],
     ['/run/codex-auth', 'deny'],
@@ -257,6 +256,7 @@ test('permission builder grants only current job roots and supplies CLI override
       `${JSON.stringify(permissionPath)}=${JSON.stringify(access)}`,
     ));
   }
+  assert.equal(filesystemOverride.includes('"/data/jobs"="deny"'), false);
   assert.equal(
     overrides.some((entry) => entry.includes('/source-index')),
     false,
@@ -282,7 +282,6 @@ test('filesystem permission paths are encoded in one TOML map so dots stay liter
     /^permissions\.tender-analysis-job\.filesystem=\{/u,
   );
   for (const expected of [
-    `${JSON.stringify(jobsRoot)}="deny"`,
     `${JSON.stringify(`${jobsRoot}/${jobId}/workspace`)}="write"`,
     `${JSON.stringify(`${jobsRoot}/${jobId}/workspace/AGENTS.md`)}="read"`,
     `${JSON.stringify(`${jobsRoot}/${jobId}/workspace/.agents`)}="read"`,
@@ -290,6 +289,10 @@ test('filesystem permission paths are encoded in one TOML map so dots stay liter
   ]) {
     assert.ok(filesystemOverrides[0].includes(expected));
   }
+  assert.equal(
+    filesystemOverrides[0].includes(`${JSON.stringify(jobsRoot)}="deny"`),
+    false,
+  );
 });
 
 test('isolation canary declares the complete positive and negative runtime probe set', () => {
@@ -303,7 +306,7 @@ test('isolation canary declares the complete positive and negative runtime probe
     { id: 'workspace', expected: 'writable' },
     { id: 'current_input_write', expected: 'denied' },
     { id: 'sibling_job', expected: 'denied' },
-    { id: 'jobs_parent', expected: 'denied' },
+    { id: 'jobs_parent', expected: 'current_path_only' },
     { id: 'codex_auth', expected: 'denied' },
     { id: 'job_codex_auth', expected: 'denied' },
     { id: 'runner_secret', expected: 'denied' },

@@ -70,6 +70,28 @@ async function denied(task) {
   }
 }
 
+async function onlyCurrentPathVisible({ io, protectedJobsRoot, currentJobRoot }) {
+  const relative = path.posix.relative(protectedJobsRoot, currentJobRoot);
+  if (
+    !relative
+    || relative === '..'
+    || relative.startsWith('../')
+    || path.posix.isAbsolute(relative)
+  ) return false;
+
+  let cursor = protectedJobsRoot;
+  try {
+    for (const segment of relative.split('/')) {
+      const entries = await io.readdir(cursor);
+      if (entries.length !== 1 || entries[0] !== segment) return false;
+      cursor = path.posix.join(cursor, segment);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function runIsolationProbe({
   plan,
   cwd = process.cwd(),
@@ -81,6 +103,7 @@ export async function runIsolationProbe({
   const inputDirectory = path.posix.join(plan.jobs_root, plan.job_id, 'input');
   const workspaceMarker = path.posix.join(cwd, 'isolation-probe-write.tmp');
   const currentInputMarker = path.posix.join(inputDirectory, 'current-readable.txt');
+  const currentJobRoot = path.posix.join(plan.jobs_root, plan.job_id);
   const probes = [];
   const record = (id, passed) => probes.push({ id, passed: passed === true });
 
@@ -110,7 +133,11 @@ export async function runIsolationProbe({
     'input',
     'sibling-readable.txt',
   ))));
-  record('jobs_parent', await denied(() => io.readdir(plan.protected_jobs_root)));
+  record('jobs_parent', await onlyCurrentPathVisible({
+    io,
+    protectedJobsRoot: plan.protected_jobs_root,
+    currentJobRoot,
+  }));
   record('codex_auth', await denied(() => io.readFile('/run/codex-auth/auth.json')));
   record('job_codex_auth', await denied(() => io.readFile(path.posix.join(
     plan.jobs_root,

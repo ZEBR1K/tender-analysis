@@ -203,7 +203,14 @@ test('probe script executes every declared read, write and environment check its
     },
     async readdir(filePath) {
       reads.push(filePath);
-      throw Object.assign(new Error('denied'), { code: 'EACCES' });
+      const visible = new Map([
+        ['/data/jobs', ['.runner-isolation']],
+        ['/data/jobs/.runner-isolation', ['333']],
+        ['/data/jobs/.runner-isolation/333', ['jobs']],
+        [jobsRoot, [jobId]],
+      ]);
+      if (visible.has(filePath)) return visible.get(filePath);
+      throw Object.assign(new Error('unexpected readdir'), { code: 'ENOENT' });
     },
     async writeFile(filePath) {
       writes.push(filePath);
@@ -235,6 +242,9 @@ test('probe script executes every declared read, write and environment check its
     `${jobsRoot}/${jobId}/workspace/isolation-probe-write.tmp`,
     `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`,
     '/data/jobs',
+    '/data/jobs/.runner-isolation',
+    '/data/jobs/.runner-isolation/333',
+    jobsRoot,
     '/run/codex-auth/auth.json',
     `${jobsRoot}/${jobId}/codex-home/auth.json`,
     '/run/secrets/runner-auth-token',
@@ -246,6 +256,33 @@ test('probe script executes every declared read, write and environment check its
     `${jobsRoot}/${jobId}/input/isolation-probe-write.tmp`,
     '/tmp/tender-codex-runner-isolation-probe.tmp',
   ]);
+
+  const leakedParent = await runIsolationProbe({
+    plan: {
+      schema_version: 'tender_codex_runner_isolation_probe_plan_v1',
+      challenge_id: '33333333-3333-4333-8333-333333333333',
+      job_id: jobId,
+      sibling_job_id: siblingJobId,
+      jobs_root: jobsRoot,
+      protected_jobs_root: '/data/jobs',
+      current_marker_sha256: currentMarkerSha256,
+      probe_script_sha256: 'E'.repeat(64),
+    },
+    cwd: `${jobsRoot}/${jobId}/workspace`,
+    environment: { PATH: '/usr/bin:/bin', HOME: `${jobsRoot}/${jobId}/workspace` },
+    ppid: 42,
+    io: {
+      ...io,
+      async readdir(filePath) {
+        if (filePath === '/data/jobs') return ['.runner-isolation', 'another-job'];
+        return io.readdir(filePath);
+      },
+    },
+  });
+  assert.equal(
+    leakedParent.probes.find(({ id }) => id === 'jobs_parent').passed,
+    false,
+  );
 });
 
 test('boot-bound attestation accepts exact evidence and rejects tamper, stale or container mismatch', async () => {
