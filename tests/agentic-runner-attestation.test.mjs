@@ -47,6 +47,7 @@ test('isolation canary command uses the real pinned Codex argv and permission bo
   const jobsRoot = '/data/jobs/.runner-isolation/canary/jobs';
   const command = buildIsolationCanaryCommand({ jobId, jobsRoot });
   const boundary = buildCodexPermissionBoundary({ jobId, jobsRoot });
+  assert.equal(command.args.includes('tools.view_image=true'), false);
 
   assert.equal(command.executable, 'codex');
   assert.deepEqual(command.args.slice(0, boundary.cliArgs.length + 1), [
@@ -62,8 +63,6 @@ test('isolation canary command uses the real pinned Codex argv and permission bo
     'model_reasoning_effort="high"',
     '-c',
     'tools.web_search=false',
-    '-c',
-    'tools.view_image=true',
     '-C',
     boundary.workspaceDirectory,
     '--skip-git-repo-check',

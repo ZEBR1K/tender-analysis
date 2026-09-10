@@ -155,8 +155,6 @@ test('Codex argv is fixed, shell-free and includes the exact per-job permission 
     'model_reasoning_effort="high"',
     '-c',
     'tools.web_search=false',
-    '-c',
-    'tools.view_image=true',
     '-C',
     boundary.workspaceDirectory,
     '--skip-git-repo-check',

@@ -131,8 +131,6 @@ export function buildIsolationCanaryCommand({ jobId, jobsRoot } = {}) {
       `model_reasoning_effort=${JSON.stringify(PINNED_REASONING_EFFORT)}`,
       '-c',
       'tools.web_search=false',
-      '-c',
-      'tools.view_image=true',
       '-C',
       boundary.workspaceDirectory,
       '--skip-git-repo-check',
