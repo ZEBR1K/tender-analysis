@@ -113,16 +113,18 @@ Add `Продвинуть agentic FINAL` between the Execute Workflow Trigger an
 Its replacements are exactly:
 
 ```js
-{{ [$json.analysis_run_id, $json.agentic_job_id ?? null] }}
+{{ [$('When Executed by Another Workflow').item.json.analysis_run_id, $('When Executed by Another Workflow').item.json.agentic_job_id ?? null] }}
 ```
 
-Its terminal `SELECT` returns:
+Keep the Execute Workflow Trigger in `passthrough` mode so every existing legacy caller remains compatible. The first `SELECT` both initializes transaction-local settings and returns the downstream item, because n8n's PostgreSQL node exposes the first result set for this multi-statement query:
 
 ```sql
 SELECT
   $1::uuid AS analysis_run_id,
   NULLIF($2::text, '')::uuid AS agentic_job_id,
-  CASE WHEN NULLIF($2::text, '') IS NULL THEN false ELSE true END AS agentic_promoted;
+  CASE WHEN NULLIF($2::text, '') IS NULL THEN false ELSE true END AS agentic_promoted,
+  set_config('tender.analysis_run_id', $1::text, true) AS run_setting,
+  set_config('tender.agentic_job_id', COALESCE($2::text, ''), true) AS job_setting;
 ```
 
 - [ ] **Step 2: Implement the integrity guards inside the same transaction**
@@ -138,8 +140,9 @@ FOR UPDATE;
 IF v_job.status <> 'completed'
    OR v_job.analysis_run_id <> v_run_id
    OR v_job.field_catalog_version <> 'tender_fields_v1'
-   OR NULLIF(v_job.runner_profile_hash, '') IS NULL
-   OR NULLIF(v_job.instruction_hash, '') IS NULL THEN
+   OR v_job.pipeline_version <> 'tender_agentic_pipeline_v1'
+   OR v_job.field_catalog_sha256 !~ '^[0-9a-f]{64}$'
+   OR v_job.input_manifest_sha256 !~ '^[0-9a-f]{64}$' THEN
   RAISE EXCEPTION 'AGENTIC_PROMOTION_JOB_IDENTITY_INVALID';
 END IF;
 ```
@@ -205,16 +208,16 @@ Expected: the Finalization assertions pass; Monitor and Report assertions remain
 
 - [ ] **Step 1: Add the Execute Workflow node**
 
-Add `Завершить agentic analysis` after `Сохранить ровно 27 shadow rows`. Wait for completion and send exactly:
+Make the successful shadow-save query return the current item as its first result set:
 
-```json
-{
-  "analysis_run_id": "{{ $json.analysis_run_id }}",
-  "agentic_job_id": "{{ $json.job_id }}"
-}
+```sql
+SELECT
+  $4::uuid AS analysis_run_id,
+  $1::uuid AS agentic_job_id,
+  set_config(...) AS ...;
 ```
 
-Use the repository-safe workflow identity `FINALIZATION_WORKFLOW_ID`; bind it to live workflow `cSsh9yjpS7t5p0OO` only during controlled deployment. Do not connect any Worker, Aggregator, Targeted Recheck, or legacy facts node.
+Add `Завершить agentic analysis` after `Сохранить ровно 27 shadow rows`. Wait for completion and call live workflow `cSsh9yjpS7t5p0OO`. Because Finalization deliberately keeps a passthrough trigger for legacy compatibility, omit `workflowInputs`: the current `{ analysis_run_id, agentic_job_id }` item is passed unchanged. Do not connect any Worker, Aggregator, Targeted Recheck, or legacy facts node.
 
 - [ ] **Step 2: Preserve explicit failure behavior**
 

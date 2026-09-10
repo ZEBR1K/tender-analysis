@@ -21,11 +21,8 @@ test('Finalization promotes one completed agentic job before its existing 27/27 
   const promotion = byName(workflow, 'Продвинуть agentic FINAL');
   const sql = promotion.parameters.query;
 
-  assert.equal(trigger.parameters.inputSource, 'workflowInputs');
-  assert.deepEqual(trigger.parameters.workflowInputs.values, [
-    { name: 'analysis_run_id', type: 'string' },
-    { name: 'agentic_job_id', type: 'string' },
-  ]);
+  assert.equal(trigger.parameters.inputSource, 'passthrough');
+  assert.equal(trigger.parameters.workflowInputs, undefined);
   assert.deepEqual(targets(workflow, trigger.name), [promotion.name]);
   assert.deepEqual(targets(workflow, promotion.name), ['Проверить 27 FINAL и завершить run']);
 
@@ -75,8 +72,9 @@ test('Monitor hands a completed exact-27 job to Finalization without restoring t
   assert.equal(finalize.type, 'n8n-nodes-base.executeWorkflow');
   assert.deepEqual(targets(workflow, 'Сохранить ровно 27 shadow rows'), [finalize.name]);
   assert.deepEqual(targets(workflow, finalize.name), ['Jobs по одному']);
-  assert.match(JSON.stringify(finalize.parameters.workflowInputs), /analysis_run_id/u);
-  assert.match(JSON.stringify(finalize.parameters.workflowInputs), /agentic_job_id/u);
+  assert.equal(finalize.parameters.workflowInputs, undefined);
+  assert.match(byName(workflow, 'Сохранить ровно 27 shadow rows').parameters.query, /analysis_run_id/u);
+  assert.match(byName(workflow, 'Сохранить ровно 27 shadow rows').parameters.query, /agentic_job_id/u);
   assert.equal(finalize.parameters.options.waitForSubWorkflow, true);
   assert.doesNotMatch(serialized, /tender_analysis_facts|Targeted Recheck|Обработать документ/u);
 });
@@ -97,4 +95,3 @@ test('Report accepts agentic null confidence and preserves opaque source locator
   assert.match(render, /source\.locator/u);
   assert.match(render, /escapeHtml\(source\.locator\)/u);
 });
-
