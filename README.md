@@ -17,9 +17,16 @@ PROJECT_STATUS.md
 Дополнительно реализован аддитивный фундамент агентского shadow-анализа через
 Codex (Tasks 0–16). Изолированный runner развёрнут, а прямой blind canary из
 четырёх запусков прошёл проверки изоляции, целостности архивов и JSON-контракта.
-Agentic-контур пока не подключён к live n8n и PostgreSQL: отсутствует требуемая
-предварительная схема БД, а gate на production write остаётся закрытым.
-Существующий legacy-контур не изменён. Подробности:
+Три agentic workflow уже присутствуют в live n8n как неактивные кандидаты с
+реальными credential/error-workflow связями. PostgreSQL `to_regclass` разрешает
+имена трёх shadow-relations, но scoped read-only роль не позволяет подтвердить их
+точную схему или число строк. Обязательная колонка
+`tender_analysis_documents.ingestion_metadata` отсутствует, а n8n
+execution-list вернул по каждому workflow ноль записей. Поэтому n8n canary и
+27-row shadow
+persistence пока не подтверждены; ни один agentic workflow не активирован, а
+существующий legacy-контур не менялся.
+Подробности:
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
 `evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
 

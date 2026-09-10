@@ -4,20 +4,19 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–16 — runner-direct canary active, live integration closed
+## Agentic shadow foundation Tasks 0–16 — runner-direct GREEN, inactive n8n canary blocked
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
 pipeline while adding isolated shadow tables/migration, source-only manifest
 staging, a focused agent skill, audited non-interactive execution,
 contract/source-identity validation, and an asynchronous restart-safe runner
-lifecycle. Tasks 11–12 add inactive, identity-neutral Dispatch and Monitor
+lifecycle. Tasks 11–12 add identity-neutral Dispatch and Monitor
 exports with exact DB ownership, source staging, runner polling, and atomic
 27-row shadow persistence. Task 13 adds an inactive, identity-neutral Error
 Workflow candidate: Dispatch crashes can fail only their exact pre-start owner;
 Monitor crashes only release their exact poll lease and append bounded technical
-audit without failing a running job. These workflows are not imported, bound to
-a real Error Workflow ID, or deployed. Task 14 now wires the inactive,
+audit without failing a running job. Task 14 now wires the inactive,
 identity-neutral Dispatch candidate additively into the repository Orchestrator
 new-run path and Intake Resume existing-run recovery path. The complete manifest
 is registered first; legacy Worker fan-out and downstream FINAL routing remain
@@ -57,13 +56,27 @@ evaluation. Repeatability differences remain unadjudicated because neither new
 procurement has an employee-authored gold report. Evidence is recorded in the
 2026-09-10 runner/canary evaluations.
 
-The live database preflight found that the required
-`tender_analysis_documents.ingestion_metadata` column and agentic shadow tables
-are absent. No migration or production n8n write was authorized, so the three
-inactive workflow candidates were not imported or bound and the
-Dispatch → Monitor → 27-row live database canary remains closed. No existing
+Fresh authoritative read-only reconciliation superseded the preliminary live
+observation used in the first Task 16 report. PostgreSQL `to_regclass` resolves
+all three agentic shadow relations, although the scoped read-only role cannot
+inspect their rows or exact schema. Live n8n contains all three candidates,
+inactive: Dispatch `d37251e524754e1f`, Monitor `47e6ede6c10349c0`, and Error
+`6ccedae778a14176`. The execution-list endpoint returned zero entries for each.
+Normalized read-back after masking instance workflow IDs and bound credential
+IDs matches the repository graphs. Dispatch and Monitor reference the real
+Error workflow and contain bound
+PostgreSQL/runner credential types without repository placeholders.
+
+The required `tender_analysis_documents.ingestion_metadata` column is still
+absent. Dispatch reads its SHA-256 source identity from that column, so neither
+the synthetic inactive n8n canary nor Dispatch → Monitor → 27-row persistence
+has run. No workflow was activated, and no existing
 n8n/PostgreSQL/Redis/archive/report container was recreated or reconfigured;
-the legacy production pipeline remains unchanged.
+the legacy production pipeline remains unchanged. The next Task 16 gate is an
+authorized exact-schema preflight for the existing shadow relations plus the
+reviewed additive `ingestion_metadata` prerequisite migration and a dedicated
+canary source with verified SHA-256 metadata, followed by the inactive
+workflow canary.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

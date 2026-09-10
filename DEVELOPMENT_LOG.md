@@ -5995,3 +5995,23 @@ Therefore no migration, inactive workflow import, credential binding, or live
 evidence is recorded in
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` and
 `evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
+
+### Correction: Task 16 live n8n/DB reconciliation
+
+This note supersedes only the preliminary live-state claim in the paragraph
+above. PostgreSQL `to_regclass` resolves `tender_agentic_jobs`,
+`tender_agentic_documents`, and `tender_agentic_field_results`. The scoped
+read-only role has no `SELECT` privilege on those relations, so their exact
+schema and row counts remain unverified. The canonical
+`tender_analysis_documents.ingestion_metadata` column is absent.
+
+Live n8n contains three inactive candidates: Dispatch
+`d37251e524754e1f`, Monitor `47e6ede6c10349c0`, and Error
+`6ccedae778a14176`. Their normalized graphs match the repository candidates
+after masking instance workflow IDs and bound credential IDs. The real Error
+Workflow links and expected credential types are bound. The execution-list
+endpoint returned zero entries for each workflow.
+
+No workflow was activated, no live Dispatch → Monitor → exact 27-row canary was
+run, and legacy routing remains unchanged. The missing `ingestion_metadata`
+source-hash contract and the unverified exact shadow schema block that canary.

@@ -8,8 +8,10 @@ PostgreSQL, Redis, archive-extractor and report containers were not recreated
 or reconfigured.
 
 This is still an inactive shadow deployment. No production workflow was
-activated, no live n8n workflow was modified, and no production database
-migration was applied.
+activated. Fresh read-only reconciliation found three already-imported inactive
+agentic workflows and three resolvable shadow relation names; this supersedes the
+preliminary observation recorded later in this report. The required canonical
+document metadata prerequisite is still absent, so no n8n canary has run.
 
 ## Host and workload baseline
 
@@ -118,20 +120,28 @@ boundary:
 No page/OOXML/XLSX coverage parser, quote verifier, evidence-sufficiency score,
 field-specific rule or semantic status rewriting is present in the runner.
 
-## Intentionally closed live gates
+## Reconciled live state and remaining gate
 
-The SELECT-only live database preflight found that the canonical
-`tender_analysis_documents.ingestion_metadata` prerequisite is absent. The
-agentic shadow tables are also not available until the additive migration is
-applied. Therefore Task 16 did not import or bind the inactive n8n candidates:
-doing so would create unusable live configuration, and no production DB/n8n
-write was authorized for this run.
+Fresh authoritative read-only checks superseded the preliminary absence claim:
 
-The repository exports remain the inactive candidates. Applying the prerequisite
-and shadow migrations, importing/binding the three candidates, and executing
-the Dispatch → Monitor → 27-row database canary require a separate explicit
-production-write window. This does not affect the runner-direct blind canary
-or the legacy production pipeline.
+- PostgreSQL resolves `tender_agentic_jobs`, `tender_agentic_documents`, and
+  `tender_agentic_field_results` as existing relations. The scoped read-only
+  role has no `SELECT` privilege on them, so row counts and exact live schema
+  parity are not claimed.
+- Live n8n contains inactive Dispatch `d37251e524754e1f`, Monitor
+  `47e6ede6c10349c0`, and Error `6ccedae778a14176`. Normalized graph read-back
+  matches the repository candidates. Dispatch and Monitor reference the real
+  Error workflow and have bound PostgreSQL and runner credential types; no
+  repository placeholder remains.
+- The execution-list endpoint returned zero entries for each workflow.
+
+The canonical `tender_analysis_documents.ingestion_metadata` prerequisite is
+still absent. Dispatch requires its `content_sha256`, so an inactive workflow
+canary cannot truthfully pass until the existing shadow relations receive an
+authorized exact-schema preflight, the additive prerequisite migration is
+applied, and a dedicated verified canary source is available. Dispatch →
+Monitor → 27-row database persistence therefore remains unverified. No workflow
+was activated, and the legacy production route was not changed.
 
 ## Final canary state
 

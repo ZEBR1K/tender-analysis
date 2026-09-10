@@ -1,8 +1,9 @@
 # TENDER — Ошибка агентского анализа
 
-**Статус:** inactive identity-neutral repository candidate; offline verification only
+**Статус:** identity-neutral repository candidate; imported live copy is inactive
 **Тип:** n8n Error Workflow
 **Repository export:** `workflows/n8n-exports/TENDER — Ошибка агентского анализа.json`
+**Live workflow ID:** `6ccedae778a14176`
 
 ## Ответственность
 
@@ -79,12 +80,15 @@ semantics не зависят от неё: финальный `SELECT` сам в
 
 ## Packaging и runtime gates
 
-Export inactive, не содержит top-level instance identity, `meta`, pin data или
-секретов. PostgreSQL credential содержит только import placeholders. Dispatch и
-Monitor уже содержат `settings.errorWorkflow=AGENTIC_ERROR_WORKFLOW_ID`; реальный
-ID назначается только при контролируемом import/read-back и не входит в Task 13.
+Repository export inactive, не содержит top-level instance identity, `meta`, pin
+data или секретов; PostgreSQL credential в нём остаётся import placeholder.
+Read-only live reconciliation подтвердил, что импортированный inactive graph
+после masking instance workflow ID и bound credential ID совпадает с repository
+candidate, а ожидаемый PostgreSQL credential type связан. Live Dispatch и
+Monitor указывают на этот workflow через реальные `settings.errorWorkflow`.
+Execution-list endpoint вернул для Error workflow ноль executions.
 
-До production claim остаются Tasks 14–15 и отдельные import, credential binding,
-inactive read-back, automatic-failure canary и activation gates. Ручной запуск
-не проверяет Error Trigger: по документации n8n handler вызывается только при
-ошибке automatic execution.
+Automatic-failure canary и activation gates не пройдены. Ручной запуск не
+проверяет Error Trigger: по документации n8n handler вызывается только при
+ошибке automatic execution. Workflow не активирован, legacy pipeline не
+изменён.

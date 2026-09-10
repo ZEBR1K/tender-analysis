@@ -103,7 +103,7 @@ and that the inactive live candidate reaches Intake duplicate/no-op without any
 downstream execution. Its schedule remains inactive; pagination/exhaustive-result
 semantics не документированы.
 
-Отдельно подготовлен repository-only агентский shadow-контур Tasks 0–10:
+Отдельно подготовлен агентский shadow-контур Tasks 0–16:
 
 ```text
 полный source manifest после commit
@@ -119,8 +119,16 @@ Runner не создаёт page/OOXML/XLSX index и не оценивает ци
 evidence или бизнес-смысл значения. Codex сам выбирает text, visual, OCR или
 OOXML способ исследования. Runtime принимает или отклоняет только по
 безопасности, целостности исходных файлов/артефактов и закрытому JSON-контракту.
-Контур пока не связан с n8n: Tasks 11–17, deployment и activation не
-выполнялись, поэтому production baseline выше не изменён.
+Изолированный runner развёрнут. Три agentic workflow импортированы в live n8n
+неактивными, с реальными credential/error-workflow связями; их read-back после
+masking instance workflow IDs и bound credential IDs совпадает с repository
+candidates. PostgreSQL `to_regclass` разрешает имена трёх shadow-таблиц, но
+scoped read-only роль не позволяет подтвердить их точную схему или число строк.
+Однако обязательная
+`tender_analysis_documents.ingestion_metadata` пока отсутствует, а n8n
+read-only execution-list вернул для каждого workflow ноль записей. Поэтому
+Dispatch → Monitor → 27-row canary и
+production activation не выполнялись; legacy routing выше не изменён.
 
 И пяти основных PostgreSQL таблиц:
 

@@ -12,9 +12,12 @@ This is not a semantic-accuracy claim. Neither procurement has an
 employee-authored gold report, so value differences are repeatability evidence
 only. They do not block, rewrite or reject a structurally valid result.
 
-The live n8n/DB portion of Task 16 remains closed. Read-only preflight found a
-missing schema prerequisite, and no production-write window was authorized.
-The legacy production pipeline was not modified.
+The live n8n/DB canary portion of Task 16 remains closed. Three inactive live
+workflow candidates exist, and PostgreSQL resolves three shadow relation names,
+but the scoped read-only role cannot confirm their exact schema or row counts.
+The required source-hash column is absent, and the execution-list endpoint
+returned zero entries for each workflow. The legacy production pipeline was not
+activated or modified.
 
 ## Fixed controls
 
@@ -122,19 +125,34 @@ Existing n8n, worker, PostgreSQL, Redis, archive-extractor and Gotenberg
 containers retained their observed start times and restart counts. The Task 16
 watchdog recorded no pressure sample while the batch was active.
 
-## Live gates deliberately not crossed
+## Reconciled live state and gates not crossed
 
-The production schema lacks
-`tender_analysis_documents.ingestion_metadata`, and the additive agentic shadow
-tables have not been applied. Therefore the following steps were not performed:
+Fresh authoritative read-only checks superseded the preliminary claim that the
+shadow objects were absent:
 
-- apply the shadow migration;
-- import or bind the three inactive agentic workflow candidates;
-- execute Dispatch → Monitor → 27-row live database persistence;
+- PostgreSQL `to_regclass` resolves all three shadow relation names, but the
+  scoped read-only role cannot confirm their exact schema or row counts;
+- inactive Dispatch `d37251e524754e1f`, Monitor `47e6ede6c10349c0`, and Error
+  `6ccedae778a14176` exist in live n8n;
+- normalized graph read-back after masking instance workflow IDs and bound
+  credential IDs matches the repository candidates, real error-workflow links
+  are present, expected credential types are bound, and the execution-list
+  endpoint returned zero entries for each workflow.
+
+The production schema still lacks
+`tender_analysis_documents.ingestion_metadata`. Because Dispatch requires the
+verified `content_sha256` from that column, the following gates remain open:
+
+- complete an authorized exact-schema preflight for the existing shadow
+  relations;
+- apply the additive `ingestion_metadata` prerequisite migration;
+- prepare a dedicated canary source row with verified SHA-256 metadata;
+- execute inactive Dispatch → Monitor → exact 27-row shadow persistence;
+- independently read back the resulting shadow rows with an authorized
+  least-privilege path;
 - wire any agentic route into production intake.
 
-Those steps require a separate, explicit production-write window after schema
-preconditions are repaired. Task 17 and production activation were not started.
+Task 17 and production activation were not started.
 
 ## Raw evidence location
 
