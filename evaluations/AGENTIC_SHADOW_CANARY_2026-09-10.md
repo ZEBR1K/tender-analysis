@@ -12,12 +12,11 @@ This is not a semantic-accuracy claim. Neither procurement has an
 employee-authored gold report, so value differences are repeatability evidence
 only. They do not block, rewrite or reject a structurally valid result.
 
-The live n8n/DB canary portion of Task 16 remains closed. Three inactive live
-workflow candidates exist, and PostgreSQL resolves three shadow relation names,
-but the scoped read-only role cannot confirm their exact schema or row counts.
-The required source-hash column is absent, and the execution-list endpoint
-returned zero entries for each workflow. The legacy production pipeline was not
-activated or modified.
+The later operator-applied additive migration and inactive n8n/DB canary are
+also GREEN. Dispatch and Monitor persisted exactly 27 shadow rows without a
+paid model call; the legacy production pipeline was not activated or modified.
+Final evidence is in
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
 
 ## Fixed controls
 
@@ -125,7 +124,7 @@ Existing n8n, worker, PostgreSQL, Redis, archive-extractor and Gotenberg
 containers retained their observed start times and restart counts. The Task 16
 watchdog recorded no pressure sample while the batch was active.
 
-## Reconciled live state and gates not crossed
+## Historical pre-migration reconciliation (superseded)
 
 Fresh authoritative read-only checks superseded the preliminary claim that the
 shadow objects were absent:
@@ -146,9 +145,9 @@ migration there stopped at its first `LOCK` because
 transaction aborted and created no DDL objects. The production tender database
 is external Supabase and was accessible only through the scoped read-only role.
 
-The production schema still lacks
+At the time of this preliminary sample the production schema still lacked
 `tender_analysis_documents.ingestion_metadata`. Because Dispatch requires the
-verified `content_sha256` from that column, the following gates remain open:
+verified `content_sha256` from that column, the following gates were open:
 
 - complete an authorized exact-schema preflight for the existing shadow
   relations;
@@ -160,6 +159,10 @@ verified `content_sha256` from that column, the following gates remain open:
 - wire any agentic route into production intake.
 
 Task 17 and production activation were not started.
+
+The schema and inactive canary gates above were subsequently closed as recorded
+in `evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`. Production intake
+wiring and activation remain outside Task 16.
 
 ## Raw evidence location
 
@@ -175,6 +178,6 @@ checksums. It contains no runner token, Codex credential or production secret.
 
 ## Verification
 
-- Fresh full Windows suite: `747 tests / 741 passed / 0 failed / 6 explicit platform/runtime skips`.
+- Fresh full Windows suite: `751 tests / 745 passed / 0 failed / 6 explicit platform/runtime skips`.
 - Targeted Linux `tests/agentic-shadow-batch.test.mjs`: `14/14 passed, 0 skipped`, including internal, escape, broken and special-target symlink cases and the offline evaluator path.
 - `git diff --check`: clean.

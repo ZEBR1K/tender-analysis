@@ -7,11 +7,11 @@ Compose service. Its execution boundary is runtime GREEN. The legacy n8n,
 PostgreSQL, Redis, archive-extractor and report containers were not recreated
 or reconfigured.
 
-This is still an inactive shadow deployment. No production workflow was
-activated. Fresh read-only reconciliation found three already-imported inactive
-agentic workflows and three resolvable shadow relation names; this supersedes the
-preliminary observation recorded later in this report. The required canonical
-document metadata prerequisite is still absent, so no n8n canary has run.
+This remains an inactive shadow deployment. No production workflow was
+activated. The later operator-applied additive migration and successful
+inactive n8n/DB canary supersede the preliminary blocked state recorded later
+in this report. Final evidence is in
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
 
 ## Host and workload baseline
 
@@ -120,7 +120,7 @@ boundary:
 No page/OOXML/XLSX coverage parser, quote verifier, evidence-sufficiency score,
 field-specific rule or semantic status rewriting is present in the runner.
 
-## Reconciled live state and remaining gate
+## Historical pre-migration reconciliation (superseded)
 
 Fresh authoritative read-only checks superseded the preliminary absence claim:
 
@@ -142,13 +142,12 @@ because `public.tender_analysis_runs` is absent. The transaction aborted and
 created no DDL objects. The production tender database is external Supabase;
 only its scoped read-only role was available for this reconciliation.
 
-The canonical `tender_analysis_documents.ingestion_metadata` prerequisite is
-still absent. Dispatch requires its `content_sha256`, so an inactive workflow
-canary cannot truthfully pass until the existing shadow relations receive an
-authorized exact-schema preflight, the additive prerequisite migration is
-applied, and a dedicated verified canary source is available. Dispatch →
-Monitor → 27-row database persistence therefore remains unverified. No workflow
-was activated, and the legacy production route was not changed.
+At the time of this preliminary sample, the canonical
+`tender_analysis_documents.ingestion_metadata` prerequisite was absent and the
+Dispatch → Monitor → 27-row database canary was unverified. That gate was
+subsequently closed by the successful inactive canary documented in
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`. No workflow was
+activated, and the legacy production route was not changed.
 
 ## Final canary state
 

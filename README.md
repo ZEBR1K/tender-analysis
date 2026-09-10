@@ -17,18 +17,18 @@ PROJECT_STATUS.md
 Дополнительно реализован аддитивный фундамент агентского shadow-анализа через
 Codex (Tasks 0–16). Изолированный runner развёрнут, а прямой blind canary из
 четырёх запусков прошёл проверки изоляции, целостности архивов и JSON-контракта.
-Три agentic workflow уже присутствуют в live n8n как неактивные кандидаты с
-реальными credential/error-workflow связями. PostgreSQL `to_regclass` разрешает
-имена трёх shadow-relations, но scoped read-only роль не позволяет подтвердить их
-точную схему или число строк. Обязательная колонка
-`tender_analysis_documents.ingestion_metadata` отсутствует, а n8n
-execution-list вернул по каждому workflow ноль записей. Поэтому n8n canary и
-27-row shadow
-persistence пока не подтверждены; ни один agentic workflow не активирован, а
-существующий legacy-контур не менялся.
+Оператором применена аддитивная PostgreSQL-миграция, после чего независимая
+read-only проверка подтвердила exact shadow schema и источник SHA-256 metadata.
+Неактивный n8n canary Dispatch → Monitor успешно сохранил ровно 27 shadow-строк.
+Воспроизведённые несовместимости n8n `2.35.3` с JSON response stream и
+PostgreSQL `max(uuid)` исправлены только на уровне transport/JSON/DB-контракта.
+Исправленные Dispatch и Monitor остаются неактивными кандидатами; временные
+one-shot workflows архивированы. Ни один agentic workflow не активирован,
+существующий legacy-контур не менялся, а production promotion остаётся Task 17.
 Подробности:
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
-`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`, а финальный n8n/DB canary —
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
 
 ---
 

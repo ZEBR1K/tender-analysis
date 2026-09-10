@@ -119,16 +119,13 @@ Runner не создаёт page/OOXML/XLSX index и не оценивает ци
 evidence или бизнес-смысл значения. Codex сам выбирает text, visual, OCR или
 OOXML способ исследования. Runtime принимает или отклоняет только по
 безопасности, целостности исходных файлов/артефактов и закрытому JSON-контракту.
-Изолированный runner развёрнут. Три agentic workflow импортированы в live n8n
-неактивными, с реальными credential/error-workflow связями; их read-back после
-masking instance workflow IDs и bound credential IDs совпадает с repository
-candidates. PostgreSQL `to_regclass` разрешает имена трёх shadow-таблиц, но
-scoped read-only роль не позволяет подтвердить их точную схему или число строк.
-Однако обязательная
-`tender_analysis_documents.ingestion_metadata` пока отсутствует, а n8n
-read-only execution-list вернул для каждого workflow ноль записей. Поэтому
-Dispatch → Monitor → 27-row canary и
-production activation не выполнялись; legacy routing выше не изменён.
+Изолированный runner развёрнут. Аддитивная PostgreSQL-миграция и точная shadow
+schema подтверждены read-only проверкой. Неактивный Dispatch → Monitor canary
+прошёл весь transport/ownership/JSON-contract путь и одной транзакцией сохранил
+ровно 27 shadow-строк. Исправленные live candidates остаются неактивными;
+временный fake runner и one-shot workflows удалены/архивированы после проверки.
+Production activation и error-workflow publication не выполнялись, поэтому
+legacy routing выше не изменён.
 
 И пяти основных PostgreSQL таблиц:
 

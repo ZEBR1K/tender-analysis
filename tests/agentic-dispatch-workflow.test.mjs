@@ -79,6 +79,7 @@ test('dispatch stages sequentially and sends binary only between HTTP nodes', as
   const upload = nodeByName(value, 'Загрузить оригинал в runner');
   assert.equal(upload.parameters.contentType, 'binaryData');
   assert.equal(upload.parameters.inputDataFieldName, 'data');
+  assert.equal(upload.parameters.rawContentType, undefined);
   assert.equal(upload.parameters.authentication, 'genericCredentialType');
   assert.equal(upload.parameters.genericAuthType, 'httpHeaderAuth');
   assert.equal(upload.credentials.httpHeaderAuth.id, 'RUNNER_HEADER_AUTH_CREDENTIAL_ID');
@@ -102,6 +103,21 @@ test('dispatch stages sequentially and sends binary only between HTTP nodes', as
   assert.match(upload.parameters.url, /\$\('Документы по одному'\)\.item/u);
   assert.doesNotMatch(JSON.stringify(upload.parameters), /Buffer\.from/u);
   assert.match(nodeByName(value, 'Создать job в runner').parameters.body, /download_url,file_name_base64,\.\.\.document/u);
+});
+
+test('runner JSON requests use autodetect so n8n resolves response streams before identity checks', async () => {
+  const value = await workflow();
+  for (const name of [
+    'Создать job в runner',
+    'Загрузить оригинал в runner',
+    'Запечатать job',
+    'Запустить Codex',
+  ]) {
+    const response = nodeByName(value, name).parameters.options.response.response;
+    assert.equal(response.fullResponse, true, `${name} must preserve HTTP status and headers`);
+    assert.equal(response.neverError, true, `${name} must route typed HTTP failures itself`);
+    assert.equal(response.responseFormat, 'autodetect', `${name} must resolve JSON stream bodies on n8n 2.35`);
+  }
 });
 
 test('dispatch verifies exact staging barrier before one seal and one start', async () => {
@@ -202,5 +218,13 @@ test('every guarded dispatch update returns one explicit outcome row', async () 
     const sql = nodeByName(value, name).parameters.query;
     assert.match(sql, /ownership_lost|update_count|barrier_failed/iu, `${name} needs explicit zero-row outcome`);
     assert.match(sql, /SELECT/iu, `${name} must always select an outcome row`);
+  }
+});
+
+test('dispatch SQL never applies unsupported aggregates directly to UUID columns', async () => {
+  const value = await workflow();
+  for (const node of value.nodes.filter((candidate) => candidate.type === 'n8n-nodes-base.postgres')) {
+    const sql = node.parameters.query;
+    assert.doesNotMatch(sql, /max\s*\(\s*(?:id|analysis_run_id)\s*\)/iu, `${node.name} aggregates UUID directly`);
   }
 });

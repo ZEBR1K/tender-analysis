@@ -4,7 +4,7 @@
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
-## Agentic shadow foundation Tasks 0–16 — runner-direct GREEN, inactive n8n canary blocked
+## Agentic shadow foundation Tasks 0–16 — GREEN; Task 17 not started
 
 The additive Codex runner foundation is implemented through Task 10 without
 changing live n8n or production PostgreSQL. It preserves the complete legacy
@@ -56,36 +56,33 @@ evaluation. Repeatability differences remain unadjudicated because neither new
 procurement has an employee-authored gold report. Evidence is recorded in the
 2026-09-10 runner/canary evaluations.
 
-Fresh authoritative read-only reconciliation superseded the preliminary live
-observation used in the first Task 16 report. PostgreSQL `to_regclass` resolves
-all three agentic shadow relations, although the scoped read-only role cannot
-inspect their rows or exact schema. Live n8n contains all three candidates,
-inactive: Dispatch `d37251e524754e1f`, Monitor `47e6ede6c10349c0`, and Error
-`6ccedae778a14176`. The execution-list endpoint returned zero entries for each.
-Normalized read-back after masking instance workflow IDs and bound credential
-IDs matches the repository graphs. Dispatch and Monitor reference the real
-Error workflow and contain bound
-PostgreSQL/runner credential types without repository placeholders.
+The operator-approved additive migration is now applied to production
+Supabase. Independent read-only verification confirms the exact shadow schema,
+constraints and indexes plus
+`tender_analysis_documents.ingestion_metadata jsonb NOT NULL DEFAULT '{}'`.
+The inactive n8n canary then reproduced and fixed two technical contract defects:
+n8n `2.35.3` did not resolve explicit-JSON `fullResponse` streams, and
+PostgreSQL does not implement `max(uuid)`. Runner JSON calls now use response
+auto-detection, UUID aggregates cast through text, and the binary upload no
+longer carries the invalid raw-body-only parameter.
 
-The required `tender_analysis_documents.ingestion_metadata` column is still
-absent. Dispatch reads its SHA-256 source identity from that column, so neither
-the synthetic inactive n8n canary nor Dispatch → Monitor → 27-row persistence
-has run. No workflow was activated, and no existing
-n8n/PostgreSQL/Redis/archive/report container was recreated or reconfigured;
-the legacy production pipeline remains unchanged. The next Task 16 gate is an
-authorized exact-schema preflight for the existing shadow relations plus the
-reviewed additive `ingestion_metadata` prerequisite migration and a dedicated
-canary source with verified SHA-256 metadata, followed by the inactive
-workflow canary.
+The final inactive chain completed successfully: wrapper execution `15256`,
+corrected Dispatch `15257`, and one-shot Monitor `15258`. Shadow job
+`79149bb3-0028-413a-bbb9-813de64b6052` committed exactly 27 ordered field rows
+and completed. The fake runner used for this transport/DB canary reported
+`paid_execution=false`; it was removed afterward. The real runner is again
+healthy and authenticated from both n8n containers, with zero restarts. The
+temporary one-shot workflows were archived.
 
-The production tender database is external Supabase, and the available scoped
-diagnostic role is strictly read-only. The server container `n8n-postgres-1` is
-n8n's internal database, not the tender database. A controlled run of the
-existing shadow migration there executed only `BEGIN`, `SET`, and `SET`, then
-failed at the first `LOCK` because `public.tender_analysis_runs` is absent. The
-transaction aborted before any DDL and made no change. Completing the Task 16
-database and n8n canary gates therefore requires an operator-executed migration
-on production Supabase, or a separately supplied audited write path.
+Corrected inactive candidates are Dispatch `gP29fv0rq4MoON9a` and the
+schedule-based Monitor `CALcBEXvQsO1AcfP`. Their normalized graphs match the
+repository exports and exact existing credentials are bound. Earlier imported
+Dispatch `d37251e524754e1f` and Monitor `47e6ede6c10349c0` remain inactive
+pre-fix copies and must not be promoted. Error candidate
+`6ccedae778a14176` remains inactive. No workflow was activated and legacy
+production routing was not changed. Production promotion and error-workflow
+publication/linking are Task 17 and were not started. Full evidence is in
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md`.
 
 ## Task 0 baseline reconciliation and live routing audit — 2026-09-08
 

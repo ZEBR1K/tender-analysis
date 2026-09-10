@@ -6023,3 +6023,24 @@ existing shadow migration against that internal database ran only `BEGIN`,
 `SET`, and `SET`, then failed at the first `LOCK` because
 `public.tender_analysis_runs` is absent. The transaction aborted and produced no
 DDL; no production migration was attempted.
+
+### Final correction: Task 16 inactive n8n/DB canary GREEN
+
+The operator-applied additive Supabase migration was independently verified:
+`ingestion_metadata` and the exact shadow schema, constraints and indexes are
+present. The first inactive Dispatch execution `15243` reproduced two
+technical contract defects: unresolved explicit-JSON response streams in n8n
+`2.35.3` and unsupported PostgreSQL `max(uuid)`. Regression tests were added
+before the minimal export corrections. Runner JSON nodes now use auto-detect,
+UUID aggregates cast through text, and the binary upload no longer carries the
+raw-body-only `rawContentType` option.
+
+The corrected inactive chain then passed: wrapper `15256`, Dispatch `15257`,
+and one-shot Monitor `15258`. Job
+`79149bb3-0028-413a-bbb9-813de64b6052` reached completed with exactly 27 shadow
+rows. The fake runner reported `paid_execution=false`, was removed, and the
+one-shot workflows were archived. The real runner is restored and healthy from
+both n8n containers with zero restarts. Corrected inactive candidates are
+Dispatch `gP29fv0rq4MoON9a` and schedule Monitor `CALcBEXvQsO1AcfP`; their
+normalized graphs match the repository exports and exact credentials are
+bound. No production workflow was activated and Task 17 was not started.

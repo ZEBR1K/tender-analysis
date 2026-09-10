@@ -69,7 +69,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 30000
@@ -176,7 +176,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET heartbeat_at=now(),\n input_tokens=coalesce(($3::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($3::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($3::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($3::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$4::jsonb,poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET heartbeat_at=now(),\n input_tokens=coalesce(($3::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($3::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($3::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($3::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$4::jsonb,poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,JSON.stringify($json.usage),JSON.stringify($json.artifacts)] }}"
         }
@@ -199,7 +199,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,attempts=$5::smallint,\n error_code=left($3::text,80),error_message=left($4::text,500),\n input_tokens=coalesce(($6::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($6::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($6::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($6::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$7::jsonb,validation_summary=validation_summary||jsonb_build_object('runner_status','failed','runner_retryable',$8::boolean,'runner_attempt',$5::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n AND $5::smallint BETWEEN 1 AND 2\n RETURNING id,status,error_code\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,attempts=$5::smallint,\n error_code=left($3::text,80),error_message=left($4::text,500),\n input_tokens=coalesce(($6::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($6::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($6::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($6::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$7::jsonb,validation_summary=validation_summary||jsonb_build_object('runner_status','failed','runner_retryable',$8::boolean,'runner_attempt',$5::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n AND $5::smallint BETWEEN 1 AND 2\n RETURNING id,status,error_code\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message,$json.runner_attempt,JSON.stringify($json.usage),JSON.stringify($json.artifacts),$json.runner_retryable] }}"
         }
@@ -230,7 +230,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 30000
@@ -411,7 +411,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET\n validation_summary=validation_summary||jsonb_build_object('last_monitor_error',jsonb_build_object('code',left($3::text,80),'message',left($4::text,500),'at',now())),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT 'MONITOR_RELEASE' audit_kind,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET\n validation_summary=validation_summary||jsonb_build_object('last_monitor_error',jsonb_build_object('code',left($3::text,80),'message',left($4::text,500),'at',now())),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT 'MONITOR_RELEASE' audit_kind,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message] }}"
         }
@@ -434,7 +434,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,error_code=left($3::text,80),error_message=left($4::text,500),\n validation_summary=validation_summary||jsonb_build_object('result_contract','invalid','error_code',left($3::text,80)),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status,error_code\n)\nSELECT 'RESULT_CONTRACT_INVALID' policy,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,error_code=left($3::text,80),error_message=left($4::text,500),\n validation_summary=validation_summary||jsonb_build_object('result_contract','invalid','error_code',left($3::text,80)),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status,error_code\n)\nSELECT 'RESULT_CONTRACT_INVALID' policy,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message] }}"
         }
@@ -514,7 +514,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 30000
@@ -589,7 +589,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',attempts=$3::smallint,error_code=NULL,error_message=NULL,heartbeat_at=now(),\n validation_summary=validation_summary||jsonb_build_object('start_reconciled',true,'runner_attempt',$3::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status='ready' AND error_code='START_OUTCOME_UNKNOWN'\n AND $3::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(status) status,max(attempts)::int attempts FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',attempts=$3::smallint,error_code=NULL,error_message=NULL,heartbeat_at=now(),\n validation_summary=validation_summary||jsonb_build_object('start_reconciled',true,'runner_attempt',$3::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status='ready' AND error_code='START_OUTCOME_UNKNOWN'\n AND $3::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(attempts)::int attempts FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.runner_attempt] }}"
         }

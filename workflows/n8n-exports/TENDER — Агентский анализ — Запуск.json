@@ -146,7 +146,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 30000
@@ -258,12 +258,11 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 120000
-        },
-        "rawContentType": "application/octet-stream"
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
@@ -339,7 +338,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 120000
@@ -389,7 +388,7 @@
             "response": {
               "fullResponse": true,
               "neverError": true,
-              "responseFormat": "json"
+              "responseFormat": "autodetect"
             }
           },
           "timeout": 30000
@@ -415,7 +414,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',dispatch_execution_id=NULL,input_manifest_sha256=$3::text,\n attempts=$4::smallint,runner_started_at=coalesce(runner_started_at,now()),heartbeat_at=now(),error_code=NULL,error_message=NULL,updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$2::text AND status='ready' AND staged_documents=expected_documents\n AND input_manifest_sha256=$3::text AND $4::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,\n count(*)::int update_count,coalesce(max(id),$1::uuid) job_id,coalesce(max(status),'running') status FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',dispatch_execution_id=NULL,input_manifest_sha256=$3::text,\n attempts=$4::smallint,runner_started_at=coalesce(runner_started_at,now()),heartbeat_at=now(),error_code=NULL,error_message=NULL,updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$2::text AND status='ready' AND staged_documents=expected_documents\n AND input_manifest_sha256=$3::text AND $4::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,\n count(*)::int update_count,coalesce(max(id::text)::uuid,$1::uuid) job_id,coalesce(max(status),'running') status FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$execution.id,$json.input_manifest_sha256,$json.runner_attempt] }}"
         }
@@ -453,7 +452,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH failed_document AS (\n UPDATE public.tender_agentic_documents d SET status='failed',error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n FROM public.tender_agentic_jobs j\n WHERE d.job_id=$1::uuid AND d.source_document_id=NULLIF($5::text,'')::uuid\n AND j.id=d.job_id AND j.dispatch_execution_id=$4::text AND j.status IN ('created','staging','ready')\n RETURNING d.source_document_id\n), failed_job AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$4::text AND status IN ('created','staging','ready')\n RETURNING *\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,false success,\n CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,coalesce(max(status),'failed') status,max(error_code) error_code,max(error_message) error_message,\n (SELECT count(*) FROM failed_document)::int failed_documents FROM failed_job;",
+        "query": "WITH failed_document AS (\n UPDATE public.tender_agentic_documents d SET status='failed',error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n FROM public.tender_agentic_jobs j\n WHERE d.job_id=$1::uuid AND d.source_document_id=NULLIF($5::text,'')::uuid\n AND j.id=d.job_id AND j.dispatch_execution_id=$4::text AND j.status IN ('created','staging','ready')\n RETURNING d.source_document_id\n), failed_job AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,error_code=left($2::text,80),error_message=left($3::text,500),updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$4::text AND status IN ('created','staging','ready')\n RETURNING *\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,false success,\n CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,coalesce(max(status),'failed') status,max(error_code) error_code,max(error_message) error_message,\n (SELECT count(*) FROM failed_document)::int failed_documents FROM failed_job;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.error_code,$json.error_message,$execution.id,$json.source_document_id ?? ''] }}"
         }
@@ -604,7 +603,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs j SET status='ready',staged_documents=expected_documents,input_manifest_sha256=$3::text,updated_at=now()\n WHERE j.id=$1::uuid AND j.dispatch_execution_id=$2::text AND j.status='staging'\n AND j.field_catalog_sha256=$4::text AND $3::text ~* '^[0-9a-f]{64}$'\n AND (SELECT count(*) FROM public.tender_agentic_documents d WHERE d.job_id=j.id AND d.status='staged')=j.expected_documents\n AND (SELECT count(DISTINCT d.document_index) FROM public.tender_agentic_documents d WHERE d.job_id=j.id)=j.expected_documents\n AND (SELECT count(DISTINCT d.artifact_key) FROM public.tender_agentic_documents d WHERE d.job_id=j.id)=j.expected_documents\n AND NOT EXISTS (SELECT 1 FROM public.tender_agentic_documents d WHERE d.job_id=j.id AND d.status<>'staged')\n RETURNING j.*\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,max(analysis_run_id) analysis_run_id,max(pipeline_version) pipeline_version,\n max(field_catalog_version) field_catalog_version,max(field_catalog_sha256) field_catalog_sha256,\n max(input_manifest_sha256) input_manifest_sha256,max(attempts)::int attempts FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs j SET status='ready',staged_documents=expected_documents,input_manifest_sha256=$3::text,updated_at=now()\n WHERE j.id=$1::uuid AND j.dispatch_execution_id=$2::text AND j.status='staging'\n AND j.field_catalog_sha256=$4::text AND $3::text ~* '^[0-9a-f]{64}$'\n AND (SELECT count(*) FROM public.tender_agentic_documents d WHERE d.job_id=j.id AND d.status='staged')=j.expected_documents\n AND (SELECT count(DISTINCT d.document_index) FROM public.tender_agentic_documents d WHERE d.job_id=j.id)=j.expected_documents\n AND (SELECT count(DISTINCT d.artifact_key) FROM public.tender_agentic_documents d WHERE d.job_id=j.id)=j.expected_documents\n AND NOT EXISTS (SELECT 1 FROM public.tender_agentic_documents d WHERE d.job_id=j.id AND d.status<>'staged')\n RETURNING j.*\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(analysis_run_id::text)::uuid analysis_run_id,max(pipeline_version) pipeline_version,\n max(field_catalog_version) field_catalog_version,max(field_catalog_sha256) field_catalog_sha256,\n max(input_manifest_sha256) input_manifest_sha256,max(attempts)::int attempts FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$execution.id,$json.input_manifest_sha256,$json.field_catalog_sha256] }}"
         }
@@ -658,7 +657,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='ready',dispatch_execution_id=NULL,input_manifest_sha256=coalesce($3::text,input_manifest_sha256),\n error_code='START_OUTCOME_UNKNOWN',error_message=left($4::text,500),updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$2::text AND status='ready'\n RETURNING id,status\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,'reconcile' action,\n CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id),$1::uuid) job_id,coalesce(max(status),'ready') status FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='ready',dispatch_execution_id=NULL,input_manifest_sha256=coalesce($3::text,input_manifest_sha256),\n error_code='START_OUTCOME_UNKNOWN',error_message=left($4::text,500),updated_at=now()\n WHERE id=$1::uuid AND dispatch_execution_id=$2::text AND status='ready'\n RETURNING id,status\n)\nSELECT 'tender_agentic_dispatch_v1' schema_version,'reconcile' action,\n CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,coalesce(max(status),'ready') status FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$execution.id,$json.input_manifest_sha256 ?? '',$json.error_message] }}"
         }

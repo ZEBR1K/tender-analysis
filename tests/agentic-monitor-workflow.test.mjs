@@ -70,6 +70,16 @@ test('monitor polls jobs one at a time with header auth and bounded status respo
   assert.equal(poll.onError, 'continueErrorOutput');
 });
 
+test('runner JSON requests use autodetect so n8n resolves response streams before identity checks', async () => {
+  const workflow = await load();
+  for (const name of ['Опросить runner', 'Получить validated result', 'Reconcile runner start']) {
+    const response = find(workflow, name).parameters.options.response.response;
+    assert.equal(response.fullResponse, true, `${name} must preserve HTTP status and headers`);
+    assert.equal(response.neverError, true, `${name} must route typed HTTP failures itself`);
+    assert.equal(response.responseFormat, 'autodetect', `${name} must resolve JSON stream bodies on n8n 2.35`);
+  }
+});
+
 test('nonterminal and failed paths persist only bounded metadata and release exact lease', async () => {
   const workflow = await load();
   const heartbeat = find(workflow, 'Сохранить heartbeat').parameters.query;
@@ -305,5 +315,13 @@ test('every guarded monitor update returns an explicit ownership outcome', async
     const sql = find(workflow, name).parameters.query;
     assert.match(sql, /ownership_lost|update_count/iu, `${name} needs explicit zero-row outcome`);
     assert.match(sql, /SELECT/iu);
+  }
+});
+
+test('monitor SQL never applies unsupported aggregates directly to UUID columns', async () => {
+  const workflow = await load();
+  for (const node of workflow.nodes.filter((candidate) => candidate.type === 'n8n-nodes-base.postgres')) {
+    const sql = node.parameters.query;
+    assert.doesNotMatch(sql, /max\s*\(\s*id\s*\)/iu, `${node.name} aggregates UUID directly`);
   }
 });

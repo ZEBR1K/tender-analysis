@@ -1,13 +1,19 @@
 # TENDER — Агентский анализ — Монитор
 
 The Task 12 repository export remains an inactive, identity-neutral candidate.
-Its imported live n8n copy is also inactive and has workflow ID
-`47e6ede6c10349c0`. A one-minute Schedule Trigger claims at
+The corrected schedule-based inactive live candidate has workflow ID
+`CALcBEXvQsO1AcfP`. The earlier imported `47e6ede6c10349c0` is a pre-fix
+inactive copy and must not be promoted. A one-minute Schedule Trigger claims at
 most two `ready`, `running`, or `validating` jobs. The short PostgreSQL claim
 transaction uses `FOR UPDATE SKIP LOCKED`, the current n8n execution ID as the
 exact poll owner, and a five-minute stale-lease cutoff. It commits before the
 first runner HTTP request, so no database transaction remains open while the
 runner is polled. Claimed jobs are processed sequentially.
+
+Runner JSON HTTP nodes use response auto-detection so n8n `2.35.3` resolves
+`application/json` streams before identity checks. Guarded SQL casts UUID
+values through text before aggregate selection because PostgreSQL has no
+`max(uuid)`.
 
 Dispatch-owned jobs are excluded from the claim. Runner `ready`, `running`, and
 `validating` responses may update only allow-listed, size-bounded heartbeat,
@@ -43,15 +49,11 @@ byte-compatible no-op. The DB stores only bounded hashes, usage, summary and
 artifact metadata. Full runner/Codex JSONL remains runner-side and is neither
 fetched nor persisted by this workflow.
 
-The export is inactive, identity-neutral and has empty `pinData`. Read-only live
-reconciliation confirmed that the imported inactive graph, after masking the
-instance workflow ID and bound credential IDs, matches the repository candidate.
-Its PostgreSQL and runner Header Auth credential types are bound, and
-`settings.errorWorkflow` points to the live agentic Error Workflow
-`6ccedae778a14176`. The n8n execution-list endpoint returned zero executions for
-this workflow.
-
-The required Dispatch source-hash prerequisite is still absent, so no
-Dispatch → Monitor → exact 27-row live canary has run. The Monitor schedule has
-not been activated, Task 12 does not wire production routing, and the legacy
-pipeline is unchanged.
+The export is inactive, identity-neutral and has empty `pinData`. Normalized
+read-back confirms that the corrected inactive candidate matches the repository
+nodes and connections and has the exact PostgreSQL/runner credentials bound.
+An archived one-shot clone executed the same corrected graph as execution
+`15258`, validated the runner envelope and atomically committed exactly 27
+shadow rows for job `79149bb3-0028-413a-bbb9-813de64b6052`. The schedule-based
+candidate has not been activated. Publishing/linking the Error Workflow and
+production routing remain Task 17.
