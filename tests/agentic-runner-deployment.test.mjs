@@ -39,6 +39,8 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr=5\.3\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
+  assert.match(dockerfile, /bubblewrap=0\.8\.0-2\+deb12u1/u);
+  assert.match(dockerfile, /chmod u\+s \/usr\/bin\/bwrap/u);
   assert.match(dockerfile, /npm ci --omit=dev/u);
   assert.match(dockerfile, /COPY field-catalog \.\/field-catalog/u);
   assert.match(dockerfile, /COPY probes \.\/probes/u);
@@ -53,15 +55,32 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /CMD \["node", "src\/server\.mjs"\]/u);
 });
 
-test('runner Compose boundary is internal-only, least-privilege and resource bounded', async () => {
+test('runner Compose exposes only the capabilities required for the inner Codex sandbox', async () => {
   const compose = await readFile(composePath, 'utf8');
 
   assert.doesNotMatch(compose, /^\s*ports:/mu);
   assert.match(compose, /container_name:\s+tender-codex-runner/u);
   assert.match(compose, /read_only:\s*true/u);
   assert.match(compose, /user:\s*"10001:10001"/u);
+  assert.match(compose, /^\s*init:\s*true$/mu);
   assert.match(compose, /cap_drop:\s*\r?\n\s*- ALL/u);
-  assert.match(compose, /no-new-privileges:true/u);
+  const capabilities = [
+    'SYS_ADMIN',
+    'SYS_CHROOT',
+    'SETUID',
+    'SETGID',
+    'SYS_PTRACE',
+    'NET_ADMIN',
+    'NET_RAW',
+  ];
+  for (const capability of capabilities) {
+    assert.match(compose, new RegExp(`^\\s*- ${capability}$`, 'mu'));
+  }
+  assert.match(compose, /^\s*- seccomp=unconfined$/mu);
+  assert.match(compose, /^\s*- apparmor=unconfined$/mu);
+  assert.doesNotMatch(compose, /no-new-privileges/u);
+  assert.doesNotMatch(compose, /^\s*privileged:\s*true$/mu);
+  assert.doesNotMatch(compose, /docker\.sock/u);
   assert.match(compose, /healthcheck:/u);
   assert.match(compose, /\/opt\/tender-codex-runner\/jobs:\/data\/jobs/u);
   assert.match(compose, /\/opt\/tender-codex-runner\/secrets\/runner-auth-token:\/run\/secrets\/runner-auth-token:ro/u);

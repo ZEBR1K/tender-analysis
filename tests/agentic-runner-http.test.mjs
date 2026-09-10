@@ -251,7 +251,7 @@ test('permission builder grants only current job roots and supplies CLI override
     [`/data/jobs/${jobId}/input`, 'read'],
     ['/run/codex-auth', 'deny'],
     ['/run/secrets', 'deny'],
-    ['/proc/*/environ', 'deny'],
+    ['/proc', 'deny'],
   ]) {
     assert.ok(filesystemOverride.includes(
       `${JSON.stringify(permissionPath)}=${JSON.stringify(access)}`,
@@ -261,6 +261,7 @@ test('permission builder grants only current job roots and supplies CLI override
     overrides.some((entry) => entry.includes('/source-index')),
     false,
   );
+  assert.equal(filesystemOverride.includes('/proc/*'), false);
   assert.ok(overrides.includes(`shell_environment_policy.set.HOME="/data/jobs/${jobId}/workspace"`));
   assert.ok(overrides.includes(`shell_environment_policy.set.TMPDIR="/data/jobs/${jobId}/workspace/.tmp"`));
   assert.equal(overrides.some((entry) => /KEY|SECRET|TOKEN|CODEX_HOME/u.test(entry)), false);

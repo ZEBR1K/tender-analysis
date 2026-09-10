@@ -64,9 +64,7 @@ export function buildCodexPermissionBoundary({
     [inputDirectory, 'read'],
     [normalizedAuthRoot, 'deny'],
     [normalizedSecretsRoot, 'deny'],
-    ['/proc/*/environ', 'deny'],
-    ['/proc/self/environ', 'deny'],
-    ['/proc/thread-self/environ', 'deny'],
+    ['/proc', 'deny'],
   ];
   const entries = [
     override('default_permissions', tomlString(PROFILE_NAME)),
@@ -95,7 +93,7 @@ export function buildCodexPermissionBoundary({
       normalizedJobsRoot,
       normalizedAuthRoot,
       normalizedSecretsRoot,
-      '/proc/*/environ',
+      '/proc',
       '/tmp',
     ]),
     shellEnvironmentKeys: Object.freeze(['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL']),

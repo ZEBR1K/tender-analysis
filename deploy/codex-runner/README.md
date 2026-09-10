@@ -5,8 +5,8 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 ## Security and runtime boundary
 
 - The service has no host-published port. n8n reaches `http://tender-codex-runner:8080` through the external `n8n_default` network.
-- The container runs as UID/GID `10001:10001`, with a read-only root filesystem, all Linux capabilities dropped and `no-new-privileges` enabled.
-- `/opt/tender-codex-runner/jobs` is the only writable host mount and appears as `/data/jobs`. Codex authentication and state are not stored below it.
+- The container runs as UID/GID `10001:10001` with a read-only root filesystem. It drops all inherited Linux capabilities, then restores only `SYS_ADMIN`, `SYS_CHROOT`, `SETUID`, `SETGID`, `SYS_PTRACE`, `NET_ADMIN`, and `NET_RAW`; Docker seccomp and AppArmor are unconfined so the inner Codex `bubblewrap` sandbox can create its own namespaces and filters.
+- `/opt/tender-codex-runner/jobs` is the only writable host mount and appears as `/data/jobs`. For each invocation the runner creates a private job-local `codex-home`, copies only `auth.json` into it with mode `0600`, keeps it outside the agent workspace, and removes it after the Codex process exits.
 - The runner Header Auth token is mounted read-only at `/run/secrets/runner-auth-token`. The dedicated Codex auth directory is mounted read-only at `/run/codex-auth`; never mount a user's complete Codex home, home directory or the n8n filesystem.
 - The service receives only its own Header Auth token and Codex credential at deployment time. It must never receive TenderPlan, n8n, PostgreSQL, Supabase or Telegram credentials.
 - Exactly one Codex process may run at a time. The initial queue accepts at most two waiting jobs and fails closed beyond that bound.
@@ -33,7 +33,7 @@ The manifest intentionally contains only job/run/catalog identity and source-fil
 
 ## Per-job Codex permissions
 
-The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes only the exact current `workspace`, reads only that job's immutable original `input`, and explicitly denies the shared jobs parent, Codex auth, runner secrets, global temp paths and `/proc/*/environ`. No generated source-index tree is mounted or granted.
+The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes only the exact current `workspace`, reads only that job's immutable original `input`, and explicitly denies the shared jobs parent, both Codex auth locations, runner secrets, global temp paths and the complete `/proc` tree. No generated source-index tree is mounted or granted.
 
 Spawned shell commands inherit no process environment. The runner supplies only fixed `PATH`, job-local `HOME`/`TMPDIR`, `LANG` and `LC_ALL`; credential-like variables are not forwarded. The actual Codex service process may read the dedicated auth mount, while its sandboxed shell may not.
 
