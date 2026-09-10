@@ -1,0 +1,17 @@
+*
+!package.json
+!package-lock.json
+!schemas/
+!schemas/**
+!policies/
+!policies/**
+!field-catalog/
+!field-catalog/**
+!agent-template/
+!agent-template/**
+!prompts/
+!prompts/**
+!probes/
+!probes/**
+!src/
+!src/**

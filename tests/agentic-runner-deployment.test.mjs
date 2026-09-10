@@ -9,6 +9,7 @@ const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, '..');
 const runnerDirectory = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const dockerfilePath = path.join(runnerDirectory, 'Dockerfile');
+const dockerignorePath = path.join(runnerDirectory, '.dockerignore');
 const composePath = path.join(runnerDirectory, 'compose.yaml');
 const attributesPath = path.join(repositoryRoot, '.gitattributes');
 const authSourcePath = path.join(runnerDirectory, 'src', 'http-auth.mjs');
@@ -78,6 +79,26 @@ test('runner Compose boundary is internal-only, least-privilege and resource bou
   assert.match(compose, /pids_limit:\s*192/u);
   assert.match(compose, /n8n_default:\s*\r?\n\s*external:\s*true/u);
   assert.doesNotMatch(compose, /^\s+(N8N_|POSTGRES|SUPABASE|TENDERPLAN|TELEGRAM)[A-Z0-9_]*:/mu);
+});
+
+test('runner build context is deny-by-default and cannot include runtime state or secrets', async () => {
+  const dockerignore = await readFile(dockerignorePath, 'utf8');
+  const entries = dockerignore.split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'));
+  assert.equal(entries[0], '*');
+  for (const required of [
+    '!package.json',
+    '!package-lock.json',
+    '!schemas/',
+    '!policies/',
+    '!field-catalog/',
+    '!agent-template/',
+    '!prompts/',
+    '!probes/',
+    '!src/',
+  ]) assert.ok(entries.includes(required), `missing build-context allowlist entry ${required}`);
+  assert.equal(entries.some((entry) => /(?:jobs|secrets|canary)/iu.test(entry)), false);
 });
 
 test('runner uses constant-time Header Auth for protected routes', async () => {
