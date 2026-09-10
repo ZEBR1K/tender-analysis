@@ -399,7 +399,7 @@ typed tender_id / source / source_event_key / trigger_kind
 → require response tender._id === requested tender_id
 → one snapshot-safe SQL:
    insert run directly as processing
-   + register all documents as pending
+   + register supported documents as pending and unsupported documents as skipped
 → created_new_run?
    ├─ true: async Worker dispatch for pdf/docx/xlsx
    └─ false: fresh active-run SELECT + exactly-one guard
@@ -416,7 +416,11 @@ docx
 xlsx
 ```
 
-Это временное ограничение. Unsupported и zero-document lifecycle не закрыты: structured output возвращается, но run всё ещё может остаться `processing` (`OR-0`, `OR-1`). Export и offline tests не доказывают import, live wiring или production runtime.
+Legacy `.doc` parsing is intentionally unsupported. Such attachments remain in
+the audit as terminal `skipped`; Intake returns
+`unsupported_documents_skipped` and fails the run instead of aggregating a
+partial document set. This boundary is runtime-verified in candidate Intake
+execution `14987`. Zero-document lifecycle remains separate (`OR-1`).
 
 ---
 
@@ -1736,8 +1740,8 @@ Error Workflow = TENDER — Ошибка обработки документа
 
 ```text
 OR-0
-unsupported document registered pending
-but Worker not started
+unsupported document is preserved as skipped;
+the run fails explicitly and partial aggregation is blocked
 ```
 
 ## Worker error handling

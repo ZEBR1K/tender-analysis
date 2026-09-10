@@ -1,15 +1,33 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-09
+**Snapshot date:** 2026-09-10
 **Status:** Active development / test hardening before client report
 **Branch at snapshot:** `codex/tenderplan-intake-resume`
 
-## TenderPlan intake/resume checkpoint — automatic mark path GREEN in isolated NO-WORKER contour, activation pending
+## TenderPlan intake/resume checkpoint — automatic mark path and resumable E2E GREEN in isolated candidate contour
 
 Starting feature commit before documentation integration: `4c32d0b`. `main` is
 not changed.
 
 ### Verified
+
+- Real marked tender `6aa2388f5b7165804b314ba5` was captured by Mark
+  Intake execution `14947`; Intake `14949` created analysis run
+  `67494863-22cc-406c-90cc-70c17e7d752a` through candidate Orchestrator
+  `14950`. The supported `.xlsx` document completed once in Worker `14951`.
+- The same tender exposed an unsupported legacy `.doc`. Candidate Orchestrator
+  now registers unsupported extensions directly as terminal `skipped` with
+  `error_message=unsupported_file_extension`; Intake also repairs legacy
+  `pending` / `processing` / `failed` unsupported rows to that state.
+- Manual Resume `14986` → Intake `14987` verified terminal containment for the
+  mixed run: readiness was `1 completed + 1 skipped`, action was
+  `unsupported_documents_skipped`, and the run became `failed`. No partial
+  Aggregator/report was started, no document was reprocessed, and the Manual
+  Resume template was returned to a blank `analysis_run_id`.
+- The earlier successful supported-only E2E run
+  `9688b632-dc69-41ec-9ac7-5b61c6942b1f` completed `3/3` documents, the 27/27
+  FINAL barrier, Finalization and the current PDF report path. XLSX and Telegram
+  delivery remain outside the current live Report workflow.
 
 - Inactive repository candidates `TENDER — Intake Resume`, `TENDER — Manual
   Resume`, `TENDER — Recovery Scan` and `TENDER — Ошибка Intake Resume` are
@@ -55,8 +73,10 @@ not changed.
   workflows: Error `kff8KIrSHzo5Mmt1`, NO-WORKER Orchestrator
   `thE9gLyNTvxLWt8I`, Intake Resume `VO8Ml0sfO65w2Jiz`, Mark Intake
   `biYC4OvWBlfJRmnj`, Recovery Scan `lwcHHdmmNd5YE6cw` and Manual Resume
-  `z8nynFC12H9WOM9s`. Entry workflows remain inactive/unpublished. The new Error
-  workflow is published only so the inactive candidates can reference it.
+  `z8nynFC12H9WOM9s`. The first import checkpoint kept them inactive; the current
+  isolated contour has Mark Intake, Recovery Scan, Intake Resume, candidate
+  Orchestrator/Worker and both Error Workflows active. Manual Resume remains
+  inactive and operator-only. Existing production workflows were not modified.
 - NO-WORKER Orchestrator canaries `14691` and `14694` created/reused exactly one
   active run for each approved test tender. Intake ledger canaries `14697` and
   `14700` used stable mark+tender keys: the first delivery completed both ledger
@@ -139,27 +159,22 @@ not changed.
   duplicate `tender`/`tenders` placement and one unique tender.
 - Task 9 Mark Intake is imported and read back with the real TenderPlan
   credential and the isolated Intake target. Its manual current-state poll is
-  runtime GREEN through Intake duplicate/no-op (`14744` → `14745`), but the
-  ten-minute schedule is intentionally not activated. Pagination/order/cursor
-  and exhaustive-result semantics remain undocumented.
+  runtime GREEN through Intake duplicate/no-op (`14744` → `14745`), and the
+  active schedule captured the real mark in `14947` → `14949`. Pagination/order/
+  cursor and exhaustive-result semantics remain undocumented.
 - The isolated Intake retry/stale/manual/CAS/API-outage runtime matrix is GREEN.
   Both execution-read HTTP nodes are bound in the isolated live candidate to the
   owner-created read-only Header Auth credential and use the explicit non-secret
   self-hosted origin `https://n8nworkup.ru`; no API key is embedded. The portable
   repository export intentionally keeps the credential reference unbound.
-- Exact execution-response ID correlation is offline-tested and present in the
-  inactive live candidate, but has not required an additional runtime canary.
-- Aggregator and Finalization routes remain unverified in this change because the
-  approved canary boundary required stopping before Document Worker. Their
-  controlled end-to-end runtime test is a separate promotion gate.
-- Existing live workflows were not changed. Mark Intake, Recovery Scan, Manual
-  Resume and Intake Resume remain inactive/unpublished; production activation
-  remains a separate owner decision.
-- The new Worker has not been executed because the approved runtime boundary
-  still stops before Document Worker. Therefore DW-8 controlled retry behavior,
-  paid AI calls, production-DB writes, Aggregator/Finalization and schedule
-  activation remain unverified. Publication/activation must not proceed until a
-  separately approved bounded Worker canary is GREEN.
+- Exact execution-response ID correlation is exercised by the active isolated
+  recovery path; malformed or unavailable responses still fail closed.
+- Candidate Worker and the existing Aggregator/Finalization/report route were
+  verified by the supported-only E2E run
+  `9688b632-dc69-41ec-9ac7-5b61c6942b1f`. The current live Report workflow
+  creates PDF only; XLSX and Telegram delivery remain outside this milestone.
+- Existing production workflows were not changed. Only the isolated candidate
+  contour was published/activated; Manual Resume remains inactive.
 - n8n import preserved all `101/101` Worker connection edges and the critical
   claim/persistence SQL, but normalized away eleven explicitly exported default
   parameter paths across ten nodes. The current HTTP Request type definition

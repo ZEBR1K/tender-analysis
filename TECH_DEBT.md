@@ -131,7 +131,7 @@ Naming, comments, cleanup, future hardening.
 |`DW-24`|✅ Isolated Worker runtime GREEN; production/full-run promotion pending. Execution `14592` exposed malformed ActiveX GroupName with literal U+0000 while option Value `0/1` remained decodable. Canonical and DW-23 beta packages reject only GroupName to `group_context=null`, preserve state, emit bounded NUL-free `invalid_activex_group_name`, and fail fast on any residual nested NUL before `Сохранить analysis unit`. Execution `14596` persisted `8/8` units and `15` facts with zero residual NUL and completed the document. Test Aggregator was not invoked; production promotion and a fresh full run remain separate gates.|Document Worker / DOCX ActiveX JSONB safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
 |`DW-8`|⚠ Local implementation/tests complete; controlled runtime retry verification OPEN. Fail-closed non-empty `analysis_unit_ids` guard и scoped replacement прошли Worker `293/293`, full `493/493`; quality re-review `Ready: Yes`. Production fixed/deployed не заявляется.|Document Worker|
-|`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
+|`OR-0`|✅ Candidate runtime GREEN. Unsupported extensions are registered/repaired as audited terminal `skipped`; a mixed run fails explicitly with `unsupported_documents_skipped` and cannot produce a partial report. Legacy `.doc` parsing is intentionally not implemented.|Orchestrator / Intake Resume|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий downstream — Report Generation V2: read-only snapshot → HTML artifact; PDF/DOCX/XLSX/delivery остаются future work.|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Live artifact GREEN / fresh runtime pending. Read-only export workflow `ftvmrEHoMbPOAqZG` от 2026-09-05 подтверждает, что active 31-node live graph уже содержит universal `procurement_subject` current-scope boundary; canonical repository export синхронизирован с ним. Offline production gate GREEN. Остаётся открытой до fresh runtime canary и полного 27/27 semantic review.|Aggregator semantic safety|
@@ -580,6 +580,18 @@ completed = documents\\\\\\\\\\\\\\\_total
 ```
 
 поэтому `skipped` надо проектировать вместе с readiness.
+
+### Resolution — 2026-09-10
+
+Candidate Orchestrator assigns unsupported extensions terminal `skipped` with
+`unsupported_file_extension`. Intake Resume normalizes pre-existing unsupported
+rows from `pending`, `processing`, or `failed` to the same audited state. The
+DB-backed readiness barrier still requires every document to be `completed` for
+aggregation; any `skipped` document instead produces
+`unsupported_documents_skipped` and atomically fails the run. This preserves the
+document in audit, prevents an eternal `processing` run, and prevents a partial
+27-field report. Manual Resume `14986` / Intake `14987` verified the mixed
+`.doc` + `.xlsx` case without a new Worker or Aggregator execution.
 
 ### Приоритет
 

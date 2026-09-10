@@ -417,6 +417,17 @@ test('orchestrator enforces typed intake and atomic concurrent-run routing befor
     /\bINSERT\s+INTO\s+(?:"?public"?\.)?"?tender_analysis_documents"?[\s\S]*?\bSELECT\b[\s\S]*?\bFROM\s+"?inserted_run"?\b/i,
     'document INSERT must select from inserted_run',
   );
+  const registeredDocuments = cteBody(creationSql, 'registered_documents');
+  assert.match(
+    registeredDocuments.body,
+    /\bCASE\b[\s\S]*?\blower\s*\([\s\S]*?file_extension[\s\S]*?\bIN\s*\(\s*'pdf'\s*,\s*'docx'\s*,\s*'xlsx'\s*\)[\s\S]*?\bTHEN\s+'pending'[\s\S]*?\bELSE\s+'skipped'[\s\S]*?\bEND\b/i,
+    'unsupported registered documents must be terminal skipped instead of pending forever',
+  );
+  assert.match(
+    registeredDocuments.body,
+    /error_message[\s\S]*unsupported[\s_-]*file[\s_-]*extension/i,
+    'unsupported registered documents must retain an auditable skip reason',
+  );
   assert.match(
     creationSql,
     /\bTRUE\b\s+AS\s+"?created_new_run"?/i,

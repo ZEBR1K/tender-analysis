@@ -1,7 +1,7 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
 **Статус:** inactive repository candidate / offline-tested / pre-DB runtime smoke GREEN
-**Последнее обновление:** 2026-09-08
+**Последнее обновление:** 2026-09-10
 **Тип:** reusable new-run-only sub-workflow
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`
 **Canonical export:** `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
@@ -31,7 +31,7 @@ typed intake input
 → validate response identity
 → normalize tender metadata and attachments
 → atomically create run as processing
-→ register every attachment as pending
+→ register supported attachments as pending and unsupported attachments as skipped
 → asynchronously dispatch supported documents
 → return one structured result
 ```
@@ -183,7 +183,11 @@ input_documents
 Основные свойства:
 
 1. `inserted_run` сразу вставляет run со `status='processing'`.
-2. `registered_documents` вставляет все normalized attachments из `input_documents` со `status='pending'` и ссылается только на новый `inserted_run`.
+2. `registered_documents` вставляет все normalized attachments из
+   `input_documents` и ссылается только на новый `inserted_run`.
+   `pdf/docx/xlsx` получают `status='pending'`; остальные расширения получают
+   terminal `status='skipped'` и
+   `error_message='unsupported_file_extension'`.
 3. `(analysis_run_id, document_index)` остаётся document UPSERT boundary.
 4. `document_stats` считает зарегистрированные строки и собирает их обратно в `attachments` с внутренними `document_id`.
 5. Ошибка statement откатывает и run, и регистрацию документов вместе.
@@ -349,9 +353,12 @@ Malformed identity, неожиданный zero/multiple conflict result или 
 
 ## OR-0 — unsupported documents
 
-Все attachments регистрируются до dispatch, но только `pdf/docx/xlsx` получают Worker call. Unsupported document остаётся `pending`. Даже при смешанном наборе supported и unsupported документов это может навсегда удержать run в `processing`.
-
-Structured Orchestrator output устраняет silent zero-item return, но не решает lifecycle unsupported document. Нужны явный terminal status/reason и согласованное изменение readiness semantics.
+Все attachments регистрируются до dispatch, но только `pdf/docx/xlsx` получают
+Worker call. Unsupported document сохраняется как audited terminal `skipped`.
+Intake Resume не считает такой набор готовым к Aggregator: он возвращает
+`unsupported_documents_skipped` и переводит run в `failed`, исключая вечный
+`processing` и частичный отчёт. Mixed `.doc` + `.xlsx` runtime проверен Intake
+execution `14987`.
 
 ## OR-1 — zero documents / zero supported documents
 

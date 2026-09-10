@@ -25,6 +25,12 @@ The intake-event compare-and-set carries `processing_started_at` twice: the norm
 
 The dispatcher uses PostgreSQL for the long-lived barrier. Worker readiness SQL is copied from the canonical Worker. Finalization is called only when the complete 27-field FINAL barrier is valid for `tender_fields_v1` / `tender_field_final_v1`.
 
+Unsupported extensions are preserved as terminal `skipped` with
+`unsupported_file_extension`; they are never dispatched. A run containing any
+such document is not partially aggregated: after all owned work is terminal,
+the dispatcher returns `unsupported_documents_skipped` and atomically marks the
+run `failed`.
+
 ## Runtime verification
 
 Isolated no-Worker executions `14704`-`14742` verify same-run retry, the automatic
@@ -35,6 +41,12 @@ Scan and exact-event Error Workflow retry. The global execution inventory for th
 test window contains no Document Worker, Aggregator, Finalization or production
 Orchestrator execution. Full evidence is recorded in
 `evaluations/TENDER_INTAKE_MIGRATION_AND_NO_WORKER_CANARY_2026-09-08.md`.
+
+Real mark canary `14947` created run
+`67494863-22cc-406c-90cc-70c17e7d752a`. Manual Resume `14986` / Intake `14987`
+then verified mixed-document containment: one `.xlsx` stayed `completed`, one
+legacy `.doc` stayed `skipped`, the run became `failed`, and neither Worker nor
+Aggregator was invoked again.
 
 ## Packaging required
 

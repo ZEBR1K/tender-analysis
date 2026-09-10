@@ -168,17 +168,20 @@ workflows/orchestrator.md
 
 ---
 
-## `TENDER — Intake Resume` — inactive repository candidate
+## `TENDER — Intake Resume` — isolated runtime-verified candidate
 
 Typed dispatcher для new/existing run: сохраняет тот же `analysis_run_id`, не
 повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
 два Worker claims total. Manual override может повторно запустить exhausted
-failed document. Candidate реализован и offline-tested; deployment/runtime
-promotion pending. Isolated NO-WORKER copy `VO8Ml0sfO65w2Jiz` imported and
-read back; executions `14697/14700` prove stable-key ledger deduplication while
-all Worker/Aggregator/Finalization calls remain disabled.
+failed document. Candidate `VO8Ml0sfO65w2Jiz` is imported, active and
+runtime-verified. Executions `14697/14700` prove stable-key ledger deduplication.
+Real mark canary `14947` created run
+`67494863-22cc-406c-90cc-70c17e7d752a`; Manual Resume `14986` / Intake `14987`
+proved that an unsupported `.doc` is audited as `skipped`, the run fails
+explicitly as `unsupported_documents_skipped`, and no partial Aggregator/report
+or repeated Worker execution occurs.
 
-## `TENDER — TenderPlan Mark Intake` — inactive repository candidate
+## `TENDER — TenderPlan Mark Intake` — active isolated candidate
 
 Каждые 10 минут читает current members метки
 `6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
@@ -187,8 +190,9 @@ all Worker/Aggregator/Finalization calls remain disabled.
 relation contract `14683`. Initial candidate execution `14743` failed closed on
 the earlier `id` assumption; corrected `14744` → `14745` is runtime GREEN through
 the Intake duplicate/no-op path with the existing `analysis_run_id`.
-Inactive isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan
-credential and the NO-WORKER Intake candidate; its schedule is not activated.
+Isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan credential and
+active Intake candidate. Scheduled execution `14947` captured real marked tender
+`6aa2388f5b7165804b314ba5` and started its new analysis run.
 
 ---
 
@@ -196,9 +200,10 @@ credential and the NO-WORKER Intake candidate; its schedule is not activated.
 
 Operator-only adapter, который принимает существующий `analysis_run_id` и
 вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
-Candidate реализован и offline-tested. Inactive isolated copy
+Candidate реализован и runtime-tested. Inactive isolated copy
 `z8nynFC12H9WOM9s` is imported/read back with a blank operator-supplied run ID;
-manual retry runtime remains pending.
+execution `14986` successfully resumed the same run and the template was cleared
+again after the test.
 
 ---
 
@@ -206,9 +211,8 @@ manual retry runtime remains pending.
 
 Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
 Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
-Candidate реализован и offline-tested. Inactive isolated copy
-`lwcHHdmmNd5YE6cw` is imported/read back; scheduled retry runtime remains
-pending.
+Candidate реализован and active as isolated copy `lwcHHdmmNd5YE6cw`; scheduled
+recovery reuses the same run and does not redispatch terminal documents.
 
 ---
 
