@@ -139,6 +139,31 @@ test('agentic promotion accepts hexadecimal file-integrity hashes independent of
   assert.match(sql, /\^\[0-9A-Fa-f\]\{64\}\$/u);
 });
 
+test('agentic promotion maps the reserved metadata artifact without weakening document or 27-field barriers', async () => {
+  const workflow = await load('TENDER — Финализация анализа.json');
+  const sql = byName(workflow, 'Продвинуть agentic FINAL').parameters.query;
+
+  assert.match(
+    sql,
+    /SELECT[\s\S]{0,200}\btender_meta\b[\s\S]{0,200}\bFROM\s+public\.tender_analysis_runs\b/iu,
+    'promotion must load the run metadata that authorizes the reserved source',
+  );
+  assert.match(
+    sql,
+    /(?:jsonb_object_length\s*\([^)]*tender_meta|tender_meta\s*(?:=|<>|IS\s+DISTINCT\s+FROM)\s*'\{\}'::jsonb|tender_meta\s*#>?>\s*'\{source_payload\}')/iu,
+    'promotion must distinguish nonempty run metadata from absent metadata',
+  );
+  assert.match(sql, /tenderplan-metadata/u);
+  assert.match(sql, /evidence_item->>'artifact_key'[\s\S]{0,240}tenderplan-metadata|tenderplan-metadata[\s\S]{0,240}evidence_item->>'artifact_key'/u);
+  assert.match(sql, /'source_type'\s*,\s*'tender_metadata'/u);
+  assert.match(sql, /TenderPlan — карточка закупки/u);
+
+  assert.match(sql, /v_job\.expected_documents\s*<>\s*v_job\.staged_documents/iu);
+  assert.match(sql, /tender_agentic_documents[\s\S]*status\s*<>\s*'staged'/iu);
+  assert.match(sql, /v_actual_count\s*<>\s*27/iu);
+  assert.match(sql, /count\(\*\)[\s\S]*tender_analysis_field_results[\s\S]*<>\s*27/iu);
+});
+
 test('Monitor hands a completed exact-27 job to Finalization without restoring the legacy semantic route', async () => {
   const workflow = await load('TENDER — Агентский анализ — Монитор.json');
   const finalize = byName(workflow, 'Завершить agentic analysis');

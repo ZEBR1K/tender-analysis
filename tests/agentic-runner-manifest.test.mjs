@@ -41,6 +41,25 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function withTenderMetadata(manifest, data = {
+  tender: {
+    _id: '6aa2c2ad5b7165804b8c4ff7',
+    orderName: 'Поставка оборудования',
+    maxPrice: 1250000,
+    guaranteeApp: null,
+  },
+}) {
+  return {
+    ...manifest,
+    tender_metadata: {
+      artifact_key: 'tenderplan-metadata',
+      source_type: 'tender_metadata',
+      source_name: 'TenderPlan — карточка закупки',
+      data,
+    },
+  };
+}
+
 function bytesFor(artifactKey) {
   return Buffer.from(`synthetic bytes for ${artifactKey}\n`, 'utf8');
 }
@@ -108,6 +127,53 @@ test('manifest normalization is closed and rejects unsafe identities and duplica
     assert.throws(() => normalizeSourceManifest(manifest, { expectedCatalogSha256 }), (error) => (
       assertRunnerError(error, code)
     ));
+  }
+});
+
+test('manifest preserves one bounded reserved TenderPlan metadata source and hashes its data', async () => {
+  const base = withTenderMetadata(await loadFixture());
+  const normalized = normalizeSourceManifest(base, { expectedCatalogSha256 });
+
+  assert.deepEqual(normalized.tender_metadata, base.tender_metadata);
+  assert.equal(normalized.expected_documents, base.expected_documents);
+  assert.deepEqual(normalized.documents, base.documents);
+
+  const changed = withTenderMetadata(await loadFixture(), {
+    ...base.tender_metadata.data,
+    tender: {
+      ...base.tender_metadata.data.tender,
+      orderName: 'Другой предмет закупки',
+    },
+  });
+  const normalizedChanged = normalizeSourceManifest(changed, { expectedCatalogSha256 });
+  assert.notEqual(
+    computeManifestSha256(normalizedChanged),
+    computeManifestSha256(normalized),
+  );
+
+  const invalidCases = [
+    {
+      name: 'unknown metadata key',
+      apply: (manifest) => { manifest.tender_metadata.unknown = true; },
+    },
+    {
+      name: 'oversized metadata data',
+      apply: (manifest) => { manifest.tender_metadata.data = { payload: 'x'.repeat(2 * 1024 * 1024 + 1) }; },
+    },
+    {
+      name: 'metadata artifact collision with a document',
+      apply: (manifest) => { manifest.documents[0].artifact_key = 'tenderplan-metadata'; },
+    },
+  ];
+
+  for (const { name, apply } of invalidCases) {
+    const manifest = clone(base);
+    apply(manifest);
+    assert.throws(
+      () => normalizeSourceManifest(manifest, { expectedCatalogSha256 }),
+      (error) => assertRunnerError(error, 'RUNNER_MANIFEST_INVALID'),
+      name,
+    );
   }
 });
 

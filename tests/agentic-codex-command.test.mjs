@@ -63,6 +63,20 @@ async function listRelativeFiles(root, directory = root) {
   return files.sort();
 }
 
+function assertTenderMetadataInstructions(source, label) {
+  assert.match(
+    source,
+    /(?:sealed[\s\S]{0,160}tender_metadata|tender_metadata[\s\S]{0,160}sealed)/iu,
+    `${label} must identify tender_metadata as a sealed source`,
+  );
+  assert.match(source, /tenderplan-metadata/u, `${label} must name the reserved artifact key`);
+  assert.match(
+    source,
+    /(?:absent|missing|null)[^\n]{0,240}(?:must not|does not|never)[^\n]{0,160}(?:negative|["'“]no["'”]|false|not required)/iu,
+    `${label} must forbid treating absent/null metadata as a negative fact`,
+  );
+}
+
 test('agent template contains only its boundary instructions and one focused skill', async () => {
   assert.deepEqual(await listRelativeFiles(templateRoot), [
     '.agents/skills/tender-document-analysis/SKILL.md',
@@ -96,6 +110,7 @@ test('skill is short, agent-led and contains no mechanical parser or semantic va
   assert.match(skill, /artifact_key/u);
   assert.match(skill, /locator/u);
   assert.match(skill, /quote.*optional|optional.*quote/iu);
+  assertTenderMetadataInstructions(skill, 'skill');
 
   for (const forbidden of [
     /source[-_ ]index/iu,
@@ -121,9 +136,10 @@ test('runtime prompt only binds job-local inputs, skill and structured output', 
   ]) {
     assert.ok(prompt.includes(required), required);
   }
+  assertTenderMetadataInstructions(prompt, 'prompt');
   assert.doesNotMatch(prompt, /https?:\/\//iu);
   assert.doesNotMatch(prompt, /credential|password|secret|token/iu);
-  assert.doesNotMatch(prompt, /TenderPlan|n8n|PostgreSQL|Telegram/iu);
+  assert.doesNotMatch(prompt, /n8n|PostgreSQL|Telegram/iu);
   assert.doesNotMatch(prompt, /цена|НДС|лиценз|аналог|гарант/iu);
 });
 

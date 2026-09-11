@@ -39,10 +39,23 @@ async function loadJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
 
-async function buildSealedFixture(t) {
+async function buildSealedFixture(t, { tenderMetadata = false } = {}) {
   const rootDirectory = await mkdtemp(path.join(os.tmpdir(), 'agentic-result-validator-'));
   t.after(() => rm(rootDirectory, { recursive: true, force: true }));
   const manifest = await loadJson(manifestPath);
+  if (tenderMetadata) {
+    manifest.tender_metadata = {
+      artifact_key: 'tenderplan-metadata',
+      source_type: 'tender_metadata',
+      source_name: 'TenderPlan — карточка закупки',
+      data: {
+        tender: {
+          _id: '6aa2c2ad5b7165804b8c4ff7',
+          maxPrice: 1250000,
+        },
+      },
+    };
+  }
   const jobStore = createJobStore({
     rootDirectory,
     fieldCatalogPath: catalogPath,
@@ -154,7 +167,31 @@ test('manifest/catalog identity and exact field contract fail with retained issu
 });
 
 test('all reported source identities must belong to this procurement manifest', async (t) => {
-  const fixture = await buildSealedFixture(t);
+  const fixture = await buildSealedFixture(t, { tenderMetadata: true });
+
+  const metadataEvidence = structuredClone(fixture.result);
+  metadataEvidence.fields[0].evidence[0] = {
+    artifact_key: 'tenderplan-metadata',
+    locator: '$.tender.maxPrice',
+    quote: null,
+  };
+  const metadataEvidenceReport = await fixture.validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: JSON.stringify(metadataEvidence),
+  });
+  assert.equal(metadataEvidenceReport.valid, true);
+  assert.deepEqual(metadataEvidenceReport.issues, []);
+
+  const metadataInspection = structuredClone(fixture.result);
+  metadataInspection.inspected_documents[0].artifact_key = 'tenderplan-metadata';
+  const metadataInspectionReport = await fixture.validator.validate({
+    jobId: fixture.manifest.job_id,
+    rawResult: JSON.stringify(metadataInspection),
+  });
+  assert.equal(metadataInspectionReport.valid, false);
+  assert.ok(codes(metadataInspectionReport).includes('SOURCE_UNKNOWN'));
+  assert.equal(metadataInspectionReport.envelope.valid, false);
+
   const unknownEvidence = structuredClone(fixture.result);
   unknownEvidence.fields[0].evidence[0].artifact_key = 'foreign-doc';
   const evidenceReport = await fixture.validator.validate({

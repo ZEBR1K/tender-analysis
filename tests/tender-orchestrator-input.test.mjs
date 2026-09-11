@@ -660,6 +660,60 @@ test('normalization rejects a mismatched TenderPlan identity', () => {
   );
 });
 
+test('normalization stores the unchanged FullInfo payload inside normalized tender_meta', () => {
+  const normalization = nodesOfType('n8n-nodes-base.code').find((node) =>
+    /TenderPlan response tender\._id is required/u.test(codeSource(node)),
+  );
+  assert.ok(normalization, 'expected the FullInfo normalization Code node');
+
+  const fullInfo = {
+    tender: {
+      _id: '6aa2c2ad5b7165804b8c4ff7',
+      number: '32400000123',
+      id: 'external-123',
+      orderName: 'Поставка оборудования',
+      maxPrice: 1250000,
+      currency: 'RUB',
+      platform: { name: 'Электронная площадка', href: 'https://platform.example/tender' },
+      customers: [{ guid: 'customer-1', name: 'Заказчик', region: 'Москва' }],
+      attachments: [{
+        realName: 'Документ.pdf',
+        displayName: 'Документация',
+        href: 'https://signed.example/document',
+        publicationDateTime: 1789056000000,
+        size: null,
+      }],
+      upstreamOnly: {
+        nested: ['must', 'remain', { unchanged: true }],
+        nullable: null,
+      },
+    },
+    requestMetadata: { traceId: 'trace-123' },
+  };
+  const original = structuredClone(fullInfo);
+  const validatedRequest = {
+    tender_id: fullInfo.tender._id,
+    source: 'tenderplan',
+    source_event_key: 'mark:fixture',
+    trigger_kind: 'tenderplan_mark',
+  };
+  const result = new Function('$json', '$', codeSource(normalization))(
+    fullInfo,
+    (name) => {
+      assert.equal(name, 'Проверить вход Orchestrator');
+      return { item: { json: validatedRequest } };
+    },
+  );
+
+  assert.equal(result.json.tender_meta.source, 'tenderplan');
+  assert.equal(result.json.tender_meta.tender_id, fullInfo.tender._id);
+  assert.equal(result.json.tender_meta.title, fullInfo.tender.orderName);
+  assert.equal(result.json.tender_meta.primary_customer.name, 'Заказчик');
+  assert.equal(result.json.tender_meta.documents_count, 1);
+  assert.deepEqual(result.json.tender_meta.source_payload, original);
+  assert.deepEqual(fullInfo, original, 'normalization must not mutate the FullInfo input');
+});
+
 test('normalization preserves validated intake provenance through run creation', () => {
   const trigger = nodesOfType('n8n-nodes-base.executeWorkflowTrigger')[0];
   const fullInfoHttp = nodesOfType('n8n-nodes-base.httpRequest').find((node) =>

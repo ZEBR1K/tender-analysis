@@ -22,6 +22,12 @@ function stringsIn(value) {
   return [];
 }
 
+function evaluateExpression(source, context) {
+  const match = /^=\{\{([\s\S]*)\}\}$/u.exec(source);
+  assert.ok(match, 'expected one n8n expression');
+  return new vm.Script(`(${match[1]})`).runInNewContext(context);
+}
+
 test('dispatch export is inactive, identity-neutral and has the typed contract', async () => {
   const value = await workflow();
   assert.equal(value.name, 'TENDER — Агентский анализ — Запуск');
@@ -66,7 +72,74 @@ test('dispatch validates input and uses one atomic database preflight', async ()
   assert.match(sql, /invalid_identity_count\s*=\s*0/iu);
   assert.match(sql, /'CODEX_TRANSPORT_ERROR'/u);
   assert.match(sql, /'retry'/u);
+  assert.match(
+    sql,
+    /\b(?:r|run)\.tender_meta\b/u,
+    'Dispatch preflight must select tender_meta from the analysis run',
+  );
   assert.ok(stringsIn(value).filter((text) => text.includes('{{')).every((text) => text.startsWith('={{')));
+});
+
+test('runner manifest carries sealed TenderPlan metadata outside the document barrier', async () => {
+  const value = await workflow();
+  const sourcePayload = {
+    tender: {
+      _id: '6aa2c2ad5b7165804b8c4ff7',
+      orderName: 'Поставка оборудования',
+      guaranteeApp: null,
+    },
+  };
+  const sourceDocument = {
+    source_document_id: '11111111-1111-4111-8111-111111111111',
+    artifact_key: 'doc-0001',
+    document_index: 1,
+    file_name: 'Документ.pdf',
+    file_name_base64: '0JTQvtC60YPQvNC10L3Rgi5wZGY=',
+    mime_type: 'application/pdf',
+    source_sha256: 'A'.repeat(64),
+    byte_size: 100,
+    download_url: 'https://signed.example/document',
+  };
+  const tenderMeta = {
+    source: 'tenderplan',
+    tender_id: sourcePayload.tender._id,
+    title: sourcePayload.tender.orderName,
+    source_payload: sourcePayload,
+  };
+  const requestBody = evaluateExpression(
+    nodeByName(value, 'Создать job в runner').parameters.body,
+    {
+      $json: {
+        job_id: '22222222-2222-4222-8222-222222222222',
+        analysis_run_id: '33333333-3333-4333-8333-333333333333',
+        pipeline_version: 'tender_agentic_pipeline_v1',
+        tender_meta: tenderMeta,
+        documents: [sourceDocument],
+      },
+    },
+  );
+  const manifest = JSON.parse(requestBody);
+
+  assert.deepEqual(manifest.tender_metadata, {
+    artifact_key: 'tenderplan-metadata',
+    source_type: 'tender_metadata',
+    source_name: 'TenderPlan — карточка закупки',
+    data: tenderMeta,
+  });
+  assert.equal(manifest.expected_documents, 1);
+  assert.deepEqual(manifest.documents, [{
+    source_document_id: sourceDocument.source_document_id,
+    artifact_key: sourceDocument.artifact_key,
+    document_index: sourceDocument.document_index,
+    file_name: sourceDocument.file_name,
+    mime_type: sourceDocument.mime_type,
+    source_sha256: sourceDocument.source_sha256,
+    byte_size: sourceDocument.byte_size,
+  }]);
+  assert.equal(
+    manifest.documents.some(({ artifact_key: artifactKey }) => artifactKey === 'tenderplan-metadata'),
+    false,
+  );
 });
 
 test('dispatch stages sequentially and sends binary only between HTTP nodes', async () => {
