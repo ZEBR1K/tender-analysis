@@ -55,7 +55,7 @@ export function buildCodexPermissionBoundary({
   const filesystemEntries = [
     [':root', 'deny'],
     [':minimal', 'read'],
-    [':tmpdir', 'deny'],
+    [':tmpdir', 'write'],
     [':slash_tmp', 'deny'],
     [workspaceDirectory, 'write'],
     [agentInstructionsPath, 'read'],
@@ -122,6 +122,7 @@ export function buildIsolationNegativeCanary({
     probes: [
       { id: 'current_input', path: path.posix.join(currentRoot, 'input', 'current-readable.txt'), expected: 'readable' },
       { id: 'workspace', path: path.posix.join(currentRoot, 'workspace', 'isolation-probe-write.tmp'), expected: 'writable' },
+      { id: 'workspace_tmp', path: path.posix.join(currentRoot, 'workspace', '.tmp', 'isolation-probe-write.tmp'), expected: 'writable' },
       { id: 'current_input_write', path: path.posix.join(currentRoot, 'input', 'isolation-probe-write.tmp'), expected: 'denied' },
       { id: 'sibling_job', path: path.posix.join(normalizedJobsRoot, sibling, 'input', 'sibling-readable.txt'), expected: 'denied' },
       { id: 'jobs_parent', path: normalizedProtectedJobsRoot, expected: 'current_path_only' },

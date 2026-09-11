@@ -271,7 +271,7 @@ test('permission builder grants only current job roots and supplies CLI override
   for (const [permissionPath, access] of [
     [':root', 'deny'],
     [':minimal', 'read'],
-    [':tmpdir', 'deny'],
+    [':tmpdir', 'write'],
     [':slash_tmp', 'deny'],
     [`/data/jobs/${jobId}/workspace`, 'write'],
     [`/data/jobs/${jobId}/input`, 'read'],
@@ -331,6 +331,7 @@ test('isolation canary declares the complete positive and negative runtime probe
   assert.deepEqual(canary.probes.map(({ id, expected }) => ({ id, expected })), [
     { id: 'current_input', expected: 'readable' },
     { id: 'workspace', expected: 'writable' },
+    { id: 'workspace_tmp', expected: 'writable' },
     { id: 'current_input_write', expected: 'denied' },
     { id: 'sibling_job', expected: 'denied' },
     { id: 'jobs_parent', expected: 'current_path_only' },

@@ -11,6 +11,7 @@ const DENIED_CODES = new Set(['EACCES', 'ENOENT', 'EPERM', 'EROFS']);
 const PROBE_IDS = Object.freeze([
   'current_input',
   'workspace',
+  'workspace_tmp',
   'current_input_write',
   'sibling_job',
   'jobs_parent',
@@ -102,6 +103,7 @@ export async function runIsolationProbe({
   assertPlan(plan, cwd);
   const inputDirectory = path.posix.join(plan.jobs_root, plan.job_id, 'input');
   const workspaceMarker = path.posix.join(cwd, 'isolation-probe-write.tmp');
+  const workspaceTempMarker = path.posix.join(cwd, '.tmp', 'isolation-probe-write.tmp');
   const currentInputMarker = path.posix.join(inputDirectory, 'current-readable.txt');
   const currentJobRoot = path.posix.join(plan.jobs_root, plan.job_id);
   const probes = [];
@@ -121,6 +123,14 @@ export async function runIsolationProbe({
   } catch {}
   await io.unlink(workspaceMarker).catch(() => {});
   record('workspace', workspaceWritable);
+
+  let workspaceTempWritable = false;
+  try {
+    await io.writeFile(workspaceTempMarker, 'workspace tmp\n', { flag: 'wx', mode: 0o600 });
+    workspaceTempWritable = String(await io.readFile(workspaceTempMarker)) === 'workspace tmp\n';
+  } catch {}
+  await io.unlink(workspaceTempMarker).catch(() => {});
+  record('workspace_tmp', workspaceTempWritable);
 
   record('current_input_write', await denied(() => io.writeFile(
     path.posix.join(inputDirectory, 'isolation-probe-write.tmp'),

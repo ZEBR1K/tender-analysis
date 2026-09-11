@@ -104,6 +104,7 @@ test('isolation canary command uses the real pinned Codex argv and permission bo
 const probeIds = [
   'current_input',
   'workspace',
+  'workspace_tmp',
   'current_input_write',
   'sibling_job',
   'jobs_parent',
@@ -224,6 +225,7 @@ test('probe script executes every declared read, write and environment check its
       reads.push(filePath);
       if (filePath === `${jobsRoot}/${jobId}/input/current-readable.txt`) return currentMarker;
       if (filePath.endsWith('/workspace/isolation-probe-write.tmp')) return Buffer.from('workspace\n');
+      if (filePath.endsWith('/workspace/.tmp/isolation-probe-write.tmp')) return Buffer.from('workspace tmp\n');
       if (deniedReads.has(filePath)) {
         const hidden = filePath === `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`
           || filePath === `${jobsRoot}/${jobId}/codex-home/auth.json`;
@@ -245,6 +247,7 @@ test('probe script executes every declared read, write and environment check its
     async writeFile(filePath) {
       writes.push(filePath);
       if (filePath.endsWith('/workspace/isolation-probe-write.tmp')) return;
+      if (filePath.endsWith('/workspace/.tmp/isolation-probe-write.tmp')) return;
       throw Object.assign(new Error('denied'), { code: 'EACCES' });
     },
     async unlink() {},
@@ -270,6 +273,7 @@ test('probe script executes every declared read, write and environment check its
   assert.deepEqual(reads, [
     `${jobsRoot}/${jobId}/input/current-readable.txt`,
     `${jobsRoot}/${jobId}/workspace/isolation-probe-write.tmp`,
+    `${jobsRoot}/${jobId}/workspace/.tmp/isolation-probe-write.tmp`,
     `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`,
     '/data/jobs',
     '/data/jobs/.runner-isolation',
@@ -283,6 +287,7 @@ test('probe script executes every declared read, write and environment check its
   ]);
   assert.deepEqual(writes, [
     `${jobsRoot}/${jobId}/workspace/isolation-probe-write.tmp`,
+    `${jobsRoot}/${jobId}/workspace/.tmp/isolation-probe-write.tmp`,
     `${jobsRoot}/${jobId}/input/isolation-probe-write.tmp`,
     '/tmp/tender-codex-runner-isolation-probe.tmp',
   ]);
