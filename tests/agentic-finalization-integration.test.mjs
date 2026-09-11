@@ -157,6 +157,11 @@ test('agentic promotion maps the reserved metadata artifact without weakening do
   assert.match(sql, /evidence_item->>'artifact_key'[\s\S]{0,240}tenderplan-metadata|tenderplan-metadata[\s\S]{0,240}evidence_item->>'artifact_key'/u);
   assert.match(sql, /'source_type'\s*,\s*'tender_metadata'/u);
   assert.match(sql, /TenderPlan — карточка закупки/u);
+  assert.match(
+    sql,
+    /CASE\s+WHEN\s+evidence_item->>'artifact_key'\s*=\s*'tenderplan-metadata'\s+THEN\s+NOT\s+v_has_tender_metadata\s+ELSE\s+agent_document\.job_id\s+IS\s+NULL\s+END/iu,
+    'reserved metadata must always require run metadata even if a conflicting document row exists',
+  );
 
   assert.match(sql, /v_job\.expected_documents\s*<>\s*v_job\.staged_documents/iu);
   assert.match(sql, /tender_agentic_documents[\s\S]*status\s*<>\s*'staged'/iu);

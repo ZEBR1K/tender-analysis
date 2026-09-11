@@ -50,7 +50,7 @@
 
 ## Workflow documentation
 
-`workflows/orchestrator.md`, `workflows/document-preparation.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/intake-error-workflow.md`, `workflows/intake-resume.md`, `workflows/manual-resume.md`, `workflows/recovery-scan.md`, `workflows/tenderplan-mark-intake.md`, `workflows/agentic-analysis-dispatch.md`, `workflows/agentic-analysis-monitor.md`, `workflows/agentic-analysis-error.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
+`workflows/orchestrator.md`, `workflows/document-preparation.md`, `workflows/document-worker.md`, `workflows/error-workflow.md`, `workflows/intake-error-workflow.md`, `workflows/intake-resume.md`, `workflows/manual-resume.md`, `workflows/recovery-scan.md`, `workflows/tenderplan-mark-intake.md`, `workflows/agentic-analysis-dispatch.md`, `workflows/agentic-analysis-monitor.md`, `workflows/agentic-analysis-error.md`, `workflows/aggregator.md`, `workflows/targeted-recheck.md`, `workflows/finalization.md`, `workflows/report-generation.md` описывают контракты соответствующих workflow.
 
 ## Workflow exports
 

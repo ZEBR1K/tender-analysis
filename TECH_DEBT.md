@@ -203,7 +203,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |ID|Проблема|Компонент|
 |-|-|-|
 |`OR-2`|✅ Fresh mark-to-report technical gate closed 2026-09-11. Published Document Preparation, Orchestrator, Intake Resume, Dispatch, Monitor, Agentic Error and Mark Intake carried tender `6aa2c2ad5b7165804b8c4ff7` through new Codex job `70d699d2-b469-40b0-a8cc-de5b38fa6374`, Monitor `16402`, Finalization `16403` and Report `16404`. Read-only DB verification confirmed completed run and exact 27 unique FINAL; HTML/PDF are valid. Manual 27-field semantic review remains a non-blocking evaluation because this procurement has no employee-authored gold report.|Orchestrator|
-|`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
+|`OR-3`|🟡 Candidate implemented: неизменённый TenderPlan FullInfo сохраняется в `tender_meta.source_payload` и передаётся агенту как sealed metadata source; production runtime ещё не подтверждён.|Orchestrator|
 |`OR-7`|✅ Temporary routing gate closed. `TASK17_TEMPORARY_AGENT_ONLY` preserves legacy Worker/Aggregator/Finalization nodes but leaves them unreachable. Raw `.xls` is staged unchanged without a parser. Fresh-run canary `15355/15356`, controlled Dispatch `15373` and terminal Monitor `15387` prove two-source real Codex execution with zero legacy-node runs.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
@@ -2022,9 +2022,13 @@ architectural task.
 
 \---
 
-## `OR-3` — raw TenderPlan snapshot не хранится
+## `OR-3` — sealed TenderPlan snapshot
 
-Полезно для audit, но не блокирует анализ.
+Локальный candidate сохраняет неизменённый FullInfo response в
+`tender_meta.source_payload`. Agentic Dispatch передаёт его runner как отдельный
+источник `tenderplan-metadata`, не включая в document barrier. Snapshot покрыт
+хэшем манифеста; семантический parser или field-specific validator не добавлен.
+До production canary статус остаётся rollout pending.
 
 \---
 
