@@ -52,12 +52,16 @@ function manifestIdentityIssues(result, manifest) {
 }
 
 function sourceMembershipIssues(result, manifest) {
-  const known = new Set(manifest.documents.map((document) => document.artifact_key));
+  const knownDocuments = new Set(manifest.documents.map((document) => document.artifact_key));
+  const knownEvidenceSources = new Set(knownDocuments);
+  if (typeof manifest.tender_metadata?.artifact_key === 'string') {
+    knownEvidenceSources.add(manifest.tender_metadata.artifact_key);
+  }
   const issues = [];
 
   if (Array.isArray(result?.inspected_documents)) {
     result.inspected_documents.forEach((document, index) => {
-      if (typeof document?.artifact_key === 'string' && !known.has(document.artifact_key)) {
+      if (typeof document?.artifact_key === 'string' && !knownDocuments.has(document.artifact_key)) {
         issues.push(issue(
           'SOURCE_UNKNOWN',
           'inspected document does not belong to the sealed manifest.',
@@ -72,7 +76,8 @@ function sourceMembershipIssues(result, manifest) {
     result.fields.forEach((field, fieldPosition) => {
       if (!Array.isArray(field?.evidence)) return;
       field.evidence.forEach((evidence, evidenceIndex) => {
-        if (typeof evidence?.artifact_key !== 'string' || known.has(evidence.artifact_key)) {
+        if (typeof evidence?.artifact_key !== 'string'
+          || knownEvidenceSources.has(evidence.artifact_key)) {
           return;
         }
         issues.push(issue(

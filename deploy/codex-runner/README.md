@@ -20,6 +20,8 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 The authenticated staging API is deliberately small:
 
 - `PUT /v1/jobs` creates one closed `tender_source_manifest_v1` declaration.
+  It may include one sealed TenderPlan metadata source with reserved identity
+  `tenderplan-metadata` / `tender_metadata`.
 - `PUT /v1/jobs/{job_id}/documents/{artifact_key}` streams one declared source file.
 - `POST /v1/jobs/{job_id}/seal` rechecks every file hash and size, copies the pinned field catalog, and freezes the input manifest.
 - `POST /v1/jobs/{job_id}/start` idempotently claims an executable job and queues Codex without holding the caller connection.
@@ -30,7 +32,15 @@ Original file names are metadata only. Physical source names are generated from 
 
 An idempotent seal revalidates the pinned catalog copy, every staged source file, and the exact sealed manifest/hash before reporting `ready`. The store exposes the same `verifySealedInput(job_id)` integrity primitive for the future pre-start gate. Recovery removes only exact job-local `.write-<uuid>.tmp`, `.upload-<uuid>.tmp`, and `.create-<job>-<uuid>.tmp` files created by the runner; unknown files and directories are never recursively treated as write residue.
 
-The manifest intentionally contains only job/run/catalog identity and source-file identity (`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256). It does not extract or index pages, sheets, OOXML parts, text, or OCR. Codex chooses how to inspect each source.
+The manifest contains job/run/catalog identity, source-file identity
+(`artifact_key`, document index/source ID, name, MIME type, size, and SHA-256),
+and optionally one independent TenderPlan metadata source. That source has a
+closed shape, fixed artifact/type identity, a nonblank display name and a plain
+JSON object payload capped at 2 MiB of canonical UTF-8 JSON. Its bytes are
+covered by the same canonical manifest SHA-256. `expected_documents` and
+`documents[]` still count only immutable original files. The runner does not
+extract or index pages, sheets, OOXML parts, text, OCR, or metadata meaning;
+Codex chooses how to inspect each source.
 
 ## Per-job Codex permissions
 
@@ -40,7 +50,17 @@ Spawned shell commands inherit no process environment. The runner supplies only 
 
 ## Agent-led analysis boundary
 
-Codex receives the immutable originals and chooses its own text, visual, OCR or OOXML inspection methods. The runner does not pre-index documents or verify business meaning. Runtime checks are restricted to security, original-file size/SHA and manifest identity, and the closed JSON contract: exact 27-key/index mapping, allowed statuses, evidence artifact membership, and a nonblank human locator for `resolved` or `requires_review`. `not_found` may have no evidence; agent-reported inspected documents, parts, methods, limitations and constraints remain audit context rather than a completeness claim.
+Codex receives the immutable originals, plus the optional sealed TenderPlan
+metadata payload, and chooses its own inspection methods. The metadata may be
+cited as evidence through `tenderplan-metadata`, but it is not an original file
+and is never accepted in `inspected_documents`. The runner does not pre-index
+documents or verify business meaning. Runtime checks are restricted to
+security, original-file size/SHA and manifest identity, and the closed JSON
+contract: exact 27-key/index mapping, allowed statuses, evidence artifact
+membership, and a nonblank human locator for `resolved` or `requires_review`.
+`not_found` may have no evidence; absent or null metadata does not imply a
+negative fact. Agent-reported inspected documents, parts, methods, limitations
+and constraints remain audit context rather than a completeness claim.
 
 ## Execution lifecycle
 

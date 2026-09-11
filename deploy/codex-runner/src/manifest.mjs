@@ -9,6 +9,9 @@ export const FIELD_CATALOG_VERSION = 'tender_fields_v1';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/iu;
 const ARTIFACT_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/iu;
+const TENDER_METADATA_ARTIFACT_KEY = 'tenderplan-metadata';
+const TENDER_METADATA_SOURCE_TYPE = 'tender_metadata';
+const MAX_TENDER_METADATA_BYTES = 2 * 1024 * 1024;
 const MANIFEST_KEYS = Object.freeze([
   'analysis_run_id',
   'documents',
@@ -19,6 +22,10 @@ const MANIFEST_KEYS = Object.freeze([
   'manifest_version',
   'pipeline_version',
 ]);
+const MANIFEST_KEYS_WITH_TENDER_METADATA = Object.freeze([
+  ...MANIFEST_KEYS,
+  'tender_metadata',
+].sort());
 const DOCUMENT_KEYS = Object.freeze([
   'artifact_key',
   'byte_size',
@@ -27,6 +34,12 @@ const DOCUMENT_KEYS = Object.freeze([
   'mime_type',
   'source_document_id',
   'source_sha256',
+]);
+const TENDER_METADATA_KEYS = Object.freeze([
+  'artifact_key',
+  'data',
+  'source_name',
+  'source_type',
 ]);
 
 function fail(message, code = 'RUNNER_MANIFEST_INVALID') {
@@ -108,8 +121,40 @@ function assertUnique(documents, property) {
   }
 }
 
+function normalizeTenderMetadata(value) {
+  assertExactKeys(value, TENDER_METADATA_KEYS, 'tender_metadata');
+  if (value.artifact_key !== TENDER_METADATA_ARTIFACT_KEY) {
+    fail(`tender_metadata.artifact_key must be ${TENDER_METADATA_ARTIFACT_KEY}`);
+  }
+  if (value.source_type !== TENDER_METADATA_SOURCE_TYPE) {
+    fail(`tender_metadata.source_type must be ${TENDER_METADATA_SOURCE_TYPE}`);
+  }
+  const sourceName = nonBlankString(value.source_name, 'tender_metadata.source_name', 255);
+  if (!isPlainObject(value.data)) fail('tender_metadata.data must be an object');
+
+  let canonicalData;
+  try {
+    canonicalData = canonicalJson(value.data);
+  } catch {
+    fail('tender_metadata.data must be valid JSON data');
+  }
+  if (Buffer.byteLength(canonicalData, 'utf8') > MAX_TENDER_METADATA_BYTES) {
+    fail(`tender_metadata.data must not exceed ${MAX_TENDER_METADATA_BYTES} canonical JSON bytes`);
+  }
+
+  return {
+    artifact_key: TENDER_METADATA_ARTIFACT_KEY,
+    source_type: TENDER_METADATA_SOURCE_TYPE,
+    source_name: sourceName,
+    data: JSON.parse(canonicalData),
+  };
+}
+
 export function normalizeSourceManifest(value, { expectedCatalogSha256 } = {}) {
-  assertExactKeys(value, MANIFEST_KEYS, 'source manifest');
+  const manifestKeys = isPlainObject(value) && Object.hasOwn(value, 'tender_metadata')
+    ? MANIFEST_KEYS_WITH_TENDER_METADATA
+    : MANIFEST_KEYS;
+  assertExactKeys(value, manifestKeys, 'source manifest');
   const jobId = assertJobId(value.job_id);
   if (!isUuid(value.analysis_run_id)) fail('analysis_run_id must be a UUID');
   if (value.manifest_version !== SOURCE_MANIFEST_VERSION) {
@@ -141,7 +186,16 @@ export function normalizeSourceManifest(value, { expectedCatalogSha256 } = {}) {
   assertUnique(documents, 'document_index');
   assertUnique(documents, 'source_document_id');
 
-  return {
+  const tenderMetadata = Object.hasOwn(value, 'tender_metadata')
+    ? normalizeTenderMetadata(value.tender_metadata)
+    : null;
+  if (tenderMetadata && documents.some(
+    (document) => document.artifact_key === tenderMetadata.artifact_key,
+  )) {
+    fail('tender_metadata artifact_key collides with a document artifact_key');
+  }
+
+  const manifest = {
     manifest_version: SOURCE_MANIFEST_VERSION,
     job_id: jobId,
     analysis_run_id: value.analysis_run_id.toLowerCase(),
@@ -151,6 +205,8 @@ export function normalizeSourceManifest(value, { expectedCatalogSha256 } = {}) {
     expected_documents: value.expected_documents,
     documents,
   };
+  if (tenderMetadata) manifest.tender_metadata = tenderMetadata;
+  return manifest;
 }
 
 function canonicalValue(value) {
