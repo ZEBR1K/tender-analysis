@@ -1,7 +1,7 @@
 # ТЕНДЕРЫ ОРКЕСТРАТОР
 
 **Статус:** published Task 17 temporary agent-only route; real Codex canary GREEN
-**Последнее обновление:** 2026-09-10
+**Последнее обновление:** 2026-09-11
 **Тип:** reusable new-run-only sub-workflow
 **Точное имя workflow в n8n:** `ТЕНДЕРЫ ОРКЕСТРАТОР`
 **Canonical export:** `workflows/n8n-exports/ТЕНДЕРЫ ОРКЕСТРАТОР.json`
@@ -153,7 +153,11 @@ attachments[]
 raw_source
 ```
 
-`tender_meta.source` и `tender_meta.tender_id` берутся из validated request. Полный `raw_source` существует только на этом этапе и дальше не сохраняется; `OR-3` остаётся открытым.
+`tender_meta.source` и `tender_meta.tender_id` берутся из validated request.
+Полный неизменённый FullInfo response дополнительно сохраняется внутри
+`tender_meta.source_payload`. Это отдельный аудируемый источник для Codex; он не
+подменяет attachments и не увеличивает document barrier. `raw_source` остаётся
+доступен в текущем execution для совместимости.
 
 ---
 
@@ -175,7 +179,11 @@ raw_source
 
 `document_index` начинается с 1. Расширение извлекается только из фактического имени файла и приводится к lowercase; неизвестное расширение остаётся `null`.
 
-Orchestrator также сохраняет существующий normalized `tender_meta` contract: идентификаторы, основные данные, даты, всех customers и `primary_customer`, platform, structured guarantees, classifiers и `documents_count`. Валюта не додумывается: если TenderPlan её не сообщил, используется `null`.
+Orchestrator также сохраняет существующий normalized `tender_meta` contract:
+идентификаторы, основные данные, даты, всех customers и `primary_customer`,
+platform, structured guarantees, classifiers, `documents_count` и неизменённый
+`source_payload`. Валюта не додумывается: если TenderPlan её не сообщил,
+используется `null`.
 
 После normalization native Crypto создаёт `analysis_run_id`. Нода `Подготовить документацию` получает этот ID и полный `attachments[]` ровно один раз, работает в `mode=all` и синхронно ждёт sub-workflow. `Проверить результат подготовки` fail-closed проверяет `success=true`, schema/run identity, полные counts и последовательные document indices. Каждый `pending` документ обязан иметь `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Typed failure, partial manifest или identity defect останавливают execution до DB INSERT.
 

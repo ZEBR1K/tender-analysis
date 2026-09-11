@@ -57,6 +57,16 @@ content are never persisted in the error record.
 
 The export is identity-neutral, inactive, and has empty `pinData`. The pinned
 shadow-v0 catalog hash is repository-known and included in the closed manifest.
+
+The preflight also reads the run's sealed `tender_meta` and sends it to the
+runner as the reserved root source `tenderplan-metadata` with
+`source_type=tender_metadata`. It remains outside `documents[]` and
+`expected_documents`, so file staging, file hashes and the document completion
+barrier still describe original attachments only. The runner manifest hash
+binds the metadata bytes. Codex may cite this source with a nonblank locator;
+the workflow adds no TenderPlan parser, field mapping, semantic evidence check,
+or negative inference from absent/null metadata.
+
 Normalized read-back confirms that the corrected live workflow matches
 the repository nodes and connections and has the exact PostgreSQL/runner
 credentials bound. Integrated execution `15257` staged one verified source,
