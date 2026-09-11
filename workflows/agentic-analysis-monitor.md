@@ -63,6 +63,11 @@ of being swallowed. The DB stores only bounded hashes, usage, summary and
 artifact metadata. Full runner/Codex JSONL remains runner-side and is neither
 fetched nor persisted by this workflow.
 
+Successful completion merges the new validation summary into the existing
+technical `validation_summary` JSON. It does not replace earlier audit such as
+`prestart_retry_used`, so recovery history remains visible after a job reaches
+`completed`.
+
 The export is inactive, identity-neutral and has empty `pinData`. Normalized
 read-back confirms that the corrected inactive candidate matches the repository
 nodes and connections and has the exact PostgreSQL/runner credentials bound.
@@ -90,8 +95,17 @@ Finalization workflow ID `cSsh9yjpS7t5p0OO`, and the exact terminal route:
 
 The called Finalization version `e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` and
 Report version `e21c7675-916a-4fd3-8499-e11444484b68` are both published.
-Controlled executions `15662/15663` proved promotion, 27/27 completion and
-HTML/PDF generation for the real Task 17 job. Replay `15666` stopped before a
-second report. A fresh scheduled Monitor execution with a newly completed job
-remains the next end-to-end gate; the canary reused an already completed job and
-therefore invoked Finalization directly to isolate this boundary.
+Controlled executions `15662/15663` first proved promotion, 27/27 completion
+and HTML/PDF generation for the real Task 17 job. Replay `15666` stopped before
+a second report.
+
+The later fresh run closed the complete gate: scheduled Monitor `16402`
+accepted newly completed job `70d699d2-b469-40b0-a8cc-de5b38fa6374`, persisted
+27 shadow rows and synchronously invoked Finalization `16403`; Report `16404`
+created valid HTML and PDF. Read-only PostgreSQL verification confirmed 27
+unique `tender_field_final_v1` rows and `run.status=completed`.
+
+Post-canary audit-retention hardening is published/read back as live Monitor
+version `0ce151f8-99bb-40d7-a426-097a01de97fd`. The successful canary preceded
+this technical merge-only refinement; the success-path identity, exact-27 and
+semantic contracts are unchanged.

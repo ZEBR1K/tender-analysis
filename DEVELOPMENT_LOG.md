@@ -6118,3 +6118,40 @@ job; it is not a fresh TenderPlan-to-report semantic run. The next gate is one
 new marked procurement through the complete published route and manual review
 of all 27 values. Detailed evidence is in
 `evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
+
+## 2026-09-11 — fresh TenderPlan mark-to-report agentic canary GREEN
+
+Tender `6aa2c2ad5b7165804b8c4ff7` completed the published temporary agent-only
+route. Direct source download first reproduced `ETIMEDOUT` independently in
+Document Preparation and Dispatch. The minimal transport fix applies the
+live-only proxy plus three native attempts at those two source HTTP boundaries;
+repository exports retain only the non-secret `=` placeholder.
+
+Preparation retry `15814` downloaded and SHA-256-verified two DOCX files and
+created run `6c36e5da-f9e2-48d9-a062-0493f0c2bf73`. The first Dispatch job
+retained its terminal audit after a revoked Codex refresh token exhausted two
+runner attempts. With explicit operator approval, the current authorization was
+atomically installed in the existing read-only mount, with a restricted backup
+kept outside the repository. No credential content was logged or committed.
+
+Controlled recovery `16383 → 16384 → 16385` created job
+`70d699d2-b469-40b0-a8cc-de5b38fa6374`, which completed on attempt 1. Monitor
+`16402` committed exact 27 shadow rows; Finalization `16403` promoted exact 27
+canonical rows and claimed completion; Report `16404` produced valid HTML
+(`26794` bytes) and PDF (`92267` bytes, `%PDF-`). TLS-verified read-only
+PostgreSQL confirmed `completed`, two documents and 27 unique
+`tender_field_final_v1` rows distributed as
+`7 resolved / 2 requires_review / 18 not_found`.
+
+Independent review then narrowed pre-start restage to the source-only fixed
+code `AGENTIC_SOURCE_DOWNLOAD_FAILED`; generic identity, ownership, CAS, seal
+and contract failures remain terminal. Monitor completion now merges validation
+metadata into existing technical audit rather than overwriting it. Published
+versions are Dispatch `4c49ed54-c2ca-40e2-9e8a-7958f84dbdbd` and Monitor
+`0ce151f8-99bb-40d7-a426-097a01de97fd`. These refinements add no semantic parser,
+quote/evidence scoring, field-specific rule or status rewrite.
+
+The canary is technical GREEN, not a gold semantic verdict. The procurement has
+no employee-authored reference report; manual 27-field review remains an
+offline, non-blocking evaluation. Detailed evidence is in
+`evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.

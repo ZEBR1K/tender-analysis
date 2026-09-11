@@ -103,7 +103,10 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   const directDownload = findNode(workflow, 'Скачать прямой документ');
   assert.equal(directDownload.parameters.options.response.response.responseFormat, 'file');
   assert.equal(directDownload.parameters.options.response.response.outputPropertyName, 'data');
-  assert.equal(directDownload.retryOnFail, false);
+  assert.equal(directDownload.parameters.options.proxy, '=');
+  assert.equal(directDownload.retryOnFail, true);
+  assert.equal(directDownload.maxTries, 3);
+  assert.equal(directDownload.waitBetweenTries, 5000);
   assert.equal(directDownload.onError, 'continueErrorOutput');
 
   const directLoop = findNode(workflow, 'Обработать прямые документы по одному');

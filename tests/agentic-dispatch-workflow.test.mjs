@@ -78,7 +78,10 @@ test('dispatch stages sequentially and sends binary only between HTTP nodes', as
   const download = nodeByName(value, 'Скачать оригинал');
   assert.equal(download.parameters.options.response.response.responseFormat, 'file');
   assert.equal(download.parameters.options.response.response.outputPropertyName, 'data');
-  assert.equal(download.retryOnFail, false);
+  assert.equal(download.parameters.options.proxy, '=');
+  assert.equal(download.retryOnFail, true);
+  assert.equal(download.maxTries, 3);
+  assert.equal(download.waitBetweenTries, 5000);
   assert.equal(download.onError, 'continueErrorOutput');
 
   const upload = nodeByName(value, 'Загрузить оригинал в runner');
@@ -236,6 +239,44 @@ test('retry claim uses synchronized runner retryability and actual runner codes'
   assert.match(sql, /poll_owner_execution_id\s+IS\s+NULL/iu);
   assert.match(sql, /attempts\s*<\s*2/iu);
   assert.match(nodeByName(value, 'Зафиксировать running').parameters.query, /attempts\s*=\s*\$4::smallint/iu);
+});
+
+test('only a source-download failure gets one auditable full restage retry', async () => {
+  const value = await workflow();
+  const claim = nodeByName(value, 'Создать или загрузить job и manifest').parameters.query;
+  assert.match(claim, /AGENTIC_SOURCE_DOWNLOAD_FAILED/u);
+  assert.doesNotMatch(claim, /coalesce\(j\.error_code,'?'\)?\s*=\s*'AGENTIC_DISPATCH_FAILED'/iu);
+  assert.match(claim, /attempts\s*=\s*0/iu);
+  assert.match(claim, /input_manifest_sha256\s+IS\s+NULL/iu);
+  assert.match(claim, /prestart_retry_used/iu);
+  assert.match(claim, /jsonb_set/iu);
+
+  assert.deepEqual(
+    value.connections['Скачать оригинал'].main[1].map(({ node }) => node),
+    ['Сформировать download failure'],
+  );
+  assert.deepEqual(
+    value.connections['Сформировать download failure'].main[0].map(({ node }) => node),
+    ['Сохранить typed failure'],
+  );
+  assert.deepEqual(
+    value.connections['Проверить upload identity'].main[1].map(({ node }) => node),
+    ['Сформировать typed failure'],
+  );
+
+  const classifier = nodeByName(value, 'Сформировать download failure').parameters.jsCode;
+  const classified = await new vm.Script(`(async()=>{${classifier}})()`).runInNewContext({
+    $input: { first: () => ({ json: { error_message: 'GET https://signed.example/?token=secret failed' } }) },
+    $: (name) => name === 'Разобрать решение'
+      ? { first: () => ({ json: { job_id: '11111111-1111-4111-8111-111111111111' } }) }
+      : { item: { json: { documents: { source_document_id: 'doc-1' } } } },
+  });
+  assert.equal(classified[0].json.error_code, 'AGENTIC_SOURCE_DOWNLOAD_FAILED');
+  assert.equal(classified[0].json.error_message, 'Agentic source document download failed');
+  assert.doesNotMatch(JSON.stringify(classified), /https?:|signed\.example|secret/u);
+
+  const staged = nodeByName(value, 'Зафиксировать staged документ').parameters.query;
+  assert.match(staged, /d\.status\s+IN\s*\([^)]*'failed'/isu);
 });
 
 test('every guarded dispatch update returns one explicit outcome row', async () => {

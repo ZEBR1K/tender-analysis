@@ -202,7 +202,7 @@ Extractor model-selection checkpoint 2026-08-29:
 
 |ID|Проблема|Компонент|
 |-|-|-|
-|`OR-2`|✅ Task 17 route and terminal integration runtime GREEN. Published Document Preparation, Orchestrator, Intake Resume, Dispatch, Monitor, Agentic Error and Mark Intake. Real job `13b090b5-38fc-432a-a235-90ae43f609fe` produced exact 27 shadow rows; Finalization `15662` promoted 27 canonical rows, completed the run and Report `15663` produced valid HTML/PDF. Fresh mark-to-report run and manual 27-field semantic review remain the next verification gate.|Orchestrator|
+|`OR-2`|✅ Fresh mark-to-report technical gate closed 2026-09-11. Published Document Preparation, Orchestrator, Intake Resume, Dispatch, Monitor, Agentic Error and Mark Intake carried tender `6aa2c2ad5b7165804b8c4ff7` through new Codex job `70d699d2-b469-40b0-a8cc-de5b38fa6374`, Monitor `16402`, Finalization `16403` and Report `16404`. Read-only DB verification confirmed completed run and exact 27 unique FINAL; HTML/PDF are valid. Manual 27-field semantic review remains a non-blocking evaluation because this procurement has no employee-authored gold report.|Orchestrator|
 |`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
 |`OR-7`|✅ Temporary routing gate closed. `TASK17_TEMPORARY_AGENT_ONLY` preserves legacy Worker/Aggregator/Finalization nodes but leaves them unreachable. Raw `.xls` is staged unchanged without a parser. Fresh-run canary `15355/15356`, controlled Dispatch `15373` and terminal Monitor `15387` prove two-source real Codex execution with zero legacy-node runs.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
@@ -1993,46 +1993,32 @@ P2
 
 ## `OR-2` — manual trigger
 
-**Status:** Local implementation complete; runtime/promotion open.
+**Status:** Closed for the active marked-procurement route.
 
-Inactive canonical repository candidate больше не содержит Manual Trigger или hardcoded `tender_id`. Он принимает typed `tender_id`, `source`, `source_event_key`, `trigger_kind` через Execute Sub-workflow Trigger и валидирует их до HTTP/DB.
+Canonical Orchestrator больше не содержит Manual Trigger или hardcoded
+`tender_id`. Опубликованный TenderPlan Mark Intake передаёт typed `tender_id`,
+`source`, `source_event_key`, `trigger_kind` через Intake Resume/Orchestrator.
+Fresh run `6c36e5da-f9e2-48d9-a062-0493f0c2bf73` прошёл от метки до completed
+run, exact 27 FINAL и HTML/PDF report.
 
-Это не доказывает import, live wiring или production runtime.
+Manual upload остаётся отдельным future entry mode и не переоткрывает этот debt.
 
 \---
 
 ## `OR-7` — repeated-run policy
 
-**Status:** Migration applied; inactive isolated dispatcher family imported and
-NO-WORKER idempotency canary GREEN; production activation/runtime matrix open.
+**Status:** Closed for the temporary agent-only marked-procurement route.
 
-Task 3 добавил conflict-aware new-run INSERT и fresh SELECT существующего unfinished run без Worker dispatch. Partial unique index/migration существует как repository candidate.
+The migration and idempotent Intake family preserve one active run, stable-event
+no-op, retry/stale/manual/CAS behavior and audit history. Task 17 published Mark
+Intake, Intake Resume and Orchestrator while keeping legacy Worker/Aggregator
+edges disconnected. The fresh 2026-09-11 run reused the same run identity across
+source-download recovery, retained the failed Codex job and completed through a
+new controlled job without duplicate canonical FINAL or report creation.
 
-Inactive repository candidates `TENDER — Intake Resume`, `TENDER — Manual Resume`,
-`TENDER — Recovery Scan` и `TENDER — Ошибка Intake Resume` реализуют и
-offline-test repeated-event/resume boundary. Dispatcher сохраняет тот же
-`analysis_run_id`, не dispatch-ит `completed`/`skipped`, применяет automatic cap
-ровно в два Worker claims total и разрешает manual override для exhausted failed.
-Stale `processing` после одного часа требует read-only observation execution и
-guarded CAS; unavailable API не мутирует state.
-
-Exact-body rollback dry-run `14686`, preflight `14687`, production migration
-`14688`, and postflights `14689/14690/14703` are GREEN. Exactly `86/86` approved
-legacy runs are `superseded`, no active duplicate group remains, and children
-are preserved. Isolated canaries `14691/14694/14697/14700` prove one active run
-per test tender, same-run reuse, stable mark-key duplicate no-op and zero Worker
-executions. Executions `14704`-`14742` prove the retry/stale/manual/CAS/API-outage,
-scoped Recovery Scan, production-mode Error Workflow and same-event retry matrix.
-Current-state Mark Intake execution `14743` exposed the live TenderPlan `_id`
-contract; after the minimal normalizer correction, `14744` dispatched Intake
-execution `14745`, which returned `duplicate_event` with the existing run ID.
-The global inventories confirm zero Worker, Aggregator, Finalization or production
-Orchestrator executions in both windows. Debt remains open because downstream
-Aggregator/Finalization runtime and controlled production activation are outside
-the approved no-Worker canary boundary, and all entry candidates remain inactive.
-The repository export stores the non-secret self-hosted origin directly because
-Custom Variables are unavailable on the current plan; it keeps the credential
-reference unbound for secret-safe packaging.
+The repository export keeps credentials unbound for secret-safe packaging.
+Changing the temporary routing policy or adding manual upload remains a separate
+architectural task.
 
 \---
 
@@ -2450,13 +2436,12 @@ future: DOCX / XLSX / delivery
 
 Главная проблема проекта сейчас не в отсутствии ещё одного AI-слоя.
 
-Основной operational gate активного agentic пути находится в:
+Fresh technical operational gate активного agentic пути закрыт. Остаются:
 
 ```text
-1. fresh full run от новой метки TenderPlan до HTML/PDF;
-2. manual semantic review 27/27;
-3. client report;
-4. последующая XLSX/Telegram delivery.
+1. manual semantic review 27/27 на закупке с доступным эталоном;
+2. согласование клиентской отправки;
+3. последующая XLSX/Telegram delivery.
 ```
 
 Promotion/hardening старого Document Worker/Aggregator остаётся отдельным

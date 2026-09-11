@@ -414,7 +414,8 @@
               "responseFormat": "file",
               "outputPropertyName": "data"
             }
-          }
+          },
+          "proxy": "="
         }
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -425,7 +426,9 @@
       ],
       "id": "da000001-0019-4000-8000-000000000019",
       "name": "Скачать прямой документ",
-      "retryOnFail": false,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "onError": "continueErrorOutput"
     },
     {

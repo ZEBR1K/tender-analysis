@@ -17,6 +17,12 @@ A failed job is eligible only when the synchronized runner audit says the
 failure is retryable, the runner attempt is below two, and its code is one of
 `RUNNER_ORPHANED_EXECUTION`, `CODEX_PROCESS_FAILED`,
 `CODEX_TRANSPORT_ERROR`, or `CODEX_TIMEOUT`. Contract failures cannot retry.
+There is one separate pre-start transport recovery: an unstarted, unsealed job
+may be restaged once only after the source HTTP branch emits the fixed bounded
+code `AGENTIC_SOURCE_DOWNLOAD_FAILED`. The audit flag
+`prestart_retry_used=true` prevents repetition. Identity, ownership, CAS, seal,
+runner-create and all other contract/integrity failures stay on the ordinary
+terminal route and cannot enter this recovery path.
 
 Documents are processed by `Loop Over Items` with batch size 1. The source HTTP
 node returns the file in n8n binary property `data`; the next HTTP node streams
@@ -64,3 +70,19 @@ accepted the runner's uppercase 64-hex manifest SHA-256, and started job
 TenderPlan Mark Intake was subsequently published. The earlier case-sensitive
 seal check is covered by a regression test; no parser or semantic rule was
 added.
+
+## Fresh mark-to-report canary — 2026-09-11
+
+The separate source-staging boundary reproduced the direct-source timeout in
+execution `15815`. The source download node now uses the same live-only proxy,
+three native attempts and five-second interval as Document Preparation; the
+portable export contains only `=`. After runner authorization was renewed with
+operator approval, Dispatch execution `16385` staged both registered DOCX
+files, verified their identities, sealed the manifest and started job
+`70d699d2-b469-40b0-a8cc-de5b38fa6374`, which completed on attempt 1.
+
+Independent review narrowed the one-time recovery from a generic Dispatch code
+to `AGENTIC_SOURCE_DOWNLOAD_FAILED`. Published/read-back live version
+`4c49ed54-c2ca-40e2-9e8a-7958f84dbdbd` contains 31 nodes, no validation
+warnings and active/draft parity. This hardening changes future failure routing
+only; it adds no semantic or field-specific validation.

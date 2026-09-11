@@ -4,7 +4,7 @@
 
 **Goal:** Restore reliable source-document download for the published agentic route and complete a fresh mark-to-report canary.
 
-**Architecture:** Reuse the existing live RU proxy only at the direct download transport boundary. Preserve the current sequential manifest builder and typed error route; add native bounded retry without changing any semantic analysis contract.
+**Architecture:** Use the user-supplied live RU proxy only at the two source-download transport boundaries: Document Preparation and Dispatch staging. Preserve the current sequential manifest builder, typed error route and semantic contracts. A failed, unstarted and unsealed Dispatch job gets at most one audited full-restage retry.
 
 **Tech Stack:** n8n HTTP Request 4.5, repository JSON exports, Node.js test runner, PostgreSQL read-only verification.
 
@@ -15,7 +15,7 @@
 **Files:**
 - Modify: `tests/document-preparation-workflow.test.mjs`
 
-- [ ] **Step 1: Change the direct-download assertions**
+- [x] **Step 1: Change the direct-download assertions**
 
 ```javascript
 assert.equal(directDownload.parameters.options.proxy, '=');
@@ -24,7 +24,7 @@ assert.equal(directDownload.maxTries, 3);
 assert.equal(directDownload.waitBetweenTries, 5000);
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `node --test tests/document-preparation-workflow.test.mjs`
 
@@ -37,7 +37,7 @@ Expected: FAIL because the current direct-download node has no proxy and has
 - Modify: `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 - Modify: `workflows/document-preparation.md`
 
-- [ ] **Step 1: Apply the minimal node settings**
+- [x] **Step 1: Apply the minimal node settings**
 
 ```json
 "options": {
@@ -55,7 +55,7 @@ Expected: FAIL because the current direct-download node has no proxy and has
 "onError": "continueErrorOutput"
 ```
 
-- [ ] **Step 2: Verify GREEN**
+- [x] **Step 2: Verify GREEN**
 
 Run: `node --test tests/document-preparation-workflow.test.mjs`
 
@@ -66,15 +66,32 @@ Expected: all focused tests pass.
 **Files:**
 - No credential values are written to repository files.
 
-- [ ] **Step 1: Atomically copy the existing proxy value and set retry**
+- [x] **Step 1: Atomically copy the existing proxy value and set retry**
 
 Update only `Скачать прямой документ` in workflow `0scTZu1aBKsMd6AM`.
 
-- [ ] **Step 2: Validate and publish**
+- [x] **Step 2: Validate and publish**
 
 Validate the updated node and complete workflow, publish the current draft,
 then read it back. Expected: active/draft parity, non-empty proxy, three tries,
 five-second delay, unchanged error output and graph.
+
+### Task 3B: Cover the runtime-discovered Dispatch boundary
+
+**Files:**
+- `tests/agentic-dispatch-workflow.test.mjs`
+- `workflows/n8n-exports/TENDER — Агентский анализ — Запуск.json`
+
+- [x] Reproduce execution `15815`: source staging timed out before runner start.
+- [x] Add the same non-secret proxy placeholder and native bounded retry to
+  `Скачать оригинал`.
+- [x] Permit one audited restage only when `attempts=0`, the manifest is
+  unsealed and the source HTTP branch produced the narrow typed error
+  `AGENTIC_SOURCE_DOWNLOAD_FAILED`.
+- [x] Keep all other identity, ownership, CAS, seal and contract failures on the
+  ordinary terminal failure route.
+- [x] Keep runner retry codes, ownership barriers, binary handoff and semantic
+  contracts unchanged.
 
 ### Task 4: Run the fresh canary and record evidence
 
@@ -82,7 +99,7 @@ five-second delay, unchanged error output and graph.
 - Create: `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`
 - Modify current-state documentation only where runtime evidence changes it.
 
-- [ ] **Step 1: Observe the automatic retry**
+- [x] **Step 1: Observe the automatic retry**
 
 Expected sequence:
 
@@ -97,16 +114,15 @@ TenderPlan Mark Intake
 → Report Generation
 ```
 
-- [ ] **Step 2: Verify database and artifacts read-only**
+- [x] **Step 2: Verify database and artifacts read-only**
 
 Require one completed run, exactly 27 unique FINAL fields, one completed Codex
 job, and valid HTML/PDF evidence. Do not semantically score the fields in
 runtime.
 
-- [ ] **Step 3: Run the full suite and commit**
+- [x] **Step 3: Run the full suite and commit**
 
 Run: `node --test`
 
 Expected: zero failures. Stage only task-owned files, commit, push the existing
 branch, and verify the remote hash.
-

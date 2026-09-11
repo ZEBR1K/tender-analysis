@@ -42,8 +42,14 @@ DOCX+XLS на attempt 1; Monitor execution `15387` принял exact-27 кон�
 Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`.
 Контролируемый canary `15662 → 15663` завершил run, сохранил 27 уникальных FINAL
 полей и создал валидные HTML/PDF artifacts; replay `15666` не создал второй
-отчёт. Следующий gate — один свежий end-to-end запуск от метки TenderPlan до
-отчёта и ручная semantic review всех 27 значений.
+отчёт. Следующий свежий end-to-end gate теперь также закрыт технически: tender
+`6aa2c2ad5b7165804b8c4ff7`, run
+`6c36e5da-f9e2-48d9-a062-0493f0c2bf73`, Monitor `16402`, Finalization `16403`
+и Report `16404` прошли полный маршрут от метки до валидных HTML/PDF. Read-only
+DB проверка подтвердила `completed` и ровно 27 уникальных FINAL
+(`7 resolved / 2 requires_review / 18 not_found`). Ручная semantic review
+остаётся отдельной неблокирующей оценкой, потому что эталонного отчёта для этой
+закупки нет.
 
 Подробности:
 `evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
@@ -51,7 +57,8 @@ Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`.
 `evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md` и
 `evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`. Terminal
 promotion/report evidence находится в
-`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`, а свежий полный
+прогон — в `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
 
 ---
 

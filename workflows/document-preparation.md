@@ -4,7 +4,7 @@
 
 **Workflow ID в n8n:** `0scTZu1aBKsMd6AM`
 
-**Статус:** published in the Task 17 temporary agent-only route; real TenderPlan DOCX+XLS canary GREEN
+**Статус:** published in the Task 17 temporary agent-only route; fresh mark-to-report DOCX canary GREEN
 
 **Repository export:** `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 
@@ -128,6 +128,17 @@ Task 17 live evidence:
   proves the aggregate done-output collector retains both results;
 - full repository suite: `753 total / 747 pass / 0 fail / 6 skipped`.
 
+Fresh mark-to-report evidence from 2026-09-11:
+
+- executions `15734` and `15754` reproduced `ETIMEDOUT` at the direct
+  `zakupki.mos.ru` transport boundary on different service IPs;
+- live version `a87bffe7-52b9-4832-891a-8b441a980833` routes only
+  `Скачать прямой документ` through the configured live proxy and uses three
+  native attempts with a five-second interval;
+- retry execution `15814` downloaded, byte-counted and SHA-256-verified both
+  DOCX files, after which the same run completed through Codex and Report;
+- the repository export stores only the non-secret `=` packaging placeholder.
+
 Production extractor runtime-check от 2026-09-08:
 
 - отдельный Compose-проект развёрнут в `/opt/tender-archive-extractor` как контейнер `tender-archive-extractor`, image `tender-archive-extractor:26.03-1`;
@@ -140,6 +151,7 @@ Production extractor runtime-check от 2026-09-08:
 
 ## Оставшиеся rollout-шаги
 
-Task 17 direct-file rollout закрыт. Отдельными будущими gates остаются реальные
-TenderPlan RAR/TAR/GZIP archives, exact-run cleanup после terminal state и
-reviewed promotion validated shadow fields в canonical FINAL/report path.
+Task 17 direct-file and canonical FINAL/report rollout is technically GREEN.
+Отдельными будущими gates остаются реальные TenderPlan RAR/TAR/GZIP archives,
+exact-run cleanup после terminal state и manual semantic review для закупок с
+доступным эталоном.

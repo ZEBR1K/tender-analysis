@@ -134,6 +134,11 @@ test('completed ingestion validates identity and atomically upserts exact catalo
   assert.match(sql, /array_agg\([^)]*field_key/iu);
   assert.match(sql, /RAISE EXCEPTION/iu);
   assert.match(sql, /status='completed'/iu);
+  assert.match(
+    sql,
+    /validation_summary\s*=\s*coalesce\(validation_summary,'\{\}'::jsonb\)\s*\|\|\s*current_setting\('tender\.validation_summary'\)::jsonb/iu,
+    'successful validation must retain earlier technical retry audit',
+  );
   assert.match(sql, /COMMIT/iu);
   assert.match(sql, /set_config\('tender\.poll_owner',\$2::text,true\)/iu);
   assert.match(sql, /set_config\('tender\.catalog_version',\$5::text,true\)/iu);

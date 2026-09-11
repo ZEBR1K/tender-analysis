@@ -147,6 +147,15 @@ Generation version `e21c7675-…` принимает тот же `tender_field_f
 `15662/15663` и DB read-back подтвердили `27/27`, `run.status=completed` и PDF
 signature `%PDF-`; idempotent replay `15666` не вызвал второй report.
 
+Fresh production-path canary затем прошёл весь маршрут для нового TenderPlan
+mark: Monitor `16402` принял новый completed Codex job, Finalization `16403`
+продвинул exact 27 canonical rows, а Report `16404` создал валидные HTML/PDF.
+Read-only DB verification подтвердил completed run и 27 уникальных
+`tender_field_final_v1`. Source-download recovery ограничен только кодом
+`AGENTIC_SOURCE_DOWNLOAD_FAILED`; Monitor сохраняет предыдущий technical audit
+при добавлении validation summary. Эти guards не оценивают смысл field values,
+цитат или evidence.
+
 И пяти основных PostgreSQL таблиц:
 
 ```text
@@ -2401,18 +2410,18 @@ tender_id
 
 Для сохранённой legacy lane AG-8 GREEN подтверждён только в test Aggregator, а
 Document Worker production candidate упакован только локально и ещё не promoted.
-Для активной agentic lane terminal path уже runtime GREEN. Перед клиентским
-отчётом текущий общий milestone:
+Для активной agentic lane свежий mark-to-HTML/PDF terminal path runtime GREEN.
+Перед безусловной отправкой клиенту текущий общий milestone:
 
 ```text
-fresh agentic run from TenderPlan mark
-→ manual review 27/27
+fresh agentic run from TenderPlan mark — technical GREEN
+→ manual semantic review 27/27 when a reference is available
 → client report
 ```
 
-Остаются future work: DOCX, XLSX, manual upload и automatic delivery. Legacy
-Worker/Aggregator promotion остаётся отдельным fallback-lane debt и не блокирует
-проверку активного agentic пути.
+Остаются future work: DOCX/XLSX report variants, manual upload и automatic
+delivery. Legacy Worker/Aggregator promotion остаётся отдельным fallback-lane
+debt и не блокирует активный agentic путь.
 ---
 
 # 81. Краткая схема будущего завершённого MVP
@@ -2503,13 +2512,16 @@ Terminal architecture runtime GREEN:
 → report_html + report_pdf
 ```
 
-Следующий шаг — не новый parser или validator, а свежая проверка уже собранного
-маршрута:
+Свежая техническая проверка уже собранного маршрута завершена:
 
 ```text
 TenderPlan mark
 → Codex
 → 27 FINAL
 → report
-→ manual semantic review 27/27
+→ technical GREEN
 ```
+
+Следующий шаг — не новый parser или validator, а неблокирующая ручная semantic
+review 27/27 на закупке с доступным эталоном и отдельно согласованная реализация
+оставшихся delivery-форматов.

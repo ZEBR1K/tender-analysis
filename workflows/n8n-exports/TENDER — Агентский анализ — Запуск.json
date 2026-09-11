@@ -34,6 +34,21 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
+        "jsCode": "const context=$('Разобрать решение').first().json;\nlet document=null; try { document=$('Документы по одному').item.json.documents??null; } catch {}\nreturn [{json:{job_id:context.job_id,source_document_id:document?.source_document_id??null,\nerror_code:'AGENTIC_SOURCE_DOWNLOAD_FAILED',\nerror_message:'Agentic source document download failed'}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        260
+      ],
+      "id": "11000000-0000-4000-8000-000000000027",
+      "name": "Сформировать download failure"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
         "jsCode": "const input = $input.first().json;\nconst analysisRunId = String(input.analysis_run_id ?? '').trim();\nconst pipelineVersion = String(input.pipeline_version ?? '').trim();\nconst replicateIndex = Number(input.replicate_index);\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(analysisRunId)) throw new Error('[AGENTIC_INPUT_INVALID] analysis_run_id must be a UUID');\nif (pipelineVersion !== 'tender_agentic_pipeline_v1') throw new Error('[AGENTIC_INPUT_INVALID] pipeline_version must be tender_agentic_pipeline_v1');\nif (!Number.isInteger(replicateIndex) || replicateIndex < 1) throw new Error('[AGENTIC_INPUT_INVALID] replicate_index must be an integer >= 1');\nreturn [{json:{analysis_run_id:analysisRunId,pipeline_version:pipelineVersion,replicate_index:replicateIndex}}];"
       },
       "type": "n8n-nodes-base.code",
@@ -48,7 +63,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH input AS (\n SELECT $1::uuid analysis_run_id,$2::text pipeline_version,$3::smallint replicate_index,$4::text owner\n), locked AS (\n SELECT pg_advisory_xact_lock(hashtextextended((SELECT analysis_run_id::text||':'||pipeline_version||':'||replicate_index FROM input),0))\n), run_state AS (\n SELECT i.analysis_run_id,r.documents_total,count(d.id)::int registered_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls'))::int processable_count,\n  count(*) FILTER (WHERE d.status='failed')::int failed_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls')\n    AND (coalesce(d.file_name,'')='' OR coalesce(d.mime_type,'')='' OR d.file_size IS NULL OR d.file_size<0 OR d.file_size>52428800\n      OR coalesce(d.ingestion_metadata->>'content_sha256','') !~* '^[0-9a-f]{64}$'))::int invalid_identity_count\n FROM input i CROSS JOIN locked LEFT JOIN public.tender_analysis_runs r ON r.id=i.analysis_run_id\n LEFT JOIN public.tender_analysis_documents d ON d.analysis_run_id=r.id\n GROUP BY i.analysis_run_id,r.documents_total\n), inserted_job AS (\n INSERT INTO public.tender_agentic_jobs(analysis_run_id,pipeline_version,replicate_index,status,model,reasoning_effort,\n field_catalog_version,field_catalog_sha256,expected_documents,dispatch_execution_id)\n SELECT rs.analysis_run_id,i.pipeline_version,i.replicate_index,'staging','gpt-5.6-sol','high','tender_fields_v1','ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',rs.processable_count,i.owner\n FROM run_state rs,input i WHERE rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total\n AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n ON CONFLICT (analysis_run_id,pipeline_version,replicate_index) DO NOTHING RETURNING *,'dispatch'::text claim_mode\n), existing_job AS (\n SELECT j.* FROM public.tender_agentic_jobs j,input i\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n), claimed_existing AS (\n UPDATE public.tender_agentic_jobs j SET\n  dispatch_execution_id=i.owner,\n  status=CASE WHEN j.status IN ('failed','ready') THEN 'ready' ELSE 'staging' END,\n  error_code=CASE WHEN j.status IN ('failed','ready') THEN j.error_code ELSE NULL END,\n  error_message=CASE WHEN j.status IN ('failed','ready') THEN j.error_message ELSE NULL END,\n  updated_at=now()\n FROM input i,run_state rs\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n AND j.dispatch_execution_id IS NULL AND j.poll_owner_execution_id IS NULL\n AND rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n AND (j.status='created'\n  OR (j.status='ready' AND j.error_code='START_OUTCOME_UNKNOWN')\n  OR (j.status='failed' AND j.attempts<2 AND coalesce((j.validation_summary->>'runner_retryable')::boolean,false)=true\n      AND coalesce(j.error_code,'') IN ('RUNNER_ORPHANED_EXECUTION','CODEX_PROCESS_FAILED','CODEX_TRANSPORT_ERROR','CODEX_TIMEOUT')))\n RETURNING j.*,CASE WHEN j.status='ready' THEN 'retry' ELSE 'dispatch' END claim_mode\n), owned AS (\n SELECT * FROM inserted_job UNION ALL SELECT * FROM claimed_existing\n), selected AS (\n SELECT o.* FROM owned o\n UNION ALL\n SELECT e.*,\n  CASE WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='staging' THEN 'dispatch'\n       WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='ready' THEN 'retry'\n       ELSE 'noop' END claim_mode\n FROM existing_job e WHERE NOT EXISTS(SELECT 1 FROM owned)\n LIMIT 1\n), source_docs AS (\n SELECT d.*,row_number() over(order by d.document_index,d.id)::int stable_index\n FROM public.tender_analysis_documents d,selected j\n WHERE d.analysis_run_id=j.analysis_run_id AND d.status IN ('pending','processing','completed')\n AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls')\n), inserted_docs AS (\n INSERT INTO public.tender_agentic_documents(job_id,analysis_run_id,source_document_id,artifact_key,document_index,file_name,mime_type,source_sha256,byte_size,status)\n SELECT j.id,j.analysis_run_id,d.id,'doc-'||lpad(d.stable_index::text,4,'0'),d.stable_index,d.file_name,d.mime_type,\n upper(d.ingestion_metadata->>'content_sha256'),d.file_size,'pending' FROM source_docs d CROSS JOIN selected j\n WHERE j.claim_mode='dispatch'\n ON CONFLICT (job_id,source_document_id) DO NOTHING RETURNING 1\n)\nSELECT s.id job_id,s.analysis_run_id,s.pipeline_version,s.replicate_index,s.status,s.attempts,s.field_catalog_version,s.field_catalog_sha256,\n s.input_manifest_sha256,s.dispatch_execution_id,rs.documents_total,rs.registered_count,rs.processable_count,rs.failed_count,rs.invalid_identity_count,\n CASE WHEN rs.documents_total IS NULL OR rs.registered_count<>rs.documents_total OR rs.processable_count<=0 OR rs.failed_count>0 OR rs.invalid_identity_count>0 THEN 'reject'\n      ELSE coalesce(s.claim_mode,'noop') END action,\n coalesce((SELECT jsonb_agg(jsonb_build_object('source_document_id',d.id,'artifact_key','doc-'||lpad(d.stable_index::text,4,'0'),\n 'document_index',d.stable_index,'file_name',d.file_name,'file_name_base64',encode(convert_to(d.file_name,'UTF8'),'base64'),'mime_type',d.mime_type,'source_sha256',upper(d.ingestion_metadata->>'content_sha256'),\n 'byte_size',d.file_size,'download_url',d.download_url) ORDER BY d.stable_index) FROM source_docs d),'[]'::jsonb) documents\nFROM run_state rs LEFT JOIN selected s ON true;",
+        "query": "WITH input AS (\n SELECT $1::uuid analysis_run_id,$2::text pipeline_version,$3::smallint replicate_index,$4::text owner\n), locked AS (\n SELECT pg_advisory_xact_lock(hashtextextended((SELECT analysis_run_id::text||':'||pipeline_version||':'||replicate_index FROM input),0))\n), run_state AS (\n SELECT i.analysis_run_id,r.documents_total,count(d.id)::int registered_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls'))::int processable_count,\n  count(*) FILTER (WHERE d.status='failed')::int failed_count,\n  count(*) FILTER (WHERE d.status IN ('pending','processing','completed') AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls')\n    AND (coalesce(d.file_name,'')='' OR coalesce(d.mime_type,'')='' OR d.file_size IS NULL OR d.file_size<0 OR d.file_size>52428800\n      OR coalesce(d.ingestion_metadata->>'content_sha256','') !~* '^[0-9a-f]{64}$'))::int invalid_identity_count\n FROM input i CROSS JOIN locked LEFT JOIN public.tender_analysis_runs r ON r.id=i.analysis_run_id\n LEFT JOIN public.tender_analysis_documents d ON d.analysis_run_id=r.id\n GROUP BY i.analysis_run_id,r.documents_total\n), inserted_job AS (\n INSERT INTO public.tender_agentic_jobs(analysis_run_id,pipeline_version,replicate_index,status,model,reasoning_effort,\n field_catalog_version,field_catalog_sha256,expected_documents,dispatch_execution_id)\n SELECT rs.analysis_run_id,i.pipeline_version,i.replicate_index,'staging','gpt-5.6-sol','high','tender_fields_v1','ABCBEA68911CE9FFAD9D436C9EABE708E12DBC4F04F7D5591CAFE4C58359B843',rs.processable_count,i.owner\n FROM run_state rs,input i WHERE rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total\n AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n ON CONFLICT (analysis_run_id,pipeline_version,replicate_index) DO NOTHING RETURNING *,'dispatch'::text claim_mode\n), existing_job AS (\n SELECT j.* FROM public.tender_agentic_jobs j,input i\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n), claimed_existing AS (\n UPDATE public.tender_agentic_jobs j SET\n  dispatch_execution_id=i.owner,\n  status=CASE WHEN j.status='failed' AND j.attempts=0 AND j.input_manifest_sha256 IS NULL AND coalesce(j.error_code,'')='AGENTIC_SOURCE_DOWNLOAD_FAILED' THEN 'staging' WHEN j.status IN ('failed','ready') THEN 'ready' ELSE 'staging' END,\n  error_code=CASE WHEN j.status IN ('failed','ready') THEN j.error_code ELSE NULL END,\n  error_message=CASE WHEN j.status IN ('failed','ready') THEN j.error_message ELSE NULL END,\n  validation_summary=CASE WHEN j.status='failed' AND j.attempts=0 AND j.input_manifest_sha256 IS NULL AND coalesce(j.error_code,'')='AGENTIC_SOURCE_DOWNLOAD_FAILED' THEN jsonb_set(coalesce(j.validation_summary,'{}'::jsonb),'{prestart_retry_used}','true'::jsonb,true) ELSE j.validation_summary END,\n  updated_at=now()\n FROM input i,run_state rs\n WHERE j.analysis_run_id=i.analysis_run_id AND j.pipeline_version=i.pipeline_version AND j.replicate_index=i.replicate_index\n AND j.dispatch_execution_id IS NULL AND j.poll_owner_execution_id IS NULL\n AND rs.documents_total IS NOT NULL AND rs.registered_count=rs.documents_total AND rs.processable_count>0 AND rs.failed_count=0 AND rs.invalid_identity_count=0\n AND (j.status='created'\n  OR (j.status='ready' AND j.error_code='START_OUTCOME_UNKNOWN')\n  OR (j.status='failed' AND j.attempts=0 AND j.input_manifest_sha256 IS NULL AND coalesce(j.error_code,'')='AGENTIC_SOURCE_DOWNLOAD_FAILED' AND coalesce((j.validation_summary->>'prestart_retry_used')::boolean,false)=false)\n  OR (j.status='failed' AND j.attempts<2 AND coalesce((j.validation_summary->>'runner_retryable')::boolean,false)=true\n      AND coalesce(j.error_code,'') IN ('RUNNER_ORPHANED_EXECUTION','CODEX_PROCESS_FAILED','CODEX_TRANSPORT_ERROR','CODEX_TIMEOUT')))\n RETURNING j.*,CASE WHEN j.status='ready' THEN 'retry' ELSE 'dispatch' END claim_mode\n), owned AS (\n SELECT * FROM inserted_job UNION ALL SELECT * FROM claimed_existing\n), selected AS (\n SELECT o.* FROM owned o\n UNION ALL\n SELECT e.*,\n  CASE WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='staging' THEN 'dispatch'\n       WHEN e.dispatch_execution_id=(SELECT owner FROM input) AND e.status='ready' THEN 'retry'\n       ELSE 'noop' END claim_mode\n FROM existing_job e WHERE NOT EXISTS(SELECT 1 FROM owned)\n LIMIT 1\n), source_docs AS (\n SELECT d.*,row_number() over(order by d.document_index,d.id)::int stable_index\n FROM public.tender_analysis_documents d,selected j\n WHERE d.analysis_run_id=j.analysis_run_id AND d.status IN ('pending','processing','completed')\n AND d.download_url IS NOT NULL AND d.file_extension IN ('pdf','docx','xlsx','xls')\n), inserted_docs AS (\n INSERT INTO public.tender_agentic_documents(job_id,analysis_run_id,source_document_id,artifact_key,document_index,file_name,mime_type,source_sha256,byte_size,status)\n SELECT j.id,j.analysis_run_id,d.id,'doc-'||lpad(d.stable_index::text,4,'0'),d.stable_index,d.file_name,d.mime_type,\n upper(d.ingestion_metadata->>'content_sha256'),d.file_size,'pending' FROM source_docs d CROSS JOIN selected j\n WHERE j.claim_mode='dispatch'\n ON CONFLICT (job_id,source_document_id) DO NOTHING RETURNING 1\n)\nSELECT s.id job_id,s.analysis_run_id,s.pipeline_version,s.replicate_index,s.status,s.attempts,s.field_catalog_version,s.field_catalog_sha256,\n s.input_manifest_sha256,s.dispatch_execution_id,rs.documents_total,rs.registered_count,rs.processable_count,rs.failed_count,rs.invalid_identity_count,\n CASE WHEN rs.documents_total IS NULL OR rs.registered_count<>rs.documents_total OR rs.processable_count<=0 OR rs.failed_count>0 OR rs.invalid_identity_count>0 THEN 'reject'\n      ELSE coalesce(s.claim_mode,'noop') END action,\n coalesce((SELECT jsonb_agg(jsonb_build_object('source_document_id',d.id,'artifact_key','doc-'||lpad(d.stable_index::text,4,'0'),\n 'document_index',d.stable_index,'file_name',d.file_name,'file_name_base64',encode(convert_to(d.file_name,'UTF8'),'base64'),'mime_type',d.mime_type,'source_sha256',upper(d.ingestion_metadata->>'content_sha256'),\n 'byte_size',d.file_size,'download_url',d.download_url) ORDER BY d.stable_index) FROM source_docs d),'[]'::jsonb) documents\nFROM run_state rs LEFT JOIN selected s ON true;",
         "options": {
           "queryReplacement": "={{ [$json.analysis_run_id, $json.pipeline_version, $json.replicate_index, $execution.id] }}"
         }
@@ -209,7 +224,8 @@
               "outputPropertyName": "data"
             }
           },
-          "timeout": 120000
+          "timeout": 120000,
+          "proxy": "="
         }
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -220,7 +236,9 @@
       ],
       "id": "11000000-0000-4000-8000-000000000010",
       "name": "Скачать оригинал",
-      "retryOnFail": false,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
       "onError": "continueErrorOutput"
     },
     {
@@ -284,7 +302,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_documents d SET status='staged',staged_sha256=$3::text,runner_storage_key=$4::text,error_code=NULL,error_message=NULL,updated_at=now()\n FROM public.tender_agentic_jobs j\n WHERE d.job_id=$1::uuid AND d.source_document_id=$2::uuid AND d.job_id=j.id\n AND j.status='staging' AND j.dispatch_execution_id=$5::text\n AND d.status IN ('pending','uploading','staged') AND upper(d.source_sha256)=upper($3::text) AND d.artifact_key=$4::text\n RETURNING d.job_id,d.source_document_id,d.artifact_key\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n $1::uuid job_id,$2::uuid source_document_id,$4::text artifact_key FROM attempted;",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_documents d SET status='staged',staged_sha256=$3::text,runner_storage_key=$4::text,error_code=NULL,error_message=NULL,updated_at=now()\n FROM public.tender_agentic_jobs j\n WHERE d.job_id=$1::uuid AND d.source_document_id=$2::uuid AND d.job_id=j.id\n AND j.status='staging' AND j.dispatch_execution_id=$5::text\n AND d.status IN ('pending','uploading','staged','failed') AND upper(d.source_sha256)=upper($3::text) AND d.artifact_key=$4::text\n RETURNING d.job_id,d.source_document_id,d.artifact_key\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n $1::uuid job_id,$2::uuid source_document_id,$4::text artifact_key FROM attempted;",
         "options": {
           "queryReplacement": "={{ [$json.job_id,$json.source_document_id,$json.sha256,$json.artifact_key,$execution.id] }}"
         }
@@ -800,7 +818,7 @@
         ],
         [
           {
-            "node": "Сформировать typed failure",
+            "node": "Сформировать download failure",
             "type": "main",
             "index": 0
           }
@@ -902,6 +920,17 @@
       ]
     },
     "Сформировать typed failure": {
+      "main": [
+        [
+          {
+            "node": "Сохранить typed failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать download failure": {
       "main": [
         [
           {

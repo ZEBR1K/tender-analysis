@@ -1,8 +1,58 @@
 # PROJECT STATUS — Tender Analysis
 
 **Snapshot date:** 2026-09-11
-**Status:** Agentic terminal path runtime GREEN / fresh end-to-end run pending
+**Status:** Fresh TenderPlan mark-to-report agentic path technical GREEN / semantic review pending
 **Branch at snapshot:** `codex/agentic-analysis-integration`
+
+## Fresh TenderPlan mark-to-report canary — technical GREEN
+
+Tender `6aa2c2ad5b7165804b8c4ff7` completed the published temporary agent-only
+route from mark ingestion through real Codex, canonical FINAL promotion and
+report generation. Analysis run `6c36e5da-f9e2-48d9-a062-0493f0c2bf73`
+registered two DOCX documents and reached `completed`.
+
+The initial attempt reproduced source-download timeouts at both Document
+Preparation and Dispatch. Only those two source HTTP nodes now use the live
+proxy with three native attempts and a five-second interval; portable exports
+contain only the non-secret `=` placeholder. The first runner job then retained
+its terminal `CODEX_PROCESS_FAILED` audit because its mounted refresh token was
+revoked. With explicit operator approval, current authorization was atomically
+installed into the existing read-only mount and the old file retained as a
+restricted backup outside the repository.
+
+Recovery `16383 → 16384 → 16385` created new job
+`70d699d2-b469-40b0-a8cc-de5b38fa6374`. It completed on attempt 1 with a valid
+27-field envelope. Monitor `16402` persisted exactly 27 shadow rows,
+Finalization `16403` promoted exactly 27 canonical rows and Report `16404`
+created valid artifacts:
+
+```text
+Анализ закупки_10293451.html — 26794 bytes
+Анализ закупки_10293451.pdf  — 92267 bytes, %PDF-
+```
+
+TLS-verified read-only PostgreSQL checks independently confirmed
+`run.status=completed`, `documents_total=2`, exactly 27 unique
+`tender_field_final_v1` rows and distribution
+`7 resolved / 2 requires_review / 18 not_found`. The failed first job and
+completed second job both remain in the audit trail.
+
+Post-canary review narrowed the one-time pre-start restage to the source-only
+code `AGENTIC_SOURCE_DOWNLOAD_FAILED`; identity, ownership, CAS, seal and other
+contract/integrity errors cannot use it. Monitor now merges successful
+validation metadata with prior technical audit instead of replacing it. Live
+published/read-back versions are Dispatch
+`4c49ed54-c2ca-40e2-9e8a-7958f84dbdbd` and Monitor
+`0ce151f8-99bb-40d7-a426-097a01de97fd`. These are failure-routing/audit changes,
+not semantic validators.
+
+This closes the fresh technical mark-to-report gate. It does not establish a
+gold semantic score because the procurement has no employee-authored reference
+report. Manual review of the 27 values remains a non-blocking evaluation task;
+the runtime must not add field-specific rules from this single case. Full
+evidence: `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
+Repository regression after the review hardening:
+`761 total / 755 pass / 0 fail / 6 skipped`.
 
 ## Agentic FINAL/report integration — live canary GREEN
 
@@ -29,9 +79,9 @@ distributed as `7 resolved / 4 requires_review / 16 not_found`.
 Replay execution `15666` returned `completion_claimed=false`, stopped before
 Report Generation and created no duplicate report. This closes the terminal
 promotion/report runtime gate but is not a new semantic blind run: it reused the
-already completed Task 17 job. The next checkpoint is one fresh procurement
-from TenderPlan mark through runner, Monitor, Finalization and report, followed
-by manual review of all 27 values. Full evidence:
+already completed Task 17 job. The fresh procurement checkpoint is now closed
+by the newer canary documented above; manual review of all 27 values remains
+offline and non-blocking. Earlier terminal-boundary evidence:
 `evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
 Post-canary repository verification: `760 total / 754 pass / 0 fail / 6 skipped`.
 
