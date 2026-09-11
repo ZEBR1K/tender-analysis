@@ -81,6 +81,10 @@ const exportWorkflow = Object.fromEntries(
     .map((key) => [key, workflow[key]]),
 );
 
+// Manual pin data is an execution aid, not part of the production contract.
+// Keep real tender payloads out of the version-controlled canonical export.
+exportWorkflow.pinData = {};
+
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const outputPath = path.join(
   scriptDirectory,

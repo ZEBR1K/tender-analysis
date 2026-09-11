@@ -54,7 +54,7 @@ function normalizedParameters(node) {
   return parameters;
 }
 
-test('published production PDF workflow matches the tested candidate semantics', () => {
+test('published production PDF chain matches the tested candidate semantics', () => {
   const canonical = loadJson(canonicalPath);
   const candidate = loadJson(candidatePath);
   const candidateText = fs.readFileSync(candidatePath, 'utf8');
@@ -64,6 +64,7 @@ test('published production PDF workflow matches the tested candidate semantics',
   assert.equal(canonical.active, true);
   assert.equal(canonical.nodes.length, 12);
   assert.equal(canonical.settings.availableInMCP, false);
+  assert.deepEqual(canonical.pinData, {});
 
   assert.equal(candidate.active, false);
   assert.equal(candidate.activeVersionId, null);
@@ -74,7 +75,14 @@ test('published production PDF workflow matches the tested candidate semantics',
   assert.equal(Object.hasOwn(candidate, 'meta'), false);
   assert.doesNotMatch(candidateText, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu);
 
-  for (const candidateNode of candidate.nodes) {
+  const pdfNodeNames = [
+    'Подготовить HTML для Gotenberg',
+    'Конвертировать HTML в PDF',
+    'Проверить PDF artifact',
+  ];
+
+  for (const nodeName of pdfNodeNames) {
+    const candidateNode = byName(candidate, nodeName);
     const canonicalNode = byName(canonical, candidateNode.name);
     assert.equal(canonicalNode.type, candidateNode.type, candidateNode.name);
     assert.equal(canonicalNode.typeVersion, candidateNode.typeVersion, candidateNode.name);
@@ -106,7 +114,11 @@ test('production and candidate append one fail-fast HTML to PDF chain', () => {
     assert.match(validate.parameters.jsCode, /getBinaryDataBuffer\(0, 'report_pdf'\)/u);
     assert.match(validate.parameters.jsCode, /signature !== '%PDF-'/u);
     assert.match(validate.parameters.jsCode, /report_html: reportHtml/u);
-    assert.match(validate.parameters.jsCode, /report_pdf:/u);
+    assert.match(
+      validate.parameters.jsCode,
+      /prepareBinaryData\(\s*pdfBuffer,\s*pdfFilename,\s*'application\/pdf',?\s*\)/u,
+    );
+    assert.match(validate.parameters.jsCode, /report_pdf: persistedPdf/u);
     assert.match(validate.parameters.jsCode, /pdf_artifact_validation/u);
   }
 });

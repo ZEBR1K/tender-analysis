@@ -306,6 +306,12 @@ json.artifact_validation.valid = true
 json.pdf_artifact_validation.valid = true
 ```
 
+После технической проверки нода повторно сохраняет проверенные PDF bytes через
+`prepareBinaryData(pdfBuffer, pdfFilename, 'application/pdf')`. Это создаёт новый
+`filesystem-v2` binary artifact, у которого читаемое имя записано в storage
+metadata, а не только изменено в отображаемом объекте n8n. Поэтому кнопка
+Download возвращает то же имя, которое показано в output ноды.
+
 Runtime gate 2026-09-07:
 
 | Проверка | Результат |
@@ -335,13 +341,34 @@ Production promotion checkpoint 2026-09-07:
 | Production MCP access | disabled |
 | Post-promotion execution | intentionally not run; pending |
 
-Live production parameters совпадают с tested candidate по исполняемой семантике. UI export production version опускает optional default fields `mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`, `fullResponse=false` и `neverError=false`; official n8n node definitions подтверждают эти defaults. Canonical repository export сохраняет exact live representation.
+PDF terminal chain совпадает с tested candidate по исполняемой семантике. UI
+export production version опускает optional default fields
+`mode=runOnceForAllItems`, `language=javaScript`, `authentication=none`,
+`fullResponse=false` и `neverError=false`; official n8n node definitions
+подтверждают эти defaults. Canonical repository export сохраняет exact live
+representation. Upstream Report Snapshot/Adapter/Renderer продолжили развиваться
+после первоначального PDF candidate, поэтому whole-workflow beta parity больше не
+заявляется.
+
+PDF filename persistence checkpoint 2026-09-11:
+
+| Проверка | Результат |
+|---|---:|
+| Production execution | `17294` / manual / success |
+| Source Gotenberg filename | UUID `.pdf` |
+| Terminal filename | `Анализ закупки 10293451 — Поставка мебели … .pdf` |
+| Source / terminal binary ID | разные `filesystem-v2` objects |
+| Download from terminal `report_pdf` | читаемое имя подтверждено |
+| Published version | `7bfa8d2a-a16e-47fe-ab80-56fd682e2b08` |
+| Active / draft parity | `versionId = activeVersionId` |
+
+Полный sanitized runtime audit находится в
+`evaluations/report-generation-pdf-filename-execution-17294.md`.
 
 ## 10. Limitations and future work
 
 Текущий production workflow **не** включает:
 
-- runtime evidence именно для опубликованной production version после promotion;
 - DOCX generation;
 - automatic delivery, Telegram или email;
 - manual upload workflow;
@@ -349,7 +376,9 @@ Live production parameters совпадают с tested candidate по испо�
 - client-safe projection of internal `review_note`;
 - XLSX artifact.
 
-PDF topology опубликована, но production runtime gate остаётся открытым как `RG-1`. Остальные возможности являются future work/technical debt, а не частью текущего report workflow.
+HTML/PDF path и скачивание PDF под читаемым именем подтверждены production
+execution `17294`. Остальные возможности являются future work/technical debt,
+а не частью текущего report workflow.
 
 ## 11. Legacy documentation
 
