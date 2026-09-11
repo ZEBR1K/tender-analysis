@@ -227,6 +227,13 @@ test('agent template staging copies only trusted instructions and rejects drift'
     await stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot });
     assert.deepEqual(await listRelativeFiles(workspaceDirectory), [
       '.agents/skills/tender-document-analysis/SKILL.md',
+      '.agents/skills/tender-document-analysis/references/tool-recipes.md',
+      '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
+      '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',
+      '.agents/skills/tender-document-analysis/scripts/ooxml-part.mjs',
+      '.agents/skills/tender-document-analysis/scripts/render-office.mjs',
+      '.agents/skills/tender-document-analysis/scripts/render-pdf-pages.mjs',
+      '.agents/skills/tender-document-analysis/scripts/search-pdf-text.mjs',
       'AGENTS.md',
     ]);
     assert.deepEqual((await readdir(workspaceDirectory)).sort(), [
@@ -243,6 +250,25 @@ test('agent template staging copies only trusted instructions and rejects drift'
 
     await chmod(path.join(workspaceDirectory, 'AGENTS.md'), 0o600);
     await writeFile(path.join(workspaceDirectory, 'AGENTS.md'), 'drift', 'utf8');
+    await assert.rejects(
+      stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot }),
+      /instruction.*changed|trusted.*instruction/iu,
+    );
+
+    await writeFile(
+      path.join(workspaceDirectory, 'AGENTS.md'),
+      await readFile(agentInstructionsPath),
+    );
+    const stagedHelper = path.join(
+      workspaceDirectory,
+      '.agents',
+      'skills',
+      'tender-document-analysis',
+      'scripts',
+      'render-pdf-pages.mjs',
+    );
+    await chmod(stagedHelper, 0o600);
+    await writeFile(stagedHelper, 'drift', 'utf8');
     await assert.rejects(
       stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot }),
       /instruction.*changed|trusted.*instruction/iu,

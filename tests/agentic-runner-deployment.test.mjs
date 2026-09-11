@@ -44,6 +44,7 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr=5\.3\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
+  assert.match(dockerfile, /unzip=6\.0-28\+deb12u1/u);
   assert.match(dockerfile, /ca-certificates=20250419~deb12u1/u);
   assert.doesNotMatch(dockerfile, /apt-get install[^;]*bubblewrap/su);
   assert.doesNotMatch(dockerfile, /chmod[^\n]*bwrap/u);

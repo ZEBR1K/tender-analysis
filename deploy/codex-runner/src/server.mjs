@@ -280,7 +280,7 @@ export function createSingleProcessQueue({ maxQueuedJobs }) {
 }
 
 function requiredToolsReady(tools) {
-  return ['node', 'codex', 'poppler', 'libreoffice', 'tesseract']
+  return ['node', 'codex', 'poppler', 'libreoffice', 'tesseract', 'unzip']
     .every((key) => typeof tools?.[key] === 'string' && tools[key].length > 0)
     && ['eng', 'rus'].every((language) => tools?.ocr_languages?.includes(language));
 }
@@ -363,11 +363,12 @@ export async function probeCommandVersion(command, args, { execute = execFileAsy
 }
 
 export async function probeToolVersions() {
-  const [codex, poppler, libreoffice, tesseract, languagesResult] = await Promise.all([
+  const [codex, poppler, libreoffice, tesseract, unzip, languagesResult] = await Promise.all([
     probeCommandVersion('codex', ['--version']),
     probeCommandVersion('pdftotext', ['-v']),
     probeCommandVersion('libreoffice', ['--version']),
     probeCommandVersion('tesseract', ['--version']),
+    probeCommandVersion('unzip', ['-v']),
     execFileAsync('tesseract', ['--list-langs'], {
       windowsHide: true,
       timeout: 10_000,
@@ -388,6 +389,7 @@ export async function probeToolVersions() {
       poppler: poppler.version,
       libreoffice: libreoffice.version,
       tesseract: tesseract.version,
+      unzip: unzip.version,
       ocr_languages: ['eng', 'rus'].filter((language) => languagesResult.languages.includes(language)),
     },
     diagnostics: {
@@ -395,6 +397,7 @@ export async function probeToolVersions() {
       poppler: poppler.diagnostic,
       libreoffice: libreoffice.diagnostic,
       tesseract: tesseract.diagnostic,
+      unzip: unzip.diagnostic,
       ocr_languages: languagesResult.diagnostic,
     },
   };

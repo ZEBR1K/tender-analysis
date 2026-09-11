@@ -10,6 +10,7 @@ RUN apt-get update \
       "tesseract-ocr=5.3.0-2" \
       "tesseract-ocr-eng=1:4.1.0-2" \
       "tesseract-ocr-rus=1:4.1.0-2" \
+      "unzip=6.0-28+deb12u1" \
     && rm -rf /var/lib/apt/lists/*
 
 RUN npm install --global --ignore-scripts @openai/codex@0.153.4

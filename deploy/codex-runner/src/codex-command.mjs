@@ -15,6 +15,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 
 import { createCodexEventAccumulator, parseCodexEventLine } from './codex-events.mjs';
+import { AGENT_TEMPLATE_FILES, agentTemplatePath } from './agent-template.mjs';
 import { buildCodexPermissionBoundary } from './permissions.mjs';
 
 const DEFAULT_TIMEOUT_MS = 90 * 60 * 1000;
@@ -258,14 +259,14 @@ export async function stageAgentTemplate({ workspaceDirectory, templateDirectory
   await ensureRegularDirectory(agentsDirectory);
   await ensureRegularDirectory(skillsDirectory);
   await ensureRegularDirectory(skillDirectory);
-  await copyExactTrustedFile(
-    path.join(templateDirectory, 'AGENTS.md'),
-    path.join(workspaceDirectory, 'AGENTS.md'),
-  );
-  await copyExactTrustedFile(
-    path.join(templateDirectory, '.agents', 'skills', 'tender-document-analysis', 'SKILL.md'),
-    path.join(skillDirectory, 'SKILL.md'),
-  );
+  await ensureRegularDirectory(path.join(skillDirectory, 'references'));
+  await ensureRegularDirectory(path.join(skillDirectory, 'scripts'));
+  for (const relativePath of AGENT_TEMPLATE_FILES) {
+    await copyExactTrustedFile(
+      agentTemplatePath(templateDirectory, relativePath),
+      agentTemplatePath(workspaceDirectory, relativePath),
+    );
+  }
 }
 
 function codexHomePath(jobDirectory) {

@@ -10,6 +10,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 
+import { agentTemplateSha256 } from './agent-template.mjs';
 import {
   buildCodexPermissionBoundary,
   buildIsolationNegativeCanary,
@@ -103,6 +104,10 @@ export async function buildRunnerExecutionProfile({ runnerRoot = '/app' } = {}) 
   for (const [key, relativePath] of EXECUTION_PROFILE_FILES) {
     hashes[key] = await sha256RegularFile(path.resolve(runnerRoot, relativePath));
   }
+  hashes.agent_template_sha256 = await agentTemplateSha256(path.resolve(
+    runnerRoot,
+    'agent-template',
+  ));
   return Object.freeze({
     schema_version: 'tender_codex_runner_execution_profile_v1',
     model: PINNED_CODEX_MODEL,

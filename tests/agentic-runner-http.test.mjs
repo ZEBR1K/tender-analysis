@@ -84,6 +84,7 @@ test('GET /health exposes readiness and tool versions without secrets', async (t
     field_catalog_sha256: 'A'.repeat(64),
     prompt_sha256: 'B'.repeat(64),
     skill_sha256: 'C'.repeat(64),
+    agent_template_sha256: 'E'.repeat(64),
     result_schema_sha256: 'D'.repeat(64),
   };
   const health = buildHealthReport({
@@ -96,6 +97,7 @@ test('GET /health exposes readiness and tool versions without secrets', async (t
       poppler: '22.12.0',
       libreoffice: '7.4.7.2',
       tesseract: '5.3.0',
+      unzip: '6.00',
       ocr_languages: ['eng', 'rus'],
     },
     isolationReady: true,
@@ -126,6 +128,7 @@ test('GET /health exposes readiness and tool versions without secrets', async (t
       poppler: '22.12.0',
       libreoffice: '7.4.7.2',
       tesseract: '5.3.0',
+      unzip: '6.00',
       ocr_languages: ['eng', 'rus'],
     },
     readiness: {
@@ -175,12 +178,33 @@ test('tool probes never promote nonzero, timeout or spawn diagnostics into a ver
       poppler: '22.12.0',
       libreoffice: '7.4.7',
       tesseract: '5.3.0',
+      unzip: '6.00',
       ocr_languages: ['eng', 'rus'],
     },
     queue: { active: 0, queued: 0, max_concurrent: 1, max_queued: 1 },
   });
   assert.equal(report.status, 'not_ready');
   assert.equal(report.readiness.tools, false);
+
+  const missingUnzip = buildHealthReport({
+    serviceVersion: '0.1.0',
+    authReady: true,
+    storeReady: true,
+    isolationReady: true,
+    codexAuthReady: true,
+    toolVersions: {
+      node: process.version,
+      codex: 'codex-cli 0.153.4',
+      poppler: '22.12.0',
+      libreoffice: '7.4.7',
+      tesseract: '5.3.0',
+      unzip: null,
+      ocr_languages: ['eng', 'rus'],
+    },
+    queue: { active: 0, queued: 0, max_concurrent: 1, max_queued: 1 },
+  });
+  assert.equal(missingUnzip.status, 'not_ready');
+  assert.equal(missingUnzip.readiness.tools, false);
 });
 
 test('health cannot promote execution from a configuration boolean alone', () => {
@@ -201,6 +225,7 @@ test('health cannot promote execution from a configuration boolean alone', () =>
       poppler: '22.12.0',
       libreoffice: '7.4.7',
       tesseract: '5.3.0',
+      unzip: '6.00',
       ocr_languages: ['eng', 'rus'],
     },
     queue: { active: 0, queued: 0, max_concurrent: 1, max_queued: 1 },

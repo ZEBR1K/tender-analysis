@@ -11,12 +11,33 @@ import { buildCodexPermissionBoundary } from '../deploy/codex-runner/src/permiss
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, '..');
 const runnerRoot = path.join(repositoryRoot, 'deploy', 'codex-runner');
+const agentTemplateFiles = [
+  'AGENTS.md',
+  '.agents/skills/tender-document-analysis/SKILL.md',
+  '.agents/skills/tender-document-analysis/references/tool-recipes.md',
+  '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
+  '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',
+  '.agents/skills/tender-document-analysis/scripts/ooxml-part.mjs',
+  '.agents/skills/tender-document-analysis/scripts/render-office.mjs',
+  '.agents/skills/tender-document-analysis/scripts/render-pdf-pages.mjs',
+  '.agents/skills/tender-document-analysis/scripts/search-pdf-text.mjs',
+];
 
 async function sha256(relativePath) {
   return createHash('sha256')
     .update(await readFile(path.join(runnerRoot, relativePath)))
     .digest('hex')
     .toUpperCase();
+}
+
+async function sha256AgentTemplate() {
+  const hash = createHash('sha256');
+  for (const relativePath of [...agentTemplateFiles].sort()) {
+    const bytes = await readFile(path.join(runnerRoot, 'agent-template', relativePath));
+    hash.update(`${relativePath}\0${bytes.length}\0`, 'utf8');
+    hash.update(bytes);
+  }
+  return hash.digest('hex').toUpperCase();
 }
 
 test('runner execution profile hashes the exact pinned image artifacts', async () => {
@@ -35,6 +56,7 @@ test('runner execution profile hashes the exact pinned image artifacts', async (
     skill_sha256: await sha256(
       'agent-template/.agents/skills/tender-document-analysis/SKILL.md',
     ),
+    agent_template_sha256: await sha256AgentTemplate(),
     result_schema_sha256: await sha256('schemas/tender-agent-result-v1.schema.json'),
   });
 });
@@ -411,6 +433,7 @@ test('health provider exposes runner-owned profile and revalidates attestation d
           poppler: '22.12.0',
           libreoffice: '7.4.7.2',
           tesseract: '5.3.0',
+          unzip: '6.00',
           ocr_languages: ['eng', 'rus'],
         },
       }),

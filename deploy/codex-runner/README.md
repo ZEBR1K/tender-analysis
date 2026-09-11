@@ -13,7 +13,7 @@ Internal-only service that runs the agentic tender analysis beside n8n, never in
 - Exactly one Codex process may run at a time. The initial queue accepts at most two waiting jobs and fails closed beyond that bound.
 - JSON bodies are limited to 2 MiB and may be buffered. Document bodies are limited to 50 MiB, are exposed to the route handler as a bounded `AsyncIterable`, and are never concatenated in memory. The raw HTTP stream is not exposed to route handlers. The server retains the single global document-upload slot until full EOF, drains an early handler return/error without retaining bytes, and lets an eventual size overflow override apparent success. Overlap is rejected with `503 RUNNER_UPLOAD_BUSY`; Task 5 must consume the stream completely while computing SHA-256 and performing an atomic rename.
 
-`GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions, boolean readiness flags, and runner-owned `tender_codex_runner_execution_profile_v1` provenance. The profile pins `gpt-5.6-sol`, reasoning effort `high`, Codex CLI `0.153.4`, and SHA-256 hashes read from the four image files used at execution time: field catalog, prompt, analysis skill, and result schema. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
+`GET /health` is unauthenticated but internal-only. It returns schema `tender_codex_runner_health_v1`, component versions, boolean readiness flags, and runner-owned `tender_codex_runner_execution_profile_v1` provenance. The profile pins `gpt-5.6-sol`, reasoning effort `high`, Codex CLI `0.153.4`, and SHA-256 hashes read from the image-owned field catalog, prompt, result schema, legacy skill entry point, and the complete allowlisted agent template. The aggregate template hash covers `AGENTS.md`, `SKILL.md`, the focused recipes, and every staged helper script. A timed-out, failed or non-zero tool probe leaves that tool version `null` and readiness false; bounded probe diagnostics stay internal. Health never returns credential values. Every `/v1/*` route requires `X-Tender-Codex-Token` Header Auth.
 
 ## Immutable source staging
 
@@ -64,6 +64,15 @@ membership, and a nonblank human locator for `resolved` or `requires_review`.
 `not_found` may have no evidence; absent or null metadata does not imply a
 negative fact. Agent-reported inspected documents, parts, methods, limitations
 and constraints remain audit context rather than a completeness claim.
+
+For every new job, the runner copies one fixed, hash-attested toolkit from the
+container image into the private workspace. It contains the short `AGENTS.md`,
+the focused tender-analysis skill, usage recipes, and bounded helpers for PDF
+text search/rendering, image OCR, Office rendering, and read-only OOXML
+inspection. The allowlist is closed: an added, missing, symlinked, or changed
+template file fails staging or changes the execution-profile attestation. The
+helpers are optional navigation aids; Codex remains responsible for choosing
+the inspection method and for the semantic conclusions.
 
 ## Execution lifecycle
 
