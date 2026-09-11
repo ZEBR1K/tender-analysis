@@ -4,6 +4,29 @@
 **Status:** Sealed TenderPlan metadata mark-to-report technical GREEN / semantic review pending
 **Branch at snapshot:** `codex/agentic-analysis-integration`
 
+## Readable TenderPlan report filenames — published, integrated runtime pending
+
+Report Generation `ckPnP3hRhKu4Mf9u` is published at
+`c23b00c0-6f46-4291-8877-71017cdfdbdf` with exact draft/active parity. Only
+`Сгенерировать HTML1.parameters.jsCode` changed; the live renderer matches the
+canonical export, while all 12 nodes and all connections remain unchanged.
+
+Final HTML/PDF artifacts now use the TenderPlan number and title:
+
+```text
+Анализ закупки <номер> — <название TenderPlan>.<html|pdf>
+```
+
+The filename is sanitized for Windows and bounded to a 180-character base.
+Missing title falls back to the number-only name; PDF continues to inherit the
+validated HTML base name. Focused behavioral/graph tests pass `4 / 4`; the full
+repository suite passes `766 total / 760 pass / 0 fail / 6 skipped`.
+
+The first integrated execution after publication remains the runtime filename
+gate. Manual execution `17213` had no sub-workflow input and correctly failed at
+the pre-existing Finalization guard with `отсутствует analysis_run_id`; it did
+not execute the renderer, Gotenberg or any database write.
+
 ## Sealed TenderPlan metadata canary — technical GREEN
 
 Tender `6aa2c2ad5b7165804b8c4ff7` was repeated after FullInfo promotion as

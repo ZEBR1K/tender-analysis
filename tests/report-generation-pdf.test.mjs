@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, '..');
@@ -40,6 +41,16 @@ function normalizedParameters(node) {
   if (node.type === 'n8n-nodes-base.code') {
     parameters.mode ??= 'runOnceForAllItems';
     parameters.language ??= 'javaScript';
+
+    if (node.name === 'Сгенерировать HTML1') {
+      parameters.jsCode = parameters.jsCode.replace(
+        /const procurement = model\.procurement \?\? \{\};[\s\S]*?\n\nconst html = `<!doctype html>/u,
+        'const procurement = model.procurement ?? {};\n/* filename policy */\n\nconst html = `<!doctype html>',
+      ).replace(
+        /filename: `[^`]+\.html`,/u,
+        'filename: `/* filename policy */.html`,',
+      );
+    }
   }
 
   if (node.type === 'n8n-nodes-base.httpRequest') {
@@ -52,6 +63,39 @@ function normalizedParameters(node) {
   }
 
   return parameters;
+}
+
+function reportModel({ number, subject }) {
+  return {
+    report_model_version: 'tender_report_model_v2',
+    model_validation: { valid: true },
+    internal: { analysis_run_id: 'test-run' },
+    procurement: { number, subject },
+    statistics: { total: 27, resolved: 27, requires_review: 0, not_found: 0 },
+    attention_field_indexes: [],
+    fields: Array.from({ length: 27 }, (_, index) => ({
+      analysis_result: {
+        field_index: index + 1,
+        status: 'resolved',
+        value_text: `value-${index + 1}`,
+        requires_human_review: false,
+      },
+      presentation: {
+        section_name: 'Раздел',
+        client_field_name: `Поле ${index + 1}`,
+        status_text: 'Подтверждено',
+      },
+      sources: [],
+    })),
+  };
+}
+
+async function runRenderer(rendererCode, model) {
+  const context = vm.createContext({ $json: structuredClone(model) });
+  const result = await new vm.Script(`(async () => {\n${rendererCode}\n})()`).runInContext(
+    context,
+  );
+  return result[0];
 }
 
 test('published production PDF workflow matches the tested candidate semantics', () => {
@@ -157,4 +201,51 @@ test('HTTP Request posts the validated HTML binary to the internal Gotenberg end
       },
     );
   }
+});
+
+test('final report filename uses the TenderPlan number and title safely', async () => {
+  const workflow = loadJson(canonicalPath);
+  const renderer = byName(workflow, 'Сгенерировать HTML1');
+
+  const named = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({
+      number: '10293451/А',
+      subject: 'Поставка: мебели / шкафов? <2026>',
+    }),
+  );
+  assert.equal(
+    named.json.filename,
+    'Анализ закупки 10293451 А — Поставка мебели шкафов 2026.html',
+  );
+
+  const withoutTitle = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: '10293451', subject: '   ' }),
+  );
+  assert.equal(withoutTitle.json.filename, 'Анализ закупки 10293451.html');
+
+  const withoutNumber = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: null, subject: 'Поставка мебели' }),
+  );
+  assert.equal(
+    withoutNumber.json.filename,
+    'Анализ закупки без номера — Поставка мебели.html',
+  );
+
+  const longTitle = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: '10293451', subject: 'Очень длинное название '.repeat(30) }),
+  );
+  assert.match(longTitle.json.filename, /^Анализ закупки 10293451 — /u);
+  assert.ok(longTitle.json.filename.endsWith('.html'));
+  assert.ok(longTitle.json.filename.slice(0, -'.html'.length).length <= 180);
+
+  const pdfValidator = byName(workflow, 'Проверить PDF artifact');
+  assert.ok(
+    pdfValidator.parameters.jsCode.includes(
+      "reportHtml.fileName.replace(/\\.html$/i, '.pdf')",
+    ),
+  );
 });

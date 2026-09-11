@@ -248,6 +248,17 @@ Renderer/Artifact, а не в HTML.
 
 `requires_review` имеет отдельный status label и отдельный attention block.
 
+Renderer формирует имя artifact из уже полученных данных TenderPlan:
+
+```text
+Анализ закупки <номер> — <название TenderPlan>.html
+```
+
+Если название отсутствует, остаётся `Анализ закупки <номер>.html`; если номер
+отсутствует, используется `без номера`. Управляющие и запрещённые Windows
+символы заменяются пробелами, повторяющиеся пробелы схлопываются, а базовое имя
+ограничивается 180 символами. Название внутри самого отчёта не сокращается.
+
 ## 7. HTML artifact
 
 `Создать HTML artifact` превращает `html` Renderer в UTF-8 binary:
@@ -259,6 +270,10 @@ fileName = Renderer filename
 ```
 
 Нода проверяет non-empty HTML, filename с расширением `.html`, `mime_type=text/html`, положительный byte size и Base64 round-trip equality с Renderer HTML. В terminal JSON остаются metadata и `artifact_validation`; raw HTML находится только в binary.
+
+`Проверить PDF artifact` наследует то же базовое имя и заменяет только
+расширение `.html` на `.pdf`. Случайное UUID-имя ответа Gotenberg является
+промежуточным и не выходит из terminal node как итоговое имя файла.
 
 ## 8. Reference regression
 
@@ -378,6 +393,20 @@ This is the first runtime proof of the published production PDF path. The
 snapshot contained canonical `codex_agentic_v1` rows with null confidence and
 opaque source locators, so the new agentic adapter compatibility was exercised,
 not only the legacy Aggregator format.
+
+Readable filename publication checkpoint 2026-09-11:
+
+| Проверка | Результат |
+|---|---:|
+| Published version | `c23b00c0-6f46-4291-8877-71017cdfdbdf` |
+| Active / draft parity | `versionId = activeVersionId` |
+| Renderer parity | live Code node equals canonical export |
+| Nodes / connections | `12` / unchanged |
+| Focused filename tests | `4 passed / 0 failed` |
+
+Новая версия ожидает первый integrated запуск с реальным input от Finalization.
+Ручной запуск `17213` без sub-workflow input остановился на первом guard с
+`отсутствует analysis_run_id`; Renderer и конвертация не запускались.
 
 ## 10. Limitations and future work
 
