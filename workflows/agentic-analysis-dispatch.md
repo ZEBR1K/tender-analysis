@@ -96,3 +96,13 @@ to `AGENTIC_SOURCE_DOWNLOAD_FAILED`. Published/read-back live version
 `4c49ed54-c2ca-40e2-9e8a-7958f84dbdbd` contains 31 nodes, no validation
 warnings and active/draft parity. This hardening changes future failure routing
 only; it adds no semantic or field-specific validation.
+
+## TenderPlan metadata canary — 2026-09-11
+
+Published/read-back version `e4ea9636-1d5d-4772-ac5c-033864014b3e` adds only
+the sealed root metadata source to the preflight/runner request. Dispatch
+execution `16925` staged three source DOCX files and started job
+`7f89e330-1011-458f-8b28-286d32d742c9`. The sealed manifest contained
+`tenderplan-metadata` outside `documents[]`; its document count remained `3`.
+The job completed on attempt 1 with a valid exact-27 envelope. Full evidence:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.

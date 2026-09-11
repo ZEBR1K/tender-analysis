@@ -1,8 +1,32 @@
 # PROJECT STATUS — Tender Analysis
 
 **Snapshot date:** 2026-09-11
-**Status:** Fresh TenderPlan mark-to-report agentic path technical GREEN / semantic review pending
+**Status:** Sealed TenderPlan metadata mark-to-report technical GREEN / semantic review pending
 **Branch at snapshot:** `codex/agentic-analysis-integration`
+
+## Sealed TenderPlan metadata canary — technical GREEN
+
+Tender `6aa2c2ad5b7165804b8c4ff7` was repeated after FullInfo promotion as
+the separate sealed runner source `tenderplan-metadata`. Orchestrator `16923`
+created run `e996c707-aa09-41c2-9fd7-d49337182c70`; Dispatch `16925` started
+runner job `7f89e330-1011-458f-8b28-286d32d742c9`; Monitor `16944`,
+Finalization `16945` and Report `16946` completed the existing terminal path.
+
+The manifest kept three source documents separate from metadata. Runner
+validation accepted exact 27 fields with zero contract issues. TLS-verified
+read-only PostgreSQL checks confirmed `completed`, no run error, 27 unique
+field keys/indexes and `8 resolved / 6 requires_review / 13 not_found`.
+HTML/PDF artifacts are valid and the HTML renders the TenderPlan source.
+
+Metadata was cited in eight fields. It directly supplied the application
+deadline, improved/corroborated subject, platform, procedure and customer,
+retained the price and results date as review candidates, and exposed a real
+working-days/calendar-days delivery conflict. This is not a controlled semantic
+A/B because the current source set has a third DOCX, the repeated source files
+have different hashes and the live TenderPlan snapshot contains later winner
+state. No semantic parser or blocking validator was introduced. Full evidence
+and sanitized raw envelopes:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
 
 ## Fresh TenderPlan mark-to-report canary — technical GREEN
 
@@ -59,10 +83,10 @@ Repository regression after the review hardening:
 Report Generation `ckPnP3hRhKu4Mf9u` is published at
 `e21c7675-916a-4fd3-8499-e11444484b68`. Finalization
 `cSsh9yjpS7t5p0OO` is published at
-`e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` with the exact route
+`e44fff3f-c0b0-4616-93c1-bda41405cb07` with the exact route
 `trigger → Продвинуть agentic FINAL → existing 27/27 barrier → Report`.
 Monitor `CALcBEXvQsO1AcfP` is published at
-`b45e4a2c-48a1-456e-8556-873dd7b19d71`; its exact-27 shadow transaction now
+`0ce151f8-99bb-40d7-a426-097a01de97fd`; its exact-27 shadow transaction now
 calls Finalization synchronously before returning to the job loop. All three
 workflows were read back with `versionId=activeVersionId`.
 

@@ -203,7 +203,7 @@ Extractor model-selection checkpoint 2026-08-29:
 |ID|Проблема|Компонент|
 |-|-|-|
 |`OR-2`|✅ Fresh mark-to-report technical gate closed 2026-09-11. Published Document Preparation, Orchestrator, Intake Resume, Dispatch, Monitor, Agentic Error and Mark Intake carried tender `6aa2c2ad5b7165804b8c4ff7` through new Codex job `70d699d2-b469-40b0-a8cc-de5b38fa6374`, Monitor `16402`, Finalization `16403` and Report `16404`. Read-only DB verification confirmed completed run and exact 27 unique FINAL; HTML/PDF are valid. Manual 27-field semantic review remains a non-blocking evaluation because this procurement has no employee-authored gold report.|Orchestrator|
-|`OR-3`|🟡 Candidate implemented: неизменённый TenderPlan FullInfo сохраняется в `tender_meta.source_payload` и передаётся агенту как sealed metadata source; production runtime ещё не подтверждён.|Orchestrator|
+|`OR-3`|✅ Production runtime GREEN: неизменённый TenderPlan FullInfo сохраняется в `tender_meta.source_payload`, передаётся как отдельный sealed source `tenderplan-metadata` и остаётся вне document barrier. Run `e996c707-aa09-41c2-9fd7-d49337182c70` завершил exact 27 FINAL и отчёт; metadata evidence промотировано/отрендерено. Семантический parser или field-specific validator не добавлен.|Orchestrator / Agentic Dispatch / Finalization|
 |`OR-7`|✅ Temporary routing gate closed. `TASK17_TEMPORARY_AGENT_ONLY` preserves legacy Worker/Aggregator/Finalization nodes but leaves them unreachable. Raw `.xls` is staged unchanged without a parser. Fresh-run canary `15355/15356`, controlled Dispatch `15373` and terminal Monitor `15387` prove two-source real Codex execution with zero legacy-node runs.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
@@ -2024,11 +2024,19 @@ architectural task.
 
 ## `OR-3` — sealed TenderPlan snapshot
 
-Локальный candidate сохраняет неизменённый FullInfo response в
+Canonical Orchestrator сохраняет неизменённый FullInfo response в
 `tender_meta.source_payload`. Agentic Dispatch передаёт его runner как отдельный
 источник `tenderplan-metadata`, не включая в document barrier. Snapshot покрыт
 хэшем манифеста; семантический parser или field-specific validator не добавлен.
-До production canary статус остаётся rollout pending.
+
+Production canary `16923 → 16925 → job
+7f89e330-1011-458f-8b28-286d32d742c9 → 16944 → 16945 → 16946`
+закрыл rollout gate. TLS-verified read-only DB audit подтвердил completed run
+`e996c707-aa09-41c2-9fd7-d49337182c70`, exact 27 unique FINAL и valid
+HTML/PDF. Metadata использована в восьми полях; Finalization принимает
+зарезервированный source только при непустом `run.tender_meta`, а прочий
+evidence по-прежнему обязан принадлежать manifest document. Детали:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
 
 \---
 

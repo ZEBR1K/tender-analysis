@@ -84,7 +84,7 @@ nonblank locator. TenderPlan Mark Intake was published after this gate passed.
 ## Finalization handoff deployment — 2026-09-11
 
 Live Monitor `CALcBEXvQsO1AcfP` is published at version
-`b45e4a2c-48a1-456e-8556-873dd7b19d71`. Read-back confirms 25 nodes, the bound
+`0ce151f8-99bb-40d7-a426-097a01de97fd`. Read-back confirms 25 nodes, the bound
 Finalization workflow ID `cSsh9yjpS7t5p0OO`, and the exact terminal route:
 
 ```text
@@ -93,7 +93,7 @@ Finalization workflow ID `cSsh9yjpS7t5p0OO`, and the exact terminal route:
 → Jobs по одному
 ```
 
-The called Finalization version `e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` and
+The called Finalization version `e44fff3f-c0b0-4616-93c1-bda41405cb07` and
 Report version `e21c7675-916a-4fd3-8499-e11444484b68` are both published.
 Controlled executions `15662/15663` first proved promotion, 27/27 completion
 and HTML/PDF generation for the real Task 17 job. Replay `15666` stopped before

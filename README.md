@@ -35,9 +35,9 @@ DOCX+XLS на attempt 1; Monitor execution `15387` принял exact-27 кон�
 принимает `.xls`; это остаётся raw agent-only форматом.
 
 Следующий terminal boundary также опубликован. Monitor version
-`b45e4a2c-48a1-456e-8556-873dd7b19d71` после exact-27 shadow commit синхронно
+`0ce151f8-99bb-40d7-a426-097a01de97fd` после exact-27 shadow commit синхронно
 вызывает существующую Finalization. Finalization version
-`e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` переводит agentic rows в неизменённый
+`e44fff3f-c0b0-4616-93c1-bda41405cb07` переводит agentic rows в неизменённый
 `tender_field_final_v1`, использует прежний DB-backed 27/27 barrier и вызывает
 Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`.
 Контролируемый canary `15662 → 15663` завершил run, сохранил 27 уникальных FINAL
@@ -59,6 +59,16 @@ DB проверка подтвердила `completed` и ровно 27 уник
 promotion/report evidence находится в
 `evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`, а свежий полный
 прогон — в `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
+
+FullInfo metadata is now part of the sealed agentic input without becoming a
+source document. Published Orchestrator `28d0126c-f546-4c02-9bee-3a0dda7febc0`,
+Dispatch `e4ea9636-1d5d-4772-ac5c-033864014b3e` and Finalization
+`e44fff3f-c0b0-4616-93c1-bda41405cb07` carried repeat run
+`e996c707-aa09-41c2-9fd7-d49337182c70` through exact 27 FINAL and valid
+HTML/PDF. Read-only DB distribution is
+`8 resolved / 6 requires_review / 13 not_found`; eight fields cite the
+TenderPlan source. The canary and its non-isolated A/B limitation are recorded
+in `evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
 
 ---
 

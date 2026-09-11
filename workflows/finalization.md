@@ -40,3 +40,14 @@ Workflow не проверяет программно истинность ци�
 строк, переводит run из `aggregating` в `completed` и вызывает
 `TENDER — Генерация отчета`. Report adapter уже отображает
 `source_type=tender_metadata` как карточку TenderPlan.
+
+## Live verification — 2026-09-11
+
+Finalization `cSsh9yjpS7t5p0OO` is published/read back at version
+`e44fff3f-c0b0-4616-93c1-bda41405cb07`. Execution `16945` accepted job
+`7f89e330-1011-458f-8b28-286d32d742c9`, promoted exact 27 FINAL including
+reserved metadata evidence, completed run
+`e996c707-aa09-41c2-9fd7-d49337182c70` and synchronously called successful
+Report execution `16946`. Read-only PostgreSQL confirmed 27 unique field keys
+and indexes. Full evidence:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.

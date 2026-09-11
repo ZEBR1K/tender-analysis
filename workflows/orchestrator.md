@@ -476,6 +476,14 @@ Monitor атомарно сохранил exact 27 shadow rows, legacy nodes и�
 После terminal GREEN TenderPlan Mark Intake опубликован. Следующая отдельная
 граница — reviewed promotion shadow fields в canonical FINAL/report path.
 
+The later sealed-metadata canary published/read back Orchestrator version
+`28d0126c-f546-4c02-9bee-3a0dda7febc0`. Execution `16923` fetched FullInfo for
+tender `6aa2c2ad5b7165804b8c4ff7`, stored the unchanged response under
+`tender_meta.source_payload`, registered three documents and created run
+`e996c707-aa09-41c2-9fd7-d49337182c70`. The terminal route completed through
+Report without reaching the preserved legacy branch. Evidence:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
+
 ---
 
 # 13. Safe modification checklist
