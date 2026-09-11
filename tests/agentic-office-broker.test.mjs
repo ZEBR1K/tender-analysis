@@ -32,18 +32,18 @@ test('runner-side LibreOffice call is shell-free, bounded, and uses private temp
       execute: async (...args) => { invocation = args; },
     });
     assert.equal(invocation[0], 'unshare');
-    assert.deepEqual(invocation[1].slice(0, 8), [
+    assert.deepEqual(invocation[1].slice(0, 6), [
       '--user',
       '--map-root-user',
       '--net',
-      '--pid',
       '--fork',
-      '--mount-proc',
       '--',
       'libreoffice',
     ]);
-    assert.match(invocation[1][8], /^-env:UserInstallation=file:\/\//u);
-    assert.deepEqual(invocation[1].slice(9), [
+    assert.equal(invocation[1].includes('--pid'), false);
+    assert.equal(invocation[1].includes('--mount-proc'), false);
+    assert.match(invocation[1][6], /^-env:UserInstallation=file:\/\//u);
+    assert.deepEqual(invocation[1].slice(7), [
       '--headless',
       '--convert-to',
       'pdf',
