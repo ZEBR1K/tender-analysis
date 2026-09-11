@@ -28,6 +28,11 @@ import {
   parseCodexEventLine,
 } from '../deploy/codex-runner/src/codex-events.mjs';
 import { buildCodexPermissionBoundary } from '../deploy/codex-runner/src/permissions.mjs';
+import {
+  officeRuntimeDirectory,
+  prepareOfficeRuntime,
+  removeOfficeRuntime,
+} from '../deploy/codex-runner/src/office-runtime.mjs';
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, '..');
@@ -50,6 +55,23 @@ const fakeCodexPath = path.join(
   'agentic',
   'fake-codex.mjs',
 );
+
+test('Office runtime is a per-job short-lived directory with a bounded socket path', async () => {
+  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'office-runtime-'));
+  const jobId = '11111111-1111-4111-8111-111111111111';
+  try {
+    const directory = officeRuntimeDirectory(jobId, { runtimeRoot: temporaryRoot });
+    assert.match(path.basename(directory), /^tc-[0-9a-f]{24}$/u);
+    assert.equal(directory.length < temporaryRoot.length + 29, true);
+    assert.equal(await prepareOfficeRuntime({ jobId, runtimeRoot: temporaryRoot }), directory);
+    assert.equal((await stat(directory)).isDirectory(), true);
+    await writeFile(path.join(directory, 'socket-residue'), 'derived\n');
+    await removeOfficeRuntime({ jobId, runtimeRoot: temporaryRoot });
+    await assert.rejects(stat(directory), { code: 'ENOENT' });
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
 const fixtureJobId = '00000000-0000-4000-8000-000000000007';
 
 async function listRelativeFiles(root, directory = root) {

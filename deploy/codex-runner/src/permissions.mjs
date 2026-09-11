@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+import { officeRuntimeDirectory } from './office-runtime.mjs';
+
 const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const PROFILE_NAME = 'tender-analysis-job';
 
@@ -49,6 +51,7 @@ export function buildCodexPermissionBoundary({
   const workspaceDirectory = path.posix.join(jobRoot, 'workspace');
   const inputDirectory = path.posix.join(jobRoot, 'input');
   const workspaceTempDirectory = path.posix.join(workspaceDirectory, '.tmp');
+  const officeRuntime = officeRuntimeDirectory(normalizedJobId);
   const agentInstructionsPath = path.posix.join(workspaceDirectory, 'AGENTS.md');
   const agentSkillsDirectory = path.posix.join(workspaceDirectory, '.agents');
 
@@ -61,6 +64,7 @@ export function buildCodexPermissionBoundary({
     [agentInstructionsPath, 'read'],
     [agentSkillsDirectory, 'read'],
     [inputDirectory, 'read'],
+    [officeRuntime, 'write'],
     [normalizedAuthRoot, 'deny'],
     [normalizedSecretsRoot, 'deny'],
     ['/proc', 'deny'],
@@ -79,6 +83,7 @@ export function buildCodexPermissionBoundary({
     override('shell_environment_policy.set.PATH', tomlString('/usr/local/bin:/usr/bin:/bin')),
     override('shell_environment_policy.set.HOME', tomlString(workspaceDirectory)),
     override('shell_environment_policy.set.TMPDIR', tomlString(workspaceTempDirectory)),
+    override('shell_environment_policy.set.TENDER_OFFICE_RUNTIME_DIR', tomlString(officeRuntime)),
     override('shell_environment_policy.set.LANG', tomlString('C.UTF-8')),
     override('shell_environment_policy.set.LC_ALL', tomlString('C.UTF-8')),
   ];
@@ -94,7 +99,8 @@ export function buildCodexPermissionBoundary({
       '/proc',
       '/tmp',
     ]),
-    shellEnvironmentKeys: Object.freeze(['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL']),
+    officeRuntimeDirectory: officeRuntime,
+    shellEnvironmentKeys: Object.freeze(['PATH', 'HOME', 'TMPDIR', 'TENDER_OFFICE_RUNTIME_DIR', 'LANG', 'LC_ALL']),
     cliArgs: Object.freeze([
       '--ignore-user-config',
       '--strict-config',
@@ -123,6 +129,8 @@ export function buildIsolationNegativeCanary({
       { id: 'current_input', path: path.posix.join(currentRoot, 'input', 'current-readable.txt'), expected: 'readable' },
       { id: 'workspace', path: path.posix.join(currentRoot, 'workspace', 'isolation-probe-write.tmp'), expected: 'writable' },
       { id: 'workspace_tmp', path: path.posix.join(currentRoot, 'workspace', '.tmp', 'isolation-probe-write.tmp'), expected: 'writable' },
+      { id: 'office_runtime', path: path.posix.join(officeRuntimeDirectory(current), 'isolation-probe-write.tmp'), expected: 'writable' },
+      { id: 'sibling_office_runtime', path: path.posix.join(officeRuntimeDirectory(sibling), 'isolation-probe-write.tmp'), expected: 'denied' },
       { id: 'current_input_write', path: path.posix.join(currentRoot, 'input', 'isolation-probe-write.tmp'), expected: 'denied' },
       { id: 'sibling_job', path: path.posix.join(normalizedJobsRoot, sibling, 'input', 'sibling-readable.txt'), expected: 'denied' },
       { id: 'jobs_parent', path: normalizedProtectedJobsRoot, expected: 'current_path_only' },
@@ -145,7 +153,8 @@ export function permissionBoundaryContractReady() {
     return boundary.cliArgs.includes('--ignore-user-config')
       && !boundary.cliArgs.includes('--sandbox')
       && boundary.readOnlyDirectories.length === 1
-      && boundary.readOnlyInstructionPaths.length === 2;
+      && boundary.readOnlyInstructionPaths.length === 2
+      && /^\/dev\/shm\/tc-[0-9a-f]{24}$/u.test(boundary.officeRuntimeDirectory);
   } catch {
     return false;
   }

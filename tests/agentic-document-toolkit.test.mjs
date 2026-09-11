@@ -166,9 +166,8 @@ test('PDF renderer accepts only an explicit bounded page range and sane DPI', as
 test('OCR and Office helpers build shell-free single-source commands', async () => {
   const { buildTesseractArgs, parseOcrRequest } = await importScript('ocr-image.mjs');
   const {
-    OFFICE_NAMESPACE_SCRIPT,
     buildLibreOfficeArgs,
-    buildSandboxedLibreOfficeCommand,
+    requiredOfficeRuntimeDirectory,
   } = await importScript('render-office.mjs');
   assert.deepEqual(parseOcrRequest(['page.png']), {
     source: 'page.png',
@@ -180,8 +179,10 @@ test('OCR and Office helpers build shell-free single-source commands', async () 
     '-l',
     'rus+eng',
   ]);
-  assert.deepEqual(buildLibreOfficeArgs('/input/form.docx', '/work/rendered'), [
-    '-env:UserInstallation=file:///tmp/profile',
+  const officeRuntime = '/dev/shm/tc-0123456789abcdef01234567';
+  assert.deepEqual(buildLibreOfficeArgs('/input/form.docx', '/work/rendered', officeRuntime), [
+    `-env:OSL_SOCKET_PATH=${officeRuntime}`,
+    `-env:UserInstallation=file://${officeRuntime}/profile`,
     '--headless',
     '--convert-to',
     'pdf',
@@ -189,33 +190,13 @@ test('OCR and Office helpers build shell-free single-source commands', async () 
     '/work/rendered',
     '/input/form.docx',
   ]);
-  assert.deepEqual(
-    buildSandboxedLibreOfficeCommand('/input/form.docx', '/work/rendered', '/work/runtime'),
-    {
-      command: 'unshare',
-      args: [
-        '--user',
-        '--map-root-user',
-        '--mount',
-        'sh',
-        '-ceu',
-        OFFICE_NAMESPACE_SCRIPT,
-        'render-office',
-        '/work/runtime',
-        'libreoffice',
-        '-env:UserInstallation=file:///tmp/profile',
-        '--headless',
-        '--convert-to',
-        'pdf',
-        '--outdir',
-        '/work/rendered',
-        '/input/form.docx',
-      ],
-    },
+  assert.equal(requiredOfficeRuntimeDirectory({
+    TENDER_OFFICE_RUNTIME_DIR: officeRuntime,
+  }), officeRuntime);
+  assert.throws(
+    () => requiredOfficeRuntimeDirectory({ TENDER_OFFICE_RUNTIME_DIR: '/tmp' }),
+    /office runtime/iu,
   );
-  assert.match(OFFICE_NAMESPACE_SCRIPT, /mount --bind "\$1" \/tmp/u);
-  assert.match(OFFICE_NAMESPACE_SCRIPT, /exec "\$@"/u);
-  assert.doesNotMatch(OFFICE_NAMESPACE_SCRIPT, /eval/u);
 });
 
 test('OOXML helper permits one normalized part and rejects traversal', async () => {

@@ -7,6 +7,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { buildCodexPermissionBoundary } from '../deploy/codex-runner/src/permissions.mjs';
+import { officeRuntimeDirectory } from '../deploy/codex-runner/src/office-runtime.mjs';
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, '..');
@@ -105,6 +106,8 @@ const probeIds = [
   'current_input',
   'workspace',
   'workspace_tmp',
+  'office_runtime',
+  'sibling_office_runtime',
   'current_input_write',
   'sibling_job',
   'jobs_parent',
@@ -209,6 +212,8 @@ test('probe script executes every declared read, write and environment check its
   const siblingJobId = '22222222-2222-4222-8222-222222222222';
   const currentMarker = Buffer.from('current marker\n', 'utf8');
   const currentMarkerSha256 = createHash('sha256').update(currentMarker).digest('hex').toUpperCase();
+  const officeRuntime = officeRuntimeDirectory(jobId);
+  const siblingOfficeRuntime = officeRuntimeDirectory(siblingJobId);
   const reads = [];
   const writes = [];
   const deniedReads = new Set([
@@ -226,6 +231,7 @@ test('probe script executes every declared read, write and environment check its
       if (filePath === `${jobsRoot}/${jobId}/input/current-readable.txt`) return currentMarker;
       if (filePath.endsWith('/workspace/isolation-probe-write.tmp')) return Buffer.from('workspace\n');
       if (filePath.endsWith('/workspace/.tmp/isolation-probe-write.tmp')) return Buffer.from('workspace tmp\n');
+      if (filePath === `${officeRuntime}/isolation-probe-write.tmp`) return Buffer.from('office runtime\n');
       if (deniedReads.has(filePath)) {
         const hidden = filePath === `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`
           || filePath === `${jobsRoot}/${jobId}/codex-home/auth.json`;
@@ -248,6 +254,10 @@ test('probe script executes every declared read, write and environment check its
       writes.push(filePath);
       if (filePath.endsWith('/workspace/isolation-probe-write.tmp')) return;
       if (filePath.endsWith('/workspace/.tmp/isolation-probe-write.tmp')) return;
+      if (filePath === `${officeRuntime}/isolation-probe-write.tmp`) return;
+      if (filePath === `${siblingOfficeRuntime}/isolation-probe-write.tmp`) {
+        throw Object.assign(new Error('denied'), { code: 'EACCES' });
+      }
       throw Object.assign(new Error('denied'), { code: 'EACCES' });
     },
     async unlink() {},
@@ -260,6 +270,8 @@ test('probe script executes every declared read, write and environment check its
       sibling_job_id: siblingJobId,
       jobs_root: jobsRoot,
       protected_jobs_root: '/data/jobs',
+      office_runtime: officeRuntime,
+      sibling_office_runtime: siblingOfficeRuntime,
       current_marker_sha256: currentMarkerSha256,
       probe_script_sha256: 'E'.repeat(64),
     },
@@ -274,6 +286,7 @@ test('probe script executes every declared read, write and environment check its
     `${jobsRoot}/${jobId}/input/current-readable.txt`,
     `${jobsRoot}/${jobId}/workspace/isolation-probe-write.tmp`,
     `${jobsRoot}/${jobId}/workspace/.tmp/isolation-probe-write.tmp`,
+    `${officeRuntime}/isolation-probe-write.tmp`,
     `${jobsRoot}/${siblingJobId}/input/sibling-readable.txt`,
     '/data/jobs',
     '/data/jobs/.runner-isolation',
@@ -288,6 +301,8 @@ test('probe script executes every declared read, write and environment check its
   assert.deepEqual(writes, [
     `${jobsRoot}/${jobId}/workspace/isolation-probe-write.tmp`,
     `${jobsRoot}/${jobId}/workspace/.tmp/isolation-probe-write.tmp`,
+    `${officeRuntime}/isolation-probe-write.tmp`,
+    `${siblingOfficeRuntime}/isolation-probe-write.tmp`,
     `${jobsRoot}/${jobId}/input/isolation-probe-write.tmp`,
     '/tmp/tender-codex-runner-isolation-probe.tmp',
   ]);
@@ -300,6 +315,8 @@ test('probe script executes every declared read, write and environment check its
       sibling_job_id: siblingJobId,
       jobs_root: jobsRoot,
       protected_jobs_root: '/data/jobs',
+      office_runtime: officeRuntime,
+      sibling_office_runtime: siblingOfficeRuntime,
       current_marker_sha256: currentMarkerSha256,
       probe_script_sha256: 'E'.repeat(64),
     },
@@ -541,6 +558,8 @@ test('attestation runner stages a fresh probe and persists only after fake Codex
       codexAuthFile,
       verifyProtectedTargets: async () => {},
       probeCodexVersion: async () => 'codex-cli 0.153.4',
+      prepareOfficeRuntimeImpl: async () => {},
+      removeOfficeRuntimeImpl: async () => {},
       executeCommand: async (command) => {
         observedCommand = command;
         stagedAuthDuringExecution = await readFile(path.join(

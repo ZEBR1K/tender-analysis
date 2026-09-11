@@ -9,6 +9,7 @@ import {
   buildCodexPermissionBoundary,
   buildIsolationNegativeCanary,
 } from '../deploy/codex-runner/src/permissions.mjs';
+import { officeRuntimeDirectory } from '../deploy/codex-runner/src/office-runtime.mjs';
 import {
   buildHealthReport,
   createServer,
@@ -245,6 +246,7 @@ test('health cannot promote execution from a configuration boolean alone', () =>
 test('permission builder grants only current job roots and supplies CLI overrides after user-config isolation', () => {
   const jobId = '11111111-1111-4111-8111-111111111111';
   const boundary = buildCodexPermissionBoundary({ jobId });
+  const officeRuntime = officeRuntimeDirectory(jobId);
 
   assert.equal(boundary.workspaceDirectory, `/data/jobs/${jobId}/workspace`);
   assert.deepEqual(boundary.readOnlyDirectories, [
@@ -275,6 +277,7 @@ test('permission builder grants only current job roots and supplies CLI override
     [':slash_tmp', 'deny'],
     [`/data/jobs/${jobId}/workspace`, 'write'],
     [`/data/jobs/${jobId}/input`, 'read'],
+    [officeRuntime, 'write'],
     ['/run/codex-auth', 'deny'],
     ['/run/secrets', 'deny'],
     ['/proc', 'deny'],
@@ -291,6 +294,7 @@ test('permission builder grants only current job roots and supplies CLI override
   assert.equal(filesystemOverride.includes('/proc/*'), false);
   assert.ok(overrides.includes(`shell_environment_policy.set.HOME="/data/jobs/${jobId}/workspace"`));
   assert.ok(overrides.includes(`shell_environment_policy.set.TMPDIR="/data/jobs/${jobId}/workspace/.tmp"`));
+  assert.ok(overrides.includes(`shell_environment_policy.set.TENDER_OFFICE_RUNTIME_DIR="${officeRuntime}"`));
   assert.equal(overrides.some((entry) => /KEY|SECRET|TOKEN|CODEX_HOME/u.test(entry)), false);
 });
 
@@ -332,6 +336,8 @@ test('isolation canary declares the complete positive and negative runtime probe
     { id: 'current_input', expected: 'readable' },
     { id: 'workspace', expected: 'writable' },
     { id: 'workspace_tmp', expected: 'writable' },
+    { id: 'office_runtime', expected: 'writable' },
+    { id: 'sibling_office_runtime', expected: 'denied' },
     { id: 'current_input_write', expected: 'denied' },
     { id: 'sibling_job', expected: 'denied' },
     { id: 'jobs_parent', expected: 'current_path_only' },

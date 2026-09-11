@@ -7,11 +7,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/iu;
+const OFFICE_RUNTIME_PATTERN = /^\/dev\/shm\/tc-[0-9a-f]{24}$/u;
 const DENIED_CODES = new Set(['EACCES', 'ENOENT', 'EPERM', 'EROFS']);
 const PROBE_IDS = Object.freeze([
   'current_input',
   'workspace',
   'workspace_tmp',
+  'office_runtime',
+  'sibling_office_runtime',
   'current_input_write',
   'sibling_job',
   'jobs_parent',
@@ -31,9 +34,11 @@ function assertPlan(plan, cwd) {
     'job_id',
     'sibling_job_id',
     'jobs_root',
+    'office_runtime',
     'protected_jobs_root',
     'current_marker_sha256',
     'probe_script_sha256',
+    'sibling_office_runtime',
   ].sort();
   if (
     plan === null
@@ -47,6 +52,9 @@ function assertPlan(plan, cwd) {
     || plan.job_id === plan.sibling_job_id
     || !SHA256_PATTERN.test(plan.current_marker_sha256)
     || !SHA256_PATTERN.test(plan.probe_script_sha256)
+    || !OFFICE_RUNTIME_PATTERN.test(plan.office_runtime)
+    || !OFFICE_RUNTIME_PATTERN.test(plan.sibling_office_runtime)
+    || plan.office_runtime === plan.sibling_office_runtime
   ) throw new Error('Isolation probe plan is invalid');
   for (const root of [plan.jobs_root, plan.protected_jobs_root]) {
     if (typeof root !== 'string' || !root.startsWith('/') || path.posix.normalize(root) !== root) {
@@ -131,6 +139,21 @@ export async function runIsolationProbe({
   } catch {}
   await io.unlink(workspaceTempMarker).catch(() => {});
   record('workspace_tmp', workspaceTempWritable);
+
+  const officeRuntimeMarker = path.posix.join(plan.office_runtime, 'isolation-probe-write.tmp');
+  let officeRuntimeWritable = false;
+  try {
+    await io.writeFile(officeRuntimeMarker, 'office runtime\n', { flag: 'wx', mode: 0o600 });
+    officeRuntimeWritable = String(await io.readFile(officeRuntimeMarker)) === 'office runtime\n';
+  } catch {}
+  await io.unlink(officeRuntimeMarker).catch(() => {});
+  record('office_runtime', officeRuntimeWritable);
+
+  record('sibling_office_runtime', await denied(() => io.writeFile(
+    path.posix.join(plan.sibling_office_runtime, 'isolation-probe-write.tmp'),
+    'forbidden\n',
+    { flag: 'wx', mode: 0o600 },
+  )));
 
   record('current_input_write', await denied(() => io.writeFile(
     path.posix.join(inputDirectory, 'isolation-probe-write.tmp'),

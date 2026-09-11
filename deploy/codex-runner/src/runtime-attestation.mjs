@@ -31,6 +31,8 @@ export const ISOLATION_PROBE_IDS = Object.freeze([
   'current_input',
   'workspace',
   'workspace_tmp',
+  'office_runtime',
+  'sibling_office_runtime',
   'current_input_write',
   'sibling_job',
   'jobs_parent',

@@ -16,6 +16,7 @@ import { createInterface } from 'node:readline';
 
 import { createCodexEventAccumulator, parseCodexEventLine } from './codex-events.mjs';
 import { AGENT_TEMPLATE_FILES, agentTemplatePath } from './agent-template.mjs';
+import { prepareOfficeRuntime, removeOfficeRuntime } from './office-runtime.mjs';
 import { buildCodexPermissionBoundary } from './permissions.mjs';
 
 const DEFAULT_TIMEOUT_MS = 90 * 60 * 1000;
@@ -541,8 +542,12 @@ export async function runCodexAttempt({
   const prompt = await readFile(command.promptPath, 'utf8');
   const jobDirectory = path.posix.join(jobsRoot, jobId);
   const auditDirectory = path.posix.join(jobDirectory, 'audit');
-  const codexHome = await stageCodexHome({ jobDirectory, codexAuthFile });
+  let codexHome;
+  let officeRuntimePrepared = false;
   try {
+    codexHome = await stageCodexHome({ jobDirectory, codexAuthFile });
+    await prepareOfficeRuntime({ jobId });
+    officeRuntimePrepared = true;
     return await executeCodexCommand({
       auditDirectory,
       attempt,
@@ -554,6 +559,9 @@ export async function runCodexAttempt({
       prompt,
     });
   } finally {
-    await removeStagedCodexHome({ jobDirectory });
+    await Promise.all([
+      codexHome ? removeStagedCodexHome({ jobDirectory }) : undefined,
+      officeRuntimePrepared ? removeOfficeRuntime({ jobId }) : undefined,
+    ]);
   }
 }

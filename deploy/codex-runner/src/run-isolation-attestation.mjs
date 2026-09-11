@@ -19,6 +19,11 @@ import {
 } from './codex-command.mjs';
 import { config } from './config.mjs';
 import {
+  officeRuntimeDirectory,
+  prepareOfficeRuntime,
+  removeOfficeRuntime,
+} from './office-runtime.mjs';
+import {
   buildIsolationAttestationRecord,
   buildIsolationCanaryCommand,
   buildRunnerExecutionProfile,
@@ -171,9 +176,11 @@ async function stageProbe({ paths, runnerRoot, challenge, jobId, siblingJobId })
     job_id: jobId,
     sibling_job_id: siblingJobId,
     jobs_root: paths.containerCanaryJobsRoot,
+    office_runtime: officeRuntimeDirectory(jobId),
     protected_jobs_root: paths.protectedJobsRoot,
     current_marker_sha256: digest(currentMarker),
     probe_script_sha256: challenge.probe_script_sha256,
+    sibling_office_runtime: officeRuntimeDirectory(siblingJobId),
   };
   await Promise.all([
     writeFile(path.join(paths.currentInput, 'isolation-probe.mjs'), probeSource, {
@@ -209,6 +216,8 @@ export async function runIsolationAttestation({
   verifyProtectedTargets = defaultVerifyProtectedTargets,
   probeCodexVersion = defaultProbeCodexVersion,
   executeCommand = executeCodexCommand,
+  prepareOfficeRuntimeImpl = prepareOfficeRuntime,
+  removeOfficeRuntimeImpl = removeOfficeRuntime,
   baseEnv = process.env,
   secretValues = [],
   codexAuthFile = '/run/codex-auth/auth.json',
@@ -258,9 +267,17 @@ export async function runIsolationAttestation({
     jobsRoot: paths.containerCanaryJobsRoot,
   });
   const startedAt = now();
-  await stageCodexHome({ jobDirectory: paths.currentJob, codexAuthFile });
+  let codexHomeStaged = false;
+  let currentOfficeRuntimePrepared = false;
+  let siblingOfficeRuntimePrepared = false;
   let execution;
   try {
+    await prepareOfficeRuntimeImpl({ jobId });
+    currentOfficeRuntimePrepared = true;
+    await prepareOfficeRuntimeImpl({ jobId: siblingJobId });
+    siblingOfficeRuntimePrepared = true;
+    await stageCodexHome({ jobDirectory: paths.currentJob, codexAuthFile });
+    codexHomeStaged = true;
     execution = await executeCommand({
       ...command,
       prompt: PROBE_PROMPT,
@@ -275,7 +292,11 @@ export async function runIsolationAttestation({
       secretValues,
     });
   } finally {
-    await removeStagedCodexHome({ jobDirectory: paths.currentJob });
+    await Promise.all([
+      codexHomeStaged ? removeStagedCodexHome({ jobDirectory: paths.currentJob }) : undefined,
+      currentOfficeRuntimePrepared ? removeOfficeRuntimeImpl({ jobId }) : undefined,
+      siblingOfficeRuntimePrepared ? removeOfficeRuntimeImpl({ jobId: siblingJobId }) : undefined,
+    ]);
   }
   const completedAt = now();
   const expectedEventPath = path.join(paths.currentAudit, 'codex-events.attempt-1.jsonl');
