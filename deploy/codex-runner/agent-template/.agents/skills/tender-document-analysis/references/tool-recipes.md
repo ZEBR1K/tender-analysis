@@ -8,6 +8,23 @@ manifest sources and must never be cited as evidence instead of the immutable
 original. A failed search, empty text layer, OCR miss, or unavailable tool does
 not prove that information is absent.
 
+## Give a sealed source its declared extension
+
+Runner documents are physically stored as
+`NNNN-<artifact_key>.source`. Use the manifest `file_name` and `mime_type` to
+choose the declared extension. If a helper requires that extension, make a
+byte-for-byte alias inside the workspace and compare both hashes with the
+manifest before using it:
+
+```bash
+mkdir -p .tmp/source-aliases
+cp -- ../input/documents/0002-form.source .tmp/source-aliases/0002-form.docx
+sha256sum -- ../input/documents/0002-form.source .tmp/source-aliases/0002-form.docx
+```
+
+Do not guess an extension from content, change the bytes, or cite the alias as a
+source. Evidence still names the original manifest `artifact_key`.
+
 ## Search a PDF text layer
 
 ```bash

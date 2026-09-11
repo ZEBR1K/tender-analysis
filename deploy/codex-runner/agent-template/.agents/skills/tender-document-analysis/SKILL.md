@@ -14,6 +14,7 @@ description: Use when analyzing one sealed procurement package into the 27-field
 2. Work one document at a time and choose the lightest reliable method. Do not
    pre-index every document, page, sheet, or OOXML part. Do not perform a
    conversion merely to satisfy a coverage counter.
+   If a sealed physical name ends in `.source`, use the recipe to create a byte-for-byte workspace alias with the extension declared by its manifest metadata.
 
    - Search an existing PDF text layer with `scripts/search-pdf-text.mjs`, then
      inspect relevant pages with `scripts/render-pdf-pages.mjs` when visual

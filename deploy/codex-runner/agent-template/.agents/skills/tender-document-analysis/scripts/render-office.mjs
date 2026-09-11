@@ -1,3 +1,6 @@
+import { mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+
 import {
   cleanupToolOutputAfterError,
   createToolOutputDirectory,
@@ -9,6 +12,15 @@ import {
   validateGeneratedFiles,
 } from './document-toolkit-lib.mjs';
 
+export const OFFICE_NAMESPACE_SCRIPT = `
+mount --bind "$1" /tmp
+shift
+umask 077
+mkdir -p /tmp/profile /tmp/home /tmp/cache
+export HOME=/tmp/home TMPDIR=/tmp XDG_CACHE_HOME=/tmp/cache
+exec "$@"
+`.trim();
+
 const USAGE = `Usage:
   node render-office.mjs <source.docx|source.xlsx|source.xls>
 
@@ -18,6 +30,7 @@ original remains immutable and authoritative.
 
 export function buildLibreOfficeArgs(source, outputDirectory) {
   return [
+    '-env:UserInstallation=file:///tmp/profile',
     '--headless',
     '--convert-to',
     'pdf',
@@ -25,6 +38,24 @@ export function buildLibreOfficeArgs(source, outputDirectory) {
     outputDirectory,
     source,
   ];
+}
+
+export function buildSandboxedLibreOfficeCommand(source, outputDirectory, runtimeDirectory) {
+  return {
+    command: 'unshare',
+    args: [
+      '--user',
+      '--map-root-user',
+      '--mount',
+      'sh',
+      '-ceu',
+      OFFICE_NAMESPACE_SCRIPT,
+      'render-office',
+      runtimeDirectory,
+      'libreoffice',
+      ...buildLibreOfficeArgs(source, outputDirectory),
+    ],
+  };
 }
 
 export async function main(args) {
@@ -35,12 +66,16 @@ export async function main(args) {
   if (args.length !== 1) throw new Error('Expected exactly one Office source file');
   const source = await resolveRegularInput(args[0], { extensions: ['.docx', '.xlsx', '.xls'] });
   const outputDirectory = await createToolOutputDirectory('office-render');
+  const runtimeDirectory = path.join(outputDirectory, 'runtime');
   try {
+    await mkdir(runtimeDirectory, { mode: 0o700 });
+    const command = buildSandboxedLibreOfficeCommand(source, outputDirectory, runtimeDirectory);
     await runBoundedCommand(
-      'libreoffice',
-      buildLibreOfficeArgs(source, outputDirectory),
+      command.command,
+      command.args,
       { maxBytes: 2 * 1024 * 1024 },
     );
+    await rm(runtimeDirectory, { recursive: true, force: true });
     const [pdf] = await validateGeneratedFiles(outputDirectory, {
       extensions: ['.pdf'],
       expectedCount: 1,

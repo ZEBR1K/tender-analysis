@@ -69,6 +69,9 @@ test('focused skill ships the documented local helper set', async () => {
   assert.match(skill, /references\/tool-recipes\.md/u);
   assert.match(skill, /Do not\s+pre-index every document, page, sheet, or OOXML part/iu);
   assert.match(skill, /OCR[^\n]+navigation aid/iu);
+  assert.match(skill, /\.source[^\n]+byte-for-byte workspace alias/iu);
+  assert.match(recipes, /sha256sum/iu);
+  assert.match(recipes, /manifest `file_name` and `mime_type`/iu);
   for (const name of scriptNames) {
     assert.match(skill, new RegExp(name.replaceAll('.', '\\.')));
     assert.match(recipes, new RegExp(name.replaceAll('.', '\\.')));
@@ -162,7 +165,11 @@ test('PDF renderer accepts only an explicit bounded page range and sane DPI', as
 
 test('OCR and Office helpers build shell-free single-source commands', async () => {
   const { buildTesseractArgs, parseOcrRequest } = await importScript('ocr-image.mjs');
-  const { buildLibreOfficeArgs } = await importScript('render-office.mjs');
+  const {
+    OFFICE_NAMESPACE_SCRIPT,
+    buildLibreOfficeArgs,
+    buildSandboxedLibreOfficeCommand,
+  } = await importScript('render-office.mjs');
   assert.deepEqual(parseOcrRequest(['page.png']), {
     source: 'page.png',
     language: 'rus+eng',
@@ -174,6 +181,7 @@ test('OCR and Office helpers build shell-free single-source commands', async () 
     'rus+eng',
   ]);
   assert.deepEqual(buildLibreOfficeArgs('/input/form.docx', '/work/rendered'), [
+    '-env:UserInstallation=file:///tmp/profile',
     '--headless',
     '--convert-to',
     'pdf',
@@ -181,6 +189,33 @@ test('OCR and Office helpers build shell-free single-source commands', async () 
     '/work/rendered',
     '/input/form.docx',
   ]);
+  assert.deepEqual(
+    buildSandboxedLibreOfficeCommand('/input/form.docx', '/work/rendered', '/work/runtime'),
+    {
+      command: 'unshare',
+      args: [
+        '--user',
+        '--map-root-user',
+        '--mount',
+        'sh',
+        '-ceu',
+        OFFICE_NAMESPACE_SCRIPT,
+        'render-office',
+        '/work/runtime',
+        'libreoffice',
+        '-env:UserInstallation=file:///tmp/profile',
+        '--headless',
+        '--convert-to',
+        'pdf',
+        '--outdir',
+        '/work/rendered',
+        '/input/form.docx',
+      ],
+    },
+  );
+  assert.match(OFFICE_NAMESPACE_SCRIPT, /mount --bind "\$1" \/tmp/u);
+  assert.match(OFFICE_NAMESPACE_SCRIPT, /exec "\$@"/u);
+  assert.doesNotMatch(OFFICE_NAMESPACE_SCRIPT, /eval/u);
 });
 
 test('OOXML helper permits one normalized part and rejects traversal', async () => {
