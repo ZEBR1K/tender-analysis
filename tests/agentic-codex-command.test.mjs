@@ -85,9 +85,16 @@ function assertTenderMetadataPromptInjectionBoundary(source, label) {
   );
 }
 
-test('agent template contains only its boundary instructions and one focused skill', async () => {
+test('agent template contains boundary instructions and one allowlisted focused skill toolkit', async () => {
   assert.deepEqual(await listRelativeFiles(templateRoot), [
     '.agents/skills/tender-document-analysis/SKILL.md',
+    '.agents/skills/tender-document-analysis/references/tool-recipes.md',
+    '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
+    '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',
+    '.agents/skills/tender-document-analysis/scripts/ooxml-part.mjs',
+    '.agents/skills/tender-document-analysis/scripts/render-office.mjs',
+    '.agents/skills/tender-document-analysis/scripts/render-pdf-pages.mjs',
+    '.agents/skills/tender-document-analysis/scripts/search-pdf-text.mjs',
     'AGENTS.md',
   ]);
 

@@ -51,3 +51,55 @@ runtime dependency of the runner. The current real corpus still contains one pro
 GREEN result validates prompt behavior, not cross-procurement semantic
 accuracy; the nonblocking gate in `evaluations/agentic-blind-tests-v1` remains
 `awaiting_additional_procurements`.
+
+## Local document-toolkit RED/GREEN — 2026-09-11
+
+This check covers local skill behavior and helper contracts only. It is not a
+paid Codex blind run, container smoke, or production deployment result.
+
+The RED reviewer used the previous skill against a pressure scenario with a
+100-page mixed PDF, a scan-only candidate on page 43, and an ambiguous DOCX
+checkbox. The agent had to invent text extraction, page rendering, OCR loops,
+and OOXML access. The likely path could render and OCR all 100 pages, offered no
+reproducible fallback after a text miss, and did not clearly separate OCR
+navigation from visual confirmation.
+
+The GREEN reviewer read the updated `AGENTS.md`, skill, recipes, and helpers and
+confirmed:
+
+- no mandatory full-document index or conversion;
+- PDF rendering is one explicit range of at most 20 pages;
+- OCR runs on one selected image and is navigation only;
+- text/OCR misses do not prove absence;
+- relevant OCR candidates are confirmed visually;
+- OOXML access lists entries or extracts one exact part without interpreting a
+  field or control state;
+- a material render/OOXML mismatch remains `requires_review`;
+- derived artifacts are never promoted to manifest evidence.
+
+The focused local suites finished with `28 pass / 0 fail / 1 Windows-only
+skip`. The complete `tests/agentic-*.test.mjs` suite finished with `207 pass /
+0 fail / 6 environment-specific skips`. The installed skill validator printed
+`Skill is valid!` via an ephemeral `uv run --with pyyaml` environment.
+
+A separate code-safety review reproduced path escape through a workspace
+junction, unbounded generated artifacts, incomplete PDF-range acceptance, and
+missing subprocess timeouts in the first GREEN implementation. The helpers now
+resolve canonical job roots, reject symlink/junction escape, limit individual
+and total derived output, fail on a partial page range, and terminate timed-out
+process trees. These checks protect job boundaries and file integrity; they do
+not score document meaning or evidence quality.
+
+A local real-binary smoke rendered page 1 of the archived `РАСЧЕТ_НМЦ.pdf` at
+96 DPI through `pdftoppm`, returned an exact page-to-PNG mapping, and removed
+the derived smoke directory through the guarded cleanup helper. The remaining
+external binaries were not available on this Windows host and are still part
+of the later container smoke.
+
+Runtime caveat: `ooxml-part.mjs` deliberately depends on the system `unzip`
+binary, which the current runner image does not yet install. The local
+instruction and unit contract are GREEN, but executable OOXML support remains
+unverified until the separate image/staging phase adds the dependency and runs
+a real container smoke. Current `stageAgentTemplate` also still copies only
+`AGENTS.md` and `SKILL.md`, so none of the new helper resources reach a live job
+in this local-only phase.
