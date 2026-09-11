@@ -153,6 +153,11 @@ test('agentic promotion maps the reserved metadata artifact without weakening do
     /(?:jsonb_object_length\s*\([^)]*tender_meta|tender_meta\s*(?:=|<>|IS\s+DISTINCT\s+FROM)\s*'\{\}'::jsonb|tender_meta\s*#>?>\s*'\{source_payload\}')/iu,
     'promotion must distinguish nonempty run metadata from absent metadata',
   );
+  assert.match(
+    sql,
+    /v_has_tender_metadata\s*:=\s*COALESCE\s*\(/iu,
+    'SQL NULL tender_meta must become a two-valued false authorization flag',
+  );
   assert.match(sql, /tenderplan-metadata/u);
   assert.match(sql, /evidence_item->>'artifact_key'[\s\S]{0,240}tenderplan-metadata|tenderplan-metadata[\s\S]{0,240}evidence_item->>'artifact_key'/u);
   assert.match(sql, /'source_type'\s*,\s*'tender_metadata'/u);
