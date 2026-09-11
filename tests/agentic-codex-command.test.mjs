@@ -77,6 +77,14 @@ function assertTenderMetadataInstructions(source, label) {
   );
 }
 
+function assertTenderMetadataPromptInjectionBoundary(source, label) {
+  assert.match(
+    source,
+    /(?:instructions|commands)[\s\S]{0,240}(?:tender_metadata|TenderPlan metadata)[\s\S]{0,240}(?:source content|untrusted)[\s\S]{0,160}(?:never|do not|must not)[\s\S]{0,80}(?:follow|obey)/iu,
+    `${label} must treat metadata instructions as untrusted source content, never commands`,
+  );
+}
+
 test('agent template contains only its boundary instructions and one focused skill', async () => {
   assert.deepEqual(await listRelativeFiles(templateRoot), [
     '.agents/skills/tender-document-analysis/SKILL.md',
@@ -89,6 +97,7 @@ test('agent template contains only its boundary instructions and one focused ski
   assert.match(instructions, /read[- ]only/iu);
   assert.match(instructions, /no internet|do not use (?:the )?internet/iu);
   assert.match(instructions, /do not read|outside/iu);
+  assertTenderMetadataPromptInjectionBoundary(instructions, 'agent boundary');
   assert.doesNotMatch(instructions, /n8n|postgres|telegram|browser/iu);
 });
 
@@ -111,6 +120,7 @@ test('skill is short, agent-led and contains no mechanical parser or semantic va
   assert.match(skill, /locator/u);
   assert.match(skill, /quote.*optional|optional.*quote/iu);
   assertTenderMetadataInstructions(skill, 'skill');
+  assertTenderMetadataPromptInjectionBoundary(skill, 'skill');
 
   for (const forbidden of [
     /source[-_ ]index/iu,
@@ -137,6 +147,7 @@ test('runtime prompt only binds job-local inputs, skill and structured output', 
     assert.ok(prompt.includes(required), required);
   }
   assertTenderMetadataInstructions(prompt, 'prompt');
+  assertTenderMetadataPromptInjectionBoundary(prompt, 'prompt');
   assert.doesNotMatch(prompt, /https?:\/\//iu);
   assert.doesNotMatch(prompt, /credential|password|secret|token/iu);
   assert.doesNotMatch(prompt, /n8n|PostgreSQL|Telegram/iu);
