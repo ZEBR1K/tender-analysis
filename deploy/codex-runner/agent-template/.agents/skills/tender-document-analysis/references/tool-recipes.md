@@ -67,8 +67,9 @@ node .agents/skills/tender-document-analysis/scripts/render-office.mjs \
   ../input/documents/0002-form.docx
 ```
 
-`render-office.mjs` uses headless LibreOffice and returns one derived PDF. Search
-or render that PDF with the PDF helpers. The conversion may differ from the
+`render-office.mjs` sends a bounded request to the job-local runner broker, which
+uses headless LibreOffice and returns one derived PDF below `.tmp`. Search or
+render that PDF with the PDF helpers. The conversion may differ from the
 authoring application when fonts or interactive controls are involved; record
 that limitation and inspect OOXML only when it can clarify a relevant control.
 

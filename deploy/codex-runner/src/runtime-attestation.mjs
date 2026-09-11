@@ -25,6 +25,7 @@ const EXECUTION_PROFILE_FILES = Object.freeze([
   ['prompt_sha256', 'prompts/tender-analysis-v1.txt'],
   ['skill_sha256', 'agent-template/.agents/skills/tender-document-analysis/SKILL.md'],
   ['result_schema_sha256', 'schemas/tender-agent-result-v1.schema.json'],
+  ['office_render_broker_sha256', 'src/office-render-broker.mjs'],
 ]);
 const PROBE_COMMAND = 'node ../input/isolation-probe.mjs';
 export const ISOLATION_PROBE_IDS = Object.freeze([

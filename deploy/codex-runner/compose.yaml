@@ -26,6 +26,9 @@ services:
       - /opt/tender-codex-runner/jobs:/data/jobs
       - /opt/tender-codex-runner/secrets/runner-auth-token:/run/secrets/runner-auth-token:ro
       - /opt/tender-codex-runner/secrets/codex-auth:/run/codex-auth:ro
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,uid=10001,gid=10001,mode=0700
+      - /var/tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=0700
     networks:
       - n8n_default
     pids_limit: 192

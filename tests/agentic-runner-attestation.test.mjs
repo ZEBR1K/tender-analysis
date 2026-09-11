@@ -59,6 +59,7 @@ test('runner execution profile hashes the exact pinned image artifacts', async (
     ),
     agent_template_sha256: await sha256AgentTemplate(),
     result_schema_sha256: await sha256('schemas/tender-agent-result-v1.schema.json'),
+    office_render_broker_sha256: await sha256('src/office-render-broker.mjs'),
   });
 });
 

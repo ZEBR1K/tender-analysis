@@ -47,7 +47,7 @@ Codex chooses how to inspect each source.
 
 ## Per-job Codex permissions
 
-The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes to the exact current `workspace` (including its job-local `.tmp`) and one short-lived per-job `/dev/shm/tc-*` LibreOffice runtime directory, reads only that job's immutable original `input`, and explicitly denies both Codex auth locations, runner secrets, global `/tmp` and the complete `/proc` tree. The runner creates the Office runtime before an attempt and removes it afterward. The inner sandbox exposes only the synthetic ancestor path to the current job; the canary verifies that neither a sibling job nor its Office runtime is accessible. No generated source-index tree is mounted or granted.
+The runner builds a fresh permission profile for each job and supplies it through CLI `-c` overrides after `--ignore-user-config`. It never passes the legacy `--sandbox` flag because current Codex permission profiles and the legacy sandbox do not compose. The profile denies the filesystem root by default, restores only `:minimal` read access, writes to the exact current `workspace` (including its job-local `.tmp`) and one short-lived per-job `/dev/shm/tc-*` Office request directory, reads only that job's immutable original `input`, and explicitly denies both Codex auth locations, runner secrets, global `/tmp` and the complete `/proc` tree. The runner creates the Office request directory before an attempt and removes it afterward. The inner sandbox exposes only the synthetic ancestor path to the current job; the canary verifies that neither a sibling job nor its Office request directory is accessible. No generated source-index tree is mounted or granted.
 
 Spawned shell commands inherit no process environment. The runner supplies only fixed `PATH`, job-local `HOME`/`TMPDIR`, `LANG` and `LC_ALL`; credential-like variables are not forwarded. The actual Codex service process may read the dedicated auth mount, while its sandboxed shell may not.
 
@@ -73,6 +73,18 @@ inspection. The allowlist is closed: an added, missing, symlinked, or changed
 template file fails staging or changes the execution-profile attestation. The
 helpers are optional navigation aids; Codex remains responsible for choosing
 the inspection method and for the semantic conclusions.
+
+LibreOffice itself cannot run inside the Codex filesystem/network sandbox: it
+requires process metadata, a writable global temporary directory, and local IPC.
+The `render-office.mjs` helper therefore submits a bounded file request through
+the current job's short-lived `/dev/shm/tc-*` directory. A runner-side broker
+accepts only a regular DOCX/XLSX/XLS source from that same job and an output
+directory below its `.tmp/document-tools`; sibling-job and arbitrary output
+paths are rejected before LibreOffice starts. LibreOffice runs outside the
+agent sandbox, inside its own no-network user/PID namespace, with private
+in-memory `/tmp` and `/var/tmp` mounts. Those mounts,
+the complete `/proc` tree, credentials, and the network remain unavailable to
+the agent.
 
 ## Execution lifecycle
 

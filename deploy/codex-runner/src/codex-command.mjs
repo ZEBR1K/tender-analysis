@@ -17,6 +17,7 @@ import { createInterface } from 'node:readline';
 import { createCodexEventAccumulator, parseCodexEventLine } from './codex-events.mjs';
 import { AGENT_TEMPLATE_FILES, agentTemplatePath } from './agent-template.mjs';
 import { prepareOfficeRuntime, removeOfficeRuntime } from './office-runtime.mjs';
+import { startOfficeRenderBroker } from './office-render-broker.mjs';
 import { buildCodexPermissionBoundary } from './permissions.mjs';
 
 const DEFAULT_TIMEOUT_MS = 90 * 60 * 1000;
@@ -544,10 +545,12 @@ export async function runCodexAttempt({
   const auditDirectory = path.posix.join(jobDirectory, 'audit');
   let codexHome;
   let officeRuntimePrepared = false;
+  let officeBroker;
   try {
     codexHome = await stageCodexHome({ jobDirectory, codexAuthFile });
     await prepareOfficeRuntime({ jobId });
     officeRuntimePrepared = true;
+    officeBroker = await startOfficeRenderBroker({ jobId, jobsRoot });
     return await executeCodexCommand({
       auditDirectory,
       attempt,
@@ -559,6 +562,7 @@ export async function runCodexAttempt({
       prompt,
     });
   } finally {
+    await officeBroker?.close();
     await Promise.all([
       codexHome ? removeStagedCodexHome({ jobDirectory }) : undefined,
       officeRuntimePrepared ? removeOfficeRuntime({ jobId }) : undefined,

@@ -45,6 +45,7 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);
   assert.match(dockerfile, /unzip=6\.0-28\+deb12u1/u);
+  assert.match(dockerfile, /util-linux=2\.38\.1-5\+deb12u3/u);
   assert.match(dockerfile, /ca-certificates=20250419~deb12u1/u);
   assert.doesNotMatch(dockerfile, /apt-get install[^;]*bubblewrap/su);
   assert.doesNotMatch(dockerfile, /chmod[^\n]*bwrap/u);
@@ -82,7 +83,9 @@ test('runner Compose enables unprivileged Codex namespaces without Linux capabil
   assert.match(compose, /\/opt\/tender-codex-runner\/secrets\/runner-auth-token:\/run\/secrets\/runner-auth-token:ro/u);
   assert.match(compose, /\/opt\/tender-codex-runner\/secrets\/codex-auth:\/run\/codex-auth:ro/u);
   assert.doesNotMatch(compose, /TENDER_CODEX_RUNNER_AUTH_TOKEN:\s/u);
-  assert.doesNotMatch(compose, /^\s*tmpfs:/mu);
+  assert.match(compose, /^\s*tmpfs:\s*$/mu);
+  assert.match(compose, /^\s*- \/tmp:rw,nosuid,nodev,noexec,size=128m,uid=10001,gid=10001,mode=0700$/mu);
+  assert.match(compose, /^\s*- \/var\/tmp:rw,nosuid,nodev,noexec,size=64m,uid=10001,gid=10001,mode=0700$/mu);
   const hostMounts = compose.split(/\r?\n/u)
     .map((line) => line.trim())
     .filter((line) => line.startsWith('- /opt/tender-codex-runner/'));

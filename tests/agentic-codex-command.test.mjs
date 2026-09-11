@@ -56,7 +56,7 @@ const fakeCodexPath = path.join(
   'fake-codex.mjs',
 );
 
-test('Office runtime is a per-job short-lived directory with a bounded socket path', async () => {
+test('Office request exchange is a per-job short-lived directory with a bounded path', async () => {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'office-runtime-'));
   const jobId = '11111111-1111-4111-8111-111111111111';
   try {
