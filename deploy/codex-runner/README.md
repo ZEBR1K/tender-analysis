@@ -37,7 +37,10 @@ The manifest contains job/run/catalog identity, source-file identity
 and optionally one independent TenderPlan metadata source. That source has a
 closed shape, fixed artifact/type identity, a nonblank display name and a plain
 JSON object payload capped at 2 MiB of canonical UTF-8 JSON. Its bytes are
-covered by the same canonical manifest SHA-256. `expected_documents` and
+covered by the same canonical manifest SHA-256. The complete JSON request has a
+separate 16 MiB transport limit, leaving room for the enclosing manifest and
+the maximum declared JSON-escaped document identity set.
+`expected_documents` and
 `documents[]` still count only immutable original files. The runner does not
 extract or index pages, sheets, OOXML parts, text, OCR, or metadata meaning;
 Codex chooses how to inspect each source.

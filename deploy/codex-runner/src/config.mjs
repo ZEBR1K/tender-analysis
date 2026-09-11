@@ -2,7 +2,7 @@ import path from 'node:path';
 import { readFileSync } from 'node:fs';
 
 export const BODY_LIMITS = Object.freeze({
-  maxJsonBytes: 2 * 1024 * 1024,
+  maxJsonBytes: 16 * 1024 * 1024,
   maxDocumentBytes: 50 * 1024 * 1024,
 });
 

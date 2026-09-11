@@ -58,7 +58,9 @@ function openChunkedRequest(url, headers) {
 
 test('configuration fixes one Codex process and exact JSON/document request limits', () => {
   assert.deepEqual(BODY_LIMITS, {
-    maxJsonBytes: 2 * 1024 * 1024,
+    // The complete manifest must have transport headroom around the separately
+    // bounded 2 MiB TenderPlan metadata payload.
+    maxJsonBytes: 16 * 1024 * 1024,
     maxDocumentBytes: 50 * 1024 * 1024,
   });
 
