@@ -22,6 +22,11 @@ description: Use when analyzing one sealed procurement package into the 27-field
    - For a selected scan page, `scripts/ocr-image.mjs` is only a navigation aid.
      Confirm relevant text, signs, amounts, and marks visually. A text or OCR
      miss never proves absence.
+   - Creating or rendering a PNG is not visual inspection. Open every PNG used
+     for a conclusion with `view_image`. For a scan PDF inspected as a complete
+     document, open every rendered page with `view_image`; rendering alone does
+     not count as inspection. If `view_image` is unavailable or a page cannot
+     be opened, record that limitation and do not claim visual inspection.
    - Render one DOCX/XLSX/XLS with `scripts/render-office.mjs` when layout,
      sheets, tables, or controls matter.
    - Use `scripts/ooxml-part.mjs` only to list package entries or expose one

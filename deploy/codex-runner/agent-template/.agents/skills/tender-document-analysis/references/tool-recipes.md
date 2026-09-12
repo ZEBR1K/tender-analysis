@@ -47,7 +47,8 @@ node .agents/skills/tender-document-analysis/scripts/render-pdf-pages.mjs \
 `render-pdf-pages.mjs` uses Poppler `pdftoppm`. One invocation accepts an
 explicit range of at most 20 pages and DPI from 96 to 400. Request another
 bounded range only when the investigation needs it; do not render a long
-document wholesale by default.
+document wholesale by default. Open every rendered PNG relied upon for a
+conclusion with `view_image`; creating the file is not visual inspection.
 
 ## OCR one selected image
 

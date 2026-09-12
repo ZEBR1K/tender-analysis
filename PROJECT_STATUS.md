@@ -1,8 +1,27 @@
 # PROJECT STATUS — Tender Analysis
 
 **Snapshot date:** 2026-09-12
-**Status:** Manual upload entry and Blind Test 2 terminal runtime GREEN
+**Status:** Manual upload entry GREEN; runner visual-inspection hardening GREEN
 **Branch at snapshot:** `codex/manual-upload-entry`
+
+## Runner visual-inspection hardening — runtime GREEN
+
+Review of Blind Test 2 job `ad4aea11-04b8-4d26-a9a1-5d694c5584d8`
+confirmed that Codex rendered the eight scan pages but never opened their PNGs,
+then misread `Епи → Еш` as `Епр → Еп`. The focused skill now states that
+rendering is not inspection: every PNG used for a conclusion must be opened
+with `view_image`, and an unreadable/unavailable image must be recorded as a
+limitation.
+
+The production runner now uses the checksum-pinned official LibreOffice 26.2.6
+archive (runtime build 26.2.6.3) instead of Debian LibreOffice 7.4.7. A targeted
+render of the known Information Card DOCX visibly preserves the selected
+`Не применимо` control. A separate server-side Codex vision canary read the
+known scan page exactly as `Епи → Еш` without receiving the expected answer in
+its prompt. The rebuilt runner passed its isolation attestation and reports
+`readiness.execute=true`. No field-specific parser, page-coverage counter or
+blocking semantic validator was added. A full procurement rerun remains a
+separate evaluation step.
 
 ## Manual upload entry — terminal runtime GREEN
 

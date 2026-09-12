@@ -69,6 +69,11 @@ test('focused skill ships the documented local helper set', async () => {
   assert.match(skill, /references\/tool-recipes\.md/u);
   assert.match(skill, /Do not\s+pre-index every document, page, sheet, or OOXML part/iu);
   assert.match(skill, /OCR[^\n]+navigation aid/iu);
+  assert.match(skill, /(?:Creating|rendering)[\s\S]{0,80}PNG[\s\S]{0,80}not visual inspection/iu);
+  assert.match(skill, /open every PNG[\s\S]{0,80}`view_image`/iu);
+  assert.match(skill, /scan PDF[\s\S]{0,120}open every rendered page with `view_image`/iu);
+  assert.match(skill, /`view_image` is unavailable[\s\S]{0,80}limitation/iu);
+  assert.match(recipes, /open every rendered PNG[\s\S]{0,80}`view_image`/iu);
   assert.match(skill, /\.source[^\n]+byte-for-byte workspace alias/iu);
   assert.match(recipes, /sha256sum/iu);
   assert.match(recipes, /manifest `file_name` and `mime_type`/iu);
