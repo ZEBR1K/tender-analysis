@@ -39,8 +39,25 @@ function parsePositiveInteger(value, name) {
 
 function safeDownloadName(value) {
   return String(value || 'artifact.bin')
-    .replace(/[\r\n"\\/]/gu, '_')
+    .replace(/[\u0000-\u001F\u007F"\\/]/gu, '_')
     .slice(0, 200) || 'artifact.bin';
+}
+
+function encodeRfc5987Value(value) {
+  return encodeURIComponent(value).replace(/['()*]/gu, (character) => (
+    `%${character.codePointAt(0).toString(16).toUpperCase()}`
+  ));
+}
+
+function artifactContentDisposition(fileName, artifactId) {
+  const safeName = safeDownloadName(fileName);
+  const extensionMatch = safeName.match(/\.([A-Za-z0-9]{1,16})$/u);
+  const extension = extensionMatch ? `.${extensionMatch[1]}` : '.bin';
+  const safeArtifactId = String(artifactId || '')
+    .replace(/[^A-Za-z0-9_-]/gu, '')
+    .slice(0, 12) || 'download';
+  const fallback = `artifact-${safeArtifactId}${extension}`;
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987Value(safeName)}`;
 }
 
 function validateSourceMediaType(request, declaredMimeType) {
@@ -164,7 +181,7 @@ export function createServer({
         });
         response.writeHead(200, {
           'content-type': resolved.artifact.mime_type || 'application/octet-stream',
-          'content-disposition': `attachment; filename="${safeDownloadName(resolved.artifact.file_name)}"`,
+          'content-disposition': artifactContentDisposition(resolved.artifact.file_name, pathSegments[3]),
           'cache-control': 'private, no-store',
           'x-content-type-options': 'nosniff',
         });

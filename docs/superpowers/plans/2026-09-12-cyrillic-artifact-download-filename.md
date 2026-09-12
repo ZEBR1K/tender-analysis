@@ -16,14 +16,14 @@
 - Modify: `tests/archive-extractor-http.test.mjs`
 - Modify: `deploy/archive-extractor/src/server.mjs`
 
-- [ ] **Step 1: Write the failing regression test**
+- [x] **Step 1: Write the failing regression test**
 
 Add a test that resolves an artifact named `0_Общая_часть_зо.docx`, downloads
 it through the real HTTP server, and asserts HTTP 200, byte-identical content,
 an ASCII-only `filename="artifact-<id-prefix>.docx"`, and an RFC 5987
 `filename*=UTF-8''...` parameter that decodes to the original name.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -34,7 +34,7 @@ node --test --test-name-pattern="Cyrillic artifact filename" tests/archive-extra
 Expected: FAIL because the current server raises `ERR_INVALID_CHAR` and returns
 an unsuccessful response.
 
-- [ ] **Step 3: Implement the minimal header builder**
+- [x] **Step 3: Implement the minimal header builder**
 
 In `deploy/archive-extractor/src/server.mjs`, sanitize header controls, preserve
 the original name for UTF-8 encoding, derive a deterministic ASCII fallback
@@ -46,20 +46,20 @@ attachment; filename="<ascii-fallback>"; filename*=UTF-8''<encoded-original>
 
 Use that builder only in the artifact GET response.
 
-- [ ] **Step 4: Verify GREEN and regression safety**
+- [x] **Step 4: Verify GREEN and regression safety**
 
 Run:
 
 ```powershell
 node --test tests/archive-extractor-http.test.mjs
-npm test
+node --test tests/*.test.mjs
 git diff --check
 ```
 
 Expected: all tests pass, the Cyrillic download body is byte-identical, and no
 whitespace errors are reported.
 
-- [ ] **Step 5: Review the scoped diff**
+- [x] **Step 5: Review the scoped diff**
 
 Run:
 

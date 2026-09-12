@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
@@ -246,12 +247,46 @@ test('HTTP service streams an exact artifact and deletes only an exact run', asy
   assert.equal(artifact.status, 200);
   assert.equal(await artifact.text(), 'pdf bytes');
   assert.equal(artifact.headers.get('content-type'), 'application/pdf');
-  assert.match(artifact.headers.get('content-disposition'), /^attachment; filename="quote _ report\.pdf"$/u);
+  assert.equal(
+    artifact.headers.get('content-disposition'),
+    `attachment; filename="artifact-${ARTIFACT_ID.slice(0, 12)}.pdf"; filename*=UTF-8''quote%20_%20report.pdf`,
+  );
 
   const deletion = await fetch(`${base}/v1/runs/${RUN_ID}`, { method: 'DELETE' });
   assert.equal(deletion.status, 200);
   assert.deepEqual(await deletion.json(), { success: true, analysis_run_id: RUN_ID, deleted: true });
   assert.deepEqual(deleted, [RUN_ID]);
+});
+
+test('HTTP service downloads an exact artifact with a Cyrillic artifact filename', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'archive-http-cyrillic-'));
+  const artifactPath = path.join(root, 'artifact.bin');
+  const expectedBody = Buffer.from('byte-identical Cyrillic artifact body', 'utf8');
+  await writeFile(artifactPath, expectedBody);
+  const store = {
+    cleanupExpiredRuns: async () => [],
+    resolveArtifact: async () => ({
+      path: artifactPath,
+      artifact: { file_name: '0_Общая_часть_зо.docx', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    }),
+  };
+  const server = createServer({ extractJob: async () => assert.fail('not expected'), store });
+  t.after(() => close(server));
+  const base = await listen(server);
+
+  const artifact = await fetch(`${base}/v1/artifacts/${RUN_ID}/${ARTIFACT_ID}`);
+  const actualBody = Buffer.from(await artifact.arrayBuffer());
+
+  assert.equal(artifact.status, 200);
+  assert.deepEqual(actualBody, expectedBody);
+  assert.equal(
+    createHash('sha256').update(actualBody).digest('hex'),
+    createHash('sha256').update(expectedBody).digest('hex'),
+  );
+  assert.equal(
+    artifact.headers.get('content-disposition'),
+    `attachment; filename="artifact-${ARTIFACT_ID.slice(0, 12)}.docx"; filename*=UTF-8''0_%D0%9E%D0%B1%D1%89%D0%B0%D1%8F_%D1%87%D0%B0%D1%81%D1%82%D1%8C_%D0%B7%D0%BE.docx`,
+  );
 });
 
 test('HTTP service admits one extraction and returns EXTRACTOR_BUSY to a concurrent POST', async (t) => {

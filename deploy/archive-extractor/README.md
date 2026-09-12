@@ -16,6 +16,9 @@ size, count and time limits outside the n8n process.
   `tender_manual_source_upload_v1` with SHA-256 and an internal artifact URL.
 - A native file MIME type is accepted when it matches the `mime_type` query
   metadata; `application/octet-stream` remains valid for generic binary clients.
+- Artifact downloads preserve the original Unicode name through RFC 5987
+  `filename*` and include a deterministic ASCII `filename` fallback for legacy
+  clients; source bytes and manifest metadata are unchanged.
 
 ## Local checks
 
