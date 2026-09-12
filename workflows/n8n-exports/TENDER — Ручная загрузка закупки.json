@@ -1,0 +1,589 @@
+{
+  "name": "TENDER — Ручная загрузка закупки",
+  "nodes": [
+    {
+      "id": "16569406-343e-4316-b11f-ee547ff071c4",
+      "name": "Ручная загрузка закупки",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -1320,
+        80
+      ],
+      "parameters": {
+        "authentication": "none",
+        "formTitle": "Запустить анализ закупки",
+        "formDescription": "<p>Укажите закупку и приложите документы. Общий размер — не более 200 МБ. Один обычный файл — до 50 МБ, архив — до 100 МБ.</p>",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Название закупки",
+              "fieldName": "procurement_title",
+              "fieldType": "text",
+              "placeholder": "Например: Поставка офисной мебели",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Номер закупки",
+              "fieldName": "procurement_number",
+              "fieldType": "text",
+              "placeholder": "Если известен",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Комментарий",
+              "fieldName": "comment",
+              "fieldType": "textarea",
+              "placeholder": "Необязательный комментарий",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Документы",
+              "fieldName": "documents",
+              "fieldType": "file",
+              "multipleFiles": true,
+              "acceptFileTypes": ".pdf,.docx,.xlsx,.xls,.txt,.csv,.tsv,.md,.json,.xml,.html,.rtf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.zip,.7z,.rar,.tar,.gz,.tar.gz,.tgz",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "appendAttribution": false,
+          "ignoreBots": true,
+          "path": "tender-manual-upload",
+          "buttonLabel": "Запустить анализ"
+        }
+      },
+      "webhookId": "b196f4cd-fa64-4385-9df1-e693715bbf59"
+    },
+    {
+      "id": "85cbcd2f-e3a7-45c9-8ef9-a4e4bd5db923",
+      "name": "Проверить ручную загрузку",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const input = $input.first();\nconst data = input.json ?? {};\nconst binary = input.binary ?? {};\nconst title = String(data.procurement_title ?? '').trim();\nconst number = String(data.procurement_number ?? '').trim();\nconst comment = String(data.comment ?? '').trim();\nconst files = Object.entries(binary);\nconst SUPPORTED_DOCUMENTS = new Set(['pdf', 'docx', 'xlsx', 'xls', 'txt', 'csv', 'tsv', 'md', 'json', 'xml', 'html', 'rtf', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'webp']);\nconst SUPPORTED_ARCHIVES = new Set(['zip', '7z', 'rar', 'tar', 'gz', 'tar.gz', 'tgz']);\n\nfunction extensionOf(fileName) {\n  const lower = String(fileName ?? '').trim().toLowerCase();\n  if (lower.endsWith('.tar.gz')) return 'tar.gz';\n  const dot = lower.lastIndexOf('.');\n  return dot > 0 ? lower.slice(dot + 1) : '';\n}\n\nif (!title) throw new Error('[Manual Upload] procurement_title is required.');\nif (title.length > 500 || number.length > 200 || comment.length > 2000) {\n  throw new Error('[Manual Upload] Text field is too long.');\n}\nif (files.length < 1) throw new Error('[Manual Upload] At least one document is required.');\nif (files.length > 100) throw new Error('[Manual Upload] No more than 100 source files are allowed.');\n\nconst fileMetadata = files.map(([binaryKey, descriptor], offset) => {\n  const fileName = String(descriptor?.fileName ?? '').normalize('NFC').trim();\n  if (!fileName || fileName.length > 200 || /[\\/\u0000-\u001f]/u.test(fileName)) {\n    throw new Error('[Manual Upload] Unsafe file name.');\n  }\n  const extension = extensionOf(fileName);\n  if (!SUPPORTED_DOCUMENTS.has(extension) && !SUPPORTED_ARCHIVES.has(extension)) {\n    throw new Error('[Manual Upload] Executable or unsupported file type: ' + fileName);\n  }\n  return {\n    binary_key: binaryKey,\n    document_index: offset + 1,\n    file_name: fileName,\n    file_extension: extension,\n    mime_type: String(descriptor?.mimeType ?? 'application/octet-stream').slice(0, 200),\n  };\n});\n\nreturn [{\n  json: {\n    procurement_title: title,\n    procurement_number: number || null,\n    comment: comment || null,\n    submitted_at: data.submittedAt ?? null,\n    form_mode: data.formMode ?? null,\n    file_metadata: fileMetadata,\n  },\n  binary,\n}];"
+      }
+    },
+    {
+      "id": "1da0695c-14cc-4161-9583-ec250477406b",
+      "name": "Сформировать analysis_run_id",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 1,
+      "position": [
+        -840,
+        80
+      ],
+      "parameters": {
+        "action": "generate",
+        "encodingType": "uuid",
+        "dataPropertyName": "analysis_run_id"
+      }
+    },
+    {
+      "id": "bfe98283-507a-4f97-88b1-ab2cd4e485bc",
+      "name": "Развернуть очередь исходных файлов",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const generated = $input.first().json ?? {};\nconst source = $('Проверить ручную загрузку').first();\nconst context = source.json;\nconst analysisRunId = String(generated.analysis_run_id ?? generated.data ?? '').trim();\nif (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(analysisRunId)) {\n  throw new Error('[Manual Upload] Generated analysis_run_id is invalid.');\n}\nreturn context.file_metadata.map((file) => ({\n  json: {\n    analysis_run_id: analysisRunId,\n    upload_job_id: analysisRunId + '--upload-' + String(file.document_index).padStart(6, '0'),\n    procurement_title: context.procurement_title,\n    procurement_number: context.procurement_number,\n    comment: context.comment,\n    submitted_at: context.submitted_at,\n    form_mode: context.form_mode,\n    ...file,\n  },\n  binary: { data: source.binary[file.binary_key] },\n}));"
+      }
+    },
+    {
+      "id": "3b7a3ea2-ded7-4e33-94b1-17f1399e0929",
+      "name": "Собрать сохранённые исходники",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        -80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const rows = $input.all().map((item) => item.json).sort((a, b) => a.uploaded_source.document_index - b.uploaded_source.document_index);\nif (rows.length < 1) throw new Error('[Manual Upload] No stored source files were returned.');\nconst first = rows[0];\nif (rows.some((row) => row.analysis_run_id !== first.analysis_run_id)) {\n  throw new Error('[Manual Upload] Mixed analysis_run_id values.');\n}\nconst attachments = rows.map((row) => row.uploaded_source);\nconst totalBytes = attachments.reduce((sum, file) => sum + Number(file.source_size ?? 0), 0);\nif (!Number.isSafeInteger(totalBytes) || totalBytes < 0) {\n  throw new Error('[Manual Upload] Uploaded byte total is invalid.');\n}\nif (totalBytes > 200 * 1024 * 1024) {\n  throw new Error('[MANUAL_UPLOAD_TOTAL_TOO_LARGE] Total upload exceeds 200 MiB.');\n}\nconst tenderId = 'manual:' + first.analysis_run_id;\nreturn [{ json: {\n  analysis_run_id: first.analysis_run_id,\n  source: 'manual_upload',\n  tender_meta: {\n    source: 'manual_upload',\n    tender_id: tenderId,\n    tender_number: first.procurement_number,\n    tender_external_id: null,\n    title: first.procurement_title,\n    documents_count: attachments.length,\n    source_payload: {\n      procurement_title: first.procurement_title,\n      procurement_number: first.procurement_number,\n      comment: first.comment,\n      submitted_at: first.submitted_at,\n      form_mode: first.form_mode,\n      n8n_execution_id: String($execution.id),\n      files: attachments.map((file) => ({\n        document_index: file.document_index,\n        file_name: file.file_name,\n        file_extension: file.file_extension,\n        source_size: file.source_size,\n        sha256: file.sha256,\n      })),\n    },\n  },\n  attachments,\n  total_upload_bytes: totalBytes,\n} }];"
+      }
+    },
+    {
+      "id": "ac2c3949-c4ee-48e3-b8ab-33b36cac6563",
+      "name": "Подготовить документацию",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        120,
+        -80
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "0scTZu1aBKsMd6AM",
+          "mode": "list",
+          "cachedResultName": "TENDER — Подготовить документацию",
+          "cachedResultUrl": "/workflow/0scTZu1aBKsMd6AM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $('Собрать сохранённые исходники').first().json.analysis_run_id }}",
+            "attachments": "={{ $('Собрать сохранённые исходники').first().json.attachments }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "analysis_run_id",
+              "displayName": "analysis_run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "attachments",
+              "displayName": "attachments",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "array"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "9769c2bb-7a02-4fdf-9829-bf9de5e869ff",
+      "name": "Проверить результат подготовки",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        -80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const result = $input.first().json;\nconst context = $('Собрать сохранённые исходники').first().json;\nif (result.success !== true || result.schema_version !== 'tender_document_ingestion_v1' || !result.manifest) {\n  throw new Error('[Manual Upload] Document preparation failed: ' + String(result.failure?.error_code ?? 'UNKNOWN'));\n}\nif (result.analysis_run_id !== context.analysis_run_id || result.manifest.analysis_run_id !== context.analysis_run_id) {\n  throw new Error('[Manual Upload] Preparation identity mismatch.');\n}\nconst documents = Array.isArray(result.manifest.documents) ? result.manifest.documents : [];\nif (documents.length < 1 || Number(result.manifest.processable_document_count) < 1) {\n  throw new Error('[Manual Upload] Preparation returned no processable documents.');\n}\nreturn [{ json: {\n  analysis_run_id: context.analysis_run_id,\n  source: 'manual_upload',\n  tender_meta: context.tender_meta,\n  attachments: documents,\n  manifest: result.manifest,\n} }];"
+      }
+    },
+    {
+      "id": "59ff78eb-ef70-4c20-a425-0f87b8aa1bf9",
+      "name": "Создать запуск и зарегистрировать документы",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        600,
+        -80
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_documents AS (\n  SELECT\n    (document->>'document_index')::integer AS document_index,\n    NULLIF(document->>'file_name', '') AS file_name,\n    NULLIF(document->>'file_extension', '') AS file_extension,\n    NULLIF(document->>'display_name', '') AS display_name,\n    NULLIF(document->>'download_url', '') AS download_url,\n    NULLIF(document->>'publication_at', '')::timestamptz AS publication_at,\n    NULLIF(document->>'source_size', '')::bigint AS source_size,\n    NULLIF(document->>'mime_type', '') AS mime_type,\n    NULLIF(document->>'file_size', '')::bigint AS file_size,\n    COALESCE(NULLIF(document->>'status', ''), 'pending') AS status,\n    NULLIF(document->>'error_message', '') AS error_message,\n    COALESCE(document->'ingestion_metadata', '{}'::jsonb) AS ingestion_metadata\n  FROM jsonb_array_elements($8::jsonb) AS document\n),\ninserted_run AS (\n  INSERT INTO tender_analysis_runs (\n    id, source, tender_id, tender_number, tender_external_id, status, documents_total, tender_meta\n  )\n  VALUES ($1::uuid, $2, $3, NULLIF($4, ''), NULLIF($5, ''), 'processing', $6::integer, $7::jsonb)\n  ON CONFLICT (source, tender_id) WHERE status NOT IN ('completed', 'superseded')\n  DO NOTHING\n  RETURNING *\n),\nregistered_documents AS (\n  INSERT INTO tender_analysis_documents (\n    analysis_run_id, document_index, file_name, file_extension, display_name, download_url,\n    publication_at, source_size, mime_type, file_size, status, error_message, ingestion_metadata\n  )\n  SELECT\n    run.id, document.document_index, document.file_name, document.file_extension,\n    document.display_name, document.download_url, document.publication_at, document.source_size,\n    document.mime_type, document.file_size, document.status, document.error_message, document.ingestion_metadata\n  FROM inserted_run AS run\n  CROSS JOIN input_documents AS document\n  ON CONFLICT (analysis_run_id, document_index) DO UPDATE SET\n    file_name = EXCLUDED.file_name,\n    file_extension = EXCLUDED.file_extension,\n    display_name = EXCLUDED.display_name,\n    download_url = EXCLUDED.download_url,\n    publication_at = EXCLUDED.publication_at,\n    source_size = EXCLUDED.source_size,\n    mime_type = EXCLUDED.mime_type,\n    file_size = EXCLUDED.file_size,\n    status = EXCLUDED.status,\n    error_message = EXCLUDED.error_message,\n    ingestion_metadata = EXCLUDED.ingestion_metadata\n  RETURNING document_index\n),\ndocument_stats AS (\n  SELECT count(*)::integer AS registered_documents_count FROM registered_documents\n)\nSELECT\n  run.id AS analysis_run_id,\n  run.source,\n  run.tender_id,\n  run.status,\n  run.documents_total,\n  stats.registered_documents_count,\n  run.tender_meta,\n  true AS created_new_run\nFROM inserted_run AS run\nCROSS JOIN document_stats AS stats\nUNION ALL\nSELECT NULL::uuid, $2::text, $3::text, NULL::text, 0, 0, $7::jsonb, false\nWHERE NOT EXISTS (SELECT 1 FROM inserted_run);",
+        "options": {
+          "queryReplacement": "={{ [ $('Проверить результат подготовки').first().json.analysis_run_id, 'manual_upload', $('Проверить результат подготовки').first().json.tender_meta.tender_id, $('Проверить результат подготовки').first().json.tender_meta.tender_number ?? '', '', $('Проверить результат подготовки').first().json.attachments.length, JSON.stringify($('Проверить результат подготовки').first().json.tender_meta), JSON.stringify($('Проверить результат подготовки').first().json.attachments) ] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "id": "e9b73a48-8b22-4707-b579-bd642dbafce4",
+      "name": "Проверить регистрацию запуска",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        -80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const row = $input.first().json;\nconst expected = $('Проверить результат подготовки').first().json.attachments.length;\nif (row.created_new_run !== true || !row.analysis_run_id) {\n  throw new Error('[Manual Upload] Analysis run was not created.');\n}\nif (Number(row.documents_total) !== expected || Number(row.registered_documents_count) !== expected) {\n  throw new Error('[Manual Upload] Not all prepared documents were registered.');\n}\nreturn [{ json: {\n  analysis_run_id: String(row.analysis_run_id),\n  source: 'manual_upload',\n  tender_id: String(row.tender_id),\n  documents_total: expected,\n} }];"
+      }
+    },
+    {
+      "id": "33a3f076-8a8c-423d-8c24-3917726e66c8",
+      "name": "Запустить агентский анализ",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1080,
+        -80
+      ],
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "gP29fv0rq4MoON9a",
+          "mode": "list",
+          "cachedResultName": "TENDER — Агентский анализ — Запуск",
+          "cachedResultUrl": "/workflow/gP29fv0rq4MoON9a"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "analysis_run_id": "={{ $('Проверить регистрацию запуска').first().json.analysis_run_id }}",
+            "pipeline_version": "tender_agentic_pipeline_v1",
+            "replicate_index": 1
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "analysis_run_id",
+              "displayName": "analysis_run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "pipeline_version",
+              "displayName": "pipeline_version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "replicate_index",
+              "displayName": "replicate_index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "2efa26f3-02fd-44ab-9914-822a310393e0",
+      "name": "Подтвердить запуск агента",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        -80
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const result = $input.first().json;\nconst run = $('Проверить регистрацию запуска').first().json;\nif (result.schema_version !== 'tender_agentic_dispatch_v1' || result.success === false) {\n  throw new Error('[Manual Upload] Agentic dispatch failed.');\n}\nreturn [{ json: {\n  success: true,\n  analysis_run_id: run.analysis_run_id,\n  tender_id: run.tender_id,\n  documents_total: run.documents_total,\n  agent_status: result.status ?? null,\n  job_id: result.job_id ?? null,\n} }];"
+      }
+    },
+    {
+      "id": "3989a054-9cc1-4b21-bf94-78e6915c607f",
+      "name": "Показать подтверждение",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1560,
+        -80
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Анализ закупки запущен",
+        "completionMessage": "={{ 'Документы приняты. analysis_run_id: ' + $json.analysis_run_id + '. Отчёт будет сформирован существующим агентским конвейером.' }}"
+      },
+      "webhookId": "6a4019f5-6634-400c-b880-6a8ce4da148c"
+    },
+    {
+      "id": "1f48e477-e36a-4ca1-87b0-2da61c21b88b",
+      "name": "Сохранить исходный файл",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -120,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-archive-extractor:8080/v1/source-files/' + encodeURIComponent($json.upload_job_id) }}",
+        "authentication": "none",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "run_id",
+              "value": "={{ $json.analysis_run_id }}"
+            },
+            {
+              "name": "source_attachment_index",
+              "value": "={{ $json.document_index }}"
+            },
+            {
+              "name": "declared_extension",
+              "value": "={{ $json.file_extension }}"
+            },
+            {
+              "name": "file_name",
+              "value": "={{ $json.file_name }}"
+            },
+            {
+              "name": "mime_type",
+              "value": "={{ $json.mime_type }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "49a3228d-ee2e-42c4-a480-ed3131ce7f11",
+      "name": "Проверить сохранённый исходник",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        240
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "const response = $json;\nconst source = $('Загрузить файлы по одному').item.json;\nif (response.schema_version !== 'tender_manual_source_upload_v1' || response.success !== true) {\n  throw new Error('[Manual Upload] Source storage returned an invalid contract.');\n}\nif (response.analysis_run_id !== source.analysis_run_id || Number(response.source_attachment_index) !== source.document_index) {\n  throw new Error('[Manual Upload] Source storage identity mismatch.');\n}\nconst entry = Array.isArray(response.entries) ? response.entries[0] : null;\nif (!entry || response.entries.length !== 1 || !entry.download_url || !/^[0-9a-f]{64}$/u.test(String(entry.sha256 ?? ''))) {\n  throw new Error('[Manual Upload] Stored source metadata is incomplete.');\n}\nreturn {\n  json: {\n    analysis_run_id: source.analysis_run_id,\n    procurement_title: source.procurement_title,\n    procurement_number: source.procurement_number,\n    comment: source.comment,\n    submitted_at: source.submitted_at,\n    form_mode: source.form_mode,\n    uploaded_source: {\n      document_index: source.document_index,\n      file_name: source.file_name,\n      file_extension: source.file_extension,\n      display_name: source.file_name,\n      download_url: String(entry.download_url),\n      publication_at: null,\n      source_size: Number(entry.size_bytes),\n      mime_type: String(entry.mime_type ?? source.mime_type),\n      sha256: String(entry.sha256).toLowerCase(),\n    },\n  },\n};"
+      }
+    },
+    {
+      "id": "f5383183-7089-46d9-8dc1-c758827647df",
+      "name": "Загрузить файлы по одному",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -360,
+        80
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Ручная загрузка закупки": {
+      "main": [
+        [
+          {
+            "node": "Проверить ручную загрузку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить ручную загрузку": {
+      "main": [
+        [
+          {
+            "node": "Сформировать analysis_run_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать analysis_run_id": {
+      "main": [
+        [
+          {
+            "node": "Развернуть очередь исходных файлов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Развернуть очередь исходных файлов": {
+      "main": [
+        [
+          {
+            "node": "Загрузить файлы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать сохранённые исходники": {
+      "main": [
+        [
+          {
+            "node": "Подготовить документацию",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить документацию": {
+      "main": [
+        [
+          {
+            "node": "Проверить результат подготовки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить результат подготовки": {
+      "main": [
+        [
+          {
+            "node": "Создать запуск и зарегистрировать документы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать запуск и зарегистрировать документы": {
+      "main": [
+        [
+          {
+            "node": "Проверить регистрацию запуска",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить регистрацию запуска": {
+      "main": [
+        [
+          {
+            "node": "Запустить агентский анализ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запустить агентский анализ": {
+      "main": [
+        [
+          {
+            "node": "Подтвердить запуск агента",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подтвердить запуск агента": {
+      "main": [
+        [
+          {
+            "node": "Показать подтверждение",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить исходный файл": {
+      "main": [
+        [
+          {
+            "node": "Проверить сохранённый исходник",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить сохранённый исходник": {
+      "main": [
+        [
+          {
+            "node": "Загрузить файлы по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Загрузить файлы по одному": {
+      "main": [
+        [
+          {
+            "node": "Собрать сохранённые исходники",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сохранить исходный файл",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "errorWorkflow": "xW4DHtnBYddbaU14",
+    "saveExecutionProgress": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "110057aa-dd11-44ec-b8cb-1d0db9fa1c45",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  },
+  "nodeGroups": [],
+  "id": "fB46LZnrNCs2MDeL",
+  "tags": []
+}

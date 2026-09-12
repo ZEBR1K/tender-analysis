@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { config } from './config.mjs';
 import { ArchiveError, toSafeError } from './errors.mjs';
 import { extractJob as defaultExtractJob } from './extract-job.mjs';
+import { createSourceUploader } from './source-upload.mjs';
 import { createStore, validateAnalysisRunId } from './store.mjs';
 
 function writeJson(response, statusCode, body) {
@@ -42,6 +43,26 @@ function safeDownloadName(value) {
     .slice(0, 200) || 'artifact.bin';
 }
 
+function validateSourceMediaType(request, declaredMimeType) {
+  const contentType = String(request.headers['content-type'] || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
+  const declared = String(declaredMimeType || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
+  if (contentType === 'application/octet-stream') return;
+  if (!contentType || !declared || contentType !== declared) {
+    request.resume();
+    throw new ArchiveError(
+      'INGESTION_CONTRACT_INVALID',
+      'Content-Type must be application/octet-stream or match mime_type',
+      400,
+    );
+  }
+}
+
 function decorateManifest(manifest, publicBaseUrl) {
   const base = String(publicBaseUrl).replace(/\/+$/u, '');
   return {
@@ -60,10 +81,12 @@ function decorateManifest(manifest, publicBaseUrl) {
 export function createServer({
   extractJob = defaultExtractJob,
   store = createStore({ rootDirectory: config.rootDirectory, ttlHours: config.ttlHours }),
+  sourceUploader = null,
   publicBaseUrl = config.publicBaseUrl,
   cleanupIntervalMs = config.cleanupIntervalMinutes * 60 * 1000,
 } = {}) {
   let extractionActive = false;
+  const activeSourceUploader = sourceUploader || createSourceUploader({ store });
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -109,6 +132,28 @@ export function createServer({
         } finally {
           extractionActive = false;
         }
+      }
+
+      if (pathSegments[0] === 'v1' && pathSegments[1] === 'source-files' && pathSegments.length === 3) {
+        if (request.method !== 'POST') return methodNotAllowed(response);
+        const mimeType = String(url.searchParams.get('mime_type') || '');
+        validateSourceMediaType(request, mimeType);
+        const sourceAttachmentIndex = parsePositiveInteger(
+          url.searchParams.get('source_attachment_index'),
+          'source_attachment_index',
+        );
+        const analysisRunId = validateAnalysisRunId(url.searchParams.get('run_id'));
+        const fileName = String(url.searchParams.get('file_name') || '');
+        const manifest = await activeSourceUploader.uploadSource({
+          inputStream: request,
+          analysisRunId,
+          sourceAttachmentIndex,
+          declaredExtension: String(url.searchParams.get('declared_extension') || ''),
+          fileName,
+          mimeType,
+          jobId: pathSegments[2],
+        });
+        return writeJson(response, 200, decorateManifest(manifest, publicBaseUrl));
       }
 
       if (pathSegments[0] === 'v1' && pathSegments[1] === 'artifacts' && pathSegments.length === 4) {

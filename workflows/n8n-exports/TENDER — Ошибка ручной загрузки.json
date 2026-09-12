@@ -1,0 +1,87 @@
+{
+  "name": "TENDER — Ошибка ручной загрузки",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-upload-error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payload = $input.first()?.json;\nconst execution = payload && typeof payload === 'object' && !Array.isArray(payload) && payload.execution && typeof payload.execution === 'object' && !Array.isArray(payload.execution) ? payload.execution : {};\nconst workflow = payload && typeof payload === 'object' && !Array.isArray(payload) && payload.workflow && typeof payload.workflow === 'object' && !Array.isArray(payload.workflow) ? payload.workflow : {};\nconst rawId = typeof execution.id === 'string' ? execution.id.trim() : '';\nconst validId = rawId.length > 0 && rawId.length <= 4096;\nconst expectedWorkflow = workflow.name === 'TENDER — Ручная загрузка закупки';\nconst error = execution.error && typeof execution.error === 'object' && !Array.isArray(execution.error) ? execution.error : {};\nconst candidate = [error.message, error.description].find((value) => typeof value === 'string' && value.trim()) || '';\nconst cleaned = candidate.replace(/[\\u0000-\\u001F\\u007F]/gu, ' ').replace(/\\s+/gu, ' ').trim();\nconst unsafe = /\\b[a-z][a-z0-9+.-]{0,31}:|\\bwww\\.|\\blocalhost(?:[:/][^\\s]*)?|\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?:[:/][^\\s]*)?|(?:authorization|cookie|pass[\\s_-]*word|secret|api[\\s_-]*key|access[\\s_-]*token|bearer|token)(?:\\s*(?::|=|\\bis\\b)|\\s+)|\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}(?:\\.[A-Za-z0-9_-]{8,})?\\b|\\b(?:sk|pk|ghp|xox[baprs]|AKIA)[_-]?[A-Za-z0-9_-]{12,}\\b|\\b[A-Fa-f0-9]{32,}\\b|\\b[A-Za-z0-9+/]{32,}={0,2}\\b|\\b[A-Za-z0-9_-]{40,}\\b/iu.test(cleaned);\nconst executionId = validId && expectedWorkflow ? rawId : null;\nconst errorCode = !validId ? 'MANUAL_UPLOAD_ERROR_IDENTITY_INVALID' : !expectedWorkflow ? 'MANUAL_UPLOAD_ERROR_WORKFLOW_UNSUPPORTED' : 'MANUAL_UPLOAD_WORKFLOW_FAILED';\nconst errorMessage = unsafe || !cleaned ? 'Manual upload workflow failed' : cleaned.slice(0, 500);\nreturn [{ json: { execution_id: executionId, error_code: errorCode, error_message: errorMessage } }];"
+      },
+      "id": "normalize-manual-upload-error",
+      "name": "Нормализовать ошибку ручной загрузки",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input AS (\n  SELECT\n    NULLIF($1::text, '') AS execution_id,\n    left($2::text, 80) AS error_code,\n    left($3::text, 500) AS error_message\n),\nowned AS (\n  SELECT run.id, run.status\n  FROM public.tender_analysis_runs AS run\n  CROSS JOIN input\n  WHERE input.execution_id IS NOT NULL\n    AND run.source = 'manual_upload'\n    AND run.tender_meta -> 'source_payload' ->> 'n8n_execution_id' = input.execution_id\n),\nownership AS (\n  SELECT\n    count(*) AS owner_count,\n    count(*) FILTER (WHERE status IN ('created', 'processing', 'ready_for_aggregation', 'aggregating')) AS eligible_count,\n    (array_agg(id ORDER BY id) FILTER (WHERE status IN ('created', 'processing', 'ready_for_aggregation', 'aggregating')))[1] AS eligible_id\n  FROM owned\n),\nupdated AS (\n  UPDATE public.tender_analysis_runs AS run\n  SET status = 'failed',\n      error_message = input.error_message,\n      updated_at = now()\n  FROM input\n  CROSS JOIN ownership\n  WHERE ownership.owner_count = 1\n    AND ownership.eligible_count = 1\n    AND run.id = ownership.eligible_id\n    AND run.source = 'manual_upload'\n    AND run.tender_meta -> 'source_payload' ->> 'n8n_execution_id' = input.execution_id\n    AND run.status IN ('created', 'processing', 'ready_for_aggregation', 'aggregating')\n  RETURNING run.id\n)\nSELECT\n  CASE\n    WHEN input.execution_id IS NULL THEN 'invalid_identity'\n    WHEN ownership.owner_count > 1 THEN 'ownership_ambiguous'\n    WHEN EXISTS (SELECT 1 FROM updated) THEN 'manual_run_failed'\n    WHEN EXISTS (SELECT 1 FROM owned WHERE status IN ('completed', 'failed', 'superseded')) THEN 'terminal_no_op'\n    ELSE 'ownership_lost'\n  END AS outcome,\n  (SELECT count(*)::integer FROM updated) AS update_count,\n  (SELECT id FROM updated LIMIT 1) AS analysis_run_id,\n  input.execution_id,\n  input.error_code\nFROM input\nCROSS JOIN ownership;",
+        "options": {
+          "queryReplacement": "={{ [$json.execution_id ?? '', $json.error_code, $json.error_message] }}"
+        }
+      },
+      "id": "terminalize-manual-upload-run",
+      "name": "Завершить только принадлежащий manual run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        520,
+        0
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "KITATEH Tenders"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать ошибку ручной загрузки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать ошибку ручной загрузки": {
+      "main": [
+        [
+          {
+            "node": "Завершить только принадлежащий manual run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "nodeGroups": [],
+  "tags": []
+}

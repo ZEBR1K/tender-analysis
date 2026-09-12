@@ -7,6 +7,8 @@ import test from 'node:test';
 
 import { ArchiveError } from '../deploy/archive-extractor/src/errors.mjs';
 import { createServer } from '../deploy/archive-extractor/src/server.mjs';
+import { createSourceUploader } from '../deploy/archive-extractor/src/source-upload.mjs';
+import { createStore } from '../deploy/archive-extractor/src/store.mjs';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const JOB_ID = `${RUN_ID}--source-000001`;
@@ -81,6 +83,112 @@ test('HTTP service exposes health and a successful extraction manifest without b
   assert.equal(JSON.stringify(result).includes('emlw'), false);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body, 'zip');
+});
+
+test('HTTP service accepts one manual source file and decorates its artifact URL', async (t) => {
+  const calls = [];
+  const sourceUploader = {
+    uploadSource: async (input) => {
+      let body = '';
+      for await (const chunk of input.inputStream) body += chunk.toString('utf8');
+      calls.push({ ...input, inputStream: undefined, body });
+      return {
+        schema_version: 'tender_manual_source_upload_v1',
+        success: true,
+        job_id: `${RUN_ID}--upload-000001`,
+        analysis_run_id: RUN_ID,
+        source_attachment_index: 1,
+        entries: [{
+          kind: 'file', logical_path: 'report.pdf', file_name: 'report.pdf', file_extension: 'pdf',
+          archive_depth: 0, archive_chain: [], mime_type: 'application/pdf', size_bytes: 3,
+          sha256: ARTIFACT_ID, artifact_id: ARTIFACT_ID,
+        }],
+      };
+    },
+  };
+  const server = createServer({
+    sourceUploader,
+    extractJob: async () => assert.fail('not expected'),
+    store: { cleanupExpiredRuns: async () => [] },
+    publicBaseUrl: 'http://tender-archive-extractor:8080',
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const query = new URLSearchParams({
+    run_id: RUN_ID,
+    source_attachment_index: '1',
+    declared_extension: 'pdf',
+    file_name: 'report.pdf',
+    mime_type: 'application/pdf',
+  });
+
+  const response = await fetch(`${base}/v1/source-files/${RUN_ID}--upload-000001?${query}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/pdf' },
+    body: Buffer.from('pdf'),
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.entries[0].download_url, `http://tender-archive-extractor:8080/v1/artifacts/${RUN_ID}/${ARTIFACT_ID}`);
+  assert.equal(calls[0].fileName, 'report.pdf');
+  assert.equal(calls[0].mimeType, 'application/pdf');
+  assert.equal(calls[0].body, 'pdf');
+});
+
+test('HTTP service rejects a manual source body whose media type disagrees with metadata', async (t) => {
+  const server = createServer({
+    sourceUploader: { uploadSource: async () => assert.fail('not expected') },
+    extractJob: async () => assert.fail('not expected'),
+    store: { cleanupExpiredRuns: async () => [] },
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const query = new URLSearchParams({
+    run_id: RUN_ID,
+    source_attachment_index: '1',
+    declared_extension: 'pdf',
+    file_name: 'report.pdf',
+    mime_type: 'application/pdf',
+  });
+
+  const response = await fetch(`${base}/v1/source-files/${RUN_ID}--upload-000001?${query}`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/png' },
+    body: Buffer.from('not a pdf'),
+  });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'INGESTION_CONTRACT_INVALID');
+});
+
+test('HTTP service returns typed 413 when a manual source exceeds its per-file limit', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'archive-source-limit-http-'));
+  const store = createStore({ rootDirectory: root, ttlHours: 72 });
+  const sourceUploader = createSourceUploader({
+    store,
+    limits: { maxDocumentBytes: 4, maxArchiveBytes: 8 },
+  });
+  const server = createServer({
+    sourceUploader,
+    extractJob: async () => assert.fail('not expected'),
+    store,
+  });
+  t.after(() => close(server));
+  const base = await listen(server);
+  const query = new URLSearchParams({
+    run_id: RUN_ID,
+    source_attachment_index: '1',
+    declared_extension: 'pdf',
+    file_name: 'report.pdf',
+    mime_type: 'application/pdf',
+  });
+
+  const response = await fetch(`${base}/v1/source-files/${RUN_ID}--upload-000001?${query}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/pdf' },
+    body: Buffer.from('12345'),
+  });
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).error.code, 'SOURCE_FILE_TOO_LARGE');
 });
 
 test('HTTP service returns typed 4xx errors and rejects invalid routes and identifiers', async (t) => {

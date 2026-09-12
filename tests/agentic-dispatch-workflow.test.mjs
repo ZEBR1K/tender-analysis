@@ -157,6 +157,36 @@ test('dispatch stages sequentially and sends binary only between HTTP nodes', as
   assert.equal(download.waitBetweenTries, 5000);
   assert.equal(download.onError, 'continueErrorOutput');
 
+  const internalRoute = nodeByName(value, 'Внутренний документ runner?');
+  assert.equal(internalRoute.type, 'n8n-nodes-base.if');
+  assert.equal(
+    internalRoute.parameters.conditions.conditions[0].rightValue,
+    'http://tender-archive-extractor:8080/v1/artifacts/',
+  );
+  assert.equal(internalRoute.parameters.conditions.conditions[0].operator.operation, 'startsWith');
+
+  const internalDownload = nodeByName(value, 'Скачать внутренний оригинал');
+  assert.equal(internalDownload.parameters.options.proxy, undefined);
+  assert.equal(internalDownload.parameters.options.response.response.responseFormat, 'file');
+  assert.equal(internalDownload.parameters.options.response.response.outputPropertyName, 'data');
+  assert.equal(internalDownload.retryOnFail, true);
+  assert.equal(internalDownload.maxTries, 3);
+  assert.equal(internalDownload.waitBetweenTries, 5000);
+  assert.equal(internalDownload.onError, 'continueErrorOutput');
+
+  assert.deepEqual(
+    value.connections['Документы по одному'].main[1].map(({ node }) => node),
+    ['Внутренний документ runner?'],
+  );
+  assert.deepEqual(
+    value.connections['Внутренний документ runner?'].main.map((output) => output.map(({ node }) => node)),
+    [['Скачать внутренний оригинал'], ['Скачать оригинал']],
+  );
+  assert.deepEqual(
+    value.connections['Скачать внутренний оригинал'].main.map((output) => output.map(({ node }) => node)),
+    [['Загрузить оригинал в runner'], ['Сформировать download failure']],
+  );
+
   const upload = nodeByName(value, 'Загрузить оригинал в runner');
   assert.equal(upload.parameters.contentType, 'binaryData');
   assert.equal(upload.parameters.inputDataFieldName, 'data');
@@ -326,6 +356,10 @@ test('only a source-download failure gets one auditable full restage retry', asy
 
   assert.deepEqual(
     value.connections['Скачать оригинал'].main[1].map(({ node }) => node),
+    ['Сформировать download failure'],
+  );
+  assert.deepEqual(
+    value.connections['Скачать внутренний оригинал'].main[1].map(({ node }) => node),
     ['Сформировать download failure'],
   );
   assert.deepEqual(

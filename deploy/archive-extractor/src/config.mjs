@@ -12,6 +12,7 @@ function positiveInteger(name, fallback) {
 
 export const LIMITS = Object.freeze({
   maxArchiveBytes: 100 * 1024 * 1024,
+  maxDocumentBytes: 50 * 1024 * 1024,
   maxFileBytes: 50 * 1024 * 1024,
   maxTotalBytes: 300 * 1024 * 1024,
   maxEntries: 500,
@@ -19,7 +20,11 @@ export const LIMITS = Object.freeze({
   maxDurationMs: 5 * 60 * 1000,
 });
 
-export const SUPPORTED_DOCUMENT_EXTENSIONS = new Set(['pdf', 'docx', 'xlsx']);
+export const SUPPORTED_DOCUMENT_EXTENSIONS = new Set([
+  'pdf', 'docx', 'xlsx', 'xls',
+  'txt', 'csv', 'tsv', 'md', 'json', 'xml', 'html', 'rtf',
+  'png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'webp',
+]);
 export const SUPPORTED_ARCHIVE_EXTENSIONS = new Set([
   'zip',
   '7z',

@@ -32,6 +32,13 @@ the runner Header Auth import placeholder and no token. In the live inactive
 copy the expected credential types are bound; no credential value or bound ID
 is recorded in the repository documentation.
 
+For manual-upload artifacts the loop first recognizes the exact internal prefix
+`http://tender-archive-extractor:8080/v1/artifacts/` and downloads directly on
+the shared Docker network. All other source URLs retain the existing live proxy
+node. This prevents internal traffic from leaking into the external proxy while
+preserving the TenderPlan transport path; it adds no document parser or semantic
+validation.
+
 Runner JSON HTTP nodes use response auto-detection because n8n `2.35.3` can
 otherwise leave an explicit-JSON `fullResponse` body as an unresolved stream.
 The binary upload keeps `application/octet-stream` in its header and does not
@@ -106,3 +113,12 @@ execution `16925` staged three source DOCX files and started job
 `tenderplan-metadata` outside `documents[]`; its document count remained `3`.
 The job completed on attempt 1 with a valid exact-27 envelope. Full evidence:
 `evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
+
+## Manual-upload canary — 2026-09-12
+
+Execution `18779` reproduced `AGENTIC_SOURCE_DOWNLOAD_FAILED` because the
+manual artifact was sent through the external proxy. The internal-route split
+was published without changing the proxy node. Repeated manual execution
+`18796` registered all 12 Blind Test 2 documents and Dispatch started job
+`ad4aea11-04b8-4d26-a9a1-5d694c5584d8` in `running` state for run
+`0ac0b487-71b7-4a35-8412-e587f608aeca`.

@@ -1,8 +1,70 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-11
-**Status:** Sealed TenderPlan metadata mark-to-report technical GREEN / semantic review pending
-**Branch at snapshot:** `codex/agentic-analysis-integration`
+**Snapshot date:** 2026-09-12
+**Status:** Manual upload entry and Blind Test 2 terminal runtime GREEN
+**Branch at snapshot:** `codex/manual-upload-entry`
+
+## Manual upload entry — terminal runtime GREEN
+
+Published workflow `TENDER — Ручная загрузка закупки`
+(`fB46LZnrNCs2MDeL`, version `110057aa-dd11-44ec-b8cb-1d0db9fa1c45`)
+adds a second production entry at
+`https://n8nworkup.ru/form/tender-manual-upload`. It accepts a procurement
+title, optional number/comment and multiple files, enforces a 200 MiB total,
+rejects unknown/executable inputs, stores immutable source bytes with SHA-256,
+then reuses Document Preparation → atomic run/document registration → Agentic
+Dispatch → existing Monitor/Finalization/Report.
+
+Blind Test 2 runtime debugging established three exact transport boundaries:
+
+- execution `17975` reached the internal source upload but n8n sent the native
+  DOCX MIME instead of `application/octet-stream`; the service now accepts only
+  octet-stream or an exact match with declared `mime_type`;
+- execution `18762` reproduced an internal artifact being sent through the
+  external TenderPlan proxy; Document Preparation now bypasses that proxy only
+  for the fixed internal artifact prefix;
+- execution `18779` reproduced the same leak during runner staging; Dispatch now
+  uses the same exact internal route and retains the external proxy for all
+  other source URLs.
+
+Published/read-back versions after the fixes are Document Preparation
+`1e07051f-cc94-4a30-a091-a8f7d92b36f5` (27 nodes) and Dispatch
+`7a72d863-c0c9-42d0-8d3e-7a0efa754533` (33 nodes), both with exact
+`versionId=activeVersionId`.
+
+Final form execution `18796` succeeded. Run
+`0ac0b487-71b7-4a35-8412-e587f608aeca` registered `12/12` Blind Test 2 files and
+started real Codex job `ad4aea11-04b8-4d26-a9a1-5d694c5584d8`. Job attempt 1
+completed with `9,981,910` input, `9,670,656` cached input, `46,062` output and
+`6,085` reasoning-output tokens. Monitor execution `18857` accepted exactly 27
+unique field keys with zero job issue codes (`23 resolved / 1 requires_review /
+3 not_found`) and completed Finalization/Report. Generated artifacts are valid:
+HTML `34,361` bytes and PDF `101,076` bytes with `%PDF-` signature.
+
+Post-canary review reproduced two technical failures and both were fixed before
+publication. Oversized source uploads used to close the TCP socket; the service
+now drains the bounded request and returns typed HTTP `413
+SOURCE_FILE_TOO_LARGE`, confirmed from the live n8n network. The previous shared
+Intake Resume error workflow could not own a manual run. Manual Upload now saves
+its parent execution ID in run metadata and uses dedicated published handler
+`xW4DHtnBYddbaU14` (version `27e6d260-8681-4b99-92a6-67d4d7b0a588`), which may
+terminalize only one exact nonterminal `manual_upload` run. No schema change was
+required.
+
+The Form Trigger remains intentionally `authentication=none` per the current MVP
+decision. This is a documented security/cost exposure: possession of the URL is
+enough to upload up to 200 MiB and start a paid run. The URL must stay within the
+trusted circle until `n8n User Auth` or an external access-control layer is
+explicitly selected.
+
+Post-review repository regression is GREEN: `796` tests total, `790` passed,
+`0` failed and `6` skipped.
+
+The live external download nodes contain the operator-approved proxy parameters;
+portable repository exports intentionally retain the non-secret `=` placeholder.
+Live n8n is authoritative for those two secret parameters. New internal download
+nodes have no proxy. No parser, field-specific rule, quote check or semantic
+validator was added.
 
 ## Readable TenderPlan report filenames — published, integrated runtime pending
 

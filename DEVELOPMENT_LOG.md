@@ -1,5 +1,24 @@
 # Журнал разработки — AI-анализ тендерной документации
 
+## 12.09.2026 — ручная загрузка в агентский контур
+
+Добавлен production Form-вход без TenderPlan: документы и архивы сохраняются
+последовательно во внутреннем artifact store с SHA-256, проходят существующую
+подготовку и после atomic регистрации передаются тому же Codex runner. Общий
+лимит формы — 200 MiB; исполняемые и неизвестные типы отклоняются.
+
+Blind Test 2 execution `18796` зарегистрировал 12/12 документов. Codex job
+`ad4aea11-04b8-4d26-a9a1-5d694c5584d8` завершился на первой попытке; Monitor
+`18857` принял 27/27 полей и сформировал валидные HTML/PDF artifacts.
+
+Post-canary review добавил только проверки безопасности и audit lifecycle:
+typed HTTP 413 вместо socket reset и отдельный dedicated error workflow
+`xW4DHtnBYddbaU14`, владеющий ровно одним manual run по сохранённому execution
+ID. Semantic parsers, citation checks и field-specific validators не добавлены.
+
+Форма пока открыта с `authentication=none`; риск запуска платного анализа любым
+получившим ссылку документирован и требует отдельного решения об авторизации.
+
 ## 13.08.2026
 
 ### Подключили Docling для разбора документов
@@ -6155,3 +6174,18 @@ The canary is technical GREEN, not a gold semantic verdict. The procurement has
 no employee-authored reference report; manual 27-field review remains an
 offline, non-blocking evaluation. Detailed evidence is in
 `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
+# 2026-09-12 — Manual upload entry integrated into the agentic path
+
+Published `TENDER — Ручная загрузка закупки` as a second input to the existing
+agentic pipeline. The n8n Form accepts multiple supported documents/archives,
+enforces a 200 MiB procurement limit, stores source bytes in the internal
+artifact service with SHA-256 and reuses Document Preparation, atomic
+run/document registration and Agentic Dispatch.
+
+Blind Test 2 reproduced and fixed three transport-only defects: native MIME was
+rejected by source storage, then internal artifact downloads leaked through the
+external proxy in Document Preparation and Dispatch. The final form execution
+`18796` succeeded, registered 12/12 documents for run
+`0ac0b487-71b7-4a35-8412-e587f608aeca` and started job
+`ad4aea11-04b8-4d26-a9a1-5d694c5584d8`. No semantic parser or validator was
+added. Details: `evaluations/MANUAL_UPLOAD_CANARY_2026-09-12.md`.
