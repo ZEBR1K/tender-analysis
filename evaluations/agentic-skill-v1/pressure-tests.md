@@ -103,3 +103,54 @@ unverified until the separate image/staging phase adds the dependency and runs
 a real container smoke. Current `stageAgentTemplate` also still copies only
 `AGENTS.md` and `SKILL.md`, so none of the new helper resources reach a live job
 in this local-only phase.
+
+## Progressive format-routing skill — deployed 2026-09-12
+
+This section supersedes the earlier local-only caveat. The runner already had
+the bounded helpers and `unzip`; this revision reorganizes their instructions
+without adding a parser or runtime semantic validator.
+
+The 374-word `SKILL.md` now routes progressively to four read-only references:
+
+- PDF/image inspection requires visual confirmation, treats OCR only as
+  navigation, and rechecks fragile short identifiers character by character;
+- DOCX inspection combines a LibreOffice render with targeted OOXML only when
+  controls or embedded objects matter;
+- spreadsheet inspection binds values to sheet labels, units, formula context,
+  and targeted OOXML when a print area clips the render;
+- final review preserves material conflicts as `requires_review`, forbids
+  `not_found` from a search miss, and rechecks the exact 27-field contract.
+
+The RED test failed while these references were absent. GREEN verification
+finished with `797` repository tests total, `791` passed, `0` failed and `6`
+environment-specific skips. The installed `skill-creator` validator returned
+`Skill is valid!`. Two independent pressure reviews confirmed the intended PDF,
+DOCX, spreadsheet, conflict, and duplicate-key routes; they did not execute a
+paid procurement analysis.
+
+Only the Codex runner was rebuilt on the existing server. Six transferred files
+matched their local SHA-256 before installation, and the previous `SKILL.md`
+plus template allowlist remain in restricted backup
+`/opt/tender-codex-runner/.skill-backup-20260912-v2`. Fresh isolation challenge
+`33d45901-0824-4067-95fa-df8e203e43d3` passed. Health then reported every
+readiness flag true, including `execute`, with full local/server template hash
+`878F9B1387660836EA1CB305D8D30376D474E71BB11B9E65237D578A3C1D8B7B`.
+n8n, PostgreSQL, and Redis containers retained their prior restart counts and
+start times. A new blind procurement rerun remains the semantic quality gate.
+
+The runtime user prompt was then replaced by a production adaptation of the
+original local blind-test prompt. Quality-critical behavior is now explicit in
+the user message: inspect every manifest document fully; visually open rendered
+scan evidence; use OCR/text search only for navigation; verify selected DOCX
+controls rather than label presence; preserve conflicts; record inaccessible
+material; and never infer a negative from missing information. File paths,
+sealed TenderPlan metadata, and the exact JSON output replace the local test's
+free-form `codex-result.md` instructions. Tool commands remain in the skill.
+
+The focused prompt test was RED against the former short prompt and GREEN after
+the replacement. The installed server/image prompt hash is
+`1AEFA9F605DEF7704AEC922048308FF758E258952D64694C57961A3656606311`.
+Fresh isolation challenge `ea5e2cca-a7de-4b1d-9498-b72dfc1408a7` passed and
+health returned `readiness.execute=true`; protected container restart counts
+and start times were unchanged. The prior prompt remains in restricted backup
+`/opt/tender-codex-runner/.prompt-backup-20260912-v2`.

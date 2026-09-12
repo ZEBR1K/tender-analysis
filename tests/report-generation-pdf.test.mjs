@@ -42,10 +42,23 @@ function normalizedParameters(node) {
     parameters.mode ??= 'runOnceForAllItems';
     parameters.language ??= 'javaScript';
 
+    if (node.name === 'Собрать Report Model2') {
+      parameters.jsCode = parameters.jsCode.replace(
+        /\/\/ (?:Metadata|Header data)[\s\S]*?\n\nconst statistics =/u,
+        '/* procurement header policy */\n\nconst statistics =',
+      );
+    }
+
     if (node.name === 'Сгенерировать HTML1') {
       parameters.jsCode = parameters.jsCode.replace(
         /const procurement = model\.procurement \?\? \{\};[\s\S]*?\n\nconst html = `<!doctype html>/u,
         'const procurement = model.procurement ?? {};\n/* filename policy */\n\nconst html = `<!doctype html>',
+      ).replace(
+        /<title>[^<]*<\/title>/u,
+        '<title>/* report heading */</title>',
+      ).replace(
+        /<h1>[^<]*<\/h1>/u,
+        '<h1>/* report heading */</h1>',
       ).replace(
         /filename: `[^`]+\.html`,/u,
         'filename: `/* filename policy */.html`,',
@@ -233,6 +246,32 @@ test('final report filename uses the TenderPlan number and title safely', async 
     withoutNumber.json.filename,
     'Анализ закупки без номера — Поставка мебели.html',
   );
+  assert.match(
+    withoutNumber.json.html,
+    /<title>Анализ закупки без номера<\/title>/u,
+  );
+  assert.match(
+    withoutNumber.json.html,
+    /<h1>Анализ закупки без номера<\/h1>/u,
+  );
+  assert.doesNotMatch(withoutNumber.json.html, /№не указан/u);
+
+  const unsafeHeader = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({
+      number: '<img src=x onerror=alert(1)>',
+      subject: '<script>alert(2)</script>',
+    }),
+  );
+  assert.match(
+    unsafeHeader.json.html,
+    /<h1>Анализ закупки №&lt;img src=x onerror=alert\(1\)&gt;<\/h1>/u,
+  );
+  assert.match(
+    unsafeHeader.json.html,
+    /<dd>&lt;script&gt;alert\(2\)&lt;\/script&gt;<\/dd>/u,
+  );
+  assert.doesNotMatch(unsafeHeader.json.html, /<img src=x|<script>alert\(2\)<\/script>/u);
 
   const longTitle = await runRenderer(
     renderer.parameters.jsCode,

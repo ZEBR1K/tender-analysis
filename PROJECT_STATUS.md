@@ -23,6 +23,41 @@ its prompt. The rebuilt runner passed its isolation attestation and reports
 blocking semantic validator was added. A full procurement rerun remains a
 separate evaluation step.
 
+The focused skill is now split by progressive disclosure: its 374-word entry
+point routes only the current format to dedicated PDF/image, DOCX/OOXML, or
+spreadsheet guidance and always loads a final semantic/JSON review. The server
+image was rebuilt with all four references in the closed template allowlist.
+Fresh isolation challenge `33d45901-0824-4067-95fa-df8e203e43d3` passed;
+runtime reports `skill_sha256=B76820EE...1C1B4C6`,
+`agent_template_sha256=878F9B13...C1D8B7B`, and
+`readiness.execute=true`. n8n, PostgreSQL, and Redis restart baselines remained
+unchanged. This proves deployment and isolation, not procurement-level semantic
+improvement; that still requires a fresh blind rerun.
+
+The runtime user prompt is now the production adaptation of the successful
+local blind-test prompt. It directly requires complete document analysis,
+visual scan inspection, navigation-only OCR, selected-control verification,
+conflict preservation, honest limitations, and safe `not_found`, while the
+skill retains format-specific tool recipes. The prompt still binds only sealed
+job inputs, TenderPlan metadata, and `tender_agent_result_v1`. Server hash
+`1AEFA9F6...606311` matches the local artifact; fresh isolation challenge
+`ea5e2cca-a7de-4b1d-9498-b72dfc1408a7` passed and restored
+`readiness.execute=true` without restarting n8n, PostgreSQL, or Redis.
+
+## Report header fallback — live published
+
+Report Generation `ckPnP3hRhKu4Mf9u` is published at
+`9fb64a15-af46-4f05-9435-b73fa41152ed` with exact draft/active parity. Live
+read-back confirms 12 unchanged nodes and byte-identical `jsCode` for
+`Собрать Report Model2` and `Сгенерировать HTML1` relative to the canonical
+repository export.
+
+Missing presentation-only `subject`, `customer`, `platform` and `price` are now
+filled from the corresponding nonblank `resolved` / `requires_review` FINAL
+fields. TenderPlan metadata keeps priority; `not_found` is never converted into
+a value. Missing tender number renders as `Анализ закупки без номера`. No FINAL
+row, database schema, workflow connection or semantic validator changed.
+
 ## Manual upload entry — terminal runtime GREEN
 
 Published workflow `TENDER — Ручная загрузка закупки`

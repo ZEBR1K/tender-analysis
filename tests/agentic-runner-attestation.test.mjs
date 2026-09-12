@@ -15,6 +15,10 @@ const runnerRoot = path.join(repositoryRoot, 'deploy', 'codex-runner');
 const agentTemplateFiles = [
   'AGENTS.md',
   '.agents/skills/tender-document-analysis/SKILL.md',
+  '.agents/skills/tender-document-analysis/references/docx-inspection.md',
+  '.agents/skills/tender-document-analysis/references/final-review.md',
+  '.agents/skills/tender-document-analysis/references/pdf-inspection.md',
+  '.agents/skills/tender-document-analysis/references/spreadsheet-inspection.md',
   '.agents/skills/tender-document-analysis/references/tool-recipes.md',
   '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
   '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',

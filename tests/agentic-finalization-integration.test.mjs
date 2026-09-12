@@ -206,6 +206,98 @@ test('Report accepts agentic null confidence and preserves opaque source locator
   assert.match(render, /escapeHtml\(source\.locator\)/u);
 });
 
+test('Report Model fills missing header metadata from usable FINAL fields without overriding TenderPlan', async () => {
+  const workflow = await load('TENDER — Генерация отчета.json');
+  const buildModel = byName(workflow, 'Собрать Report Model2').parameters.jsCode;
+  const adaptedFields = [
+    ['procurement_subject', 'resolved', 'Предмет из анализа'],
+    ['nm_price_with_vat', 'resolved', '3 181 278,10 руб. с НДС'],
+    ['platform', 'requires_review', 'ЭТП «ГПБ»'],
+    ['customer', 'resolved', 'ООО «ССК «Звезда»'],
+  ].map(([fieldKey, status, valueText], index) => ({
+    analysis_result: {
+      field_index: index + 1,
+      field_key: fieldKey,
+      status,
+      value_text: valueText,
+      requires_human_review: status === 'requires_review',
+    },
+    presentation: {},
+    sources: [],
+  }));
+
+  const manualModel = executeCodeNode(buildModel, {
+    adapter_version: 'tender_report_adapter_v2',
+    analysis_run_id: 'manual-run',
+    analysis_run: {
+      tender_meta: {
+        source: 'manual_upload',
+        title: 'Название из формы',
+        primary_customer: { name: '   ' },
+      },
+    },
+    adapted_fields: adaptedFields,
+  })[0].json;
+
+  assert.deepEqual(manualModel.procurement, {
+    number: null,
+    subject: 'Название из формы',
+    customer: 'ООО «ССК «Звезда»',
+    platform: 'ЭТП «ГПБ»',
+    price: '3 181 278,10 руб. с НДС',
+    publication_at: null,
+  });
+
+  const emptyMetadataModel = executeCodeNode(buildModel, {
+    adapter_version: 'tender_report_adapter_v2',
+    analysis_run_id: 'manual-run-without-metadata',
+    analysis_run: { tender_meta: {} },
+    adapted_fields: adaptedFields,
+  })[0].json;
+  assert.equal(emptyMetadataModel.procurement.subject, 'Предмет из анализа');
+
+  const notFoundCustomerFields = structuredClone(adaptedFields);
+  const notFoundCustomer = notFoundCustomerFields.find(
+    field => field.analysis_result.field_key === 'customer',
+  );
+  notFoundCustomer.analysis_result.status = 'not_found';
+  notFoundCustomer.analysis_result.value_text = 'Не должно попасть в шапку';
+
+  const notFoundModel = executeCodeNode(buildModel, {
+    adapter_version: 'tender_report_adapter_v2',
+    analysis_run_id: 'manual-run-not-found',
+    analysis_run: { tender_meta: {} },
+    adapted_fields: notFoundCustomerFields,
+  })[0].json;
+  assert.equal(notFoundModel.procurement.customer, null);
+
+  const tenderPlanModel = executeCodeNode(buildModel, {
+    adapter_version: 'tender_report_adapter_v2',
+    analysis_run_id: 'tenderplan-run',
+    analysis_run: {
+      tender_meta: {
+        source: 'tenderplan',
+        tender_number: '10293451',
+        title: 'Название из TenderPlan',
+        primary_customer: { name: 'Заказчик из TenderPlan' },
+        platform: { name: 'Площадка из TenderPlan' },
+        max_price: 42,
+        publication_at: '2026-09-12T00:00:00.000Z',
+      },
+    },
+    adapted_fields: adaptedFields,
+  })[0].json;
+
+  assert.deepEqual(tenderPlanModel.procurement, {
+    number: '10293451',
+    subject: 'Название из TenderPlan',
+    customer: 'Заказчик из TenderPlan',
+    platform: 'Площадка из TenderPlan',
+    price: 42,
+    publication_at: '2026-09-12T00:00:00.000Z',
+  });
+});
+
 test('agentic Report path executes all Code nodes and escapes an opaque locator', async () => {
   const workflow = await load('TENDER — Генерация отчета.json');
   const snapshot = agenticSnapshot();

@@ -67,11 +67,12 @@ and constraints remain audit context rather than a completeness claim.
 
 For every new job, the runner copies one fixed, hash-attested toolkit from the
 container image into the private workspace. It contains the short `AGENTS.md`,
-the focused tender-analysis skill, usage recipes, and bounded helpers for PDF
-text search/rendering, image OCR, Office rendering, and read-only OOXML
-inspection. The allowlist is closed: an added, missing, symlinked, or changed
-template file fails staging or changes the execution-profile attestation. The
-helpers are optional navigation aids; Codex remains responsible for choosing
+the focused tender-analysis skill, format-specific references for PDF/image,
+DOCX/OOXML and spreadsheets, a final-review reference, usage recipes, and
+bounded helpers for PDF text search/rendering, image OCR, Office rendering, and
+read-only OOXML inspection. The allowlist is closed: an added, missing,
+symlinked, or changed template file fails staging or changes the
+execution-profile attestation. The helpers are optional navigation aids; Codex remains responsible for choosing
 the inspection method and for the semantic conclusions. Rendering a PNG does
 not count as visual inspection: the focused skill requires Codex to open every
 PNG used for a conclusion with `view_image`, and to record a limitation when an

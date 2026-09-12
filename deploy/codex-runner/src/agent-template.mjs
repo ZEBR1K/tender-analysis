@@ -5,6 +5,10 @@ import path from 'node:path';
 export const AGENT_TEMPLATE_FILES = Object.freeze([
   'AGENTS.md',
   '.agents/skills/tender-document-analysis/SKILL.md',
+  '.agents/skills/tender-document-analysis/references/docx-inspection.md',
+  '.agents/skills/tender-document-analysis/references/final-review.md',
+  '.agents/skills/tender-document-analysis/references/pdf-inspection.md',
+  '.agents/skills/tender-document-analysis/references/spreadsheet-inspection.md',
   '.agents/skills/tender-document-analysis/references/tool-recipes.md',
   '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
   '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',

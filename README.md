@@ -455,7 +455,7 @@ Workflow ID: `cSsh9yjpS7t5p0OO`.
 
 ## `TENDER — Генерация отчета`
 
-Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` конвертирует этот же HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены, post-promotion production execution намеренно отложен.
+Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `9fb64a15-af46-4f05-9435-b73fa41152ed` заполняет отсутствующие presentation-only данные шапки из пригодных FINAL-полей, конвертирует HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены; текущая live-версия read-back проверена на точное совпадение изменённых Code-нод с canonical export.
 
 Workflow ID: `ckPnP3hRhKu4Mf9u`.
 

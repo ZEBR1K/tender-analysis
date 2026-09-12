@@ -30,6 +30,13 @@ const scriptNames = [
   'render-office.mjs',
   'ooxml-part.mjs',
 ];
+const referenceNames = [
+  'pdf-inspection.md',
+  'docx-inspection.md',
+  'spreadsheet-inspection.md',
+  'final-review.md',
+  'tool-recipes.md',
+];
 
 async function importScript(name) {
   return import(pathToFileURL(path.join(scriptsRoot, name)).href);
@@ -52,7 +59,9 @@ function runNode(args) {
 }
 
 test('focused skill ships the documented local helper set', async () => {
-  await access(path.join(skillRoot, 'references', 'tool-recipes.md'));
+  for (const name of referenceNames) {
+    await access(path.join(skillRoot, 'references', name));
+  }
   for (const name of ['document-toolkit-lib.mjs', ...scriptNames]) {
     await access(path.join(scriptsRoot, name));
   }
@@ -65,6 +74,14 @@ test('focused skill ships the documented local helper set', async () => {
   assert.ok(agents.trim().split(/\s+/u).length < 180, 'AGENTS.md must stay concise');
   assert.match(agents, /text search or OCR miss[^\n]+not evidence of absence/iu);
   assert.match(agents, /visually inspect/iu);
+  assert.match(
+    agents,
+    /Creating or rendering[\s\S]{0,80}image[\s\S]{0,80}not visual inspection[\s\S]{0,160}open every rendered\s+image[\s\S]{0,80}`view_image`/iu,
+  );
+  assert.match(
+    agents,
+    /`view_image` is unavailable[\s\S]{0,120}record[\s\S]{0,80}limitation[\s\S]{0,120}do not claim\s+visual inspection/iu,
+  );
   assert.match(agents, /only the current job/iu);
   assert.match(skill, /references\/tool-recipes\.md/u);
   assert.match(skill, /Do not\s+pre-index every document, page, sheet, or OOXML part/iu);
@@ -82,6 +99,46 @@ test('focused skill ships the documented local helper set', async () => {
     assert.match(recipes, new RegExp(name.replaceAll('.', '\\.')));
   }
   assert.doesNotMatch(skill, /\b(?:PRICE|VAT|NEGATIVE|CONFLICT)\b|field-specific validator/u);
+});
+
+test('skill progressively routes document formats to read-only inspection references', async () => {
+  const [skill, pdf, docx, spreadsheet, finalReview] = await Promise.all([
+    readFile(path.join(skillRoot, 'SKILL.md'), 'utf8'),
+    readFile(path.join(skillRoot, 'references', 'pdf-inspection.md'), 'utf8'),
+    readFile(path.join(skillRoot, 'references', 'docx-inspection.md'), 'utf8'),
+    readFile(path.join(skillRoot, 'references', 'spreadsheet-inspection.md'), 'utf8'),
+    readFile(path.join(skillRoot, 'references', 'final-review.md'), 'utf8'),
+  ]);
+
+  assert.ok(skill.trim().split(/\s+/u).length < 500, 'SKILL.md must stay compact');
+  for (const name of referenceNames) {
+    assert.match(skill, new RegExp(`references/${name.replaceAll('.', '\\.')}`, 'u'));
+  }
+
+  assert.match(pdf, /text layer/iu);
+  assert.match(pdf, /scan[\s\S]{0,200}(?:every|each)[\s\S]{0,120}(?:page|image)[\s\S]{0,160}`view_image`/iu);
+  assert.match(pdf, /(?:zoom|crop|enlarge)[\s\S]{0,200}(?:character|symbol|identifier)/iu);
+  assert.match(pdf, /OCR[\s\S]{0,160}navigation/iu);
+
+  assert.match(docx, /render[\s\S]{0,120}(?:DOCX|Office)/iu);
+  assert.match(docx, /OOXML/iu);
+  assert.match(docx, /checkbox|radio|selected option/iu);
+  assert.match(docx, /requires_review/iu);
+
+  assert.match(spreadsheet, /worksheet|sheet/iu);
+  assert.match(spreadsheet, /formula/iu);
+  assert.match(spreadsheet, /render|visual/iu);
+  assert.match(spreadsheet, /print area[\s\S]{0,240}(?:actual|used)[\s\S]{0,80}(?:range|cells)/iu);
+
+  assert.match(finalReview, /27 unique/iu);
+  assert.match(finalReview, /not_found[\s\S]{0,200}(?:absence|missing)/iu);
+  assert.match(finalReview, /conflict/iu);
+  assert.match(finalReview, /each competing source[\s\S]{0,160}artifact_key[\s\S]{0,80}locator/iu);
+  assert.match(finalReview, /identifier|character|symbol/iu);
+
+  const combined = [skill, pdf, docx, spreadsheet, finalReview].join('\n');
+  assert.doesNotMatch(combined, /using-superpowers|Graphify|computer-use/iu);
+  assert.doesNotMatch(combined, /create a (?:PDF|DOCX|spreadsheet)|edit the (?:PDF|DOCX|spreadsheet)/iu);
 });
 
 test('PDF text helper finds a plain term on the original page number', async () => {
