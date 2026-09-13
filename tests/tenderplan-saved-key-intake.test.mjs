@@ -129,3 +129,116 @@ test('the same tender under two keys receives distinct event keys', async () => 
   }
   assert.equal(new Set(outputs).size, 2);
 });
+
+test('malformed TenderPlan page shapes fail closed before dispatch', async () => {
+  const node = requireNode(workflow, 'Normalize Complete Page Set');
+  const key = {
+    saved_key_id: fixture.keys[0].saved_key_id,
+    saved_key_name: fixture.keys[0].name,
+    baseline_exists: true,
+  };
+  const globals = {
+    $: () => ({ first: () => ({ json: structuredClone(key) }) }),
+  };
+
+  await assert.rejects(
+    executeCodeNode(node, [{ tenders: {} }], globals),
+    /TENDERPLAN_TENDERS_INVALID/u,
+  );
+  await assert.rejects(
+    executeCodeNode(node, [null], globals),
+    /TENDERPLAN_RESPONSE_INVALID/u,
+  );
+});
+
+test('queue emits one no-dispatch summary and rejects unknown ledger statuses', async () => {
+  const node = requireNode(workflow, 'Build Dispatch Queue');
+  const common = {
+    saved_key_id: fixture.keys[0].saved_key_id,
+    saved_key_name: fixture.keys[0].name,
+    observed_at: '2026-09-13T10:00:00.000Z',
+  };
+  const suppressed = await executeCodeNode(node, [{
+    ...common,
+    event_states: [
+      { tender_id: fixture.expectedTenderIds[0], existing_status: 'completed' },
+      { tender_id: fixture.expectedTenderIds[1], existing_status: 'processing' },
+    ],
+  }]);
+  assert.equal(suppressed.length, 1);
+  assert.equal(suppressed[0].json.should_dispatch, false);
+  assert.equal(suppressed[0].json.suppressed_count, 2);
+
+  await assert.rejects(
+    executeCodeNode(node, [{
+      ...common,
+      event_states: [{ tender_id: fixture.expectedTenderIds[0], existing_status: 'mystery' }],
+    }]),
+    /INTAKE_EVENT_STATUS_INVALID/u,
+  );
+});
+
+test('baseline validator accepts only zero markers or one exact valid marker', async () => {
+  const node = requireNode(workflow, 'Validate Baseline State');
+  const base = {
+    saved_key_id: fixture.keys[0].saved_key_id,
+    saved_key_name: fixture.keys[0].name,
+  };
+  const absent = await executeCodeNode(node, [{ ...base, marker_count: 0, valid_marker_count: 0 }]);
+  const present = await executeCodeNode(node, [{ ...base, marker_count: 1, valid_marker_count: 1 }]);
+  assert.equal(absent[0].json.baseline_exists, false);
+  assert.equal(present[0].json.baseline_exists, true);
+  await assert.rejects(
+    executeCodeNode(node, [{ ...base, marker_count: 1, valid_marker_count: 0 }]),
+    /BASELINE_MARKER_INVALID/u,
+  );
+  await assert.rejects(
+    executeCodeNode(node, [{ ...base, marker_count: 2, valid_marker_count: 1 }]),
+    /BASELINE_STATE_INVALID/u,
+  );
+});
+
+test('baseline rows and marker are persisted by one atomic SQL statement', () => {
+  const node = requireNode(workflow, 'Initialize Baseline');
+  const sql = node.parameters.query;
+  const normalized = sql.replace(/\s+/gu, ' ').toLowerCase();
+  assert.equal((sql.match(/;/gu) ?? []).length, 1);
+  assert.match(normalized, /with input_rows as/u);
+  assert.match(normalized, /baseline_events as \( insert into public\.tender_analysis_intake_events/u);
+  assert.match(normalized, /baseline_marker as \( insert into public\.tender_analysis_intake_events/u);
+  assert.ok(normalized.indexOf('baseline_events as') < normalized.indexOf('baseline_marker as'));
+  assert.match(normalized, /key_match_baseline/u);
+  assert.match(normalized, /key_baseline_completed/u);
+  assert.match(normalized, /baseline_existing_skipped/u);
+  assert.match(normalized, /baseline_initialized/u);
+  assert.match(normalized, /on conflict \(source, event_key\) do nothing/u);
+  assert.doesNotMatch(normalized, /create table|drop table|add column|parser|validator|field_key/u);
+});
+
+test('existing event states are loaded by one parameterized batch query', () => {
+  const node = requireNode(workflow, 'Load Existing Event States');
+  const normalized = node.parameters.query.replace(/\s+/gu, ' ').toLowerCase();
+  assert.match(normalized, /jsonb_array_elements_text\(\$3::jsonb\)/u);
+  assert.match(normalized, /left join public\.tender_analysis_intake_events/u);
+  assert.match(normalized, /event_key = 'tenderplan:key:' \|\| \$1::text \|\| ':tender:' \|\| requested\.tender_id/u);
+  assert.equal((node.parameters.query.match(/;/gu) ?? []).length, 1);
+});
+
+test('pagination is bounded, rate-limited, retried, and stopped by an empty tenders page', () => {
+  const node = requireNode(workflow, 'Get Complete Saved Key Pages');
+  const pagination = node.parameters.options.pagination.pagination;
+  assert.equal(pagination.paginationMode, 'updateAParameterInEachRequest');
+  assert.deepEqual(pagination.parameters.parameters, [{
+    type: 'qs',
+    name: 'page',
+    value: '={{ $pageCount + 1 }}',
+  }]);
+  assert.equal(pagination.paginationCompleteWhen, 'other');
+  assert.match(pagination.completeExpression, /tenders\.length === 0/u);
+  assert.equal(pagination.limitPagesFetched, true);
+  assert.equal(pagination.maxRequests, 100);
+  assert.equal(pagination.requestInterval, 1100);
+  assert.equal(node.retryOnFail, true);
+  assert.equal(node.maxTries, 3);
+  assert.equal(node.waitBetweenTries, 5000);
+});
