@@ -1,0 +1,466 @@
+{
+  "name": "TENDER — TenderPlan Saved Key Intake",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1280, -160],
+      "id": "51000000-0000-4000-8000-000000000001",
+      "name": "Manual Trigger"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-1280, 0],
+      "id": "51000000-0000-4000-8000-000000000002",
+      "name": "Every 10 Minutes"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const SAVED_KEYS = Object.freeze([]);\nconst objectId = /^[0-9a-f]{24}$/u;\n\nif (!Array.isArray(SAVED_KEYS) || SAVED_KEYS.length === 0) {\n  throw new Error('SAVED_KEYS_NOT_CONFIGURED');\n}\n\nconst ids = new Set();\nconst enabled = [];\nfor (const raw of SAVED_KEYS) {\n  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {\n    throw new Error('SAVED_KEY_CONFIG_INVALID: entry must be an object');\n  }\n  const saved_key_id = typeof raw.saved_key_id === 'string'\n    ? raw.saved_key_id.trim().toLowerCase()\n    : '';\n  const name = typeof raw.name === 'string' ? raw.name.trim() : '';\n  if (!objectId.test(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: id=${saved_key_id || 'empty'}`);\n  }\n  if (!name || name.length > 200 || typeof raw.enabled !== 'boolean') {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: metadata for ${saved_key_id}`);\n  }\n  if (ids.has(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_DUPLICATE: ${saved_key_id}`);\n  }\n  ids.add(saved_key_id);\n  if (raw.enabled) enabled.push({ saved_key_id, saved_key_name: name });\n}\n\nif (enabled.length === 0) throw new Error('NO_ENABLED_SAVED_KEYS');\nreturn enabled.map((json) => ({ json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1040, -80],
+      "id": "51000000-0000-4000-8000-000000000003",
+      "name": "Define Saved Keys"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-800, -80],
+      "id": "51000000-0000-4000-8000-000000000004",
+      "name": "Loop Over Saved Keys"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  $1::text AS saved_key_id,\n  $2::text AS saved_key_name,\n  count(*)::integer AS marker_count,\n  count(*) FILTER (\n    WHERE event_type = 'key_baseline_completed'\n      AND tender_id = 'baseline:' || $1::text\n      AND trigger_kind = 'tenderplan_key'\n      AND status = 'completed'\n      AND action = 'baseline_initialized'\n      AND processed_at IS NOT NULL\n  )::integer AS valid_marker_count\nFROM public.tender_analysis_intake_events\nWHERE source = 'tenderplan'\n  AND event_key = 'tenderplan:key:' || $1::text || ':baseline:v1';",
+        "options": {
+          "queryReplacement": "={{ [ $json.saved_key_id, $json.saved_key_name ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [-560, 80],
+      "id": "51000000-0000-4000-8000-000000000005",
+      "name": "Load Baseline State",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const markerCount = Number($json.marker_count);\nconst validMarkerCount = Number($json.valid_marker_count);\nif (!Number.isInteger(markerCount) || !Number.isInteger(validMarkerCount)) {\n  throw new Error('BASELINE_STATE_INVALID: counts');\n}\nif (markerCount > 1 || validMarkerCount > markerCount) {\n  throw new Error('BASELINE_STATE_INVALID: multiplicity');\n}\nif (markerCount === 1 && validMarkerCount !== 1) {\n  throw new Error(`BASELINE_MARKER_INVALID: ${$json.saved_key_id}`);\n}\nreturn [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    baseline_exists: validMarkerCount === 1,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 80],
+      "id": "51000000-0000-4000-8000-000000000006",
+      "name": "Validate Baseline State",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://tenderplan.ru/api/tenders/v2/getlist",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "0"
+            },
+            {
+              "name": "id",
+              "value": "={{ $json.saved_key_id }}"
+            },
+            {
+              "name": "page",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "updateAParameterInEachRequest",
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "qs",
+                    "name": "page",
+                    "value": "={{ $pageCount + 1 }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !Array.isArray($response.body?.tenders) || $response.body.tenders.length === 0 }}",
+              "limitPagesFetched": true,
+              "maxRequests": 100,
+              "requestInterval": 1100
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-80, 80],
+      "id": "51000000-0000-4000-8000-000000000007",
+      "name": "Get Complete Saved Key Pages",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "E9gI5Mur0c8eFsN0",
+          "name": "Тендерплан kitateh n8n автоматизация тендеров"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const key = $('Validate Baseline State').first().json;\nconst pages = $input.all().map((item) => item.json);\nconst objectId = /^[0-9a-f]{24}$/u;\n\nif (pages.length === 0) throw new Error('TENDERPLAN_EMPTY_PAGE_SET');\nif (pages.length > 100) throw new Error(`TENDERPLAN_PAGE_LIMIT_EXCEEDED: ${pages.length}`);\n\nconst ids = new Set();\nconst addTender = (candidate, location, optional = false) => {\n  if (candidate == null && optional) return;\n  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {\n    throw new Error(`TENDERPLAN_RESPONSE_INVALID: ${location}`);\n  }\n  const tenderId = typeof candidate._id === 'string'\n    ? candidate._id.trim().toLowerCase()\n    : '';\n  if (!objectId.test(tenderId)) {\n    throw new Error(`TENDERPLAN_TENDER_ID_INVALID: ${location}`);\n  }\n  ids.add(tenderId);\n};\n\npages.forEach((body, pageIndex) => {\n  if (!body || typeof body !== 'object' || Array.isArray(body)) {\n    throw new Error(`TENDERPLAN_RESPONSE_INVALID: page=${pageIndex}`);\n  }\n  if (!Array.isArray(body.tenders)) {\n    throw new Error(`TENDERPLAN_TENDERS_INVALID: page=${pageIndex}`);\n  }\n  body.tenders.forEach((candidate, index) => {\n    addTender(candidate, `page=${pageIndex}.tenders[${index}]`);\n  });\n  if (Object.hasOwn(body, 'tender')) addTender(body.tender, `page=${pageIndex}.tender`, true);\n});\n\nif (pages.at(-1).tenders.length !== 0) {\n  throw new Error(`TENDERPLAN_PAGINATION_INCOMPLETE: pages=${pages.length}`);\n}\n\nreturn [{\n  json: {\n    ...key,\n    tender_ids: [...ids].sort(),\n    page_count: pages.length,\n    observed_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 80],
+      "id": "51000000-0000-4000-8000-000000000008",
+      "name": "Normalize Complete Page Set",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "51000000-0000-4000-8000-000000000901",
+              "leftValue": "={{ $json.baseline_exists }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [400, 80],
+      "id": "51000000-0000-4000-8000-000000000009",
+      "name": "Baseline Exists?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_rows AS (\n  SELECT DISTINCT value::text AS tender_id\n  FROM jsonb_array_elements_text($3::jsonb) AS value\n),\nbaseline_events AS (\n  INSERT INTO public.tender_analysis_intake_events (\n    source,\n    event_key,\n    event_type,\n    tender_id,\n    observed_at,\n    trigger_kind,\n    status,\n    attempts,\n    n8n_execution_id,\n    action,\n    processed_at,\n    updated_at\n  )\n  SELECT\n    'tenderplan',\n    'tenderplan:key:' || $1::text || ':tender:' || input_rows.tender_id,\n    'key_match_baseline',\n    input_rows.tender_id,\n    $5::timestamptz,\n    'tenderplan_key',\n    'completed',\n    1,\n    $4::text,\n    'baseline_existing_skipped',\n    now(),\n    now()\n  FROM input_rows\n  ON CONFLICT (source, event_key) DO NOTHING\n  RETURNING id\n),\nbaseline_marker AS (\n  INSERT INTO public.tender_analysis_intake_events (\n    source,\n    event_key,\n    event_type,\n    tender_id,\n    observed_at,\n    trigger_kind,\n    status,\n    attempts,\n    n8n_execution_id,\n    action,\n    processed_at,\n    updated_at\n  )\n  VALUES (\n    'tenderplan',\n    'tenderplan:key:' || $1::text || ':baseline:v1',\n    'key_baseline_completed',\n    'baseline:' || $1::text,\n    $5::timestamptz,\n    'tenderplan_key',\n    'completed',\n    1,\n    $4::text,\n    'baseline_initialized',\n    now(),\n    now()\n  )\n  ON CONFLICT (source, event_key) DO NOTHING\n  RETURNING id\n)\nSELECT\n  $1::text AS saved_key_id,\n  $2::text AS saved_key_name,\n  (SELECT count(*)::integer FROM input_rows) AS baseline_tenders_total,\n  (SELECT count(*)::integer FROM baseline_events) AS baseline_events_inserted,\n  (SELECT count(*)::integer FROM baseline_marker) AS baseline_marker_inserted;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.saved_key_id,\n  $json.saved_key_name,\n  JSON.stringify($json.tender_ids),\n  $execution.id,\n  $json.observed_at\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [640, 240],
+      "id": "51000000-0000-4000-8000-000000000010",
+      "name": "Initialize Baseline",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const markerInserted = Number($json.baseline_marker_inserted);\nif (![0, 1].includes(markerInserted)) {\n  throw new Error('BASELINE_INSERT_RESULT_INVALID');\n}\nreturn [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: markerInserted === 1 ? 'baseline_initialized' : 'baseline_race_noop',\n    baseline_tenders_total: Number($json.baseline_tenders_total),\n    baseline_events_inserted: Number($json.baseline_events_inserted),\n    dispatched_count: 0,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 240],
+      "id": "51000000-0000-4000-8000-000000000011",
+      "name": "Baseline Summary"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH requested AS (\n  SELECT DISTINCT value::text AS tender_id\n  FROM jsonb_array_elements_text($3::jsonb) AS value\n),\nclassified AS (\n  SELECT\n    requested.tender_id,\n    event_row.status AS existing_status\n  FROM requested\n  LEFT JOIN public.tender_analysis_intake_events AS event_row\n    ON event_row.source = 'tenderplan'\n   AND event_row.event_key = 'tenderplan:key:' || $1::text || ':tender:' || requested.tender_id\n)\nSELECT\n  $1::text AS saved_key_id,\n  $2::text AS saved_key_name,\n  $4::timestamptz AS observed_at,\n  COALESCE(\n    jsonb_agg(\n      jsonb_build_object(\n        'tender_id', classified.tender_id,\n        'existing_status', classified.existing_status\n      )\n      ORDER BY classified.tender_id\n    ) FILTER (WHERE classified.tender_id IS NOT NULL),\n    '[]'::jsonb\n  ) AS event_states\nFROM classified;",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.saved_key_id,\n  $json.saved_key_name,\n  JSON.stringify($json.tender_ids),\n  $json.observed_at\n] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [640, -80],
+      "id": "51000000-0000-4000-8000-000000000012",
+      "name": "Load Existing Event States",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rawStates = typeof $json.event_states === 'string'\n  ? JSON.parse($json.event_states)\n  : $json.event_states;\nif (!Array.isArray(rawStates)) throw new Error('EVENT_STATES_INVALID');\n\nconst dispatchable = [];\nfor (const state of rawStates) {\n  const status = state.existing_status ?? null;\n  if (status === null || status === 'failed') {\n    dispatchable.push(state.tender_id);\n    continue;\n  }\n  if (status === 'processing' || status === 'completed') continue;\n  throw new Error(`INTAKE_EVENT_STATUS_INVALID: ${String(status)}`);\n}\n\nif (dispatchable.length === 0) {\n  return [{\n    json: {\n      saved_key_id: $json.saved_key_id,\n      saved_key_name: $json.saved_key_name,\n      should_dispatch: false,\n      tender_id: null,\n      observed_at: $json.observed_at,\n      suppressed_count: rawStates.length,\n    },\n  }];\n}\n\nreturn dispatchable.map((tender_id) => ({\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    should_dispatch: true,\n    trigger_kind: 'tenderplan_key',\n    source_event_key: `tenderplan:key:${$json.saved_key_id}:tender:${tender_id}`,\n    tender_id,\n    analysis_run_id: '',\n    manual_override: false,\n    observed_at: $json.observed_at,\n    total_count: rawStates.length,\n    suppressed_count: rawStates.length - dispatchable.length,\n  },\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -80],
+      "id": "51000000-0000-4000-8000-000000000013",
+      "name": "Build Dispatch Queue",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "51000000-0000-4000-8000-000000000902",
+              "leftValue": "={{ $json.should_dispatch }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1120, -80],
+      "id": "51000000-0000-4000-8000-000000000014",
+      "name": "Has Dispatch?"
+    },
+    {
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "VO8Ml0sfO65w2Jiz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VO8Ml0sfO65w2Jiz",
+          "cachedResultName": "TENDER — Intake Resume"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "trigger_kind": "={{ $json.trigger_kind }}",
+            "source_event_key": "={{ $json.source_event_key }}",
+            "tender_id": "={{ $json.tender_id }}",
+            "analysis_run_id": "={{ $json.analysis_run_id }}",
+            "manual_override": "={{ $json.manual_override }}",
+            "observed_at": "={{ $json.observed_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "trigger_kind", "displayName": "trigger_kind", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "source_event_key", "displayName": "source_event_key", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "tender_id", "displayName": "tender_id", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "analysis_run_id", "displayName": "analysis_run_id", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" },
+            { "id": "manual_override", "displayName": "manual_override", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "boolean" },
+            { "id": "observed_at", "displayName": "observed_at", "required": false, "defaultMatch": false, "display": true, "canBeUsedToMatch": true, "type": "string" }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [1360, -160],
+      "id": "51000000-0000-4000-8000-000000000015",
+      "name": "Execute TENDER — Intake Resume",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const dispatched = $input.all()\n  .map((item) => item.json)\n  .filter((item) => item.should_dispatch === true);\nconst key = dispatched[0];\nif (!key) throw new Error('DISPATCH_SUMMARY_WITHOUT_EVENTS');\nreturn [{\n  json: {\n    saved_key_id: key.saved_key_id,\n    saved_key_name: key.saved_key_name,\n    outcome: 'polled',\n    discovered_count: Number(key.total_count),\n    dispatched_count: dispatched.length,\n    suppressed_count: Number(key.suppressed_count),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, -160],
+      "id": "51000000-0000-4000-8000-000000000016",
+      "name": "Dispatch Summary"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: 'polled',\n    discovered_count: Number($json.suppressed_count ?? 0),\n    dispatched_count: 0,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 0],
+      "id": "51000000-0000-4000-8000-000000000017",
+      "name": "No New Tenders"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const key = $('Loop Over Saved Keys').item.json;\nconst detail = $json.error?.message ?? $json.message ?? 'unknown key-processing error';\nreturn [{\n  json: {\n    saved_key_id: key.saved_key_id,\n    saved_key_name: key.saved_key_name,\n    outcome: 'failed',\n    error_message: String(detail).slice(0, 2000),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 480],
+      "id": "51000000-0000-4000-8000-000000000018",
+      "name": "Key Failure"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const summaries = $input.all().map((item) => item.json);\nconst failed = summaries.filter((item) => item.outcome === 'failed');\nif (failed.length > 0) {\n  const ids = failed.map((item) => item.saved_key_id).join(',');\n  throw new Error(`TENDERPLAN_SAVED_KEY_POLL_FAILED: ${ids}`);\n}\nreturn [{\n  json: {\n    success: true,\n    keys_total: summaries.length,\n    baseline_initialized: summaries.filter((item) => item.outcome === 'baseline_initialized').length,\n    polled: summaries.filter((item) => item.outcome === 'polled').length,\n    dispatched: summaries.reduce((sum, item) => sum + Number(item.dispatched_count ?? 0), 0),\n    summaries,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, -240],
+      "id": "51000000-0000-4000-8000-000000000019",
+      "name": "Assert Poll Completed"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Define Saved Keys", "type": "main", "index": 0 }]] },
+    "Every 10 Minutes": { "main": [[{ "node": "Define Saved Keys", "type": "main", "index": 0 }]] },
+    "Define Saved Keys": { "main": [[{ "node": "Loop Over Saved Keys", "type": "main", "index": 0 }]] },
+    "Loop Over Saved Keys": {
+      "main": [
+        [{ "node": "Assert Poll Completed", "type": "main", "index": 0 }],
+        [{ "node": "Load Baseline State", "type": "main", "index": 0 }]
+      ]
+    },
+    "Load Baseline State": {
+      "main": [
+        [{ "node": "Validate Baseline State", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Baseline State": {
+      "main": [
+        [{ "node": "Get Complete Saved Key Pages", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Complete Saved Key Pages": {
+      "main": [
+        [{ "node": "Normalize Complete Page Set", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Complete Page Set": {
+      "main": [
+        [{ "node": "Baseline Exists?", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Baseline Exists?": {
+      "main": [
+        [{ "node": "Load Existing Event States", "type": "main", "index": 0 }],
+        [{ "node": "Initialize Baseline", "type": "main", "index": 0 }]
+      ]
+    },
+    "Initialize Baseline": {
+      "main": [
+        [{ "node": "Baseline Summary", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Baseline Summary": { "main": [[{ "node": "Loop Over Saved Keys", "type": "main", "index": 0 }]] },
+    "Load Existing Event States": {
+      "main": [
+        [{ "node": "Build Dispatch Queue", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Dispatch Queue": {
+      "main": [
+        [{ "node": "Has Dispatch?", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Dispatch?": {
+      "main": [
+        [{ "node": "Execute TENDER — Intake Resume", "type": "main", "index": 0 }],
+        [{ "node": "No New Tenders", "type": "main", "index": 0 }]
+      ]
+    },
+    "Execute TENDER — Intake Resume": {
+      "main": [
+        [{ "node": "Dispatch Summary", "type": "main", "index": 0 }],
+        [{ "node": "Key Failure", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dispatch Summary": { "main": [[{ "node": "Loop Over Saved Keys", "type": "main", "index": 0 }]] },
+    "No New Tenders": { "main": [[{ "node": "Loop Over Saved Keys", "type": "main", "index": 0 }]] },
+    "Key Failure": { "main": [[{ "node": "Loop Over Saved Keys", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Moscow",
+    "errorWorkflow": "kff8KIrSHzo5Mmt1",
+    "availableInMCP": false
+  },
+  "versionId": "51000000-0000-4000-8000-000000000100",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
