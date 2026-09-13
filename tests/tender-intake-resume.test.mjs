@@ -17,6 +17,7 @@ const fixture = JSON.parse(fs.readFileSync(path.join(
 const automaticIntents = [
   { triggerKind: 'tenderplan_mark', manualOverride: false },
   { triggerKind: 'recovery_scan', manualOverride: false },
+  { triggerKind: 'tenderplan_key', manualOverride: false },
 ];
 const manualIntent = { triggerKind: 'manual', manualOverride: true };
 const workflowExportPath = path.resolve(
@@ -256,6 +257,27 @@ async function executeSingleCodeJson(node, inputJson, globals) {
   assert.ok(items[0]?.json && typeof items[0].json === 'object');
   return items[0].json;
 }
+
+test('Intake Resume maps tenderplan_key to TenderPlan identity', async () => {
+  const workflow = JSON.parse(fs.readFileSync(workflowExportPath, 'utf8'));
+  const validate = requireNode(workflow, 'Validate Intake Input');
+  const identity = requireNode(workflow, 'Prepare Event Identity');
+  const input = {
+    trigger_kind: 'tenderplan_key',
+    source_event_key: 'tenderplan:key:64f000000000000000000001:tender:66a000000000000000000002',
+    tender_id: '66a000000000000000000002',
+    analysis_run_id: '',
+    manual_override: false,
+    observed_at: '2026-09-13T10:00:00.000Z',
+  };
+  const validated = await executeSingleCodeJson(validate, input);
+  assert.equal(validated.source, 'tenderplan');
+  assert.equal(validated.intent, 'automatic');
+  assert.equal(validated.run_authoritative, false);
+  const identified = await executeSingleCodeJson(identity, validated);
+  assert.equal(identified.source, 'tenderplan');
+  assert.equal(identified.event_type, 'key_match_added');
+});
 
 function evaluate({
   intent,

@@ -1,6 +1,7 @@
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const AUTOMATIC_TRIGGER_KINDS = new Set([
   'tenderplan_mark',
+  'tenderplan_key',
   'recovery_scan',
 ]);
 const RECLAIMABLE_EXECUTION_STATES = new Set([

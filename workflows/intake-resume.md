@@ -5,7 +5,13 @@ Repository export for the typed, resumable tender dispatcher. Live workflow
 
 ## Contract
 
-`tenderplan_mark` and `recovery_scan` are automatic intents. Only `manual` with `manual_override=true` may reopen a failed run or dispatch documents after two total Worker claims. The dispatcher preserves the same `analysis_run_id`, never dispatches completed or skipped documents, and leaves attempt increments to the Worker atomic claim.
+`tenderplan_mark`, `tenderplan_key`, and `recovery_scan` are automatic intents. Only `manual` with `manual_override=true` may reopen a failed run or dispatch documents after two total Worker claims. The dispatcher preserves the same `analysis_run_id`, never dispatches completed or skipped documents, and leaves attempt increments to the Worker atomic claim.
+
+`tenderplan_key` requires `tender_id`, forbids `analysis_run_id` and manual
+override, maps to `source=tenderplan`, and persists
+`event_type=key_match_added`. Its input otherwise uses the unchanged six-field
+Intake Resume schema. The existing `tenderplan_mark` mapping remains
+`source=tenderplan`, `event_type=mark_added`.
 
 `superseded` is a separate terminal run state. Any direct automatic, recovery,
 or manual request for that `analysis_run_id` returns explicit

@@ -44,6 +44,16 @@ function directTargets(nodeName) {
   return outputs.flatMap((output) => output.map((connection) => connection.node));
 }
 
+test('Orchestrator accepts tenderplan_key without relaxing the other input guards', () => {
+  const guard = nodesByName.get('Проверить вход Orchestrator');
+  assert.ok(guard);
+  const source = codeSource(guard);
+  assert.match(source, /tenderplan_key/u);
+  assert.match(source, /source\s*!==\s*['"]tenderplan['"]/u);
+  assert.match(source, /source_event_key/u);
+  assert.match(source, /tender_id/u);
+});
+
 function canReach(startName, targetName, blockedNames = new Set()) {
   if (blockedNames.has(startName) || blockedNames.has(targetName)) return false;
 

@@ -71,7 +71,7 @@ Orchestrator только возвращает уже существующий �
 | `tender_id` | trim; непустая строка; максимум 128 символов |
 | `source` | trim + lowercase; только `tenderplan`; максимум 64 символа |
 | `source_event_key` | trim; непустая строка; максимум 512 символов |
-| `trigger_kind` | trim; максимум 64 символа; одно из `tenderplan_mark`, `recovery_scan`, `manual` |
+| `trigger_kind` | trim; максимум 64 символа; одно из `tenderplan_mark`, `tenderplan_key`, `recovery_scan`, `manual` |
 
 Проверка выполняется до TenderPlan HTTP и до любой записи в PostgreSQL. Нарушение контракта — hard error.
 
