@@ -1,0 +1,9 @@
+Готов полный отчёт: [codex-result.md](F:/Vibe-projects/Tender-blind-test-exec/codex-result.md).
+
+Проверены все 12 документов, включая PDF-сканы, OOXML-флажки и вложенную Excel-анкету. Итог:
+
+- 21 поле — `resolved`
+- 4 — `requires_review`
+- 2 — `not_found`
+
+Исходные документы не изменялись. Недоступных для исследования форматов не осталось.

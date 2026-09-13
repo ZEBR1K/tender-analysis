@@ -1,7 +1,7 @@
 # AI-анализ тендерной документации — n8n
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-07
+**Последнее обновление:** 2026-09-11
 **Основной стек:** n8n + PostgreSQL + TenderPlan + IBM Docling + Polza AI
 **Каталог полей:** `tender_fields_v1`  
 **FINAL-контракт:** `tender_field_final_v1`
@@ -13,6 +13,62 @@ PROJECT_STATUS.md
 ```
 
 Последний Document Worker handoff: executions `14374/14376` технически GREEN только до `ready_for_aggregation`; semantic applicability gate FAIL. Sanitized audit: `evaluations/DOCUMENT_WORKER_SEMANTIC_AUDIT_14374_14376_2026-09-03.md`.
+
+Дополнительно реализован аддитивный фундамент агентского shadow-анализа через
+Codex (Tasks 0–17). Изолированный runner развёрнут, а прямой blind canary из
+четырёх запусков прошёл проверки изоляции, целостности архивов и JSON-контракта.
+Оператором применена аддитивная PostgreSQL-миграция, после чего независимая
+read-only проверка подтвердила exact shadow schema и источник SHA-256 metadata.
+Неактивный n8n canary Dispatch → Monitor успешно сохранил ровно 27 shadow-строк.
+Воспроизведённые несовместимости n8n `2.35.3` с JSON response stream и
+PostgreSQL `max(uuid)` исправлены только на уровне transport/JSON/DB-контракта.
+Task 17 опубликовал Document Preparation, Orchestrator, Intake Resume, Dispatch,
+Monitor и Agentic Error. В Orchestrator и Intake Resume действует временный
+`TASK17_TEMPORARY_AGENT_ONLY`: legacy-ноды сохранены, но входящие связи к ним
+разорваны. Исходный `.xls` теперь передаётся Codex без parser/indexing наравне с
+PDF/DOCX/XLSX. Реальный job `13b090b5-38fc-432a-a235-90ae43f609fe` обработал
+DOCX+XLS на attempt 1; Monitor execution `15387` принял exact-27 контракт и
+атомарно сохранил 27 shadow-строк. Legacy Worker/Aggregator/Finalization в этом
+прогоне не запускались. После GREEN canary TenderPlan Mark Intake опубликован.
+Финальный review добавил явные outcomes `agentic_dispatched` / `agentic_no_op`
+для успешного Intake handoff и подтвердил, что сохранённый legacy-фильтр не
+принимает `.xls`; это остаётся raw agent-only форматом.
+
+Следующий terminal boundary также опубликован. Monitor version
+`0ce151f8-99bb-40d7-a426-097a01de97fd` после exact-27 shadow commit синхронно
+вызывает существующую Finalization. Finalization version
+`e44fff3f-c0b0-4616-93c1-bda41405cb07` переводит agentic rows в неизменённый
+`tender_field_final_v1`, использует прежний DB-backed 27/27 barrier и вызывает
+Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`.
+Контролируемый canary `15662 → 15663` завершил run, сохранил 27 уникальных FINAL
+полей и создал валидные HTML/PDF artifacts; replay `15666` не создал второй
+отчёт. Следующий свежий end-to-end gate теперь также закрыт технически: tender
+`6aa2c2ad5b7165804b8c4ff7`, run
+`6c36e5da-f9e2-48d9-a062-0493f0c2bf73`, Monitor `16402`, Finalization `16403`
+и Report `16404` прошли полный маршрут от метки до валидных HTML/PDF. Read-only
+DB проверка подтвердила `completed` и ровно 27 уникальных FINAL
+(`7 resolved / 2 requires_review / 18 not_found`). Ручная semantic review
+остаётся отдельной неблокирующей оценкой, потому что эталонного отчёта для этой
+закупки нет.
+
+Подробности:
+`evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` и
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`, а финальный n8n/DB canary —
+`evaluations/AGENTIC_TASK16_LIVE_CANARY_2026-09-10.md` и
+`evaluations/AGENTIC_TASK17_AGENT_ONLY_CANARY_2026-09-10.md`. Terminal
+promotion/report evidence находится в
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`, а свежий полный
+прогон — в `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
+
+FullInfo metadata is now part of the sealed agentic input without becoming a
+source document. Published Orchestrator `28d0126c-f546-4c02-9bee-3a0dda7febc0`,
+Dispatch `e4ea9636-1d5d-4772-ac5c-033864014b3e` and Finalization
+`e44fff3f-c0b0-4616-93c1-bda41405cb07` carried repeat run
+`e996c707-aa09-41c2-9fd7-d49337182c70` through exact 27 FINAL and valid
+HTML/PDF. Read-only DB distribution is
+`8 resolved / 6 requires_review / 13 not_found`; eight fields cite the
+TenderPlan source. The canary and its non-isolated A/B limitation are recorded
+in `evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
 
 ---
 
@@ -89,6 +145,25 @@ not_found
 
 # 3. Текущая архитектура
 
+В live Task 17 временно активен агентский путь от регистрации manifest до
+готового HTML/PDF отчёта:
+
+```text
+TenderPlan mark
+→ Orchestrator / Intake Resume
+→ source manifest
+→ Agentic Dispatch
+→ Codex runner
+→ Agentic Monitor
+→ exact 27 shadow rows
+→ Finalization / canonical FINAL 27/27
+→ Report Generation / HTML + PDF
+```
+
+Приведённая ниже длинная Worker/Aggregator схема сохранена как
+legacy/canonical baseline для будущего контролируемого объединения; её ноды
+сейчас не достижимы из Orchestrator и Intake Resume.
+
 ```text
 TenderPlan
     ↓
@@ -116,7 +191,7 @@ independent AI Validator
     ↓
 save facts
     ↓
-all documents completed
+all documents terminal (`completed` / `skipped`)
     ↓
 TENDER — Агрегация закупки
     ↓
@@ -149,6 +224,22 @@ internal Gotenberg conversion + binary report_pdf
 
 # 4. Основные workflow
 
+## `TENDER — Подготовить документацию` — published agentic prerequisite
+
+Reusable sub-workflow принимает metadata всех TenderPlan attachments,
+последовательно скачивает прямые PDF/DOCX/XLSX/XLS только для фиксации MIME,
+размера и SHA-256, а архивы раскрывает через внутренний bounded extractor. Он
+не индексирует страницы, листы или OOXML. Workflow `0scTZu1aBKsMd6AM`
+опубликован и синхронно вызывается Task 17 Orchestrator до регистрации run.
+
+Документация:
+
+```text
+workflows/document-preparation.md
+```
+
+---
+
 ## `ТЕНДЕРЫ ОРКЕСТРАТОР`
 
 Отвечает за:
@@ -159,7 +250,7 @@ tender_id
 → normalize tender
 → create run
 → register ALL documents
-→ launch Document Workers
+→ launch agentic Dispatch; legacy Worker nodes remain intentionally disconnected
 ```
 
 Документация:
@@ -167,6 +258,66 @@ tender_id
 ```text
 workflows/orchestrator.md
 ```
+
+---
+
+## `TENDER — Intake Resume` — isolated runtime-verified candidate
+
+Typed dispatcher для new/existing run: сохраняет тот же `analysis_run_id`, не
+повторяет `completed`/`skipped` documents и применяет автоматический cap ровно в
+два Worker claims total. Manual override может повторно запустить exhausted
+failed document. Candidate `VO8Ml0sfO65w2Jiz` is imported, active and
+runtime-verified. Executions `14697/14700` prove stable-key ledger deduplication.
+Real mark canary `14947` created run
+`67494863-22cc-406c-90cc-70c17e7d752a`; Manual Resume `14986` / Intake `14987`
+proved that an unsupported `.doc` is audited as `skipped`, the run fails
+explicitly as `unsupported_documents_skipped`, and no partial Aggregator/report
+or repeated Worker execution occurs.
+
+## `TENDER — TenderPlan Mark Intake` — published Task 17 entry
+
+Каждые 10 минут читает current members метки
+`6a732cd00c61629cf1d3c144` («Проверить»), дедуплицирует подтверждённые
+`tender._id` / `tenders[]._id` и асинхронно вызывает Intake Resume со
+стабильным mark+tender key. Notification type-5 plan superseded runtime-proven
+relation contract `14683`. Initial candidate execution `14743` failed closed on
+the earlier `id` assumption; corrected `14744` → `14745` is runtime GREEN through
+the Intake duplicate/no-op path with the existing `analysis_run_id`.
+Isolated copy `biYC4OvWBlfJRmnj` is wired to the real TenderPlan credential and
+active Intake candidate. It was published only after real Codex job
+`13b090b5-38fc-432a-a235-90ae43f609fe` reached `completed` and Monitor execution
+`15387` atomically persisted exact 27 shadow rows. Scheduled execution `14947`
+previously captured real marked tender `6aa2388f5b7165804b314ba5` and started its
+new analysis run.
+
+---
+
+## `TENDER — Manual Resume` — inactive repository candidate
+
+Operator-only adapter, который принимает существующий `analysis_run_id` и
+вызывает Intake Resume с `trigger_kind=manual` и `manual_override=true`.
+Candidate реализован и runtime-tested. Inactive isolated copy
+`z8nynFC12H9WOM9s` is imported/read back with a blank operator-supplied run ID;
+execution `14986` successfully resumed the same run and the template was cleared
+again after the test.
+
+---
+
+## `TENDER — Recovery Scan` — inactive repository candidate
+
+Read-only scheduled selector незавершённых runs. Передаёт каждый candidate в
+Intake Resume, но сам не мутирует PostgreSQL и не принимает retry-решения.
+Candidate реализован and active as isolated copy `lwcHHdmmNd5YE6cw`; scheduled
+recovery reuses the same run and does not redispatch terminal documents.
+
+---
+
+## `TENDER — Ошибка Intake Resume` — inactive repository candidate
+
+Workflow-level handler, который guarded update переводит только принадлежащий
+текущему execution intake event из `processing` в `failed`, сохраняя audit.
+New copy `kff8KIrSHzo5Mmt1` is published and linked only as the error handler for
+the isolated candidates. Production failure-path runtime remains pending.
 
 ---
 
@@ -552,7 +703,7 @@ Gemini 3.7 Flash low оставлен резервным Extractor candidate. GL
 
 Test/calibration Worker сохранён как immutable beta snapshot `workflows/n8n-exports/beta/[3 TEST] TENDER — Обработать документ.json` с SHA-256 `02e4e5ccc761ecf78771c2ae4a3c4e529f3536533de2d9e7a5ef2084fe0459dd`.
 
-Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 51 node, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
+Canonical `workflows/n8n-exports/TENDER — Обработать документ.json` теперь является clean offline production candidate: 85 nodes, production trigger/persistence connections, без Manual Trigger, calibration nodes, `pinData` и top-level instance identity. Beta→canonical regression проходит; live production Worker не менялся, candidate ещё не promoted/wired и не прошёл runtime canary.
 
 Для Aggregator execution-derived risk по `procurement_subject` mitigated и verified в `[TEST CODEX]`: historical DeepSeek canary `14104` вернул `round1_final/resolved`, назначил внутреннему процессу `not_applicable`, выбрал fixture fact `14104000-0001-4000-8000-000000000001` primary и прошёл 6/6 semantic oracle. Subsequent bounded request-model-only A/B на fixture `14104` подтвердил, что GLM 5.3 Flash low и Gemini 3.7 Flash low оба проходят checker, `round1_final` и 6/6 semantic oracle; оба назначили внутреннему процессу `not_applicable`. GLM выбран текущим recommended Aggregator beta baseline по reliability/correctness/cost; Gemini остаётся fallback для latency/provider issues. Детали: `evaluations/AGGREGATOR_MODEL_COMPARISON_2026-08-29.md`.
 

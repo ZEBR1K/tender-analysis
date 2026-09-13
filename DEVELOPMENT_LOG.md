@@ -5776,3 +5776,382 @@ Repository synchronization added a guarded read-only production export script an
 - post-promotion runtime of production version `a6fbb0f6-…` is intentionally not verified yet.
 
 No production execution, DB query/write, workflow write, credential change or infrastructure mutation was performed by Codex during this synchronization.
+
+## 2026-09-08 — Archive extractor deployed and runtime-checked
+
+Commit `cc2336e` was deployed to `/opt/tender-archive-extractor` as the isolated
+Compose project `tender-archive-extractor`. Preflight recorded Docker/Compose,
+`n8n_default`, system resources and exact IDs/start times/restart counts for all
+eight existing containers. Only the new image `tender-archive-extractor:26.03-1`
+was built and only `archive-extractor` was started with `--no-deps`.
+
+Runtime checks confirmed healthy status, zero restarts, no host ports, non-root
+execution, read-only root filesystem, dropped capabilities, resource limits and
+HTTP reachability from both n8n main and worker. A direct ZIP canary and nested
+`ZIP → 7Z → file` canary returned deterministic manifests and exact artifact
+bytes. Both exact test runs were deleted, subsequent artifact reads returned
+`404`, and temporary canary/staging files were removed. All pre-existing
+container identities and start times remained unchanged. RAR/TAR/GZIP and a
+real TenderPlan archive remain runtime-pending. The n8n preparation workflow
+stays inactive/unwired; PostgreSQL and the production Orchestrator were not
+changed.
+
+---
+
+## 2026-09-08 — TenderPlan intake/resume documentation integration checkpoint
+
+Documentation integration started from feature commit `4c32d0b` on
+`codex/tenderplan-intake-resume`; `main` was not changed.
+
+Repository implementation/offline evidence is GREEN for four inactive
+candidates:
+
+```text
+TENDER — Intake Resume
+TENDER — Manual Resume
+TENDER — Recovery Scan
+TENDER — Ошибка Intake Resume
+```
+
+Dispatcher preserves the existing `analysis_run_id`, excludes
+`completed`/`skipped` documents, limits automatic dispatch to exactly two Worker
+claims total, and allows `manual_override=true` to retry exhausted failed.
+`processing` is stale after one hour, but reclaim requires read-only observation
+of the recorded n8n execution followed by guarded CAS; unavailable API performs
+no mutation.
+
+Read-only production evidence remains deliberately bounded:
+
+- execution `14676`: intake migration is absent; intake table and required
+  partial unique/helper indexes are all `false`;
+- type-5 probe `oCXpDbO3Xz1qrCBf`, execution `14677`: type-5 list empty and
+  FullInfo `marks=[]` for both supplied IDs, so Task 8 contract is incomplete and
+  no event paths/fixture were fabricated;
+- pre-DB smoke `yocBDh0nCvPPxItn`, execution `14678`: exact Orchestrator input
+  validation, FullInfo identity and normalization succeeded for both tender IDs,
+  then stopped before registration; no DB write and no Worker call occurred;
+- safe no-worker Orchestrator `thE9gLyNTvxLWt8I` was validated/read back but not
+  executed.
+
+The pre-DB evidence is stored in
+`evaluations/TENDERPLAN_ORCHESTRATOR_PRE_DB_SMOKE_14678_2026-09-08.md`.
+At this checkpoint Task 9 was not implemented and remained blocked on a
+representative type-5 event. This historical blocker was later superseded by the
+execution-`14683` mark-relation contract recorded below.
+
+Full offline suite after the runtime probes:
+
+```text
+node --test tests/*.test.mjs
+518/518 PASS
+local date: 2026-09-08
+```
+
+Read-only local/live audit found that Orchestrator and both plausible Worker
+targets differ; Document Error Workflow, Aggregator and Finalization have exact
+normalized config and connections parity under the defined comparison boundary.
+Method, exact node counts/IDs and sanitized results are recorded in
+`evaluations/TENDER_INTAKE_LIVE_PARITY_PREFLIGHT_2026-09-08.md`. Existing live
+workflows were not changed. All new workflows remain inactive/unpublished, and
+production promotion/runtime matrix are pending. MCP ignored requested folder
+placement and returned `parentFolderId=null`; this remains tooling/packaging
+drift.
+
+Controlled activation order remains:
+
+```text
+migration
+→ error workflow
+→ Worker
+→ Orchestrator
+→ Dispatcher
+→ Manual Resume
+→ Recovery Scan
+→ TenderPlan poller
+```
+
+This is not a production-complete integration checkpoint.
+
+---
+
+## 2026-09-08 — Task 9 TenderPlan mark-relation poller
+
+Task 9 replaces the unconfirmed notification type-5 design with the runtime-proven
+current relation contract from execution `14683`. The inactive candidate polls
+mark `6a732cd00c61629cf1d3c144` («Проверить») every 10 minutes via one
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`, deduplicates `tender.id` and
+`tenders[].id`, and asynchronously invokes Intake Resume with a stable
+mark+tender key. Missing source event time stays null.
+
+Historical negative evidence remains separate: executions `14677`, `14680` and
+`14682` did not provide a usable type-5 event. Pagination, ordering, cursor and
+exhaustive-result semantics for the relation response are undocumented, so the
+candidate invents no pagination and documents the bounded coverage limitation.
+
+TDD RED before the export: focused poller test `0 pass / 1 fail` because
+`TENDER — TenderPlan Mark Intake.json` was absent. Final GREEN plus existing
+intake/resume regression: `28/28` assertions PASS across six focused test files.
+In the same terminal environment with `--experimental-test-isolation=none`, the
+current full suite is `521/522` and the exact detached parent `ba4edee` baseline
+is `517/518`. Both have the same single ActiveX fixture failure
+`word/activeX/_rels/activeX5.xml.rels: 286 !== 287`, so Task 9 adds four passing
+subtests and zero new failures.
+
+Production n8n, PostgreSQL, credentials and external state were not changed.
+The candidate itself has no runtime GREEN claim; only source contract `14683` is
+runtime GREEN.
+
+---
+
+## 2026-09-08 — Full DB deployment preflight execution 14684
+
+One explicitly authorized inactive/unpublished probe
+`fbjRXqyQ71toBhZK` (`[CODEX TEST] Tender Intake Full DB Preflight — 2026-09-08`)
+was created and executed exactly once. Its graph was Manual Trigger → one
+aggregate-only PostgreSQL `WITH … SELECT` → fail-closed sanitized Code. No retry,
+workflow update, publication, activation or database write occurred.
+
+Execution `14684` returned current aggregate evidence before the sanitizer
+stopped the workflow with `status=error`:
+
+```text
+current_user: postgres
+transaction_read_only: off
+connection_uses_ssl: false
+total_run_count: 97
+unfinished_run_count: 86
+duplicate_unfinished_group_count: 3
+intake_events_table_exists: false
+unfinished_run_unique_index_exists: false
+intake_run_index_exists: false
+intake_status_started_index_exists: false
+```
+
+The error is a correct fail-closed preflight outcome. Migration is `NO-GO`:
+three duplicate unfinished groups violate the migration precondition, and the
+inherited diagnostic credential is neither the required `tender_codex_ro` role
+nor read-only/TLS-protected. No duplicate identifiers were retrieved or recorded.
+Evidence: `evaluations/TENDER_INTAKE_FULL_DB_PREFLIGHT_14684_2026-09-08.md`.
+
+---
+
+## 2026-09-09 — Agentic shadow foundation Tasks 0–10
+
+An additive repository-only Codex runner foundation was completed without
+changing live n8n, production PostgreSQL, or the existing legacy analysis lane.
+The runner stages immutable original documents from a source-only manifest,
+uses one focused agent skill, records bounded attempt-local audit, returns an
+exact 27-field JSON result, and validates only security, file/artifact integrity
+and the closed JSON contract.
+
+Final review removed the rejected page/OOXML/XLSX source-index implementation,
+semantic quote/evidence/value checks, field-specific rules, alternate
+`reported_*`/`effective_*` projections, and `validation_level`. The unapplied
+shadow migration now stores the unchanged `status` and `value_text` plus
+contract-only `validation_issues`. A fresh disposable PostgreSQL 17 run passed
+empty/populated fixtures, double application, ownership rejection and drift
+rollback checks.
+
+Lifecycle review also added attempt-local terminal journals and restart
+reconciliation so a crash between immutable audit writes and state persistence
+cannot create a duplicate paid retry or poison attempt 2. The final repository
+suite is `670 passed`, `0 failed`, `2` explicit environment/platform skips.
+Detailed removal/retention inventory and remaining gates are in
+`evaluations/AGENTIC_TASKS_0_10_HANDOFF_2026-09-09.md`.
+
+---
+
+## 2026-09-10 — Task 16 isolated runner and runner-direct blind canary
+
+An isolated, resource-bounded Codex runner was deployed without changing the
+legacy n8n or database services. Its permanent boundary is non-root,
+non-privileged and read-only, with all Linux capabilities dropped, no published
+host port, `no-new-privileges`, and a named AppArmor profile that permits the
+runner's user-namespace sandbox. Linux isolation attestation and authenticated
+reachability from both the n8n main and worker containers are GREEN.
+
+The runner-direct blind canary completed four runs: two replicates each for
+`procurement-02` and `procurement-03`. Every result contains 27 unique
+`field_key` values, and structural plus immutable archive-integrity checks are
+GREEN. These runs have no gold truth; repeatability comparison is an offline
+diagnostic only and does not establish semantic correctness.
+
+Aggregate model usage across the four completed runs was:
+
+```text
+input tokens:     10,392,902
+cached tokens:     9,843,584
+output tokens:       125,623
+reasoning tokens:     22,915
+```
+
+Two preliminary batches were rejected by the provider's strict-schema checks
+before model execution and consumed zero tokens.
+
+The live database preflight found that
+`tender_analysis_documents.ingestion_metadata` and the shadow tables are absent.
+Therefore no migration, inactive workflow import, credential binding, or live
+27-row canary was performed; legacy production remains unchanged. Detailed
+evidence is recorded in
+`evaluations/AGENTIC_RUNNER_DEPLOYMENT_2026-09-10.md` and
+`evaluations/AGENTIC_SHADOW_CANARY_2026-09-10.md`.
+
+### Correction: Task 16 live n8n/DB reconciliation
+
+This note supersedes only the preliminary live-state claim in the paragraph
+above. PostgreSQL `to_regclass` resolves `tender_agentic_jobs`,
+`tender_agentic_documents`, and `tender_agentic_field_results`. The scoped
+read-only role has no `SELECT` privilege on those relations, so their exact
+schema and row counts remain unverified. The canonical
+`tender_analysis_documents.ingestion_metadata` column is absent.
+
+Live n8n contains three inactive candidates: Dispatch
+`d37251e524754e1f`, Monitor `47e6ede6c10349c0`, and Error
+`6ccedae778a14176`. Their normalized graphs match the repository candidates
+after masking instance workflow IDs and bound credential IDs. The real Error
+Workflow links and expected credential types are bound. The execution-list
+endpoint returned zero entries for each workflow.
+
+No workflow was activated, no live Dispatch → Monitor → exact 27-row canary was
+run, and legacy routing remains unchanged. The missing `ingestion_metadata`
+source-hash contract and the unverified exact shadow schema block that canary.
+
+The production tender database is external Supabase, and only its scoped
+read-only role was available. The server container `n8n-postgres-1` is n8n's
+internal database, not the tender database. A controlled execution of the
+existing shadow migration against that internal database ran only `BEGIN`,
+`SET`, and `SET`, then failed at the first `LOCK` because
+`public.tender_analysis_runs` is absent. The transaction aborted and produced no
+DDL; no production migration was attempted.
+
+### Final correction: Task 16 inactive n8n/DB canary GREEN
+
+The operator-applied additive Supabase migration was independently verified:
+`ingestion_metadata` and the exact shadow schema, constraints and indexes are
+present. The first inactive Dispatch execution `15243` reproduced two
+technical contract defects: unresolved explicit-JSON response streams in n8n
+`2.35.3` and unsupported PostgreSQL `max(uuid)`. Regression tests were added
+before the minimal export corrections. Runner JSON nodes now use auto-detect,
+UUID aggregates cast through text, and the binary upload no longer carries the
+raw-body-only `rawContentType` option.
+
+The corrected inactive chain then passed: wrapper `15256`, Dispatch `15257`,
+and one-shot Monitor `15258`. Job
+`79149bb3-0028-413a-bbb9-813de64b6052` reached completed with exactly 27 shadow
+rows. The fake runner reported `paid_execution=false`, was removed, and the
+one-shot workflows were archived. The real runner is restored and healthy from
+both n8n containers with zero restarts. Corrected inactive candidates are
+Dispatch `gP29fv0rq4MoON9a` and schedule Monitor `CALcBEXvQsO1AcfP`; their
+normalized graphs match the repository exports and exact credentials are
+bound. No production workflow was activated and Task 17 was not started.
+
+## 10.09.2026 — Task 17 temporary agent-only production route
+
+Published Document Preparation, Orchestrator, Intake Resume, Agentic Dispatch,
+Agentic Monitor and ownership-guarded Agentic Error. Orchestrator and Intake
+Resume retain all legacy Worker/Aggregator/Finalization nodes, but the incoming
+edges are intentionally disconnected and marked `TASK17_TEMPORARY_AGENT_ONLY`.
+
+Added legacy XLS only as an unchanged agentic source format. Preparation records
+file name, MIME, byte size and SHA-256; Codex chooses the inspection method. No
+XLS/page/OOXML parser or semantic runtime validator was added.
+
+Real TenderPlan canary exposed two contract defects. Execution `15333` showed
+that a manifest read from an inner Loop node retained only one of two direct
+documents; the done-output now has one aggregate collector. Dispatch `15357`
+then showed that the seal guard accepted lowercase SHA-256 only while the runner
+returns uppercase hex; the same 64-hex contract is now case-insensitive. Both
+were reproduced by failing tests before the minimal fixes.
+
+Fresh run `b731f861-4df6-40df-a8c5-67b8564f3f03` registered the DOCX and XLS.
+Controlled Dispatch execution `15373` started real Codex job
+`13b090b5-38fc-432a-a235-90ae43f609fe`; Monitor `15387` observed completion,
+validated 27 unique fields and atomically persisted exactly 27 shadow rows.
+Legacy nodes had zero runs. The normal replicate-1 inputs were restored, then
+TenderPlan Mark Intake was published. Final local verification was
+`753 total / 747 pass / 0 fail / 6 skipped`.
+
+The first normal schedule tick after activation also passed: Mark Intake
+execution `15393` invoked Intake Resume executions `15394–15396` for the three
+currently marked tenders. Every child completed at `Return Event No-op`, so the
+event identity contract suppressed duplicates without creating another run or
+agentic job.
+
+Independent final review reproduced two structural regressions before commit.
+The Intake restore output lacked a top-level successful action and could be
+persisted as `manual_attention_required`; it now emits
+`agentic_dispatched` / `agentic_no_op` while retaining the child action in the
+audit object. The disconnected Orchestrator legacy filter briefly admitted
+`.xls`; it now remains pending PDF/DOCX/XLSX only, keeping legacy XLS exclusive
+to raw agentic staging. Focused RED→GREEN coverage was added. Corrected live
+versions are Intake `51f567d2-4100-4d81-9a17-29b7df7eeb6c` and Orchestrator
+`e8a085a9-6a7e-4230-9026-2839f48ba359`; both were published and read back with
+`versionId=activeVersionId`.
+
+## 11.09.2026 — Agentic FINAL promotion and existing report integration
+
+Published Report Generation version `e21c7675-916a-4fd3-8499-e11444484b68`,
+Finalization version `e1aad7e7-2b1b-4f95-9fff-bcaf72ebc8cd` and Monitor version
+`b45e4a2c-48a1-456e-8556-873dd7b19d71`. Finalization now places the bounded
+agentic promotion transaction before the unchanged 27/27 completion barrier.
+Monitor calls this Finalization synchronously after its exact-27 shadow commit.
+Read-only n8n API checks confirmed all three active/draft version pairs and the
+exact live connections. The promotion node uses the existing PostgreSQL
+credential and its parameters exactly match the repository export.
+
+Controlled Finalization execution `15662` used the real Task 17 run/job pair.
+It promoted the 27 shadow rows into `tender_field_final_v1`, returned
+`barrier_ready=true`, claimed completion once and invoked Report execution
+`15663`. Report Snapshot and Report Model both contained 27 fields. HTML
+validation passed at 24761 bytes; PDF validation passed at 90367 bytes with
+signature `%PDF-`; both binary properties were preserved.
+
+A TLS-verified read-only Supabase `SELECT` confirmed `run.status=completed`,
+27 unique FINAL rows, all 27 with `resolution_method=codex_agentic_v1`, and the
+original status distribution `7 resolved / 4 requires_review / 16 not_found`.
+Replay execution `15666` completed with `completion_claimed=false`, stopped at
+the existing `If` and did not run Report Generation again. No semantic quote,
+evidence-sufficiency or field-specific runtime validator was added.
+
+This canary isolates the new terminal boundary by reusing the completed Task 17
+job; it is not a fresh TenderPlan-to-report semantic run. The next gate is one
+new marked procurement through the complete published route and manual review
+of all 27 values. Detailed evidence is in
+`evaluations/AGENTIC_FINALIZATION_REPORT_CANARY_2026-09-11.md`.
+
+## 2026-09-11 — fresh TenderPlan mark-to-report agentic canary GREEN
+
+Tender `6aa2c2ad5b7165804b8c4ff7` completed the published temporary agent-only
+route. Direct source download first reproduced `ETIMEDOUT` independently in
+Document Preparation and Dispatch. The minimal transport fix applies the
+live-only proxy plus three native attempts at those two source HTTP boundaries;
+repository exports retain only the non-secret `=` placeholder.
+
+Preparation retry `15814` downloaded and SHA-256-verified two DOCX files and
+created run `6c36e5da-f9e2-48d9-a062-0493f0c2bf73`. The first Dispatch job
+retained its terminal audit after a revoked Codex refresh token exhausted two
+runner attempts. With explicit operator approval, the current authorization was
+atomically installed in the existing read-only mount, with a restricted backup
+kept outside the repository. No credential content was logged or committed.
+
+Controlled recovery `16383 → 16384 → 16385` created job
+`70d699d2-b469-40b0-a8cc-de5b38fa6374`, which completed on attempt 1. Monitor
+`16402` committed exact 27 shadow rows; Finalization `16403` promoted exact 27
+canonical rows and claimed completion; Report `16404` produced valid HTML
+(`26794` bytes) and PDF (`92267` bytes, `%PDF-`). TLS-verified read-only
+PostgreSQL confirmed `completed`, two documents and 27 unique
+`tender_field_final_v1` rows distributed as
+`7 resolved / 2 requires_review / 18 not_found`.
+
+Independent review then narrowed pre-start restage to the source-only fixed
+code `AGENTIC_SOURCE_DOWNLOAD_FAILED`; generic identity, ownership, CAS, seal
+and contract failures remain terminal. Monitor completion now merges validation
+metadata into existing technical audit rather than overwriting it. Published
+versions are Dispatch `4c49ed54-c2ca-40e2-9e8a-7958f84dbdbd` and Monitor
+`0ce151f8-99bb-40d7-a426-097a01de97fd`. These refinements add no semantic parser,
+quote/evidence scoring, field-specific rule or status rewrite.
+
+The canary is technical GREEN, not a gold semantic verdict. The procurement has
+no employee-authored reference report; manual 27-field review remains an
+offline, non-blocking evaluation. Detailed evidence is in
+`evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
