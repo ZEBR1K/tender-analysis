@@ -148,9 +148,14 @@ Baseline marker:
 source = tenderplan
 event_key = tenderplan:key:<saved_key_id>:baseline:v1
 event_type = key_baseline_completed
+tender_id = baseline:<saved_key_id>
 status = completed
 action = baseline_initialized
 ```
+
+Синтетическое `tender_id` marker обязательно, потому что колонка
+`tender_analysis_intake_events.tender_id` имеет `NOT NULL`. Оно никогда не
+передаётся в Orchestrator и не является идентификатором закупки.
 
 Baseline-событие конкретной закупки использует тот же event key, который позже
 использовался бы для её запуска:
@@ -181,8 +186,9 @@ tenderplan:key:<saved_key_id>:tender:<tender_id>
 4. Завершает пагинацию только после корректного признака конца выдачи.
 5. Проверяет, что каждый найденный объект содержит корректный `tender_id`.
 6. Удаляет дубли `tender_id` внутри ответа этого ключа.
-7. Одним запросом получает уже зарегистрированные event keys.
-8. Передаёт в `Intake Resume` только отсутствующие в журнале закупки.
+7. Одним запросом получает event keys со статусами `processing` и `completed`.
+8. Передаёт в `Intake Resume` закупки без такого события, включая события со
+   статусом `failed`, которые существующая логика умеет claim-нуть повторно.
 
 Чтение всех страниц одного ключа обязательно. Частичная выдача не должна
 приводить к обновлению состояния или запуску части найденных по этому ключу
@@ -218,7 +224,7 @@ read-only probe настроенных сохранённых ключей.
 Вызов выполняется отдельно для каждой закупки, без ожидания завершения полного
 анализа.
 
-## 8. Минимальное изменение Intake Resume
+## 8. Минимальные изменения существующей входной цепочки
 
 `Intake Resume` должен принять новый `trigger_kind = tenderplan_key`.
 
@@ -246,6 +252,27 @@ trigger_kind = tenderplan_key
 
 Остальная логика `Intake Resume` не меняется.
 
+### 8.3. Входная проверка TenderPlan Orchestrator
+
+`Call Intake Resume Orchestrator` передаёт `trigger_kind` дальше без
+преобразования. Поэтому нода `Проверить вход Orchestrator` должна добавить
+`tenderplan_key` в существующий allow-list допустимых автоматических входов.
+
+Другой код Orchestrator, подготовка документов и создание `analysis_run` не
+меняются.
+
+### 8.4. CHECK-контракт intake ledger
+
+Актуальная схема `tender_analysis_intake_events` разрешает только
+`tenderplan_mark`, `recovery_scan` и `manual`. До первого события нового типа
+нужно выполнить отдельную fail-closed migration, которая добавит
+`tenderplan_key` только в CHECK колонки `trigger_kind`.
+
+Migration не добавляет таблиц или колонок и не меняет status-контракт. Перед
+заменой она обязана подтвердить точную текущую форму CHECK, а после замены —
+точный набор из четырёх допустимых значений. Неизвестная форма constraint
+должна откатить transaction.
+
 ## 9. Защита от повторов
 
 Используются два уже существующих уровня защиты.
@@ -271,6 +298,10 @@ tender_id = <tender_id>
 
 Если закупка ранее уже анализировалась через метку, второй `analysis_run` не
 создаётся, даже если событие сохранённого ключа имеет другой event key.
+
+Одновременное обнаружение одной закупки несколькими ключами дополнительно
+защищено существующим атомарным `INSERT ... ON CONFLICT (source, tender_id)` для
+незавершённых запусков в Orchestrator.
 
 Новый parser, validator или field-specific rule для этой функции не требуется.
 
@@ -346,6 +377,8 @@ TenderPlan access token остаётся в существующем n8n Credent
 - один workflow `TENDER — TenderPlan Saved Key Intake`;
 - repository export этого workflow;
 - описание workflow;
+- одну migration, расширяющую CHECK `trigger_kind` значением
+  `tenderplan_key`;
 - offline regression tests для контракта нормализации и baseline;
 - runtime canary checklist.
 
@@ -354,12 +387,15 @@ TenderPlan access token остаётся в существующем n8n Credent
 - `Intake Resume / Validate Intake Input`;
 - `Intake Resume / Prepare Event Identity`;
 - repository export и документацию `Intake Resume`.
+- `TenderPlan Orchestrator / Проверить вход Orchestrator` — только allow-list
+  `trigger_kind`;
+- repository export и документацию Orchestrator.
 
 ### Не изменять
 
 - вход по метке;
 - ручную загрузку;
-- TenderPlan Orchestrator;
+- остальную логику TenderPlan Orchestrator;
 - подготовку документации и архивов;
 - агентский runner;
 - монитор агентского анализа;
@@ -367,8 +403,8 @@ TenderPlan access token остаётся в существующем n8n Credent
 - финализацию;
 - генерацию PDF;
 - бизнес-семантику `FIELD_CATALOG.md`;
-- схему PostgreSQL, если runtime-проверка подтвердит пригодность существующего
-  event ledger.
+- все таблицы, колонки и индексы PostgreSQL; меняется только allow-list
+  существующего CHECK `trigger_kind`.
 
 ## 13. Проверки
 
@@ -387,10 +423,17 @@ TenderPlan access token остаётся в существующем n8n Credent
 9. Новый event key устойчив к повторному исполнению.
 10. `Intake Resume` принимает `tenderplan_key` и отклоняет несовместимые identity
     поля.
-11. Два ключа инициализируются независимо и не смешивают event keys.
-12. Одна закупка, найденная двумя ключами, создаёт не более одного
+11. TenderPlan Orchestrator принимает `tenderplan_key`, сохраняя остальные
+    входные ограничения.
+12. Event со статусом `failed` не подавляется предварительным фильтром и может
+    быть повторно claim-нут `Intake Resume`.
+13. Migration принимает точный прежний CHECK, добавляет только
+    `tenderplan_key`, безопасно повторяется при уже обновлённом CHECK и
+    отклоняет неизвестную форму constraint.
+14. Два ключа инициализируются независимо и не смешивают event keys.
+15. Одна закупка, найденная двумя ключами, создаёт не более одного
     `analysis_run`.
-13. Добавленный позднее ключ на первом цикле создаёт только baseline, а уже
+16. Добавленный позднее ключ на первом цикле создаёт только baseline, а уже
     работающие ключи продолжают обычную обработку.
 
 ### Runtime canary
@@ -420,6 +463,8 @@ TenderPlan access token остаётся в существующем n8n Credent
 - новый ключ можно добавить без создания отдельного workflow и без остановки
   уже настроенных ключей;
 - ошибка или неполная пагинация не дают частичный dispatch;
+- CHECK `tender_analysis_intake_events.trigger_kind` принимает
+  `tenderplan_key` и сохраняет прежние три значения;
 - токен TenderPlan отсутствует в export и repository;
 - актуальные workflow exports и документация сохранены в проекте;
 - runtime evidence первого полного canary зафиксирован.
@@ -429,9 +474,10 @@ TenderPlan access token остаётся в существующем n8n Credent
 Составить пошаговый implementation plan:
 
 1. read-only probe всех настроенных сохранённых ключей;
-2. offline workflow export и тесты;
-3. минимальное расширение `Intake Resume`;
-4. inactive live deployment;
-5. baseline initialization;
-6. один controlled canary;
-7. активация расписания.
+2. fail-closed migration для CHECK `trigger_kind`;
+3. offline workflow export и тесты;
+4. минимальное расширение `Intake Resume` и входного allow-list Orchestrator;
+5. inactive live deployment;
+6. baseline initialization;
+7. один controlled canary;
+8. активация расписания.
