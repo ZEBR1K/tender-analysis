@@ -2,6 +2,14 @@
 
 Files in this directory are versioned repository artifacts. Their presence in Git is not evidence that a migration was applied to any live PostgreSQL environment.
 
+`2026-09-13_tenderplan_saved_key_intake.sql` changes only the existing
+`tender_analysis_intake_events.trigger_kind` CHECK. Its fail-closed precondition
+requires exactly one validated and enforced CHECK that references only
+`trigger_kind` and allows exactly the three legacy values `tenderplan_mark`,
+`recovery_scan`, and `manual` (or the exact already-migrated four-value form).
+Its postcondition requires exactly `tenderplan_mark`, `tenderplan_key`,
+`recovery_scan`, and `manual`. Any other catalog shape aborts and rolls back.
+
 Applying a migration to production requires separate explicit approval and an operator with write access. Codex read-only credentials must never be used or extended for migration application.
 
 Before applying `2026-09-07_tender_intake_resume.sql`, run its duplicate-active-run preflight as a read-only query:

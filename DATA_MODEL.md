@@ -448,6 +448,7 @@ Allowed `trigger_kind`:
 
 ```text
 tenderplan_mark
+tenderplan_key
 recovery_scan
 manual
 ```
