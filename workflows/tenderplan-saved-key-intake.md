@@ -2,8 +2,9 @@
 
 **Назначение:** получение новых закупок из сохранённого поиска TenderPlan.
 
-**Статус repository candidate:** inactive; до runtime preflight список ключей
-пуст и `Define Saved Keys` завершается с `SAVED_KEYS_NOT_CONFIGURED`.
+**Статус repository/live candidate:** в `Define Saved Keys` включён только
+`6a734cce4a60de2dbf1dc032` (`Красное Сормово`). Live workflow
+`5TVcGDDzz56CpmfF` остаётся inactive и unpublished; schedule не работает.
 
 ## Contract
 
@@ -60,11 +61,16 @@ active-run uniqueness для `(source=tenderplan, tender_id)`.
 - PostgreSQL: credential `RFpUr3McElcwyoxy`, `KITATEH Tenders`;
 - Intake Resume: workflow `VO8Ml0sfO65w2Jiz`.
 
-Текущий repository candidate не содержит configured keys. После credentialed
-runtime preflight список фиксируется здесь и в `Define Saved Keys` exact live
-read-back. Чтобы добавить или отключить ключ, изменить только `SAVED_KEYS`,
-сохраняя уникальный 24-символьный `saved_key_id`, исходное display name и
-boolean `enabled`; порядок — по `saved_key_id`.
+Текущий repository/live candidate содержит один enabled key:
+
+```text
+6a734cce4a60de2dbf1dc032 — Красное Сормово
+```
+
+Credentialed discovery execution `26564` подтвердил эту ID/name пару. Чтобы
+добавить или отключить ключ, изменить только `SAVED_KEYS`, сохраняя уникальный
+24-символьный `saved_key_id`, исходное display name и boolean `enabled`; порядок
+— по `saved_key_id`.
 
 ## Rollback
 

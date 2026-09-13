@@ -80,6 +80,38 @@ test('workflow contains the bounded sequential polling topology', () => {
   assert.equal(workflow.settings.errorWorkflow, 'kff8KIrSHzo5Mmt1');
 });
 
+test('runtime configuration enables only the owner-selected Красное Сормово key', async () => {
+  const node = requireNode(workflow, 'Define Saved Keys');
+  const result = await executeCodeNode(node, [{}]);
+  assert.deepEqual(result, [{
+    json: {
+      saved_key_id: '6a734cce4a60de2dbf1dc032',
+      saved_key_name: 'Красное Сормово',
+    },
+  }]);
+});
+
+test('Code node output shapes match their n8n execution modes', () => {
+  const buildQueue = requireNode(workflow, 'Build Dispatch Queue');
+  assert.equal(buildQueue.parameters.mode, 'runOnceForAllItems');
+  assert.match(buildQueue.parameters.jsCode, /\$input\.first\(\)\.json/u);
+
+  for (const name of [
+    'Validate Baseline State',
+    'Baseline Summary',
+    'No New Tenders',
+    'Key Failure',
+  ]) {
+    const node = requireNode(workflow, name);
+    assert.equal(node.parameters.mode, 'runOnceForEachItem');
+    assert.doesNotMatch(
+      node.parameters.jsCode,
+      /return\s*\[\s*\{/u,
+      `${name} must return one item object, not an array`,
+    );
+  }
+});
+
 test('complete page set is deduplicated and requires a final empty page', async () => {
   const node = requireNode(workflow, 'Normalize Complete Page Set');
   const key = {

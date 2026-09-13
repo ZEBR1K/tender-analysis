@@ -1,8 +1,15 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 
-function normalizeResult(raw, nodeName) {
+function normalizeResult(raw, nodeName, mode) {
   assert.notEqual(raw, undefined, `${nodeName} returned no data`);
+  if (mode === 'runOnceForEachItem') {
+    assert.equal(
+      Array.isArray(raw),
+      false,
+      `${nodeName} must return one item object in runOnceForEachItem mode`,
+    );
+  }
   const items = Array.isArray(raw) ? raw : [raw];
   return items.map((item) => (
     item && typeof item === 'object' && Object.hasOwn(item, 'json')
@@ -32,7 +39,11 @@ export async function executeCodeNode(node, inputJson, globals = {}) {
       `(async () => {\n${node.parameters.jsCode}\n})()`,
       { filename: `${node.name}.code-node.js` },
     );
-    return normalizeResult(await script.runInContext(context, { timeout: 1000 }), node.name);
+    return normalizeResult(
+      await script.runInContext(context, { timeout: 1000 }),
+      node.name,
+      mode,
+    );
   };
   if (mode === 'runOnceForEachItem') {
     const output = [];

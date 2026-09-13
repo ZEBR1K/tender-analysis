@@ -1,8 +1,34 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-11
-**Status:** Sealed TenderPlan metadata mark-to-report technical GREEN / semantic review pending
-**Branch at snapshot:** `codex/agentic-analysis-integration`
+**Snapshot date:** 2026-09-14
+**Status:** Saved-key intake baseline GREEN / activation intentionally withheld
+**Branch at snapshot:** `codex/tenderplan-saved-search-intake-implementation`
+
+## TenderPlan saved-key intake — baseline GREEN, schedule withheld
+
+Live workflow `5TVcGDDzz56CpmfF` содержит только saved key
+`6a734cce4a60de2dbf1dc032` (`Красное Сормово`) и остаётся inactive/unpublished
+(`active=false`, `activeVersionId=null`) по явному решению владельца. Поэтому
+новые закупки автоматически не запускают анализ.
+
+Первый manual baseline execution `26611` атомарно сохранил baseline, но затем
+выявил execution-contract defect Code nodes: `runOnceForEachItem` возвращал
+массив. Intake Resume в этом execution не запускался. Минимальный fix изменил
+только return shape четырёх per-item nodes и перевёл multi-item
+`Build Dispatch Queue` в `runOnceForAllItems`; focused tests `15/15` и official
+node validation GREEN.
+
+Повторный manual execution `26640` завершился `success`: marker `1/1`, все 306
+event states имеют `completed`, `dispatched=0`, `Initialize Baseline` и
+`Execute TENDER — Intake Resume` не выполнялись. Временный SELECT-only audit
+execution `26646` независимо подтвердил `markers=1`, `baseline_tenders=306`,
+`linked_runs=0`, `all_completed=true`; временный workflow архивирован.
+
+Следующий шаг после отдельного решения владельца — дождаться новой закупки для
+одного manual end-to-end canary. Публикация/активация schedule до этого решения
+не выполняется. UI-only housekeeping остаётся отдельным не блокирующим шагом:
+перенести workflow в `TEST AGENTIC TENDER ANALYSIS` и выключить
+`availableInMCP`, сохранив только draft.
 
 ## Readable TenderPlan report filenames — published, integrated runtime pending
 

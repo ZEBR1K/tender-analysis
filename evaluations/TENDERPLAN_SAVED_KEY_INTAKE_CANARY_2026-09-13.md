@@ -41,12 +41,33 @@ Runtime evidence для baseline, одного нового tender и repeat no-
   - `6a7ef6e3334239a03ce52a50` — `тест n8n`.
 - Временные migration/probe workflow архивированы после использования.
 
+## Owner selection and baseline evidence
+
+Проверено 2026-09-14:
+
+- Владелец выбрал только `6a734cce4a60de2dbf1dc032` — `Красное Сормово`.
+- Exact live read-back `5TVcGDDzz56CpmfF` подтвердил этот единственный enabled
+  key; workflow остаётся inactive и unpublished (`activeVersionId = null`).
+- Первый manual baseline execution `26611` успешно выполнил atomic
+  `Initialize Baseline`, не вызвал Intake Resume, но затем завершился `error` в
+  `Baseline Summary`: per-item Code node возвращал массив вместо одного item.
+- Regression fix сохраняет четыре nodes в `runOnceForEachItem` с object return,
+  а `Build Dispatch Queue`, который может эмитить несколько items, выполняется
+  в `runOnceForAllItems` через `$input.first().json`. Focused tests `15/15` и
+  official validation всех пяти изменённых Code nodes GREEN.
+- Повторный manual execution `26640` завершился `success`: marker count `1`,
+  valid marker count `1`, `306` event states имеют `completed`, queue вернула
+  `should_dispatch=false`, итог `dispatched=0`.
+- В execution `26640` не выполнялись `Initialize Baseline`,
+  `Baseline Summary`, `Execute TENDER — Intake Resume` и `Dispatch Summary`.
+- Временный SELECT-only audit execution `26646` подтвердил persisted state:
+  `markers=1`, `baseline_tenders=306`, `linked_runs=0`,
+  `all_completed=true`. Audit workflow `lLV5F6JPlHugpkhM` архивирован.
+
 Незакрытые gates:
 
-- владелец ещё не выбрал, какие из трёх saved keys включить;
-- baseline execution и repeat baseline no-op ещё не запускались;
 - новая procurement для end-to-end canary ещё не наблюдалась;
-- schedule не опубликован и не активирован;
+- schedule намеренно не опубликован и не активирован по решению владельца;
 - live workflow пока находится в personal-project root и имеет
   `availableInMCP = true`: официальный MCP create проигнорировал переданный
   folder ID и не предоставляет update-операцию для этого флага; исправление

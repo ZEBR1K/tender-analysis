@@ -29,7 +29,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const SAVED_KEYS = Object.freeze([]);\nconst objectId = /^[0-9a-f]{24}$/u;\n\nif (!Array.isArray(SAVED_KEYS) || SAVED_KEYS.length === 0) {\n  throw new Error('SAVED_KEYS_NOT_CONFIGURED');\n}\n\nconst ids = new Set();\nconst enabled = [];\nfor (const raw of SAVED_KEYS) {\n  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {\n    throw new Error('SAVED_KEY_CONFIG_INVALID: entry must be an object');\n  }\n  const saved_key_id = typeof raw.saved_key_id === 'string'\n    ? raw.saved_key_id.trim().toLowerCase()\n    : '';\n  const name = typeof raw.name === 'string' ? raw.name.trim() : '';\n  if (!objectId.test(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: id=${saved_key_id || 'empty'}`);\n  }\n  if (!name || name.length > 200 || typeof raw.enabled !== 'boolean') {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: metadata for ${saved_key_id}`);\n  }\n  if (ids.has(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_DUPLICATE: ${saved_key_id}`);\n  }\n  ids.add(saved_key_id);\n  if (raw.enabled) enabled.push({ saved_key_id, saved_key_name: name });\n}\n\nif (enabled.length === 0) throw new Error('NO_ENABLED_SAVED_KEYS');\nreturn enabled.map((json) => ({ json }));"
+        "jsCode": "const SAVED_KEYS = Object.freeze([\n  Object.freeze({\n    saved_key_id: '6a734cce4a60de2dbf1dc032',\n    name: 'Красное Сормово',\n    enabled: true,\n  }),\n]);\nconst objectId = /^[0-9a-f]{24}$/u;\n\nif (!Array.isArray(SAVED_KEYS) || SAVED_KEYS.length === 0) {\n  throw new Error('SAVED_KEYS_NOT_CONFIGURED');\n}\n\nconst ids = new Set();\nconst enabled = [];\nfor (const raw of SAVED_KEYS) {\n  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {\n    throw new Error('SAVED_KEY_CONFIG_INVALID: entry must be an object');\n  }\n  const saved_key_id = typeof raw.saved_key_id === 'string'\n    ? raw.saved_key_id.trim().toLowerCase()\n    : '';\n  const name = typeof raw.name === 'string' ? raw.name.trim() : '';\n  if (!objectId.test(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: id=${saved_key_id || 'empty'}`);\n  }\n  if (!name || name.length > 200 || typeof raw.enabled !== 'boolean') {\n    throw new Error(`SAVED_KEY_CONFIG_INVALID: metadata for ${saved_key_id}`);\n  }\n  if (ids.has(saved_key_id)) {\n    throw new Error(`SAVED_KEY_CONFIG_DUPLICATE: ${saved_key_id}`);\n  }\n  ids.add(saved_key_id);\n  if (raw.enabled) enabled.push({ saved_key_id, saved_key_name: name });\n}\n\nif (enabled.length === 0) throw new Error('NO_ENABLED_SAVED_KEYS');\nreturn enabled.map((json) => ({ json }));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -72,7 +72,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const markerCount = Number($json.marker_count);\nconst validMarkerCount = Number($json.valid_marker_count);\nif (!Number.isInteger(markerCount) || !Number.isInteger(validMarkerCount)) {\n  throw new Error('BASELINE_STATE_INVALID: counts');\n}\nif (markerCount > 1 || validMarkerCount > markerCount) {\n  throw new Error('BASELINE_STATE_INVALID: multiplicity');\n}\nif (markerCount === 1 && validMarkerCount !== 1) {\n  throw new Error(`BASELINE_MARKER_INVALID: ${$json.saved_key_id}`);\n}\nreturn [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    baseline_exists: validMarkerCount === 1,\n  },\n}];"
+        "jsCode": "const markerCount = Number($json.marker_count);\nconst validMarkerCount = Number($json.valid_marker_count);\nif (!Number.isInteger(markerCount) || !Number.isInteger(validMarkerCount)) {\n  throw new Error('BASELINE_STATE_INVALID: counts');\n}\nif (markerCount > 1 || validMarkerCount > markerCount) {\n  throw new Error('BASELINE_STATE_INVALID: multiplicity');\n}\nif (markerCount === 1 && validMarkerCount !== 1) {\n  throw new Error(`BASELINE_MARKER_INVALID: ${$json.saved_key_id}`);\n}\nreturn {\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    baseline_exists: validMarkerCount === 1,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -214,7 +214,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const markerInserted = Number($json.baseline_marker_inserted);\nif (![0, 1].includes(markerInserted)) {\n  throw new Error('BASELINE_INSERT_RESULT_INVALID');\n}\nreturn [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: markerInserted === 1 ? 'baseline_initialized' : 'baseline_race_noop',\n    baseline_tenders_total: Number($json.baseline_tenders_total),\n    baseline_events_inserted: Number($json.baseline_events_inserted),\n    dispatched_count: 0,\n  },\n}];"
+        "jsCode": "const markerInserted = Number($json.baseline_marker_inserted);\nif (![0, 1].includes(markerInserted)) {\n  throw new Error('BASELINE_INSERT_RESULT_INVALID');\n}\nreturn {\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: markerInserted === 1 ? 'baseline_initialized' : 'baseline_race_noop',\n    baseline_tenders_total: Number($json.baseline_tenders_total),\n    baseline_events_inserted: Number($json.baseline_events_inserted),\n    dispatched_count: 0,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -245,8 +245,8 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const rawStates = typeof $json.event_states === 'string'\n  ? JSON.parse($json.event_states)\n  : $json.event_states;\nif (!Array.isArray(rawStates)) throw new Error('EVENT_STATES_INVALID');\n\nconst dispatchable = [];\nfor (const state of rawStates) {\n  const status = state.existing_status ?? null;\n  if (status === null || status === 'failed') {\n    dispatchable.push(state.tender_id);\n    continue;\n  }\n  if (status === 'processing' || status === 'completed') continue;\n  throw new Error(`INTAKE_EVENT_STATUS_INVALID: ${String(status)}`);\n}\n\nif (dispatchable.length === 0) {\n  return [{\n    json: {\n      saved_key_id: $json.saved_key_id,\n      saved_key_name: $json.saved_key_name,\n      should_dispatch: false,\n      tender_id: null,\n      observed_at: $json.observed_at,\n      suppressed_count: rawStates.length,\n    },\n  }];\n}\n\nreturn dispatchable.map((tender_id) => ({\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    should_dispatch: true,\n    trigger_kind: 'tenderplan_key',\n    source_event_key: `tenderplan:key:${$json.saved_key_id}:tender:${tender_id}`,\n    tender_id,\n    analysis_run_id: '',\n    manual_override: false,\n    observed_at: $json.observed_at,\n    total_count: rawStates.length,\n    suppressed_count: rawStates.length - dispatchable.length,\n  },\n}));"
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json;\nconst rawStates = typeof input.event_states === 'string'\n  ? JSON.parse(input.event_states)\n  : input.event_states;\nif (!Array.isArray(rawStates)) throw new Error('EVENT_STATES_INVALID');\n\nconst dispatchable = [];\nfor (const state of rawStates) {\n  const status = state.existing_status ?? null;\n  if (status === null || status === 'failed') {\n    dispatchable.push(state.tender_id);\n    continue;\n  }\n  if (status === 'processing' || status === 'completed') continue;\n  throw new Error(`INTAKE_EVENT_STATUS_INVALID: ${String(status)}`);\n}\n\nif (dispatchable.length === 0) {\n  return [{\n    json: {\n      saved_key_id: input.saved_key_id,\n      saved_key_name: input.saved_key_name,\n      should_dispatch: false,\n      tender_id: null,\n      observed_at: input.observed_at,\n      suppressed_count: rawStates.length,\n    },\n  }];\n}\n\nreturn dispatchable.map((tender_id) => ({\n  json: {\n    saved_key_id: input.saved_key_id,\n    saved_key_name: input.saved_key_name,\n    should_dispatch: true,\n    trigger_kind: 'tenderplan_key',\n    source_event_key: `tenderplan:key:${input.saved_key_id}:tender:${tender_id}`,\n    tender_id,\n    analysis_run_id: '',\n    manual_override: false,\n    observed_at: input.observed_at,\n    total_count: rawStates.length,\n    suppressed_count: rawStates.length - dispatchable.length,\n  },\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -345,7 +345,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "return [{\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: 'polled',\n    discovered_count: Number($json.suppressed_count ?? 0),\n    dispatched_count: 0,\n  },\n}];"
+        "jsCode": "return {\n  json: {\n    saved_key_id: $json.saved_key_id,\n    saved_key_name: $json.saved_key_name,\n    outcome: 'polled',\n    discovered_count: Number($json.suppressed_count ?? 0),\n    dispatched_count: 0,\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -356,7 +356,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const key = $('Loop Over Saved Keys').item.json;\nconst detail = $json.error?.message ?? $json.message ?? 'unknown key-processing error';\nreturn [{\n  json: {\n    saved_key_id: key.saved_key_id,\n    saved_key_name: key.saved_key_name,\n    outcome: 'failed',\n    error_message: String(detail).slice(0, 2000),\n  },\n}];"
+        "jsCode": "const key = $('Loop Over Saved Keys').item.json;\nconst detail = $json.error?.message ?? $json.message ?? 'unknown key-processing error';\nreturn {\n  json: {\n    saved_key_id: key.saved_key_id,\n    saved_key_name: key.saved_key_name,\n    outcome: 'failed',\n    error_message: String(detail).slice(0, 2000),\n  },\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

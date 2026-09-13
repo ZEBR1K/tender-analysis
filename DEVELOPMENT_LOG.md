@@ -6155,3 +6155,20 @@ The canary is technical GREEN, not a gold semantic verdict. The procurement has
 no employee-authored reference report; manual 27-field review remains an
 offline, non-blocking evaluation. Detailed evidence is in
 `evaluations/AGENTIC_MARK_TO_REPORT_CANARY_2026-09-11.md`.
+
+## 2026-09-14 — TenderPlan saved-key baseline for Красное Сормово
+
+Live draft `5TVcGDDzz56CpmfF` was configured with only saved key
+`6a734cce4a60de2dbf1dc032` (`Красное Сормово`) and intentionally left inactive
+and unpublished. Manual baseline execution `26611` persisted 306 completed
+baseline tender events plus one marker without invoking Intake Resume, then
+exposed an n8n Code-node return-shape defect at `Baseline Summary`.
+
+The minimal runtime fix keeps four single-item nodes in
+`runOnceForEachItem` with object returns and moves multi-item
+`Build Dispatch Queue` to `runOnceForAllItems`. Repeat execution `26640`
+completed with `dispatched=0`; Intake Resume did not execute. SELECT-only audit
+execution `26646` confirmed one marker, 306 completed baseline events and zero
+linked analysis runs. The temporary audit workflow was archived. The saved-key
+schedule remains withheld by owner decision pending a separate canary/activation
+step.
