@@ -40,6 +40,21 @@ function canReach(currentWorkflow, startName, targetName) {
   return false;
 }
 
+function canReachBefore(currentWorkflow, startName, targetName, boundaryName) {
+  const queue = [startName];
+  const visited = new Set();
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === targetName) return true;
+    if (current === boundaryName || visited.has(current)) continue;
+    visited.add(current);
+    for (const output of currentWorkflow.connections?.[current]?.main ?? []) {
+      for (const connection of output ?? []) queue.push(connection.node);
+    }
+  }
+  return false;
+}
+
 test('workflow contains the bounded sequential polling topology', () => {
   const requiredNodes = [
     'Manual Trigger',
@@ -241,4 +256,58 @@ test('pagination is bounded, rate-limited, retried, and stopped by an empty tend
   assert.equal(node.retryOnFail, true);
   assert.equal(node.maxTries, 3);
   assert.equal(node.waitBetweenTries, 5000);
+});
+
+test('saved-key workflow reaches Intake Resume only from the dispatch=true branch', () => {
+  const hasDispatch = requireNode(workflow, 'Has Dispatch?');
+  assert.equal(hasDispatch.type, 'n8n-nodes-base.if');
+  assert.deepEqual(directTargets(workflow, 'Has Dispatch?', 0), ['Execute TENDER — Intake Resume']);
+  assert.deepEqual(directTargets(workflow, 'Has Dispatch?', 1), ['No New Tenders']);
+  assert.equal(
+    canReachBefore(
+      workflow,
+      'Initialize Baseline',
+      'Execute TENDER — Intake Resume',
+      'Loop Over Saved Keys',
+    ),
+    false,
+  );
+});
+
+test('saved-key workflow preserves the exact Intake Resume input schema', () => {
+  const execute = requireNode(workflow, 'Execute TENDER — Intake Resume');
+  assert.equal(execute.parameters.workflowId.value, 'VO8Ml0sfO65w2Jiz');
+  assert.equal(execute.parameters.options.waitForSubWorkflow, false);
+  assert.deepEqual(
+    Object.keys(execute.parameters.workflowInputs.value).sort(),
+    [
+      'analysis_run_id',
+      'manual_override',
+      'observed_at',
+      'source_event_key',
+      'tender_id',
+      'trigger_kind',
+    ],
+  );
+});
+
+test('all per-key failure surfaces converge on one auditable failure summary', () => {
+  const guardedNodes = [
+    'Load Baseline State',
+    'Validate Baseline State',
+    'Get Complete Saved Key Pages',
+    'Normalize Complete Page Set',
+    'Initialize Baseline',
+    'Load Existing Event States',
+    'Build Dispatch Queue',
+    'Execute TENDER — Intake Resume',
+  ];
+  for (const name of guardedNodes) {
+    const node = requireNode(workflow, name);
+    assert.equal(node.onError, 'continueErrorOutput', `${name} must expose its error output`);
+    assert.deepEqual(directTargets(workflow, name, 1), ['Key Failure']);
+  }
+  assert.deepEqual(directTargets(workflow, 'Key Failure'), ['Loop Over Saved Keys']);
+  assert.deepEqual(directTargets(workflow, 'Loop Over Saved Keys', 0), ['Assert Poll Completed']);
+  assert.equal(workflow.nodes.length, 19);
 });
