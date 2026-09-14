@@ -26,9 +26,11 @@ execution `26646` независимо подтвердил `markers=1`, `baseli
 
 Следующий шаг после отдельного решения владельца — дождаться новой закупки для
 одного manual end-to-end canary. Публикация/активация schedule до этого решения
-не выполняется. UI-only housekeeping остаётся отдельным не блокирующим шагом:
-перенести workflow в `TEST AGENTIC TENDER ANALYSIS` и выключить
-`availableInMCP`, сохранив только draft.
+не выполняется. Владелец сообщил о завершении UI housekeeping: workflow перенесён
+в `TEST AGENTIC TENDER ANALYSIS`, а `availableInMCP` выключен. Read-only API
+независимо подтвердил `availableInMCP=false`, `active=false` и
+`activeVersionId=null`; используемый workflow endpoint не возвращает folder
+metadata, поэтому placement зафиксирован как owner-reported, а не API-verified.
 
 ## Readable TenderPlan report filenames — published, integrated runtime pending
 

@@ -6172,3 +6172,10 @@ execution `26646` confirmed one marker, 306 completed baseline events and zero
 linked analysis runs. The temporary audit workflow was archived. The saved-key
 schedule remains withheld by owner decision pending a separate canary/activation
 step.
+
+The owner then completed the UI-only housekeeping step. Read-only API verified
+`availableInMCP=false` while the workflow remained `active=false` and
+`activeVersionId=null`. The owner reported folder placement under
+`TEST AGENTIC TENDER ANALYSIS`; the available workflow read endpoint omits
+folder metadata, so that placement is recorded as owner-reported rather than
+independently API-verified.

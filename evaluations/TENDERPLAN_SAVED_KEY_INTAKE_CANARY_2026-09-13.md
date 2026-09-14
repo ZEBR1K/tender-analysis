@@ -63,12 +63,13 @@ Runtime evidence для baseline, одного нового tender и repeat no-
 - Временный SELECT-only audit execution `26646` подтвердил persisted state:
   `markers=1`, `baseline_tenders=306`, `linked_runs=0`,
   `all_completed=true`. Audit workflow `lLV5F6JPlHugpkhM` архивирован.
+- Владелец сообщил, что перенёс workflow в `TEST AGENTIC TENDER ANALYSIS` и
+  выключил MCP access. Read-only API независимо подтвердил
+  `availableInMCP=false`, `active=false`, `activeVersionId=null`; этот endpoint
+  не возвращает folder metadata, поэтому folder placement остаётся
+  owner-reported.
 
 Незакрытые gates:
 
 - новая procurement для end-to-end canary ещё не наблюдалась;
 - schedule намеренно не опубликован и не активирован по решению владельца;
-- live workflow пока находится в personal-project root и имеет
-  `availableInMCP = true`: официальный MCP create проигнорировал переданный
-  folder ID и не предоставляет update-операцию для этого флага; исправление
-  требует аутентифицированного n8n UI.
