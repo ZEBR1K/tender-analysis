@@ -1,5 +1,16 @@
 # Журнал разработки — AI-анализ тендерной документации
 
+## 2026-09-14 — Saved-key read-only delta preflight
+
+Одноразовый inactive/unpublished workflow только чтением повторил полный poll
+saved key `Красное Сормово` и SELECT-сравнение с intake ledger. Execution
+`28212` завершился `success`: `current_tenders=306`, `completed=306`,
+`processing=0`, `new=0`, `failed=0`. Dispatch/Intake Resume отсутствовали в
+графе, baseline и ledger не изменялись. Временный workflow
+`M0osEV8s7GWTjEmL` архивирован. Основной workflow `5TVcGDDzz56CpmfF` остаётся
+inactive/unpublished; следующий gate — новая закупка и отдельно разрешённый
+manual end-to-end canary.
+
 ## 13.08.2026
 
 ### Подключили Docling для разбора документов

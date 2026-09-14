@@ -5,6 +5,9 @@
 **Статус repository/live candidate:** в `Define Saved Keys` включён только
 `6a734cce4a60de2dbf1dc032` (`Красное Сормово`). Live workflow
 `5TVcGDDzz56CpmfF` остаётся inactive и unpublished; schedule не работает.
+Read-only preflight execution `28212` от 2026-09-14 подтвердил отсутствие
+дельты после baseline: `306 completed`, `0 processing`, `0 new`, `0 failed`;
+временный workflow архивирован без вызова Intake Resume и без DB writes.
 
 ## Contract
 

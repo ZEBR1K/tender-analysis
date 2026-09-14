@@ -24,6 +24,13 @@ event states имеют `completed`, `dispatched=0`, `Initialize Baseline` и
 execution `26646` независимо подтвердил `markers=1`, `baseline_tenders=306`,
 `linked_runs=0`, `all_completed=true`; временный workflow архивирован.
 
+Read-only delta preflight execution `28212` от 2026-09-14 повторно прочитал
+полный saved-key result и только SELECT-ом сравнил его с intake ledger:
+`current_tenders=306`, `completed=306`, `processing=0`, `new=0`, `failed=0`.
+Intake Resume не вызывался, baseline/ledger не изменялись; временный
+диагностический workflow `M0osEV8s7GWTjEmL` после успешного execution
+архивирован.
+
 Следующий шаг после отдельного решения владельца — дождаться новой закупки для
 одного manual end-to-end canary. Публикация/активация schedule до этого решения
 не выполняется. Владелец сообщил о завершении UI housekeeping: workflow перенесён
