@@ -1,0 +1,9 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Ubuntu 24.04 otherwise routes unconfined callers into a capability-stripping
+# userns profile. This named profile keeps that host-wide restriction enabled
+# and grants the exception only to the dedicated runner container.
+profile tender-codex-runner-userns flags=(unconfined) {
+  userns,
+}

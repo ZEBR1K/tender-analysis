@@ -1,0 +1,96 @@
+{
+  "name": "TENDER — Manual Resume",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -460,
+        0
+      ],
+      "id": "20000000-0000-4000-8000-000000000001",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ANALYSIS_RUN_ID = '';\n\nconst analysisRunId = ANALYSIS_RUN_ID.trim().toLowerCase();\nconst uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;\n\nif (!analysisRunId || !uuidPattern.test(analysisRunId)) {\n  throw new Error(\n    '[Manual Resume] analysis_run_id must be a non-empty UUID. Edit ANALYSIS_RUN_ID in Set and Validate analysis_run_id before executing.',\n  );\n}\n\nconst executionId = String($execution.id ?? '').trim();\nif (!executionId) {\n  throw new Error('[Manual Resume] current n8n execution ID is unavailable');\n}\n\nreturn [{\n  json: {\n    analysis_run_id: analysisRunId,\n    source_event_key: `manual:${analysisRunId}:${executionId}`,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        0
+      ],
+      "id": "20000000-0000-4000-8000-000000000002",
+      "name": "Set and Validate analysis_run_id"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "TENDER — Intake Resume"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "trigger_kind": "manual",
+            "source_event_key": "={{ $('Set and Validate analysis_run_id').first().json.source_event_key }}",
+            "analysis_run_id": "={{ $('Set and Validate analysis_run_id').first().json.analysis_run_id }}",
+            "manual_override": true
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        20,
+        0
+      ],
+      "id": "20000000-0000-4000-8000-000000000003",
+      "name": "Execute TENDER — Intake Resume"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set and Validate analysis_run_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set and Validate analysis_run_id": {
+      "main": [
+        [
+          {
+            "node": "Execute TENDER — Intake Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

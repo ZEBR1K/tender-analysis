@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testsDirectory, '..');
@@ -40,6 +41,29 @@ function normalizedParameters(node) {
   if (node.type === 'n8n-nodes-base.code') {
     parameters.mode ??= 'runOnceForAllItems';
     parameters.language ??= 'javaScript';
+
+    if (node.name === 'Собрать Report Model2') {
+      parameters.jsCode = parameters.jsCode.replace(
+        /\/\/ (?:Metadata|Header data)[\s\S]*?\n\nconst statistics =/u,
+        '/* procurement header policy */\n\nconst statistics =',
+      );
+    }
+
+    if (node.name === 'Сгенерировать HTML1') {
+      parameters.jsCode = parameters.jsCode.replace(
+        /const procurement = model\.procurement \?\? \{\};[\s\S]*?\n\nconst html = `<!doctype html>/u,
+        'const procurement = model.procurement ?? {};\n/* filename policy */\n\nconst html = `<!doctype html>',
+      ).replace(
+        /<title>[^<]*<\/title>/u,
+        '<title>/* report heading */</title>',
+      ).replace(
+        /<h1>[^<]*<\/h1>/u,
+        '<h1>/* report heading */</h1>',
+      ).replace(
+        /filename: `[^`]+\.html`,/u,
+        'filename: `/* filename policy */.html`,',
+      );
+    }
   }
 
   if (node.type === 'n8n-nodes-base.httpRequest') {
@@ -52,6 +76,39 @@ function normalizedParameters(node) {
   }
 
   return parameters;
+}
+
+function reportModel({ number, subject }) {
+  return {
+    report_model_version: 'tender_report_model_v2',
+    model_validation: { valid: true },
+    internal: { analysis_run_id: 'test-run' },
+    procurement: { number, subject },
+    statistics: { total: 27, resolved: 27, requires_review: 0, not_found: 0 },
+    attention_field_indexes: [],
+    fields: Array.from({ length: 27 }, (_, index) => ({
+      analysis_result: {
+        field_index: index + 1,
+        status: 'resolved',
+        value_text: `value-${index + 1}`,
+        requires_human_review: false,
+      },
+      presentation: {
+        section_name: 'Раздел',
+        client_field_name: `Поле ${index + 1}`,
+        status_text: 'Подтверждено',
+      },
+      sources: [],
+    })),
+  };
+}
+
+async function runRenderer(rendererCode, model) {
+  const context = vm.createContext({ $json: structuredClone(model) });
+  const result = await new vm.Script(`(async () => {\n${rendererCode}\n})()`).runInContext(
+    context,
+  );
+  return result[0];
 }
 
 test('published production PDF chain matches the tested candidate semantics', () => {
@@ -169,4 +226,79 @@ test('HTTP Request posts the validated HTML binary to the internal Gotenberg end
       },
     );
   }
+});
+
+test('final report filename uses the TenderPlan number and title safely', async () => {
+  const workflow = loadJson(canonicalPath);
+  const renderer = byName(workflow, 'Сгенерировать HTML1');
+
+  const named = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({
+      number: '10293451/А',
+      subject: 'Поставка: мебели / шкафов? <2026>',
+    }),
+  );
+  assert.equal(
+    named.json.filename,
+    'Анализ закупки 10293451 А — Поставка мебели шкафов 2026.html',
+  );
+
+  const withoutTitle = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: '10293451', subject: '   ' }),
+  );
+  assert.equal(withoutTitle.json.filename, 'Анализ закупки 10293451.html');
+
+  const withoutNumber = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: null, subject: 'Поставка мебели' }),
+  );
+  assert.equal(
+    withoutNumber.json.filename,
+    'Анализ закупки без номера — Поставка мебели.html',
+  );
+  assert.match(
+    withoutNumber.json.html,
+    /<title>Анализ закупки без номера<\/title>/u,
+  );
+  assert.match(
+    withoutNumber.json.html,
+    /<h1>Анализ закупки без номера<\/h1>/u,
+  );
+  assert.doesNotMatch(withoutNumber.json.html, /№не указан/u);
+
+  const unsafeHeader = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({
+      number: '<img src=x onerror=alert(1)>',
+      subject: '<script>alert(2)</script>',
+    }),
+  );
+  assert.match(
+    unsafeHeader.json.html,
+    /<h1>Анализ закупки №&lt;img src=x onerror=alert\(1\)&gt;<\/h1>/u,
+  );
+  assert.match(
+    unsafeHeader.json.html,
+    /<dd>&lt;script&gt;alert\(2\)&lt;\/script&gt;<\/dd>/u,
+  );
+  assert.doesNotMatch(unsafeHeader.json.html, /<img src=x|<script>alert\(2\)<\/script>/u);
+
+  const longTitle = await runRenderer(
+    renderer.parameters.jsCode,
+    reportModel({ number: '10293451', subject: 'Очень длинное название '.repeat(30) }),
+  );
+  assert.match(longTitle.json.filename, /^Анализ закупки 10293451 — /u);
+  assert.ok(longTitle.json.filename.endsWith('.html'));
+  assert.ok(longTitle.json.filename.slice(0, -'.html'.length).length <= 180);
+
+  const pdfValidator = byName(workflow, 'Проверить PDF artifact');
+  assert.ok(
+    pdfValidator.parameters.jsCode.includes(
+      "const pdfFilename = reportHtml.fileName.replace(/[.]html$/i, '.pdf');",
+    ) || pdfValidator.parameters.jsCode.includes(
+      "const pdfFilename = reportHtml.fileName.replace(/\\.html$/i, '.pdf');",
+    ),
+  );
 });

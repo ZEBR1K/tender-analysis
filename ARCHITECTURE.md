@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-08-29
+**Последнее обновление:** 2026-09-12
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -10,7 +10,9 @@
 
 # 1. Цель системы
 
-Система принимает одну закупку из TenderPlan, обрабатывает все приложенные документы, извлекает подтверждённые candidate facts по фиксированному каталогу из 27 полей, агрегирует их и должна сформировать финальный результат анализа закупки.
+Система принимает одну закупку из TenderPlan или через ручную n8n Form,
+обрабатывает все приложенные документы, извлекает результаты по фиксированному
+каталогу из 27 полей и формирует финальный отчёт.
 
 Текущая MVP-цель:
 
@@ -71,7 +73,7 @@ Company matching — отдельный будущий слой.
 
 # 3. Основные компоненты
 
-Система состоит из семи n8n workflow:
+Production baseline описывается семью n8n workflow:
 
 ```text
 1. ТЕНДЕРЫ ОРКЕСТРАТОР
@@ -83,6 +85,93 @@ Company matching — отдельный будущий слой.
 7. TENDER — Генерация отчета (Report Generation V2)
 ```
 
+Дополнительно реализованы и offline-tested пять intake workflow. Intake Resume
+и TenderPlan Mark Intake сейчас опубликованы в Task 17 agent-only контуре;
+Manual Resume и Recovery Scan остаются операторскими кандидатами:
+
+```text
+8. TENDER — Intake Resume
+9. TENDER — Manual Resume
+10. TENDER — Recovery Scan
+11. TENDER — Ошибка Intake Resume
+12. TENDER — TenderPlan Mark Intake
+13. TENDER — Ручная загрузка закупки
+14. TENDER — Ошибка ручной загрузки
+```
+
+Manual Upload `fB46LZnrNCs2MDeL` опубликован как второй production entry. Он
+сохраняет исходные bytes в существующем внутреннем artifact store, вызывает
+Document Preparation, атомарно создаёт run и регистрирует все документы, после
+чего передаёт управление тому же Agentic Dispatch. Общий лимит формы — 200 MiB;
+исполняемые и неизвестные типы отклоняются. Отдельного анализатора, parser или
+semantic validator для ручного пути нет. Его отдельный Error workflow
+`xW4DHtnBYddbaU14` по сохранённому n8n execution ID может завершить только один
+принадлежащий manual run; это защита audit/lifecycle, а не семантическая
+проверка. Form Trigger пока использует `authentication=none`, поэтому URL
+считается доверенной непубличной ссылкой, а не защищённым пользовательским
+порталом.
+
+`TENDER — TenderPlan Mark Intake` опрашивает current membership фиксированной
+метки `6a732cd00c61629cf1d3c144` («Проверить») каждые 10 минут через
+GET `/api/tenders/v2/getlist?type=1&id=<mark_id>`. Runtime source contract
+`14683` supersedes неподтверждённый notification type-5 plan. Executions
+`14743`-`14745` additionally confirm that the internal tender identity is `_id`
+and that the then-inactive live candidate reached Intake duplicate/no-op without
+downstream execution. После успешного Task 17 real-Codex canary schedule
+опубликован; pagination/exhaustive-result semantics не документированы.
+
+Отдельно подготовлен агентский контур Tasks 0–17 и terminal integration:
+
+```text
+полный source manifest после commit
+→ immutable job folder
+→ fixed codex exec + focused skill
+→ agent-owned document inspection
+→ exact 27-field JSON
+→ contract/source/file-integrity validation
+→ validated shadow result
+→ canonical tender_field_final_v1
+→ DB-backed 27/27 completion
+→ existing HTML/PDF report
+```
+
+Runner не создаёт page/OOXML/XLSX index и не оценивает цитаты, достаточность
+evidence или бизнес-смысл значения. Codex сам выбирает text, visual, OCR или
+OOXML способ исследования. Runtime принимает или отклоняет только по
+безопасности, целостности исходных файлов/артефактов и закрытому JSON-контракту.
+Изолированный runner развёрнут. Аддитивная PostgreSQL-миграция и точная shadow
+schema подтверждены read-only проверкой. Неактивный Dispatch → Monitor canary
+прошёл весь transport/ownership/JSON-contract путь и одной транзакцией сохранил
+ровно 27 shadow-строк. Task 17 опубликовал Document Preparation, Orchestrator,
+Intake Resume, Dispatch, Monitor и ownership-guarded Agentic Error. Временный
+режим `TASK17_TEMPORARY_AGENT_ONLY` сохраняет legacy-ноды, но делает их
+недостижимыми из Orchestrator и Intake Resume. Реальный job
+`13b090b5-38fc-432a-a235-90ae43f609fe` обработал DOCX и legacy XLS на attempt 1.
+Monitor execution `15387` принял exact-27 контракт и атомарно сохранил 27 shadow
+rows; legacy Worker/Aggregator/Finalization не запускались. После этого
+TenderPlan Mark Intake был опубликован. `.xls` передаётся как неизменённый
+source artifact; Codex сам выбирает способ исследования, а runtime не добавляет
+XLS parser или semantic validation. Сохранённый legacy Worker-фильтр `.xls` не
+принимает.
+
+На terminal boundary Monitor version `b45e4a2c-…` после успешного shadow commit
+вызывает существующую Finalization. Finalization version `e1aad7e7-…` проверяет
+только identity/JSON/manifest contracts, атомарно продвигает ровно 27 строк в
+canonical FINAL и передаёт управление прежнему completion barrier. Report
+Generation version `e21c7675-…` принимает тот же `tender_field_final_v1` и
+создаёт HTML/PDF без повторного semantic анализа. Canary executions
+`15662/15663` и DB read-back подтвердили `27/27`, `run.status=completed` и PDF
+signature `%PDF-`; idempotent replay `15666` не вызвал второй report.
+
+Fresh production-path canary затем прошёл весь маршрут для нового TenderPlan
+mark: Monitor `16402` принял новый completed Codex job, Finalization `16403`
+продвинул exact 27 canonical rows, а Report `16404` создал валидные HTML/PDF.
+Read-only DB verification подтвердил completed run и 27 уникальных
+`tender_field_final_v1`. Source-download recovery ограничен только кодом
+`AGENTIC_SOURCE_DOWNLOAD_FAILED`; Monitor сохраняет предыдущий technical audit
+при добавлении validation summary. Эти guards не оценивают смысл field values,
+цитат или evidence.
+
 И пяти основных PostgreSQL таблиц:
 
 ```text
@@ -93,9 +182,25 @@ tender_analysis_facts
 tender_analysis_field_results
 ```
 
+Восьмой reusable workflow `TENDER — Подготовить документацию`
+(`0scTZu1aBKsMd6AM`) опубликован и подключён как синхронная preprocessing
+boundary до atomic run/document INSERT. Поддерживаемые документы, таблицы,
+текст и изображения последовательно скачиваются только для byte size, MIME и
+SHA-256; страницы, листы и OOXML не разбираются. Архивы раскрываются внутренним
+bounded extractor. Caller принимает только полный manifest либо останавливается
+до создания run. Internal manual artifacts обходят внешний TenderPlan proxy по
+точному Docker-service prefix; это transport routing, не разбор содержимого.
+
 ---
 
 # 4. Общая архитектура
+
+Временный live Task 17 route после source-manifest registration идёт в Agentic
+Dispatch → Codex runner → Agentic Monitor → 27 shadow rows → Finalization →
+27 canonical FINAL rows → HTML/PDF report. Показанный ниже
+Worker/Aggregator контур остаётся canonical legacy baseline, но его входы из
+Orchestrator и Intake Resume намеренно отключены и помечены
+`TASK17_TEMPORARY_AGENT_ONLY`.
 
 ```text
                 ┌─────────────────────┐
@@ -177,6 +282,11 @@ tender_analysis_field_results
 | Workflow | Главная ответственность | Что не делает |
 |---|---|---|
 | `ТЕНДЕРЫ ОРКЕСТРАТОР` | Создать run, зарегистрировать документы, запустить Workers | Не анализирует содержимое документов |
+| `TENDER — Ручная загрузка закупки` | Принять локальные файлы, сохранить source identity, создать run и вызвать Agentic Dispatch | Не создаёт отдельный анализатор и не интерпретирует документы |
+| `TENDER — Intake Resume` *(inactive candidate)* | Выбрать new/existing run и идемпотентно продолжить его lifecycle | Не является TenderPlan poller и не создаёт новый event contract |
+| `TENDER — Manual Resume` *(inactive candidate)* | Передать operator-selected `analysis_run_id` в dispatcher с manual override | Не выбирает run по `tender_id` и не дублирует dispatch policy |
+| `TENDER — Recovery Scan` *(inactive candidate)* | Read-only выбрать незавершённые runs для повторной передачи dispatcher | Не мутирует run/documents и не решает retry policy |
+| `TENDER — Ошибка Intake Resume` *(inactive candidate)* | Зафиксировать failure принадлежащего execution intake event | Не изменяет run/documents и не заменяет document Error Workflow |
 | `TENDER — Обработать документ` | Полностью обработать один документ и сохранить facts | Не агрегирует факты между документами |
 | `TENDER — Ошибка обработки документа` | Пометить упавший processing-document как failed | Не решает retry policy всего run |
 | `TENDER — Агрегация закупки` | Свести candidate facts в 27 field items и вызвать финализацию | Не строит внешний отчёт |
@@ -255,6 +365,7 @@ ready_for_aggregation
 aggregating
 completed
 failed
+superseded
 ```
 
 Intended happy path:
@@ -328,7 +439,7 @@ failed
 processing
 ```
 
-`skipped` существует в DB schema, но текущая readiness semantics не считает его эквивалентом completed.
+`skipped` является terminal status для readiness вместе с `completed`; `failed` остаётся блокирующим fail path. Worker и Intake Resume используют одинаковый barrier `completed + skipped = documents_total`.
 
 ---
 
@@ -365,21 +476,25 @@ vs
 
 # 11. Orchestrator
 
-Текущий путь:
+Текущий canonical repository candidate — inactive 14-node reusable sub-workflow с ответственностью только за создание нового run:
 
 ```text
-Manual Trigger
-→ hardcoded tender_id
+typed tender_id / source / source_event_key / trigger_kind
+→ validate input
 → TenderPlan FullInfo
-→ normalize
-→ create run
-→ register all documents
-→ split
-→ temporary extension filter
-→ Execute Document Worker
+→ require response tender._id === requested tender_id
+→ one snapshot-safe SQL:
+   insert run directly as processing
+   + register supported documents as pending and unsupported documents as skipped
+→ created_new_run?
+   ├─ true: async Worker dispatch for pdf/docx/xlsx
+   └─ false: fresh active-run SELECT + exactly-one guard
+→ one structured result
 ```
 
-На текущем MVP Orchestrator поддерживает запуск Worker только для:
+PostgreSQL partial uniqueness по `(source, tender_id) WHERE status NOT IN ('completed', 'superseded')` является concurrency boundary. `superseded` — terminal audit state, который не возобновляется. Проигравший `ON CONFLICT DO NOTHING` путь не регистрирует документы повторно и не запускает Worker.
+
+Worker по-прежнему запускается только для:
 
 ```text
 pdf
@@ -387,38 +502,60 @@ docx
 xlsx
 ```
 
-Это временное ограничение.
+Legacy `.doc` parsing is intentionally unsupported. Such attachments remain in
+the audit as terminal `skipped`; Intake returns
+`unsupported_documents_skipped` and fails the run instead of aggregating a
+partial document set. This boundary is runtime-verified in candidate Intake
+execution `14987`. Zero-document lifecycle remains separate (`OR-1`).
 
 ---
 
 # 12. Orchestrator input / production boundary
 
-Сейчас точка входа:
+Точка входа canonical candidate:
 
 ```text
-Manual Trigger
-+
-hardcoded tender_id
+Execute Sub-workflow Trigger v1.2
 ```
 
-Это development-only.
+Typed contract:
 
-В будущем можно заменить trigger на:
-
-```text
-Webhook
-Telegram
-Bitrix
-Scheduler
-API
-another workflow
+```json
+{
+  "tender_id": "string",
+  "source": "tenderplan",
+  "source_event_key": "string",
+  "trigger_kind": "tenderplan_mark | recovery_scan | manual"
+}
 ```
 
-без изменения downstream architecture, если сохраняется контракт:
+Все поля валидируются до HTTP/DB. FullInfo response обязан вернуть string `tender._id`, точно равный validated `tender_id`.
 
-```text
-tender_id
-```
+Orchestrator не является владельцем resume policy. Inactive repository candidate
+`TENDER — Intake Resume` уже реализован и offline-tested: он выбирает новый или
+существующий `analysis_run_id`, обрабатывает repeated mark/manual/recovery и
+вызывает Orchestrator только для new-run boundary. Conflict result Orchestrator
+имеет `action='concurrent_existing_run'` и не означает, что существующий run уже
+возобновлён.
+
+Dispatcher сохраняет тот же `analysis_run_id`, никогда не повторяет
+`completed`/`skipped` documents и ограничивает automatic path ровно двумя Worker
+claims total. Только `manual_override=true` может повторить exhausted failed
+document. `processing` считается stale после одного часа, но reclaim разрешён
+только после read-only observation соответствующего n8n execution и guarded CAS;
+недоступность execution API ничего не мутирует.
+
+Если история `(source, tender_id)` содержит только `superseded`, active-run
+boundary допускает создание нового run. Прямой automatic/manual/recovery вызов
+с superseded `analysis_run_id` возвращает `superseded_no_op` и не dispatch-ит
+Worker, Aggregator или Finalization.
+
+Manual/hardcoded boundary устранён в inactive repository candidate и проверен в
+isolated NO-WORKER contour. Migration applied; dispatcher/error/manual/recovery
+и mark-poller candidates imported and runtime-tested within the documented
+safety boundary. Production promotion/activation and downstream Worker,
+Aggregator/Finalization runtime remain separate gates. Relation poller schedule
+remains inactive; manual current-state canary `14744` → `14745` is GREEN.
 
 ---
 
@@ -969,7 +1106,8 @@ processing
 ```text
 documents_total > 0
 registered = documents_total
-completed = documents_total
+failed = 0
+completed + skipped = documents_total
 ```
 
 ---
@@ -1691,8 +1829,8 @@ Error Workflow = TENDER — Ошибка обработки документа
 
 ```text
 OR-0
-unsupported document registered pending
-but Worker not started
+unsupported document is preserved as skipped;
+the run fails explicitly and partial aggregation is blocked
 ```
 
 ## Worker error handling
@@ -2289,16 +2427,20 @@ tender_id
 → report_html
 → report_pdf
 
-AG-8 GREEN подтверждён только в test Aggregator. Document Worker production candidate упакован только локально и ещё не promoted. Перед клиентским отчётом текущий milestone:
+Для сохранённой legacy lane AG-8 GREEN подтверждён только в test Aggregator, а
+Document Worker production candidate упакован только локально и ещё не promoted.
+Для активной agentic lane свежий mark-to-HTML/PDF terminal path runtime GREEN.
+Перед безусловной отправкой клиенту текущий общий milestone:
 
 ```text
-test workflow promotion / wiring clean Document Worker candidate
-→ fresh full run
-→ manual review 27/27
+fresh agentic run from TenderPlan mark — technical GREEN
+→ manual semantic review 27/27 when a reference is available
 → client report
 ```
 
-Остаются future work: post-promotion PDF runtime canary, DOCX, XLSX, manual upload и automatic delivery.
+Остаются future work: DOCX/XLSX report variants, manual upload и automatic
+delivery. Legacy Worker/Aggregator promotion остаётся отдельным fallback-lane
+debt и не блокирует активный agentic путь.
 ---
 
 # 81. Краткая схема будущего завершённого MVP
@@ -2362,37 +2504,43 @@ Aggregator
 ```text
 1. PostgreSQL как persistent state и synchronization layer.
 
-2. AI как semantic engine,
-   но каждый AI-этап ограничен deterministic validation.
+2. Codex как semantic engine agentic lane;
+   runtime проверяет только безопасность, целостность и JSON-контракт.
 
 3. Финальный анализ строится не напрямую из документов,
    а через контролируемую цепочку:
    document → unit → fact → field → FINAL.
 ```
 
-Система уже имеет достаточно сильную структуру для MVP:
+Система уже имеет полный agentic terminal contour для MVP:
 
 ```text
-registered documents
-atomic claims
-persistent units
-grounded evidence
-independent validation
-field-level recheck
-versioned final contract
+registered source manifest
+restart-safe agentic job
+exact 27-field shadow result
+canonical tender_field_final_v1
+DB-backed completion claim
+HTML/PDF report
 ```
 
-Главная незавершённая архитектурная часть:
-
-```text
-fan-out 27 FINAL fields
-→ single completion/report stage
-```
-
-То есть следующий системный шаг — не новый AI-слой, а корректная DB-backed синхронизация:
+Terminal architecture runtime GREEN:
 
 ```text
 27 / 27
 → completed
-→ report
+→ report_html + report_pdf
 ```
+
+Свежая техническая проверка уже собранного маршрута завершена:
+
+```text
+TenderPlan mark
+→ Codex
+→ 27 FINAL
+→ report
+→ technical GREEN
+```
+
+Следующий шаг — не новый parser или validator, а неблокирующая ручная semantic
+review 27/27 на закупке с доступным эталоном и отдельно согласованная реализация
+оставшихся delivery-форматов.

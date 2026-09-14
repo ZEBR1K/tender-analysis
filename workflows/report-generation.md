@@ -13,6 +13,12 @@ Orchestrator
 → Targeted Recheck
 → Finalization
 → TENDER — Генерация отчета
+
+или для временного agent-only route:
+
+Agentic Monitor
+→ Finalization (agentic promotion + тот же барьер 27/27)
+→ TENDER — Генерация отчета
 ```
 
 Report Generation начинается только после successful Finalization event. Он не извлекает новые facts, не меняет FINAL status/value и не переинтерпретирует исходные документы AI-моделью.
@@ -92,9 +98,14 @@ tender_analysis_units
 - run существует и имеет `status=completed`;
 - ровно 27 fields, точный порядок `1..27` и ожидаемые `field_key`;
 - exact canonical contract каждого поля:
-  `field_index`, `field_key`, `status`, `value_text`, `confidence`, `requires_human_review`, `result_json`;
+  `field_index`, `field_key`, `status`, `value_text`, `confidence`, `requires_human_review`, `resolution_method`, `result_json`;
 - status/value/review invariants для `resolved`, `requires_review` и `not_found`;
 - существование массивов `documents`, `facts` и `units` в `source_index`.
+
+Для прежних producers у `resolved` по-прежнему обязателен числовой
+`confidence`. Единственное исключение — `resolution_method=codex_agentic_v1`,
+для которого `confidence` обязан быть `null`: агент не выдумывает числовую
+оценку, а Report Generation не вычисляет её самостоятельно.
 
 При нарушении workflow завершает execution с явной ошибкой, например `REPORT_RUN_NOT_COMPLETED`, `REPORT_SNAPSHOT_FIELD_COUNT_INVALID`, `REPORT_ANALYSIS_CONTRACT_CHANGED` или `REPORT_SNAPSHOT_SOURCE_INDEX_INVALID`.
 
@@ -121,6 +132,7 @@ tender_analysis_units
 {
   "kind": "document",
   "document": "Проект договора.pdf",
+  "locator": "раздел 4.2",
   "page": 2,
   "page_to": 2,
   "sheet": null,
@@ -140,6 +152,8 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 1. `candidate_ref: fact:<uuid>` или exact `fact_id`:
    `fact_id → source_index.facts → document_id → source_index.documents → file_name`.
 2. embedded `evidence.document`: имя документа берётся непосредственно из evidence.
+   Agentic promotion добавляет это имя после проверки `artifact_key` по manifest;
+   непрозрачный `locator` переносится рядом без разбора его содержания.
 3. `analysis_unit_id`: unique unit разрешается через `source_index.units` и его `document_id`.
 4. `semantic_block_id`: Adapter ищет unique matching unit в `ai_segments`/provenance и затем его документ.
 5. `source_type=tender_metadata`: возвращается отдельный metadata-source:
@@ -148,6 +162,7 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 {
   "kind": "tender_metadata",
   "document": "TenderPlan — карточка закупки",
+  "locator": null,
   "page": null,
   "page_to": null,
   "sheet": null,
@@ -156,7 +171,12 @@ Adapter обрабатывает только `result_json.evidence[]` конк�
 }
 ```
 
-Quote берётся только из evidence. Страницы и sheet берутся из evidence либо source pages unit; если они не установлены, остаются `null`. Workflow не придумывает page, sheet или quote. Неоднозначный document не выбирается молча; diagnostics отражают unresolved/ambiguous reference.
+Quote и locator берутся только из evidence. Locator остаётся непрозрачной
+строкой: workflow не превращает его в page/sheet и не проверяет смысл.
+Страницы и sheet берутся из evidence либо source pages unit; если они не
+установлены, остаются `null`. Workflow не придумывает page, sheet, locator или
+quote. Неоднозначный document не выбирается молча; diagnostics отражают
+unresolved/ambiguous reference.
 
 Для `status=not_found` evidence не обрабатываются и всегда формируется `sources: []`. Sources дедуплицируются только при полном совпадении client-safe source object.
 
@@ -180,7 +200,14 @@ Internal ids (`fact_id`, `document_id`, `analysis_unit_id`, `semantic_block_id`,
 }
 ```
 
-- `procurement` — presentation data из `analysis_run.tender_meta` (number, subject, customer, platform, price, publication_at); missing metadata становится `null`, не подменяет FINAL value.
+- `procurement` — presentation data с приоритетом `analysis_run.tender_meta`.
+  Если metadata не содержат непустые `subject`, `customer`, `platform` или
+  `price`, нода использует уже готовые значения соответствующих FINAL fields:
+  `procurement_subject`, `customer`, `platform`, `nm_price_with_vat`.
+  Fallback допускает только непустой `value_text` со статусом `resolved` или
+  `requires_review`; `not_found` не превращается в значение. `number` и
+  `publication_at` остаются только metadata-полями. Canonical FINAL objects не
+  изменяются — дополнение существует только в presentation-модели отчёта.
 - `statistics` пересчитывается из `analysis_result.status`.
 - `fields` — те же adapter fields без normalization/copy-on-write presentation logic.
 - `attention_field_indexes` — производная проекция полей с `requires_human_review === true`.
@@ -214,7 +241,11 @@ HTML содержит ровно 27 client-facing rows с `data-field-index="1" 
 - отображаются все уже подготовленные `sources[]`;
 - block `attention` содержит только `requires_human_review=true`.
 
-Все динамические values и quotes проходят `escapeHtml`. HTML не выводит UUID, `field_key`, `result_json`, `confidence`, `fact_id`, `semantic_block_id`, `analysis_unit_id`, `candidate_ref` или `analysis_run_id`. Последний остаётся только в техническом JSON output Renderer/Artifact, а не в HTML.
+Все динамические values, locators и quotes проходят `escapeHtml`. HTML не
+выводит UUID, `field_key`, `result_json`, `confidence`, `fact_id`,
+`semantic_block_id`, `analysis_unit_id`, `candidate_ref` или
+`analysis_run_id`. Последний остаётся только в техническом JSON output
+Renderer/Artifact, а не в HTML.
 
 `not_found` не означает отрицательный факт и показывается нейтрально:
 
@@ -223,6 +254,20 @@ HTML содержит ровно 27 client-facing rows с `data-field-index="1" 
 ```
 
 `requires_review` имеет отдельный status label и отдельный attention block.
+
+Renderer формирует имя artifact из уже полученных данных TenderPlan:
+
+```text
+Анализ закупки <номер> — <название TenderPlan>.html
+```
+
+Если название отсутствует, остаётся `Анализ закупки <номер>.html`; если номер
+отсутствует, используется `без номера`. Управляющие и запрещённые Windows
+символы заменяются пробелами, повторяющиеся пробелы схлопываются, а базовое имя
+ограничивается 180 символами. Название внутри самого отчёта не сокращается.
+
+Если номер отсутствует, `<title>` и видимый заголовок используют нейтральную
+форму `Анализ закупки без номера`, без конструкции `№не указан`.
 
 ## 7. HTML artifact
 
@@ -235,6 +280,10 @@ fileName = Renderer filename
 ```
 
 Нода проверяет non-empty HTML, filename с расширением `.html`, `mime_type=text/html`, положительный byte size и Base64 round-trip equality с Renderer HTML. В terminal JSON остаются metadata и `artifact_validation`; raw HTML находится только в binary.
+
+`Проверить PDF artifact` наследует то же базовое имя и заменяет только
+расширение `.html` на `.pdf`. Случайное UUID-имя ответа Gotenberg является
+промежуточным и не выходит из terminal node как итоговое имя файла.
 
 ## 8. Reference regression
 
@@ -334,7 +383,7 @@ Production promotion checkpoint 2026-09-07:
 | Проверка | Результат |
 |---|---:|
 | Production workflow | `ckPnP3hRhKu4Mf9u` |
-| Published version | `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` |
+| Published version | `9fb64a15-af46-4f05-9435-b73fa41152ed` |
 | Active / draft parity | `versionId = activeVersionId` |
 | Nodes | 12 |
 | PDF connections | exact sequential chain verified read-only |
@@ -365,6 +414,38 @@ PDF filename persistence checkpoint 2026-09-11:
 Полный sanitized runtime audit находится в
 `evaluations/report-generation-pdf-filename-execution-17294.md`.
 
+Agentic production canary checkpoint 2026-09-11:
+
+| Проверка | Результат |
+|---|---:|
+| Published version | `e21c7675-916a-4fd3-8499-e11444484b68` |
+| Active / draft parity | `versionId = activeVersionId` |
+| Parent Finalization execution | `15662`, success |
+| Report execution | `15663`, integrated / success |
+| Snapshot / model fields | `27 / 27` |
+| HTML artifact | `24761` bytes, valid |
+| PDF artifact | `90367` bytes, `%PDF-`, valid |
+| Output binaries | `report_html`, `report_pdf` |
+
+This is the first runtime proof of the published production PDF path. The
+snapshot contained canonical `codex_agentic_v1` rows with null confidence and
+opaque source locators, so the new agentic adapter compatibility was exercised,
+not only the legacy Aggregator format.
+
+Readable filename publication checkpoint 2026-09-11:
+
+| Проверка | Результат |
+|---|---:|
+| Published version | `c23b00c0-6f46-4291-8877-71017cdfdbdf` |
+| Active / draft parity | `versionId = activeVersionId` |
+| Renderer parity | live Code node equals canonical export |
+| Nodes / connections | `12` / unchanged |
+| Focused filename tests | `4 passed / 0 failed` |
+
+Новая версия ожидает первый integrated запуск с реальным input от Finalization.
+Ручной запуск `17213` без sub-workflow input остановился на первом guard с
+`отсутствует analysis_run_id`; Renderer и конвертация не запускались.
+
 ## 10. Limitations and future work
 
 Текущий production workflow **не** включает:
@@ -376,9 +457,10 @@ PDF filename persistence checkpoint 2026-09-11:
 - client-safe projection of internal `review_note`;
 - XLSX artifact.
 
-HTML/PDF path и скачивание PDF под читаемым именем подтверждены production
-execution `17294`. Остальные возможности являются future work/technical debt,
-а не частью текущего report workflow.
+PDF topology и production runtime gate `RG-1` закрыты integrated execution
+`15663`; HTML/PDF path и скачивание PDF под читаемым именем дополнительно
+подтверждены production execution `17294`. Остальные возможности являются
+future work/technical debt, а не частью текущего report workflow.
 
 ## 11. Legacy documentation
 

@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kitatech.local/schemas/tender-agent-validation-v1.schema.json",
+  "title": "Tender agent validation envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job_id",
+    "valid",
+    "job_issues",
+    "fields",
+    "raw_result_sha256",
+    "validated_result_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "tender_agent_validation_v1"
+    },
+    "job_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "valid": {
+      "type": "boolean"
+    },
+    "job_issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 27,
+      "maxItems": 27,
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "raw_result_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "validated_result_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "fieldKey": {
+      "type": "string",
+      "enum": [
+        "procurement_subject",
+        "nm_price_with_vat",
+        "platform",
+        "procedure_type",
+        "application_deadline",
+        "application_review_date",
+        "results_date",
+        "customer",
+        "customer_contacts",
+        "participation_cost",
+        "participation_guarantee",
+        "evaluation_criteria",
+        "delivery_term",
+        "payment_terms",
+        "special_account_or_treasury",
+        "bank_support",
+        "government_contract",
+        "rebidding",
+        "national_regime",
+        "advance_contract_guarantee",
+        "warranty_obligations_guarantee",
+        "licenses_certificates",
+        "required_official_certificates",
+        "similar_supply_experience",
+        "analog_allowed",
+        "analog_definition",
+        "application_documents"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "resolved",
+        "requires_review",
+        "not_found"
+      ]
+    },
+    "issueCode": {
+      "type": "string",
+      "enum": [
+        "SCHEMA_INVALID",
+        "FIELD_SET_MISMATCH",
+        "DUPLICATE_FIELD",
+        "STATUS_INVALID",
+        "CATALOG_HASH_MISMATCH",
+        "MANIFEST_HASH_MISMATCH",
+        "SOURCE_UNKNOWN",
+        "LOCATOR_INVALID",
+        "FILE_INTEGRITY_MISMATCH"
+      ]
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "path"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/issueCode"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "field_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 27
+        },
+        "field_key": {
+          "$ref": "#/$defs/fieldKey"
+        },
+        "evidence_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "artifact_key": {
+          "type": "string"
+        },
+        "dimension": {
+          "type": "string"
+        },
+        "keyword": {
+          "type": "string"
+        },
+        "schema_path": {
+          "type": "string"
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_index",
+        "field_key",
+        "status",
+        "value_text",
+        "issues"
+      ],
+      "properties": {
+        "field_index": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 27
+        },
+        "field_key": {
+          "$ref": "#/$defs/fieldKey"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "value_text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
+        }
+      }
+    }
+  }
+}

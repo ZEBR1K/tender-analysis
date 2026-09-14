@@ -1,0 +1,995 @@
+{
+  "name": "TENDER — Агентский анализ — Монитор",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1000,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000001",
+      "name": "Каждую минуту"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\nWITH candidates AS (\n SELECT id FROM public.tender_agentic_jobs\n WHERE status IN ('ready','running','validating')\n   AND dispatch_execution_id IS NULL\n   AND (poll_owner_execution_id IS NULL OR poll_claimed_at < now() - interval '5 minutes')\n ORDER BY coalesce(heartbeat_at,created_at),id\n FOR UPDATE SKIP LOCKED\n LIMIT 2\n), claimed AS (\n UPDATE public.tender_agentic_jobs j\n SET poll_owner_execution_id=$1::text,poll_claimed_at=now(),updated_at=now()\n FROM candidates c WHERE j.id=c.id\n RETURNING j.id,j.analysis_run_id,j.pipeline_version,j.replicate_index,j.status,j.field_catalog_version,\n j.field_catalog_sha256,j.input_manifest_sha256,j.poll_owner_execution_id,j.error_code\n)\nSELECT * FROM claimed;\nCOMMIT;",
+        "options": {
+          "queryReplacement": "={{ [$execution.id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -780,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000002",
+      "name": "Захватить до двух jobs",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000003",
+      "name": "Jobs по одному"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.id) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "autodetect"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -340,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000004",
+      "name": "Опросить runner",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json; const claimed=$('Jobs по одному').item.json;\nfunction boundedUsage(value){const out={};for(const key of ['input_tokens','cached_input_tokens','output_tokens','reasoning_output_tokens']){const n=Number(value?.[key]);out[key]=Number.isSafeInteger(n)&&n>=0?n:0;}return out;}\nfunction allowedArtifact(value){const out={};const validation=value?.failure?.validation;if(validation&&typeof validation==='object'){if(typeof validation.artifact==='string')out.validation_artifact=validation.artifact.slice(0,255);if(/^[0-9a-f]{64}$/iu.test(String(validation.sha256??'')))out.validation_sha256=String(validation.sha256).toUpperCase();if(typeof validation.envelope_available==='boolean')out.validation_envelope_available=validation.envelope_available;}return out;}\nfunction monitorFailure(code,message){return [{json:{job_id:claimed.id,analysis_run_id:claimed.analysis_run_id,poll_owner_execution_id:claimed.poll_owner_execution_id,\noutcome:'monitor_failure',error_code:String(code).slice(0,80),error_message:String(message).slice(0,500),usage:boundedUsage(null),artifacts:{}}}];}\nif(Number(response.statusCode??200)!==200)return monitorFailure('MONITOR_STATUS_HTTP_FAILED','Runner status request failed');\nconst body=response.body??response;\nfor(const key of ['job_id','analysis_run_id','pipeline_version','field_catalog_version','field_catalog_sha256','input_manifest_sha256']){const expectedKey=key==='job_id'?'id':key;if(String(body[key]??'')!==String(claimed[expectedKey]??''))return monitorFailure('MONITOR_STATUS_IDENTITY_INVALID','Runner status identity mismatch');}\nconst status=String(body.status??'');\nif(!['ready','running','validating','completed','failed'].includes(status))return monitorFailure('MONITOR_STATUS_INVALID','Runner returned unsupported status');\nconst failure=body.failure??{};const runnerAttempt=Number(body.attempt);\nif(status==='failed'&&(!Number.isInteger(runnerAttempt)||runnerAttempt<1||runnerAttempt>2))return monitorFailure('MONITOR_STATUS_ATTEMPT_INVALID','Runner failure attempt is invalid');\nreturn [{json:{job_id:claimed.id,analysis_run_id:claimed.analysis_run_id,pipeline_version:claimed.pipeline_version,\nfield_catalog_version:claimed.field_catalog_version,field_catalog_sha256:claimed.field_catalog_sha256,input_manifest_sha256:claimed.input_manifest_sha256,\npoll_owner_execution_id:claimed.poll_owner_execution_id,status,outcome:status==='failed'?'runner_failed':status==='completed'?'completed':'nonterminal',\nheartbeat_at:null,usage:boundedUsage(body.usage),artifacts:allowedArtifact(body),\nerror_code:String(failure.code??'RUNNER_FAILED').slice(0,80),error_message:String(failure.message??'Runner job failed').slice(0,500),\nrunner_attempt:Number.isInteger(runnerAttempt)?runnerAttempt:0,runner_retryable:failure.retryable===true}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000005",
+      "name": "Нормализовать runner status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "120-if1",
+              "leftValue": "={{ $json.status === 'completed' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        100,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000006",
+      "name": "Runner completed?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "120-if2",
+              "leftValue": "={{ $json.status === 'failed' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        200
+      ],
+      "id": "12000000-0000-4000-8000-000000000007",
+      "name": "Runner failed?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET heartbeat_at=now(),\n input_tokens=coalesce(($3::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($3::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($3::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($3::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$4::jsonb,poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,JSON.stringify($json.usage),JSON.stringify($json.artifacts)] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        540,
+        320
+      ],
+      "id": "12000000-0000-4000-8000-000000000008",
+      "name": "Сохранить heartbeat",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,attempts=$5::smallint,\n error_code=left($3::text,80),error_message=left($4::text,500),\n input_tokens=coalesce(($6::jsonb->>'input_tokens')::bigint,input_tokens),cached_input_tokens=coalesce(($6::jsonb->>'cached_input_tokens')::bigint,cached_input_tokens),\n output_tokens=coalesce(($6::jsonb->>'output_tokens')::bigint,output_tokens),reasoning_output_tokens=coalesce(($6::jsonb->>'reasoning_output_tokens')::bigint,reasoning_output_tokens),\n artifacts=artifacts||$7::jsonb,validation_summary=validation_summary||jsonb_build_object('runner_status','failed','runner_retryable',$8::boolean,'runner_attempt',$5::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n AND $5::smallint BETWEEN 1 AND 2\n RETURNING id,status,error_code\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message,$json.runner_attempt,JSON.stringify($json.usage),JSON.stringify($json.artifacts),$json.runner_retryable] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        540,
+        120
+      ],
+      "id": "12000000-0000-4000-8000-000000000009",
+      "name": "Сохранить runner failure",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.job_id) + '/result' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "autodetect"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000010",
+      "name": "Получить validated result",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const claimed=$('Нормализовать runner status').item.json;const response=$input.first().json;\nfunction resultFailure(outcome,code,message){return [{json:{...claimed,outcome,error_code:String(code).slice(0,80),error_message:String(message).slice(0,500)}}];}\nif(Number(response.statusCode??200)!==200)return resultFailure('monitor_failure','MONITOR_RESULT_HTTP_FAILED','Runner result request failed');\nconst body=response.body??response;const envelope=body?.validation;const result=body?.result;\nif(!envelope||typeof envelope!=='object'||Array.isArray(envelope)||envelope.schema_version!=='tender_agent_validation_v1'||envelope.valid!==true)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation envelope is invalid');\nif(String(body?.job_id??'')!==claimed.job_id||String(envelope.job_id??'')!==claimed.job_id)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result job identity mismatch');\nif(!result||typeof result!=='object'||Array.isArray(result)||result.schema_version!=='tender_agent_result_v1'||result.field_catalog_version!==claimed.field_catalog_version||result.field_catalog_sha256!==claimed.field_catalog_sha256||result.input_manifest_sha256!==claimed.input_manifest_sha256)return resultFailure('contract_invalid','RESULT_IDENTITY_INVALID','Result source identity mismatch');\nif(!/^[0-9a-f]{64}$/iu.test(String(envelope.raw_result_sha256??''))||!/^[0-9a-f]{64}$/iu.test(String(envelope.validated_result_sha256??'')))return resultFailure('contract_invalid','RESULT_HASH_INVALID','Result artifact hash is invalid');\nif(!Array.isArray(envelope.fields)||envelope.fields.length!==27||!Array.isArray(result.fields)||result.fields.length!==27||!Array.isArray(envelope.job_issues))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result must contain exact typed arrays');\nconst fields=[];for(let index=0;index<27;index++){const field=result.fields[index];const validation=envelope.fields[index];if(!field||typeof field!=='object'||Array.isArray(field)||!validation||typeof validation!=='object'||Array.isArray(validation))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result field entry is invalid');if(!Number.isInteger(field.field_index)||typeof field.field_key!=='string'||typeof field.status!=='string'||(field.value_text!==null&&typeof field.value_text!=='string')||!Number.isInteger(validation.field_index)||typeof validation.field_key!=='string'||typeof validation.status!=='string'||(validation.value_text!==null&&typeof validation.value_text!=='string')||!Array.isArray(validation.issues))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Result field property type is invalid');if(validation.field_index!==field.field_index||validation.field_key!==field.field_key||validation.status!==field.status||validation.value_text!==field.value_text)return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation field identity mismatch');fields.push({...field,issues:validation.issues,result_json:field});}\nconst jobIssueCodes=[];for(const issue of envelope.job_issues.slice(0,100)){if(!issue||typeof issue!=='object'||Array.isArray(issue))return resultFailure('contract_invalid','RESULT_CONTRACT_INVALID','Validation job issue is invalid');jobIssueCodes.push(String(issue.code??'SCHEMA_INVALID').slice(0,80));}\nreturn [{json:{...claimed,outcome:'completed_valid',raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,fields,\nvalidation_summary:{valid:true,raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256,job_issue_codes:jobIssueCodes},\nartifacts:{raw_result_sha256:envelope.raw_result_sha256,validated_result_sha256:envelope.validated_result_sha256}}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000011",
+      "name": "Проверить envelope identity"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\nSELECT\n $4::uuid AS analysis_run_id,\n $1::uuid AS agentic_job_id,\n set_config('tender.job_id',$1::text,true) AS job_setting,\n set_config('tender.poll_owner',$2::text,true) AS poll_owner_setting,\n set_config('tender.payload',$3::text,true) AS payload_setting,\n set_config('tender.analysis_run_id',$4::text,true) AS analysis_run_setting,\n set_config('tender.catalog_version',$5::text,true) AS catalog_setting,\n set_config('tender.validation_summary',$6::text,true) AS validation_setting,\n set_config('tender.artifacts',$7::text,true) AS artifacts_setting;\nDO $agentic$\nDECLARE\n  payload jsonb := current_setting('tender.payload')::jsonb;\n  actual_count integer;\n  actual_keys text[];\n  expected_keys constant text[] := ARRAY['procurement_subject','nm_price_with_vat','platform','procedure_type','application_deadline','application_review_date','results_date','customer','customer_contacts','participation_cost','participation_guarantee','evaluation_criteria','delivery_term','payment_terms','special_account_or_treasury','bank_support','government_contract','rebidding','national_regime','advance_contract_guarantee','warranty_obligations_guarantee','licenses_certificates','required_official_certificates','similar_supply_experience','analog_allowed','analog_definition','application_documents']::text[];\nBEGIN\n  PERFORM 1 FROM public.tender_agentic_jobs\n   WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating')\n   FOR UPDATE;\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_POLL_OWNERSHIP_LOST'; END IF;\n  SELECT count(*),array_agg(field_key ORDER BY field_index)\n    INTO actual_count,actual_keys\n    FROM jsonb_to_recordset(payload) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb);\n  IF actual_count <> 27 OR actual_keys <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_RESULT_FIELD_SET_MISMATCH';\n  END IF;\n  INSERT INTO public.tender_agentic_field_results(\n    job_id,analysis_run_id,field_catalog_version,field_index,field_key,status,value_text,validation_issues,result_json\n  )\n  SELECT current_setting('tender.job_id')::uuid,current_setting('tender.analysis_run_id')::uuid,current_setting('tender.catalog_version'),f.field_index,f.field_key,f.status,f.value_text,coalesce(f.issues,'[]'::jsonb),f.result_json\n  FROM jsonb_array_elements(payload) item\n  CROSS JOIN LATERAL jsonb_to_record(item) AS f(field_index int,field_key text,status text,value_text text,issues jsonb,result_json jsonb)\n  ON CONFLICT (job_id, field_key) DO UPDATE SET\n    field_index=EXCLUDED.field_index,status=EXCLUDED.status,value_text=EXCLUDED.value_text,\n    validation_issues=EXCLUDED.validation_issues,result_json=EXCLUDED.result_json,updated_at=now();\n  IF (SELECT count(*) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> 27\n     OR (SELECT array_agg(field_key ORDER BY field_index) FROM public.tender_agentic_field_results WHERE job_id=current_setting('tender.job_id')::uuid) <> expected_keys THEN\n    RAISE EXCEPTION 'AGENTIC_DB_FIELD_SET_MISMATCH';\n  END IF;\n  UPDATE public.tender_agentic_jobs SET status='completed',completed_at=coalesce(completed_at,now()),\n    validation_summary=coalesce(validation_summary,'{}'::jsonb)||current_setting('tender.validation_summary')::jsonb,artifacts=current_setting('tender.artifacts')::jsonb,\n    poll_owner_execution_id=NULL,poll_claimed_at=NULL,error_code=NULL,error_message=NULL,updated_at=now()\n  WHERE id=current_setting('tender.job_id')::uuid AND poll_owner_execution_id=current_setting('tender.poll_owner') AND status IN ('ready','running','validating');\n  IF NOT FOUND THEN RAISE EXCEPTION 'AGENTIC_COMPLETE_OWNERSHIP_LOST'; END IF;\nEND\n$agentic$;\nCOMMIT;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,JSON.stringify($json.fields),$json.analysis_run_id,$json.field_catalog_version,JSON.stringify($json.validation_summary),JSON.stringify($json.artifacts)] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        760,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000012",
+      "name": "Сохранить ровно 27 shadow rows",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "once",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "TENDER — Финализация анализа"
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        980,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000311",
+      "name": "Завершить agentic analysis"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const claimed=$('Jobs по одному').item.json;const source=$input.first().json;const body=source.body??source;\nreturn [{json:{job_id:claimed.id,poll_owner_execution_id:claimed.poll_owner_execution_id,\nerror_code:String(source.error_code??body.error?.code??'MONITOR_TRANSPORT_FAILED').slice(0,80),\nerror_message:'Runner polling transport failed'}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        440
+      ],
+      "id": "12000000-0000-4000-8000-000000000120",
+      "name": "Сформировать monitor failure"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "poll-usable",
+              "leftValue": "={{ $json.outcome !== 'monitor_failure' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        100,
+        0
+      ],
+      "id": "12000000-0000-4000-8000-000000000300",
+      "name": "Poll status usable?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "result-valid",
+              "leftValue": "={{ $json.outcome === 'completed_valid' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        760,
+        -80
+      ],
+      "id": "12000000-0000-4000-8000-000000000301",
+      "name": "Result contract valid?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "result-contract-invalid",
+              "leftValue": "={{ $json.outcome === 'contract_invalid' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        980,
+        100
+      ],
+      "id": "12000000-0000-4000-8000-000000000302",
+      "name": "Result contract invalid?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET\n validation_summary=validation_summary||jsonb_build_object('last_monitor_error',jsonb_build_object('code',left($3::text,80),'message',left($4::text,500),'at',now())),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status\n)\nSELECT 'MONITOR_RELEASE' audit_kind,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        760,
+        420
+      ],
+      "id": "12000000-0000-4000-8000-000000000303",
+      "name": "Сохранить monitor audit и освободить lease",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='failed',dispatch_execution_id=NULL,error_code=left($3::text,80),error_message=left($4::text,500),\n validation_summary=validation_summary||jsonb_build_object('result_contract','invalid','error_code',left($3::text,80)),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status IN ('ready','running','validating')\n RETURNING id,status,error_code\n)\nSELECT 'RESULT_CONTRACT_INVALID' policy,CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(error_code) error_code FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.error_code,$json.error_message] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        100
+      ],
+      "id": "12000000-0000-4000-8000-000000000304",
+      "name": "Сохранить terminal contract failure",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const status=$input.first().json;const claimed=$('Jobs по одному').item.json;\nreturn [{json:{...status,outcome:status.status==='ready'&&claimed.error_code==='START_OUTCOME_UNKNOWN'?'reconcile_start':status.outcome}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        -20
+      ],
+      "id": "12000000-0000-4000-8000-000000000305",
+      "name": "Классифицировать start reconciliation"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "start-reconciliation",
+              "leftValue": "={{ $json.outcome === 'reconcile_start' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        420,
+        -20
+      ],
+      "id": "12000000-0000-4000-8000-000000000306",
+      "name": "Start reconciliation?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://tender-codex-runner:8080/v1/jobs/' + encodeURIComponent($json.job_id) + '/start' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "autodetect"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        600,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000307",
+      "name": "Reconcile runner start",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RUNNER_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Runner Header Auth (package at import)"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const response=$input.first().json;const context=$('Классифицировать start reconciliation').item.json;\nfunction failure(code){return [{json:{...context,outcome:'monitor_failure',error_code:code,error_message:'Runner start reconciliation failed'}}];}\nif(![200,202].includes(Number(response.statusCode??200)))return failure('MONITOR_START_HTTP_FAILED');const body=response.body??response;\nfor(const key of ['job_id','analysis_run_id','pipeline_version','field_catalog_version','field_catalog_sha256','input_manifest_sha256']){if(String(body?.[key]??'')!==String(context[key]??''))return failure('MONITOR_START_IDENTITY_INVALID');}\nconst attempt=Number(body.attempt);if(body.status!=='running'||!Number.isInteger(attempt)||attempt<1||attempt>2)return failure('MONITOR_START_CONTRACT_INVALID');\nreturn [{json:{...context,outcome:'reconciled_running',runner_attempt:attempt}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000308",
+      "name": "Проверить reconciled start"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "reconciled-running",
+              "leftValue": "={{ $json.outcome === 'reconciled_running' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000309",
+      "name": "Reconciled start valid?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH attempted AS (\n UPDATE public.tender_agentic_jobs SET status='running',attempts=$3::smallint,error_code=NULL,error_message=NULL,heartbeat_at=now(),\n validation_summary=validation_summary||jsonb_build_object('start_reconciled',true,'runner_attempt',$3::smallint),\n poll_owner_execution_id=NULL,poll_claimed_at=NULL,updated_at=now()\n WHERE id=$1::uuid AND poll_owner_execution_id=$2::text AND status='ready' AND error_code='START_OUTCOME_UNKNOWN'\n AND $3::smallint BETWEEN 1 AND 2\n RETURNING id,status,attempts\n)\nSELECT CASE WHEN count(*)=1 THEN 'updated' ELSE 'ownership_lost' END outcome,count(*)::int update_count,\n coalesce(max(id::text)::uuid,$1::uuid) job_id,max(status) status,max(attempts)::int attempts FROM attempted;",
+        "options": {
+          "queryReplacement": "={{ [$json.job_id,$json.poll_owner_execution_id,$json.runner_attempt] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1140,
+        -220
+      ],
+      "id": "12000000-0000-4000-8000-000000000310",
+      "name": "Синхронизировать reconciled running",
+      "credentials": {
+        "postgres": {
+          "id": "POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres (package at import)"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Каждую минуту": {
+      "main": [
+        [
+          {
+            "node": "Захватить до двух jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Захватить до двух jobs": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jobs по одному": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Опросить runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Опросить runner": {
+      "main": [
+        [
+          {
+            "node": "Нормализовать runner status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Нормализовать runner status": {
+      "main": [
+        [
+          {
+            "node": "Poll status usable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runner completed?": {
+      "main": [
+        [
+          {
+            "node": "Получить validated result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runner failed?": {
+      "main": [
+        [
+          {
+            "node": "Сохранить runner failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сохранить heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Получить validated result": {
+      "main": [
+        [
+          {
+            "node": "Проверить envelope identity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить envelope identity": {
+      "main": [
+        [
+          {
+            "node": "Result contract valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить heartbeat": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить runner failure": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить ровно 27 shadow rows": {
+      "main": [
+        [
+          {
+            "node": "Завершить agentic analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Завершить agentic analysis": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать monitor failure": {
+      "main": [
+        [
+          {
+            "node": "Сохранить monitor audit и освободить lease",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll status usable?": {
+      "main": [
+        [
+          {
+            "node": "Классифицировать start reconciliation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result contract valid?": {
+      "main": [
+        [
+          {
+            "node": "Сохранить ровно 27 shadow rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Result contract invalid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Result contract invalid?": {
+      "main": [
+        [
+          {
+            "node": "Сохранить terminal contract failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить monitor audit и освободить lease": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить terminal contract failure": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Классифицировать start reconciliation": {
+      "main": [
+        [
+          {
+            "node": "Start reconciliation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start reconciliation?": {
+      "main": [
+        [
+          {
+            "node": "Reconcile runner start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile runner start": {
+      "main": [
+        [
+          {
+            "node": "Проверить reconciled start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить reconciled start": {
+      "main": [
+        [
+          {
+            "node": "Reconciled start valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconciled start valid?": {
+      "main": [
+        [
+          {
+            "node": "Синхронизировать reconciled running",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать monitor failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Синхронизировать reconciled running": {
+      "main": [
+        [
+          {
+            "node": "Jobs по одному",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "AGENTIC_ERROR_WORKFLOW_ID"
+  },
+  "versionId": "00000000-0000-4000-8000-000000000112",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

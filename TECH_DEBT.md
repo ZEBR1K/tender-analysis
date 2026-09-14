@@ -130,10 +130,10 @@ Naming, comments, cleanup, future hardening.
 |`DW-23`|✅ Exact pinned runtime GREEN / fresh unpinned run and production promotion pending. Execution `14589` reproduced the execution-`14491` malformed `doc_7_au_0037#1 / licenses_certificates` response with missing `confidence`. The primary Validator stayed outside retry; only that contract-invalid fact retried. Attempt 2 returned contract-valid `rejected`, `confidence=0.95`, `wrong_field_classification`; the valid sibling was retained. Reassembly and strict checker accepted `22/22` Validator units, Worker persisted `69` audited facts over `66/66` analysis units, and the document reached `completed`. Evidence: `evaluations/DOCUMENT_WORKER_DW23_RUNTIME_14589_2026-09-06.md`. Deterministic three-attempt `requires_review` exhaustion remains covered offline. Fresh full run without pinned data and live production promotion/read-back remain separate gates.|Document Worker / AI reliability and terminal containment|
 |`DW-24`|✅ Isolated Worker runtime GREEN; production/full-run promotion pending. Execution `14592` exposed malformed ActiveX GroupName with literal U+0000 while option Value `0/1` remained decodable. Canonical and DW-23 beta packages reject only GroupName to `group_context=null`, preserve state, emit bounded NUL-free `invalid_activex_group_name`, and fail fast on any residual nested NUL before `Сохранить analysis unit`. Execution `14596` persisted `8/8` units and `15` facts with zero residual NUL and completed the document. Test Aggregator was not invoked; production promotion and a fresh full run remain separate gates.|Document Worker / DOCX ActiveX JSONB safety|
 |`DW-3`|Docling terminal failure statuses не обработаны|Document Worker|
-|`DW-8`|stale analysis units после retry могут блокировать completion|Document Worker|
-|`OR-0`|unsupported documents регистрируются, но не получают terminal status|Orchestrator|
+|`DW-8`|⚠ Local implementation/tests complete; controlled runtime retry verification OPEN. Fail-closed non-empty `analysis_unit_ids` guard и scoped replacement прошли Worker `293/293`, full `493/493`; quality re-review `Ready: Yes`. Production fixed/deployed не заявляется.|Document Worker|
+|`OR-0`|✅ Closed for the active agentic path. Все исходные файлы регистрируются; PDF/DOCX/XLSX/XLS и раскрытые поддерживаемые элементы получают `pending`, а неподдерживаемые файлы и архивные контейнеры — terminal `skipped` с audit-причиной. Agentic Dispatch получает только подготовленные `pending` документы; сохранённая legacy Worker-ветка остаётся недостижимой.|Orchestrator / Document Preparation / Intake Resume|
 |`AG-0`|✅ Closed (verified 23.08.2026)<br />Live E2E подтвердил atomic aggregation claim, DB-backed 27/27 barrier и `run.status=completed`.|Execution `13856` установил `aggregation_claimed=true`; executions `13858–13863` записали 27 FINAL rows; execution `13863` установил `barrier_ready=true` и `completion_claimed=true`. Текущий published downstream — Report Generation V2: read-only snapshot → HTML artifact → derived PDF artifact; DOCX/XLSX/delivery остаются future work.|
-|`RG-1`|⚠ Published topology GREEN / production runtime pending. Isolated execution `14649` прошёл exact HTML-to-PDF path, `%PDF-`, 909642 bytes, 153 A4 pages, HTML preserved и owner visual acceptance. Owner опубликовал production Report Generation version `a6fbb0f6-…`; read-only snapshot подтвердил `12` nodes, exact connections и `versionId=activeVersionId`. Post-promotion production execution намеренно отложен, поэтому runtime этой published version ещё не заявляется GREEN.|Report Generation / PDF production canary|
+|`RG-1`|✅ Closed 2026-09-11. Published Report Generation version `e21c7675-…` ran as integrated execution `15663` from agentic Finalization `15662`: snapshot/model `27/27`, HTML `24761` bytes valid, PDF `90367` bytes with `%PDF-`, both binaries preserved. Read-only API confirmed active/draft parity; replay `15666` did not invoke a duplicate report.|Report Generation / PDF production canary|
 |`AG-7`|✅ Closed (MVP)<br />Semantic Aggregator E2E validation завершена|Aggregator<br /><br />Проверено на полном прогоне закупки:<br />- все 27 field\_key обработаны;<br />- создано 27 записей в tender\_analysis\_field\_results;<br />- Semantic Aggregator Round 1 успешно завершён;<br />- результаты сохранены в FINAL contract.<br /><br />Остаётся:<br />- regression dataset;<br />- улучшение semantic rules для сложных полей.|
 |`AG-8`|⚠ Live artifact GREEN / fresh runtime pending. Read-only export workflow `ftvmrEHoMbPOAqZG` от 2026-09-05 подтверждает, что active 31-node live graph уже содержит universal `procurement_subject` current-scope boundary; canonical repository export синхронизирован с ним. Offline production gate GREEN. Остаётся открытой до fresh runtime canary и полного 27/27 semantic review.|Aggregator semantic safety|
 |`AG-9`|⚠ Owner-modified test topology runtime GREEN / production promotion pending: Aggregator boundary `14173/14254` сохранена. Owner-started run `14429` выявил defect: validated `application_documents` получил `post_validator_route=round_2` и вызвал общий `Semantic Aggregator1`. Execution `14449` на тех же пяти field items подтвердил исправленный test path: real Recheck AI → exact evidence → AI Validator → `terminal_requires_review`; общий Round 2 collector и `Semantic Aggregator1` имели `0` runs, отдельная terminal-ветка сохранила FINAL, Finalizer подтвердил `27/27`. Local canonical имеет отдельную `...8` normalize/UPSERT/Finalizer chain и `70/70` reachable nodes; exact live parameter/ID/position parity не доказана без snapshot. Production не изменён, fresh DB `SELECT` после `14449` не выполнялся; promotion и fresh full run остаются отдельными gates.|Aggregator / Targeted Recheck semantic safety|
@@ -202,9 +202,9 @@ Extractor model-selection checkpoint 2026-08-29:
 
 |ID|Проблема|Компонент|
 |-|-|-|
-|`OR-2`|manual trigger + hardcoded tender\_id|Orchestrator|
-|`OR-3`|`raw\\\\\\\\\\\\\\\_source` нормализуется, но не сохраняется|Orchestrator|
-|`OR-7`|policy повторных runs одного tender не зафиксирована|Orchestrator|
+|`OR-2`|✅ Fresh mark-to-report technical gate closed 2026-09-11. Published Document Preparation, Orchestrator, Intake Resume, Dispatch, Monitor, Agentic Error and Mark Intake carried tender `6aa2c2ad5b7165804b8c4ff7` through new Codex job `70d699d2-b469-40b0-a8cc-de5b38fa6374`, Monitor `16402`, Finalization `16403` and Report `16404`. Read-only DB verification confirmed completed run and exact 27 unique FINAL; HTML/PDF are valid. Manual 27-field semantic review remains a non-blocking evaluation because this procurement has no employee-authored gold report.|Orchestrator|
+|`OR-3`|✅ Production runtime GREEN: неизменённый TenderPlan FullInfo сохраняется в `tender_meta.source_payload`, передаётся как отдельный sealed source `tenderplan-metadata` и остаётся вне document barrier. Run `e996c707-aa09-41c2-9fd7-d49337182c70` завершил exact 27 FINAL и отчёт; metadata evidence промотировано/отрендерено. Семантический parser или field-specific validator не добавлен.|Orchestrator / Agentic Dispatch / Finalization|
+|`OR-7`|✅ Temporary routing gate closed. `TASK17_TEMPORARY_AGENT_ONLY` preserves legacy Worker/Aggregator/Finalization nodes but leaves them unreachable. Raw `.xls` is staged unchanged without a parser. Fresh-run canary `15355/15356`, controlled Dispatch `15373` and terminal Monitor `15387` prove two-source real Codex execution with zero legacy-node runs.|Orchestrator / Intake Resume|
 |`DW-0`|node `Проверить вход Worker` не валидирует input строго|Document Worker|
 |`DW-1`|claim false может выражаться как 0 items|Document Worker|
 |`DW-5`|stale comment про Limit|Document Worker|
@@ -536,7 +536,7 @@ P0
 
 \---
 
-## B3 — `OR-0`
+## B3 — `OR-0` (локально закрыт, runtime gate pending)
 
 ### Проблема
 
@@ -548,7 +548,7 @@ register ALL docs
 → Worker only pdf/docx/xlsx
 ```
 
-Unsupported document остаётся:
+До prerequisite fix unsupported document оставался:
 
 ```text
 pending
@@ -560,7 +560,7 @@ pending
 
 Потому что это скрывает реальный документ закупки.
 
-### Нужна terminal semantics
+### Реализованная terminal semantics
 
 Варианты:
 
@@ -574,13 +574,13 @@ unsupported → skipped
 unsupported → failed
 ```
 
-Но текущий readiness требует:
+До prerequisite fix readiness требовал:
 
 ```text
 completed = documents\\\\\\\\\\\\\\\_total
 ```
 
-поэтому `skipped` надо проектировать вместе с readiness.
+Canonical Orchestrator теперь сохраняет unsupported/container rows как `skipped`, dispatch-ит только `pending` PDF/DOCX/XLSX, а Worker и Intake Resume используют `failed=0` и `completed+skipped=documents_total`. Offline tests GREEN; production runtime pending.
 
 ### Приоритет
 
@@ -1339,9 +1339,12 @@ P0 local mitigation complete; runtime gate remains before another full/client-re
 
 ## D1 — `DW-8`
 
+**Status:** Local implementation/tests complete; controlled runtime retry verification OPEN
+**Quality re-review:** `Ready: Yes`
+
 ### Проблема
 
-Analysis units сохраняются UPSERT-ом, но stale units не удаляются.
+Исторически analysis units сохранялись UPSERT-ом, но stale units не удалялись.
 
 Пример:
 
@@ -1385,17 +1388,32 @@ failed → processing
 
 но persistence layer пока не полностью retry-safe.
 
-### Требуемое решение
+### Реализованный локальный контракт
 
-После сохранения текущего набора units:
+Upstream-нода `Собрать факты документа1` формирует `analysis_summary.analysis_unit_ids` как полный непустой deterministic набор units текущей попытки после проверки количества, уникальности и соответствия сохранённым units. В `Сохранить факты документа` missing, non-array или empty значение fail closed до destructive cleanup.
+
+Replacement ограничен тем же `(analysis_run_id, document_id)`:
+
+- units текущего набора сохраняются;
+- только stale units, отсутствующие в текущем наборе, удаляются;
+- facts удалённых units каскадируют через существующий FK;
+- stale facts сохранившихся units удаляются только когда отсутствуют в текущем input;
+- все текущие `confirmed`, `requires_review` и `rejected` facts UPSERT-ятся для audit;
+- diagnostic output содержит `deleted_stale_units_count`.
+
+Canonical и beta Worker содержат одинаковый SQL-контракт.
+
+### Offline evidence
 
 ```text
-DELETE stale units
-WHERE document\\\\\\\\\\\\\\\_id = ...
-AND analysis\\\\\\\\\\\\\\\_unit\\\\\\\\\\\\\\\_id NOT IN current set
+Worker suite: 293/293 PASS
+Full suite:   493/493 PASS
+Quality re-review: Ready Yes
 ```
 
-С учётом FK cascade это также может очищать stale facts.
+### Открытый gate
+
+Controlled runtime retry verification должна доказать фактический DB result до/после retry. До этого `DW-8` не считается production fixed/deployed.
 
 ### Приоритет
 
@@ -1499,7 +1517,7 @@ aggregating
 completed\\\\\\\\\\\\\\\_at = NOW()
 ```
 
-a затем запускается report stage. Execution `13863` подтвердил успешный completion claim; execution `13864` исторически подтвердил вызов тогдашнего stub. Текущая опубликованная реализация Report Generation V2 создаёт HTML artifact и производный PDF artifact; isolated runtime подтверждён execution `14649`, post-promotion production execution остаётся gate `RG-1`. Подробности — `workflows/report-generation.md`.
+a затем запускается report stage. Execution `13863` подтвердил успешный completion claim; execution `13864` исторически подтвердил вызов тогдашнего stub. Текущая опубликованная реализация Report Generation V2 создаёт HTML artifact и производный PDF artifact; isolated runtime подтверждён execution `14649`, а published production runtime — agentic executions `15662/15663`. `RG-1` закрыт. Подробности — `workflows/report-generation.md`.
 
 ### Приоритет
 
@@ -1975,13 +1993,50 @@ P2
 
 ## `OR-2` — manual trigger
 
-Текущий hardcoded input допустим для разработки.
+**Status:** Closed for the active marked-procurement route.
+
+Canonical Orchestrator больше не содержит Manual Trigger или hardcoded
+`tender_id`. Опубликованный TenderPlan Mark Intake передаёт typed `tender_id`,
+`source`, `source_event_key`, `trigger_kind` через Intake Resume/Orchestrator.
+Fresh run `6c36e5da-f9e2-48d9-a062-0493f0c2bf73` прошёл от метки до completed
+run, exact 27 FINAL и HTML/PDF report.
+
+Manual upload остаётся отдельным future entry mode и не переоткрывает этот debt.
 
 \---
 
-## `OR-3` — raw TenderPlan snapshot не хранится
+## `OR-7` — repeated-run policy
 
-Полезно для audit, но не блокирует анализ.
+**Status:** Closed for the temporary agent-only marked-procurement route.
+
+The migration and idempotent Intake family preserve one active run, stable-event
+no-op, retry/stale/manual/CAS behavior and audit history. Task 17 published Mark
+Intake, Intake Resume and Orchestrator while keeping legacy Worker/Aggregator
+edges disconnected. The fresh 2026-09-11 run reused the same run identity across
+source-download recovery, retained the failed Codex job and completed through a
+new controlled job without duplicate canonical FINAL or report creation.
+
+The repository export keeps credentials unbound for secret-safe packaging.
+Changing the temporary routing policy or adding manual upload remains a separate
+architectural task.
+
+\---
+
+## `OR-3` — sealed TenderPlan snapshot
+
+Canonical Orchestrator сохраняет неизменённый FullInfo response в
+`tender_meta.source_payload`. Agentic Dispatch передаёт его runner как отдельный
+источник `tenderplan-metadata`, не включая в document barrier. Snapshot покрыт
+хэшем манифеста; семантический parser или field-specific validator не добавлен.
+
+Production canary `16923 → 16925 → job
+7f89e330-1011-458f-8b28-286d32d742c9 → 16944 → 16945 → 16946`
+закрыл rollout gate. TLS-verified read-only DB audit подтвердил completed run
+`e996c707-aa09-41c2-9fd7-d49337182c70`, exact 27 unique FINAL и valid
+HTML/PDF. Metadata использована в восьми полях; Finalization принимает
+зарезервированный source только при непустом `run.tender_meta`, а прочий
+evidence по-прежнему обязан принадлежать manifest document. Детали:
+`evaluations/agentic-tenderplan-metadata-canary-2026-09-11/README.md`.
 
 \---
 
@@ -2111,7 +2166,7 @@ TR-0…TR-3 закрыты. Local `TR-10` containment не является prod
 ## Этап 4 — retry correctness
 
 ```text
-8. DW-8
+8. DW-8 — local implementation/tests complete; controlled runtime retry verification OPEN
 ```
 
 После этого:
@@ -2162,13 +2217,15 @@ FINAL UPSERT
 
 ```text
 ✅ Load immutable Report Snapshot → Report Model → HTML artifact
-✅ HTML artifact → internal Gotenberg → PDF artifact (isolated runtime GREEN; published production canary pending)
+✅ HTML artifact → internal Gotenberg → PDF artifact (isolated and published production runtime GREEN)
 future: DOCX
 future: XLSX
 future: manual upload / automatic delivery
 ```
 
-HTML/PDF report path реализован и опубликован; `RG-1` остаётся открыт до первого post-promotion production execution. Завершение полного delivery-MVP зависит от отдельных будущих интеграций.
+HTML/PDF report path реализован, опубликован и прошёл production execution
+`15663`; `RG-1` закрыт. Завершение полного delivery-MVP зависит от отдельных
+будущих интеграций.
 
 \---
 
@@ -2290,7 +2347,8 @@ don't silently stick
   |
   v
 DW-8
-retry-safe units
+local retry-safe contract GREEN
+controlled runtime retry OPEN
   |
   v
 OR-0
@@ -2324,7 +2382,7 @@ future: DOCX / XLSX / delivery
 \\\\\\\\\\\\\\\[ ] DW-14 / EW-3
 \\\\\\\\\\\\\\\[ ] DW-15
 \\\\\\\\\\\\\\\[ ] DW-3
-\\\\\\\\\\\\\\\[ ] DW-8
+\\\\\\\\\\\\\\\[ ] DW-8 — local implementation/tests complete; controlled runtime retry verification OPEN
 \\\\\\\\\\\\\\\[ ] OR-0
 \\\\\\\\\\\\\\\[x] AG-0 — verified 23.08.2026; report implementation remains
 ```
@@ -2390,17 +2448,18 @@ future: DOCX / XLSX / delivery
 
 Главная проблема проекта сейчас не в отсутствии ещё одного AI-слоя.
 
-Основной долг находится в:
+Fresh technical operational gate активного agentic пути закрыт. Остаются:
 
 ```text
-1. test workflow promotion / wiring clean Document Worker candidate, включая runtime canary;
-2. отдельный AG-8 production promotion gate;
-3. fresh full run;
-4. manual semantic review 27/27;
-5. client report.
+1. manual semantic review 27/27 на закупке с доступным эталоном;
+2. согласование клиентской отправки;
+3. последующая XLSX/Telegram delivery.
 ```
 
-После закрытия этих пунктов архитектура уже достаточно зрелая, чтобы закончить MVP без большого redesign.
+Promotion/hardening старого Document Worker/Aggregator остаётся отдельным
+fallback-lane debt (`DW-17`–`DW-24`, `AG-8`–`AG-11`) и не требует возвращать его
+в активный маршрут до результатов agentic проверки. Terminal agentic
+архитектура уже runtime GREEN и не нуждается в новом parser/validator redesign.
 
 Главный финальный milestone:
 
@@ -2409,7 +2468,7 @@ tender\\\\\\\\\\\\\\\_id
 → all documents terminal
 → 27 FINAL fields
 → run completed
-→ Markdown
+→ HTML/PDF
 → XLSX
 → Telegram
 ```

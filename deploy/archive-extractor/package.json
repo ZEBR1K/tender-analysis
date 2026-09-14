@@ -1,0 +1,13 @@
+{
+  "name": "tender-archive-extractor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.2"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test ../../tests/archive-extractor-*.test.mjs"
+  }
+}
