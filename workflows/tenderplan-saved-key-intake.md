@@ -8,6 +8,9 @@
 Read-only preflight execution `28212` от 2026-09-14 подтвердил отсутствие
 дельты после baseline: `306 completed`, `0 processing`, `0 new`, `0 failed`;
 временный workflow архивирован без вызова Intake Resume и без DB writes.
+Beta export синхронизирован с exact inactive live draft
+`5TVcGDDzz56CpmfF@2b27a678-02f2-4c23-a750-1c4d3dbda967`, включая live node
+IDs, credential references и connections; `pinData` отсутствует.
 
 ## Contract
 

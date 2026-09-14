@@ -11,6 +11,14 @@ saved key `Красное Сормово` и SELECT-сравнение с intake
 inactive/unpublished; следующий gate — новая закупка и отдельно разрешённый
 manual end-to-end canary.
 
+Completion audit обнаружил, что beta export сохранял design node IDs `5100…`,
+хотя Task 7 требует exact live read-back. Live n8n не изменялся: snapshot
+механически заменён на sanitized read-back draft
+`2b27a678-02f2-4c23-a750-1c4d3dbda967`. Повторная проверка подтвердила exact
+parity workflow ID/version, settings, 19 nodes и connections, отсутствие
+`pinData`; focused regression `32/32`, полный suite
+`798 total / 792 pass / 0 fail / 6 skipped`.
+
 ## 13.08.2026
 
 ### Подключили Docling для разбора документов

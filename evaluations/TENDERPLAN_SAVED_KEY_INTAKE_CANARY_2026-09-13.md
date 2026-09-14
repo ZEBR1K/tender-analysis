@@ -63,6 +63,14 @@ Runtime evidence для baseline, одного нового tender и repeat no-
 - Временный SELECT-only audit execution `26646` подтвердил persisted state:
   `markers=1`, `baseline_tenders=306`, `linked_runs=0`,
   `all_completed=true`. Audit workflow `lLV5F6JPlHugpkhM` архивирован.
+- Read-only delta preflight execution `28212` завершился `success` и подтвердил
+  неизменный полный result: `current_tenders=306`, `completed=306`,
+  `processing=0`, `new=0`, `failed=0`. В графе не было dispatch/Intake Resume
+  и DB writes; временный workflow `M0osEV8s7GWTjEmL` архивирован.
+- Beta export синхронизирован с exact live draft version
+  `2b27a678-02f2-4c23-a750-1c4d3dbda967`: workflow ID, все 19 live node IDs,
+  parameters, credential references, settings и connections совпадают;
+  `pinData` отсутствует.
 - Владелец сообщил, что перенёс workflow в `TEST AGENTIC TENDER ANALYSIS` и
   выключил MCP access. Read-only API независимо подтвердил
   `availableInMCP=false`, `active=false`, `activeVersionId=null`; этот endpoint

@@ -1,4 +1,5 @@
 {
+  "id": "5TVcGDDzz56CpmfF",
   "name": "TENDER — TenderPlan Saved Key Intake",
   "nodes": [
     {
@@ -6,7 +7,7 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [-1280, -160],
-      "id": "51000000-0000-4000-8000-000000000001",
+      "id": "37416245-8c14-4061-8d15-2ca088ec8ece",
       "name": "Manual Trigger"
     },
     {
@@ -23,7 +24,7 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [-1280, 0],
-      "id": "51000000-0000-4000-8000-000000000002",
+      "id": "c1e607cf-d862-4ec1-933b-9fc2bcb8d244",
       "name": "Every 10 Minutes"
     },
     {
@@ -34,7 +35,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-1040, -80],
-      "id": "51000000-0000-4000-8000-000000000003",
+      "id": "40d39a81-8c26-44a6-af36-1ea42a0e0f56",
       "name": "Define Saved Keys"
     },
     {
@@ -45,7 +46,7 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [-800, -80],
-      "id": "51000000-0000-4000-8000-000000000004",
+      "id": "2f874da0-5199-466e-81a5-b1d1de8ee77c",
       "name": "Loop Over Saved Keys"
     },
     {
@@ -59,7 +60,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [-560, 80],
-      "id": "51000000-0000-4000-8000-000000000005",
+      "id": "891e1f9a-c0d6-4fc2-8de4-7250a6a2eee3",
       "name": "Load Baseline State",
       "credentials": {
         "postgres": {
@@ -77,7 +78,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-320, 80],
-      "id": "51000000-0000-4000-8000-000000000006",
+      "id": "45b8ac7b-b634-41d2-a0c1-7521e121fbef",
       "name": "Validate Baseline State",
       "onError": "continueErrorOutput"
     },
@@ -134,7 +135,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [-80, 80],
-      "id": "51000000-0000-4000-8000-000000000007",
+      "id": "fa7d04db-c94e-46b0-8db7-228c74ac33a5",
       "name": "Get Complete Saved Key Pages",
       "credentials": {
         "httpHeaderAuth": {
@@ -155,7 +156,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [160, 80],
-      "id": "51000000-0000-4000-8000-000000000008",
+      "id": "c80a9b4d-7c3e-4d2f-920a-668526b0e6dc",
       "name": "Normalize Complete Page Set",
       "onError": "continueErrorOutput"
     },
@@ -187,7 +188,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [400, 80],
-      "id": "51000000-0000-4000-8000-000000000009",
+      "id": "24912d46-0bf4-4727-a060-19cbba0a3f9c",
       "name": "Baseline Exists?"
     },
     {
@@ -201,7 +202,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [640, 240],
-      "id": "51000000-0000-4000-8000-000000000010",
+      "id": "e7c30201-4fe3-4c37-b708-8ab2a0151481",
       "name": "Initialize Baseline",
       "credentials": {
         "postgres": {
@@ -219,7 +220,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [880, 240],
-      "id": "51000000-0000-4000-8000-000000000011",
+      "id": "f8bf735f-99a9-4833-90cd-cf94098211cd",
       "name": "Baseline Summary"
     },
     {
@@ -233,7 +234,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [640, -80],
-      "id": "51000000-0000-4000-8000-000000000012",
+      "id": "075b45e0-3405-4808-a100-d796eca8153a",
       "name": "Load Existing Event States",
       "credentials": {
         "postgres": {
@@ -251,7 +252,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [880, -80],
-      "id": "51000000-0000-4000-8000-000000000013",
+      "id": "4b70ac85-107f-4674-b5f8-5db2d1da58f6",
       "name": "Build Dispatch Queue",
       "onError": "continueErrorOutput"
     },
@@ -283,7 +284,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [1120, -80],
-      "id": "51000000-0000-4000-8000-000000000014",
+      "id": "83b7df85-ba12-4b36-aa2b-d56b853b912a",
       "name": "Has Dispatch?"
     },
     {
@@ -326,7 +327,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [1360, -160],
-      "id": "51000000-0000-4000-8000-000000000015",
+      "id": "c7056033-805d-46a7-b6d4-e37122e51c52",
       "name": "Execute TENDER — Intake Resume",
       "alwaysOutputData": true,
       "onError": "continueErrorOutput"
@@ -339,7 +340,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1600, -160],
-      "id": "51000000-0000-4000-8000-000000000016",
+      "id": "0c67cae6-e579-46f5-a6d7-24a6d4ed2b4f",
       "name": "Dispatch Summary"
     },
     {
@@ -350,7 +351,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1360, 0],
-      "id": "51000000-0000-4000-8000-000000000017",
+      "id": "9d6ee44d-707a-440c-933b-4b026241ad4b",
       "name": "No New Tenders"
     },
     {
@@ -361,7 +362,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [640, 480],
-      "id": "51000000-0000-4000-8000-000000000018",
+      "id": "e6a0600f-aef9-44f3-b5ca-a29339986092",
       "name": "Key Failure"
     },
     {
@@ -372,7 +373,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [-560, -240],
-      "id": "51000000-0000-4000-8000-000000000019",
+      "id": "ba42619a-72c0-4c34-b2a0-e9d9142056ef",
       "name": "Assert Poll Completed"
     }
   ],
@@ -458,9 +459,10 @@
     "errorWorkflow": "kff8KIrSHzo5Mmt1",
     "availableInMCP": false
   },
-  "versionId": "51000000-0000-4000-8000-000000000100",
+  "versionId": "2b27a678-02f2-4c23-a750-1c4d3dbda967",
   "meta": {
-    "templateCredsSetupCompleted": true
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
   },
   "tags": []
 }

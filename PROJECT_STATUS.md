@@ -31,6 +31,12 @@ Intake Resume не вызывался, baseline/ledger не изменялись
 диагностический workflow `M0osEV8s7GWTjEmL` после успешного execution
 архивирован.
 
+Repository beta export теперь является exact sanitized read-back live draft
+version `2b27a678-02f2-4c23-a750-1c4d3dbda967`: сохранены workflow ID и все
+19 назначенных n8n node UUID, parameters, credential references, settings и
+connections; `pinData` отсутствует. Focused regression `32/32` и полный suite
+`798 total / 792 pass / 0 fail / 6 skipped` GREEN.
+
 Следующий шаг после отдельного решения владельца — дождаться новой закупки для
 одного manual end-to-end canary. Публикация/активация schedule до этого решения
 не выполняется. Владелец сообщил о завершении UI housekeeping: workflow перенесён
