@@ -149,8 +149,8 @@ not_found
 готового HTML/PDF отчёта:
 
 ```text
-TenderPlan mark
-→ Orchestrator / Intake Resume
+TenderPlan mark → Orchestrator / Intake Resume
+или ручная n8n Form → Manual Upload
 → source manifest
 → Agentic Dispatch
 → Codex runner
@@ -224,13 +224,37 @@ internal Gotenberg conversion + binary report_pdf
 
 # 4. Основные workflow
 
+## `TENDER — Ручная загрузка закупки` — published additional entry
+
+Production form `https://n8nworkup.ru/form/tender-manual-upload` принимает
+название, необязательные номер/комментарий и несколько документов. Общий лимит
+— 200 MiB; обычный файл — до 50 MiB, архив — до 100 MiB. Разрешены документы,
+таблицы, текст, изображения и поддерживаемые архивы; неизвестные и исполняемые
+файлы отклоняются до создания run.
+
+Файлы последовательно сохраняются с SHA-256 во внутреннем artifact store,
+после чего workflow переиспользует `TENDER — Подготовить документацию`, atomic
+run/document registration, Agentic Dispatch и весь существующий terminal path.
+Это новый вход в тот же анализ, а не параллельная реализация. Blind Test 2
+runtime-canary `18796` зарегистрировал 12/12 файлов; Monitor `18857` принял
+валидные 27/27 полей и создал HTML/PDF отчёт. После регистрации run аварии
+обрабатывает отдельный ownership-guarded workflow `xW4DHtnBYddbaU14`.
+Подробные контракты: `workflows/manual-upload.md` и
+`workflows/manual-upload-error.md`.
+
+Форма сейчас намеренно открыта без n8n-авторизации. Любой получивший URL может
+запустить платный анализ, поэтому ссылку нельзя публиковать вне доверенного
+круга до включения `n8n User Auth` или внешнего access-control.
+
+---
+
 ## `TENDER — Подготовить документацию` — published agentic prerequisite
 
-Reusable sub-workflow принимает metadata всех TenderPlan attachments,
-последовательно скачивает прямые PDF/DOCX/XLSX/XLS только для фиксации MIME,
-размера и SHA-256, а архивы раскрывает через внутренний bounded extractor. Он
-не индексирует страницы, листы или OOXML. Workflow `0scTZu1aBKsMd6AM`
-опубликован и синхронно вызывается Task 17 Orchestrator до регистрации run.
+Reusable sub-workflow принимает metadata TenderPlan или manual-upload
+attachments, последовательно скачивает поддерживаемые источники только для
+фиксации MIME, размера и SHA-256, а архивы раскрывает через внутренний bounded
+extractor. Он не индексирует страницы, листы или OOXML. Workflow
+`0scTZu1aBKsMd6AM` опубликован и синхронно вызывается до регистрации run.
 
 Документация:
 
@@ -431,7 +455,7 @@ Workflow ID: `cSsh9yjpS7t5p0OO`.
 
 ## `TENDER — Генерация отчета`
 
-Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` конвертирует этот же HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены, post-promotion production execution намеренно отложен.
+Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `9fb64a15-af46-4f05-9435-b73fa41152ed` заполняет отсутствующие presentation-only данные шапки из пригодных FINAL-полей, конвертирует HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены; текущая live-версия read-back проверена на точное совпадение изменённых Code-нод с canonical export.
 
 Workflow ID: `ckPnP3hRhKu4Mf9u`.
 

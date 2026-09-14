@@ -4,7 +4,7 @@
 
 **Workflow ID в n8n:** `0scTZu1aBKsMd6AM`
 
-**Статус:** published in the Task 17 temporary agent-only route; fresh mark-to-report DOCX canary GREEN
+**Статус:** published in the Task 17 temporary agent-only route; TenderPlan и manual-upload runtime canaries GREEN
 
 **Repository export:** `workflows/n8n-exports/TENDER — Подготовить документацию.json`
 
@@ -15,7 +15,7 @@ Workflow принимает metadata всех вложений одного `ana
 ```text
 analysis_run_id + attachments
 → классификация всех source attachments
-→ последовательная загрузка прямых PDF/DOCX/XLSX/XLS
+→ последовательная загрузка прямых документов, таблиц, текста и изображений
 → byte size + MIME + SHA-256 исходных bytes
 → последовательная загрузка и распаковка архивов
 → обычные extracted files
@@ -45,6 +45,8 @@ attachments: array
 
 ```text
 pdf / docx / xlsx / xls
+txt / csv / tsv / md / json / xml / html / rtf
+png / jpg / jpeg / tif / tiff / bmp / webp
 ```
 
 Архивы:
@@ -68,6 +70,11 @@ deadline per source archive: 5 minutes
 
 Прямые документы и архивы обрабатываются отдельными последовательными `Loop Over Items` с `batchSize=1`, чтобы ограничить нагрузку и прекратить run на первой ошибке. Для прямого документа HTTP Request держит тело только в `binary.data`; Code node читает bytes только для размера, а native Crypto node вычисляет SHA-256. Binary не переносится в JSON/manifest. Done-output прямого цикла собирается одной aggregate Code node, поэтому manifest получает каждый обработанный документ, а не только последнюю итерацию. Реальная распаковка архивов выполняется внутренним сервисом `deploy/archive-extractor`.
 
+Ручная загрузка использует внутренние artifact URLs с фиксированным префиксом
+`http://tender-archive-extractor:8080/v1/artifacts/`. Такие документы скачиваются
+напрямую без внешнего proxy; остальные URLs сохраняют прежний TenderPlan proxy
+route. Разделение относится только к transport и не анализирует содержимое файла.
+
 Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, control/NUL paths, normalized collisions, symlink, hardlink и special entries. Антивирусная проверка не предусмотрена по принятому scope.
 
 ## Выходной контракт
@@ -85,7 +92,7 @@ Extractor отклоняет абсолютные, UNC, drive, URI, `.`/`..`, co
 }
 ```
 
-Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Каждый `pending` PDF/DOCX/XLSX/XLS обязан иметь непустые `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped` и не dispatch-ятся. `.xls` остаётся неизменённым source artifact: workflow не разбирает листы или значения.
+Каждый `manifest.documents[]` получает новый последовательный `document_index`, source provenance и `ingestion_metadata`. Каждый `pending` поддерживаемый источник обязан иметь непустые `file_name`, `mime_type`, целый неотрицательный `file_size` и 64-hex `ingestion_metadata.content_sha256`. Архив-контейнер и неподдерживаемые entries сохраняются как `skipped` и не dispatch-ятся. `.xls` и остальные форматы остаются неизменёнными source artifacts: workflow не разбирает страницы, листы, OOXML или значения.
 
 Ошибка:
 
@@ -127,6 +134,14 @@ Task 17 live evidence:
 - regression test reproduces the earlier two-direct-document loop loss and
   proves the aggregate done-output collector retains both results;
 - full repository suite: `753 total / 747 pass / 0 fail / 6 skipped`.
+
+Manual-upload evidence from 2026-09-12:
+
+- execution `18762` reproduced the external-proxy leak for an internal artifact;
+- the published graph now routes only the fixed internal artifact prefix around
+  the proxy and keeps the existing proxy for TenderPlan URLs;
+- execution `18796` processed all 12 Blind Test 2 sources and the caller
+  registered `12/12` documents before agentic Dispatch.
 
 Fresh mark-to-report evidence from 2026-09-11:
 

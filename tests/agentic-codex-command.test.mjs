@@ -110,6 +110,10 @@ function assertTenderMetadataPromptInjectionBoundary(source, label) {
 test('agent template contains boundary instructions and one allowlisted focused skill toolkit', async () => {
   assert.deepEqual(await listRelativeFiles(templateRoot), [
     '.agents/skills/tender-document-analysis/SKILL.md',
+    '.agents/skills/tender-document-analysis/references/docx-inspection.md',
+    '.agents/skills/tender-document-analysis/references/final-review.md',
+    '.agents/skills/tender-document-analysis/references/pdf-inspection.md',
+    '.agents/skills/tender-document-analysis/references/spreadsheet-inspection.md',
     '.agents/skills/tender-document-analysis/references/tool-recipes.md',
     '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
     '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',
@@ -165,7 +169,7 @@ test('skill is short, agent-led and contains no mechanical parser or semantic va
 
 test('runtime prompt only binds job-local inputs, skill and structured output', async () => {
   const prompt = await readFile(promptPath, 'utf8');
-  assert.ok(prompt.length <= 1400, `prompt is too long: ${prompt.length}`);
+  assert.ok(prompt.length <= 2300, `prompt is too long: ${prompt.length}`);
   for (const required of [
     '../input/manifest.json',
     '../input/FIELD_CATALOG.md',
@@ -177,6 +181,15 @@ test('runtime prompt only binds job-local inputs, skill and structured output', 
   }
   assertTenderMetadataInstructions(prompt, 'prompt');
   assertTenderMetadataPromptInjectionBoundary(prompt, 'prompt');
+  assert.match(prompt, /(?:examine|inspect|analyze)[^\n]{0,100}every[^\n]{0,80}document[^\n]{0,80}(?:fully|complete)/iu);
+  assert.match(prompt, /scan[\s\S]{0,180}visual/iu);
+  assert.match(prompt, /OCR[\s\S]{0,140}navigation[\s\S]{0,160}(?:not|never)[\s\S]{0,80}(?:proof|evidence|conclusion)/iu);
+  assert.match(prompt, /DOCX[\s\S]{0,200}OOXML/iu);
+  assert.match(prompt, /(?:checkbox|radio|selected option)[\s\S]{0,180}(?:selected|state)/iu);
+  assert.match(prompt, /not_found[\s\S]{0,220}(?:missing|absence)[\s\S]{0,180}(?:no|false|not required)/iu);
+  assert.match(prompt, /conflict[\s\S]{0,160}requires_review/iu);
+  assert.match(prompt, /(?:cannot|unavailable|unreadable)[\s\S]{0,160}limitation/iu);
+  assert.match(prompt, /do not modify[\s\S]{0,100}(?:source|original)/iu);
   assert.doesNotMatch(prompt, /https?:\/\//iu);
   assert.doesNotMatch(prompt, /credential|password|secret|token/iu);
   assert.doesNotMatch(prompt, /n8n|PostgreSQL|Telegram/iu);
@@ -249,6 +262,10 @@ test('agent template staging copies only trusted instructions and rejects drift'
     await stageAgentTemplate({ workspaceDirectory, templateDirectory: templateRoot });
     assert.deepEqual(await listRelativeFiles(workspaceDirectory), [
       '.agents/skills/tender-document-analysis/SKILL.md',
+      '.agents/skills/tender-document-analysis/references/docx-inspection.md',
+      '.agents/skills/tender-document-analysis/references/final-review.md',
+      '.agents/skills/tender-document-analysis/references/pdf-inspection.md',
+      '.agents/skills/tender-document-analysis/references/spreadsheet-inspection.md',
       '.agents/skills/tender-document-analysis/references/tool-recipes.md',
       '.agents/skills/tender-document-analysis/scripts/document-toolkit-lib.mjs',
       '.agents/skills/tender-document-analysis/scripts/ocr-image.mjs',

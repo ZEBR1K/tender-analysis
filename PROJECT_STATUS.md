@@ -1,8 +1,8 @@
 # PROJECT STATUS — Tender Analysis
 
 **Snapshot date:** 2026-09-14
-**Status:** Saved-key intake baseline GREEN / activation intentionally withheld
-**Branch at snapshot:** `codex/tenderplan-saved-search-intake-implementation`
+**Status:** Agentic path, manual upload and saved-key baseline GREEN / saved-key activation intentionally withheld
+**Branch at snapshot:** `codex/consolidate-agentic-system`
 
 ## TenderPlan saved-key intake — baseline GREEN, schedule withheld
 
@@ -44,6 +44,121 @@ connections; `pinData` отсутствует. Focused regression `32/32` и п�
 независимо подтвердил `availableInMCP=false`, `active=false` и
 `activeVersionId=null`; используемый workflow endpoint не возвращает folder
 metadata, поэтому placement зафиксирован как owner-reported, а не API-verified.
+## Runner visual-inspection hardening — runtime GREEN
+
+Review of Blind Test 2 job `ad4aea11-04b8-4d26-a9a1-5d694c5584d8`
+confirmed that Codex rendered the eight scan pages but never opened their PNGs,
+then misread `Епи → Еш` as `Епр → Еп`. The focused skill now states that
+rendering is not inspection: every PNG used for a conclusion must be opened
+with `view_image`, and an unreadable/unavailable image must be recorded as a
+limitation.
+
+The production runner now uses the checksum-pinned official LibreOffice 26.2.6
+archive (runtime build 26.2.6.3) instead of Debian LibreOffice 7.4.7. A targeted
+render of the known Information Card DOCX visibly preserves the selected
+`Не применимо` control. A separate server-side Codex vision canary read the
+known scan page exactly as `Епи → Еш` without receiving the expected answer in
+its prompt. The rebuilt runner passed its isolation attestation and reports
+`readiness.execute=true`. No field-specific parser, page-coverage counter or
+blocking semantic validator was added. A full procurement rerun remains a
+separate evaluation step.
+
+The focused skill is now split by progressive disclosure: its 374-word entry
+point routes only the current format to dedicated PDF/image, DOCX/OOXML, or
+spreadsheet guidance and always loads a final semantic/JSON review. The server
+image was rebuilt with all four references in the closed template allowlist.
+Fresh isolation challenge `33d45901-0824-4067-95fa-df8e203e43d3` passed;
+runtime reports `skill_sha256=B76820EE...1C1B4C6`,
+`agent_template_sha256=878F9B13...C1D8B7B`, and
+`readiness.execute=true`. n8n, PostgreSQL, and Redis restart baselines remained
+unchanged. This proves deployment and isolation, not procurement-level semantic
+improvement; that still requires a fresh blind rerun.
+
+The runtime user prompt is now the production adaptation of the successful
+local blind-test prompt. It directly requires complete document analysis,
+visual scan inspection, navigation-only OCR, selected-control verification,
+conflict preservation, honest limitations, and safe `not_found`, while the
+skill retains format-specific tool recipes. The prompt still binds only sealed
+job inputs, TenderPlan metadata, and `tender_agent_result_v1`. Server hash
+`1AEFA9F6...606311` matches the local artifact; fresh isolation challenge
+`ea5e2cca-a7de-4b1d-9498-b72dfc1408a7` passed and restored
+`readiness.execute=true` without restarting n8n, PostgreSQL, or Redis.
+
+## Report header fallback — live published
+
+Report Generation `ckPnP3hRhKu4Mf9u` is published at
+`9fb64a15-af46-4f05-9435-b73fa41152ed` with exact draft/active parity. Live
+read-back confirms 12 unchanged nodes and byte-identical `jsCode` for
+`Собрать Report Model2` and `Сгенерировать HTML1` relative to the canonical
+repository export.
+
+Missing presentation-only `subject`, `customer`, `platform` and `price` are now
+filled from the corresponding nonblank `resolved` / `requires_review` FINAL
+fields. TenderPlan metadata keeps priority; `not_found` is never converted into
+a value. Missing tender number renders as `Анализ закупки без номера`. No FINAL
+row, database schema, workflow connection or semantic validator changed.
+
+## Manual upload entry — terminal runtime GREEN
+
+Published workflow `TENDER — Ручная загрузка закупки`
+(`fB46LZnrNCs2MDeL`, version `110057aa-dd11-44ec-b8cb-1d0db9fa1c45`)
+adds a second production entry at
+`https://n8nworkup.ru/form/tender-manual-upload`. It accepts a procurement
+title, optional number/comment and multiple files, enforces a 200 MiB total,
+rejects unknown/executable inputs, stores immutable source bytes with SHA-256,
+then reuses Document Preparation → atomic run/document registration → Agentic
+Dispatch → existing Monitor/Finalization/Report.
+
+Blind Test 2 runtime debugging established three exact transport boundaries:
+
+- execution `17975` reached the internal source upload but n8n sent the native
+  DOCX MIME instead of `application/octet-stream`; the service now accepts only
+  octet-stream or an exact match with declared `mime_type`;
+- execution `18762` reproduced an internal artifact being sent through the
+  external TenderPlan proxy; Document Preparation now bypasses that proxy only
+  for the fixed internal artifact prefix;
+- execution `18779` reproduced the same leak during runner staging; Dispatch now
+  uses the same exact internal route and retains the external proxy for all
+  other source URLs.
+
+Published/read-back versions after the fixes are Document Preparation
+`1e07051f-cc94-4a30-a091-a8f7d92b36f5` (27 nodes) and Dispatch
+`7a72d863-c0c9-42d0-8d3e-7a0efa754533` (33 nodes), both with exact
+`versionId=activeVersionId`.
+
+Final form execution `18796` succeeded. Run
+`0ac0b487-71b7-4a35-8412-e587f608aeca` registered `12/12` Blind Test 2 files and
+started real Codex job `ad4aea11-04b8-4d26-a9a1-5d694c5584d8`. Job attempt 1
+completed with `9,981,910` input, `9,670,656` cached input, `46,062` output and
+`6,085` reasoning-output tokens. Monitor execution `18857` accepted exactly 27
+unique field keys with zero job issue codes (`23 resolved / 1 requires_review /
+3 not_found`) and completed Finalization/Report. Generated artifacts are valid:
+HTML `34,361` bytes and PDF `101,076` bytes with `%PDF-` signature.
+
+Post-canary review reproduced two technical failures and both were fixed before
+publication. Oversized source uploads used to close the TCP socket; the service
+now drains the bounded request and returns typed HTTP `413
+SOURCE_FILE_TOO_LARGE`, confirmed from the live n8n network. The previous shared
+Intake Resume error workflow could not own a manual run. Manual Upload now saves
+its parent execution ID in run metadata and uses dedicated published handler
+`xW4DHtnBYddbaU14` (version `27e6d260-8681-4b99-92a6-67d4d7b0a588`), which may
+terminalize only one exact nonterminal `manual_upload` run. No schema change was
+required.
+
+The Form Trigger remains intentionally `authentication=none` per the current MVP
+decision. This is a documented security/cost exposure: possession of the URL is
+enough to upload up to 200 MiB and start a paid run. The URL must stay within the
+trusted circle until `n8n User Auth` or an external access-control layer is
+explicitly selected.
+
+Post-review repository regression is GREEN: `796` tests total, `790` passed,
+`0` failed and `6` skipped.
+
+The live external download nodes contain the operator-approved proxy parameters;
+portable repository exports intentionally retain the non-secret `=` placeholder.
+Live n8n is authoritative for those two secret parameters. New internal download
+nodes have no proxy. No parser, field-specific rule, quote check or semantic
+validator was added.
 
 ## Readable TenderPlan report filenames — published, integrated runtime pending
 

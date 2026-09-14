@@ -200,7 +200,14 @@ Internal ids (`fact_id`, `document_id`, `analysis_unit_id`, `semantic_block_id`,
 }
 ```
 
-- `procurement` — presentation data из `analysis_run.tender_meta` (number, subject, customer, platform, price, publication_at); missing metadata становится `null`, не подменяет FINAL value.
+- `procurement` — presentation data с приоритетом `analysis_run.tender_meta`.
+  Если metadata не содержат непустые `subject`, `customer`, `platform` или
+  `price`, нода использует уже готовые значения соответствующих FINAL fields:
+  `procurement_subject`, `customer`, `platform`, `nm_price_with_vat`.
+  Fallback допускает только непустой `value_text` со статусом `resolved` или
+  `requires_review`; `not_found` не превращается в значение. `number` и
+  `publication_at` остаются только metadata-полями. Canonical FINAL objects не
+  изменяются — дополнение существует только в presentation-модели отчёта.
 - `statistics` пересчитывается из `analysis_result.status`.
 - `fields` — те же adapter fields без normalization/copy-on-write presentation logic.
 - `attention_field_indexes` — производная проекция полей с `requires_human_review === true`.
@@ -258,6 +265,9 @@ Renderer формирует имя artifact из уже полученных д�
 отсутствует, используется `без номера`. Управляющие и запрещённые Windows
 символы заменяются пробелами, повторяющиеся пробелы схлопываются, а базовое имя
 ограничивается 180 символами. Название внутри самого отчёта не сокращается.
+
+Если номер отсутствует, `<title>` и видимый заголовок используют нейтральную
+форму `Анализ закупки без номера`, без конструкции `№не указан`.
 
 ## 7. HTML artifact
 
@@ -373,7 +383,7 @@ Production promotion checkpoint 2026-09-07:
 | Проверка | Результат |
 |---|---:|
 | Production workflow | `ckPnP3hRhKu4Mf9u` |
-| Published version | `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` |
+| Published version | `9fb64a15-af46-4f05-9435-b73fa41152ed` |
 | Active / draft parity | `versionId = activeVersionId` |
 | Nodes | 12 |
 | PDF connections | exact sequential chain verified read-only |

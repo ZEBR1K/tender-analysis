@@ -129,7 +129,7 @@ test('direct processable files are downloaded sequentially and registered with f
   assert.match(classifierCode, /direct_document_jobs/u);
   assert.match(
     classifierCode,
-    /new Set\(\['pdf', 'docx', 'xlsx', 'xls'\]\)/u,
+    /supportedDocuments\s*=\s*new Set\(\[[^\]]*'xls'[^\]]*\]\)/u,
     'legacy XLS must be staged as an untouched source document for Codex',
   );
 

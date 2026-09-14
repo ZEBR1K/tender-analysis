@@ -14,6 +14,7 @@ const PUBLIC_CODES = new Set([
   'ARTIFACT_NOT_FOUND',
   'ARTIFACT_STORE_ERROR',
   'EXTRACTOR_BUSY',
+  'SOURCE_FILE_TOO_LARGE',
 ]);
 
 export class ArchiveError extends Error {

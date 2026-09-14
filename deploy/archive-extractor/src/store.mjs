@@ -27,7 +27,7 @@ export function validateAnalysisRunId(value) {
 }
 
 export function validateJobId(value, analysisRunId = null, sourceAttachmentIndex = null) {
-  if (typeof value !== 'string' || !/^([0-9a-f-]{36})--source-\d{6}$/iu.test(value)) {
+  if (typeof value !== 'string' || !/^([0-9a-f-]{36})--(?:source|upload)-\d{6}$/iu.test(value)) {
     throw new ArchiveError('INGESTION_CONTRACT_INVALID', 'job_id has an invalid format', 400);
   }
   if (analysisRunId && Number.isSafeInteger(sourceAttachmentIndex)) {
@@ -37,6 +37,15 @@ export function validateJobId(value, analysisRunId = null, sourceAttachmentIndex
     }
   }
   return value.toLowerCase();
+}
+
+export function validateUploadJobId(value, analysisRunId, sourceAttachmentIndex) {
+  const safeValue = validateJobId(value);
+  const expected = `${analysisRunId}--upload-${String(sourceAttachmentIndex).padStart(6, '0')}`;
+  if (safeValue !== expected.toLowerCase()) {
+    throw new ArchiveError('INGESTION_CONTRACT_INVALID', 'upload job_id does not match the source attachment', 400);
+  }
+  return safeValue;
 }
 
 function assertInside(parent, candidate) {

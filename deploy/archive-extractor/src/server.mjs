@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { config } from './config.mjs';
 import { ArchiveError, toSafeError } from './errors.mjs';
 import { extractJob as defaultExtractJob } from './extract-job.mjs';
+import { createSourceUploader } from './source-upload.mjs';
 import { createStore, validateAnalysisRunId } from './store.mjs';
 
 function writeJson(response, statusCode, body) {
@@ -38,8 +39,45 @@ function parsePositiveInteger(value, name) {
 
 function safeDownloadName(value) {
   return String(value || 'artifact.bin')
-    .replace(/[\r\n"\\/]/gu, '_')
+    .replace(/[\u0000-\u001F\u007F"\\/]/gu, '_')
     .slice(0, 200) || 'artifact.bin';
+}
+
+function encodeRfc5987Value(value) {
+  return encodeURIComponent(value).replace(/['()*]/gu, (character) => (
+    `%${character.codePointAt(0).toString(16).toUpperCase()}`
+  ));
+}
+
+function artifactContentDisposition(fileName, artifactId) {
+  const safeName = safeDownloadName(fileName);
+  const extensionMatch = safeName.match(/\.([A-Za-z0-9]{1,16})$/u);
+  const extension = extensionMatch ? `.${extensionMatch[1]}` : '.bin';
+  const safeArtifactId = String(artifactId || '')
+    .replace(/[^A-Za-z0-9_-]/gu, '')
+    .slice(0, 12) || 'download';
+  const fallback = `artifact-${safeArtifactId}${extension}`;
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeRfc5987Value(safeName)}`;
+}
+
+function validateSourceMediaType(request, declaredMimeType) {
+  const contentType = String(request.headers['content-type'] || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
+  const declared = String(declaredMimeType || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
+  if (contentType === 'application/octet-stream') return;
+  if (!contentType || !declared || contentType !== declared) {
+    request.resume();
+    throw new ArchiveError(
+      'INGESTION_CONTRACT_INVALID',
+      'Content-Type must be application/octet-stream or match mime_type',
+      400,
+    );
+  }
 }
 
 function decorateManifest(manifest, publicBaseUrl) {
@@ -60,10 +98,12 @@ function decorateManifest(manifest, publicBaseUrl) {
 export function createServer({
   extractJob = defaultExtractJob,
   store = createStore({ rootDirectory: config.rootDirectory, ttlHours: config.ttlHours }),
+  sourceUploader = null,
   publicBaseUrl = config.publicBaseUrl,
   cleanupIntervalMs = config.cleanupIntervalMinutes * 60 * 1000,
 } = {}) {
   let extractionActive = false;
+  const activeSourceUploader = sourceUploader || createSourceUploader({ store });
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -111,6 +151,28 @@ export function createServer({
         }
       }
 
+      if (pathSegments[0] === 'v1' && pathSegments[1] === 'source-files' && pathSegments.length === 3) {
+        if (request.method !== 'POST') return methodNotAllowed(response);
+        const mimeType = String(url.searchParams.get('mime_type') || '');
+        validateSourceMediaType(request, mimeType);
+        const sourceAttachmentIndex = parsePositiveInteger(
+          url.searchParams.get('source_attachment_index'),
+          'source_attachment_index',
+        );
+        const analysisRunId = validateAnalysisRunId(url.searchParams.get('run_id'));
+        const fileName = String(url.searchParams.get('file_name') || '');
+        const manifest = await activeSourceUploader.uploadSource({
+          inputStream: request,
+          analysisRunId,
+          sourceAttachmentIndex,
+          declaredExtension: String(url.searchParams.get('declared_extension') || ''),
+          fileName,
+          mimeType,
+          jobId: pathSegments[2],
+        });
+        return writeJson(response, 200, decorateManifest(manifest, publicBaseUrl));
+      }
+
       if (pathSegments[0] === 'v1' && pathSegments[1] === 'artifacts' && pathSegments.length === 4) {
         if (request.method !== 'GET') return methodNotAllowed(response);
         const resolved = await store.resolveArtifact({
@@ -119,7 +181,7 @@ export function createServer({
         });
         response.writeHead(200, {
           'content-type': resolved.artifact.mime_type || 'application/octet-stream',
-          'content-disposition': `attachment; filename="${safeDownloadName(resolved.artifact.file_name)}"`,
+          'content-disposition': artifactContentDisposition(resolved.artifact.file_name, pathSegments[3]),
           'cache-control': 'private, no-store',
           'x-content-type-options': 'nosniff',
         });

@@ -1,7 +1,7 @@
 # ARCHITECTURE — Tender Analysis System
 
 **Статус:** Active development / MVP  
-**Последнее обновление:** 2026-09-10
+**Последнее обновление:** 2026-09-12
 **Назначение:** верхнеуровневая архитектурная спецификация всей системы анализа тендеров в n8n.
 
 Оперативный production/test snapshot и открытые verification gates: `PROJECT_STATUS.md`.
@@ -10,7 +10,9 @@
 
 # 1. Цель системы
 
-Система принимает одну закупку из TenderPlan, обрабатывает все приложенные документы, извлекает подтверждённые candidate facts по фиксированному каталогу из 27 полей, агрегирует их и должна сформировать финальный результат анализа закупки.
+Система принимает одну закупку из TenderPlan или через ручную n8n Form,
+обрабатывает все приложенные документы, извлекает результаты по фиксированному
+каталогу из 27 полей и формирует финальный отчёт.
 
 Текущая MVP-цель:
 
@@ -93,7 +95,21 @@ Manual Resume и Recovery Scan остаются операторскими ка�
 10. TENDER — Recovery Scan
 11. TENDER — Ошибка Intake Resume
 12. TENDER — TenderPlan Mark Intake
+13. TENDER — Ручная загрузка закупки
+14. TENDER — Ошибка ручной загрузки
 ```
+
+Manual Upload `fB46LZnrNCs2MDeL` опубликован как второй production entry. Он
+сохраняет исходные bytes в существующем внутреннем artifact store, вызывает
+Document Preparation, атомарно создаёт run и регистрирует все документы, после
+чего передаёт управление тому же Agentic Dispatch. Общий лимит формы — 200 MiB;
+исполняемые и неизвестные типы отклоняются. Отдельного анализатора, parser или
+semantic validator для ручного пути нет. Его отдельный Error workflow
+`xW4DHtnBYddbaU14` по сохранённому n8n execution ID может завершить только один
+принадлежащий manual run; это защита audit/lifecycle, а не семантическая
+проверка. Form Trigger пока использует `authentication=none`, поэтому URL
+считается доверенной непубличной ссылкой, а не защищённым пользовательским
+порталом.
 
 `TENDER — TenderPlan Mark Intake` опрашивает current membership фиксированной
 метки `6a732cd00c61629cf1d3c144` («Проверить») каждые 10 минут через
@@ -168,10 +184,12 @@ tender_analysis_field_results
 
 Восьмой reusable workflow `TENDER — Подготовить документацию`
 (`0scTZu1aBKsMd6AM`) опубликован и подключён как синхронная preprocessing
-boundary до atomic run/document INSERT. Прямые PDF/DOCX/XLSX/XLS последовательно
-скачиваются только для byte size, MIME и SHA-256; страницы, листы и OOXML не
-разбираются. Архивы раскрываются внутренним bounded extractor. Orchestrator
-принимает только полный manifest либо останавливается до создания run.
+boundary до atomic run/document INSERT. Поддерживаемые документы, таблицы,
+текст и изображения последовательно скачиваются только для byte size, MIME и
+SHA-256; страницы, листы и OOXML не разбираются. Архивы раскрываются внутренним
+bounded extractor. Caller принимает только полный manifest либо останавливается
+до создания run. Internal manual artifacts обходят внешний TenderPlan proxy по
+точному Docker-service prefix; это transport routing, не разбор содержимого.
 
 ---
 
@@ -264,6 +282,7 @@ Orchestrator и Intake Resume намеренно отключены и поме�
 | Workflow | Главная ответственность | Что не делает |
 |---|---|---|
 | `ТЕНДЕРЫ ОРКЕСТРАТОР` | Создать run, зарегистрировать документы, запустить Workers | Не анализирует содержимое документов |
+| `TENDER — Ручная загрузка закупки` | Принять локальные файлы, сохранить source identity, создать run и вызвать Agentic Dispatch | Не создаёт отдельный анализатор и не интерпретирует документы |
 | `TENDER — Intake Resume` *(inactive candidate)* | Выбрать new/existing run и идемпотентно продолжить его lifecycle | Не является TenderPlan poller и не создаёт новый event contract |
 | `TENDER — Manual Resume` *(inactive candidate)* | Передать operator-selected `analysis_run_id` в dispatcher с manual override | Не выбирает run по `tender_id` и не дублирует dispatch policy |
 | `TENDER — Recovery Scan` *(inactive candidate)* | Read-only выбрать незавершённые runs для повторной передачи dispatcher | Не мутирует run/documents и не решает retry policy |

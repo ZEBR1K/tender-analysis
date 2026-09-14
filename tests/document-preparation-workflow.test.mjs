@@ -84,7 +84,7 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   const workflow = await loadWorkflow();
   assert.equal(workflow.name, 'TENDER — Подготовить документацию');
   assert.equal(workflow.active, false);
-  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 24);
+  assert.equal(workflow.nodes.filter((node) => node.type !== 'n8n-nodes-base.stickyNote').length, 26);
   assert.equal(workflow.nodes.filter((node) => node.type === 'n8n-nodes-base.stickyNote').length, 1);
 
   const trigger = findNode(workflow, 'When Executed by Another Workflow');
@@ -108,6 +108,23 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   assert.equal(directDownload.maxTries, 3);
   assert.equal(directDownload.waitBetweenTries, 5000);
   assert.equal(directDownload.onError, 'continueErrorOutput');
+
+  const internalRoute = findNode(workflow, 'Внутренний исходный файл?');
+  assert.equal(internalRoute.type, 'n8n-nodes-base.if');
+  assert.equal(
+    internalRoute.parameters.conditions.conditions[0].rightValue,
+    'http://tender-archive-extractor:8080/v1/artifacts/',
+  );
+  assert.equal(internalRoute.parameters.conditions.conditions[0].operator.operation, 'startsWith');
+
+  const internalDownload = findNode(workflow, 'Скачать внутренний документ');
+  assert.equal(internalDownload.parameters.options.proxy, undefined);
+  assert.equal(internalDownload.parameters.options.response.response.responseFormat, 'file');
+  assert.equal(internalDownload.parameters.options.response.response.outputPropertyName, 'data');
+  assert.equal(internalDownload.retryOnFail, true);
+  assert.equal(internalDownload.maxTries, 3);
+  assert.equal(internalDownload.waitBetweenTries, 5000);
+  assert.equal(internalDownload.onError, 'continueErrorOutput');
 
   const directLoop = findNode(workflow, 'Обработать прямые документы по одному');
   assert.equal(directLoop.parameters.batchSize, 1);
@@ -135,7 +152,11 @@ test('workflow has the exact preparation topology, typed trigger and fail-closed
   assert.deepEqual(c['Архив обработан?'].main[1].map(({ node }) => node), ['Сформировать ошибку подготовки']);
   assert.deepEqual(c['Обработать прямые документы по одному'].main[0].map(({ node }) => node), ['Собрать результаты прямых документов']);
   assert.deepEqual(c['Собрать результаты прямых документов'].main[0].map(({ node }) => node), ['Есть архивы?']);
-  assert.deepEqual(c['Обработать прямые документы по одному'].main[1].map(({ node }) => node), ['Скачать прямой документ']);
+  assert.deepEqual(c['Обработать прямые документы по одному'].main[1].map(({ node }) => node), ['Внутренний исходный файл?']);
+  assert.deepEqual(c['Внутренний исходный файл?'].main[0].map(({ node }) => node), ['Скачать внутренний документ']);
+  assert.deepEqual(c['Внутренний исходный файл?'].main[1].map(({ node }) => node), ['Скачать прямой документ']);
+  assert.deepEqual(c['Скачать внутренний документ'].main[0].map(({ node }) => node), ['Нормализовать скачивание прямого документа']);
+  assert.deepEqual(c['Скачать внутренний документ'].main[1].map(({ node }) => node), ['Нормализовать скачивание прямого документа']);
   assert.deepEqual(c['Скачать прямой документ'].main[1].map(({ node }) => node), ['Нормализовать скачивание прямого документа']);
   assert.deepEqual(c['Вычислить SHA-256 прямого документа'].main[1].map(({ node }) => node), ['Зафиксировать идентичность прямого документа']);
   assert.deepEqual(c['Идентичность прямого документа готова?'].main[0].map(({ node }) => node), ['Обработать прямые документы по одному']);
@@ -226,7 +247,7 @@ test('no-archive input hashes direct documents and preserves skipped audit rows'
       analysis_run_id: RUN_ID,
       attachments: [
         sourceAttachment(),
-        sourceAttachment({ document_index: 2, file_name: 'readme.txt', file_extension: 'txt' }),
+        sourceAttachment({ document_index: 2, file_name: 'payload.exe', file_extension: 'exe' }),
       ],
     } }],
   });
@@ -287,6 +308,31 @@ test('no-archive input hashes direct documents and preserves skipped audit rows'
   assert.equal(directDocument.file_size, bytes.length);
   assert.equal(directDocument.status, 'pending');
   assert.equal(directDocument.ingestion_metadata.content_sha256, 'a'.repeat(64));
+});
+
+test('office, text and image sources are passed through as direct agent documents', async () => {
+  const workflow = await loadWorkflow();
+  const extensions = [
+    'pdf', 'docx', 'xlsx', 'xls',
+    'txt', 'csv', 'tsv', 'md', 'json', 'xml', 'html', 'rtf',
+    'png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp', 'webp',
+  ];
+  const classified = await executeCode({
+    workflow,
+    name: 'Проверить и классифицировать вход',
+    inputItems: [{ json: {
+      analysis_run_id: RUN_ID,
+      attachments: extensions.map((extension, offset) => sourceAttachment({
+        document_index: offset + 1,
+        file_name: `source-${offset + 1}.${extension}`,
+        file_extension: extension,
+        download_url: `http://tender-archive-extractor:8080/source-${offset + 1}`,
+      })),
+    } }],
+  });
+  assert.equal(classified[0].json.preliminary_failure, null);
+  assert.equal(classified[0].json.direct_document_jobs.length, extensions.length);
+  assert.equal(classified[0].json.base_documents.length, 0);
 });
 
 test('archive manifest keeps root container, stable paths and duplicate basenames', async () => {
@@ -391,7 +437,7 @@ test('zero processable documents returns NO_PROCESSABLE_DOCUMENTS', async () => 
   const classified = await executeCode({
     workflow,
     name: 'Проверить и классифицировать вход',
-    inputItems: [{ json: { analysis_run_id: RUN_ID, attachments: [sourceAttachment({ file_name: 'notes.txt', file_extension: 'txt' })] } }],
+    inputItems: [{ json: { analysis_run_id: RUN_ID, attachments: [sourceAttachment({ file_name: 'payload.exe', file_extension: 'exe' })] } }],
   });
   const result = await executeCode({
     workflow,

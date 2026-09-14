@@ -38,9 +38,23 @@ test('runner image pins Node, Codex CLI and every document inspection tool', asy
   assert.match(dockerfile, /^FROM node:24\.18\.0-bookworm-slim$/mu);
   assert.match(dockerfile, /@openai\/codex@0\.153\.4/u);
   assert.match(dockerfile, /poppler-utils=22\.12\.0-2\+deb12u3/u);
-  assert.match(dockerfile, /libreoffice-core=4:7\.4\.7-1\+deb12u14/u);
-  assert.match(dockerfile, /libreoffice-writer=4:7\.4\.7-1\+deb12u14/u);
-  assert.match(dockerfile, /libreoffice-calc=4:7\.4\.7-1\+deb12u14/u);
+  assert.match(dockerfile, /LibreOffice_26\.2\.6_Linux_x86-64_deb\.tar\.gz/u);
+  assert.match(
+    dockerfile,
+    /--checksum=sha256:fd0e8f8f2408dd2e5b90286e60f3f97cf566ba441cd48cfc5bcc68067303e0bc/u,
+  );
+  assert.match(dockerfile, /\/opt\/libreoffice26\.2\/program\/soffice/u);
+  for (const dependency of [
+    'libcups2=2.4.2-3\\+deb12u9',
+    'libdbus-1-3=1.14.10-1~deb12u1',
+    'libice6=2:1.0.10-1',
+    'libsm6=2:1.2.3-1',
+    'libx11-xcb1=2:1.8.4-2\\+deb12u2',
+    'libxinerama1=2:1.1.4-3',
+    'libxrandr2=2:1.5.2-2\\+b1',
+    'libxt6=1:1.2.1-1.1',
+  ]) assert.match(dockerfile, new RegExp(dependency, 'u'));
+  assert.doesNotMatch(dockerfile, /libreoffice-(?:core|writer|calc)=4:7\.4\.7/u);
   assert.match(dockerfile, /tesseract-ocr=5\.3\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-eng=1:4\.1\.0-2/u);
   assert.match(dockerfile, /tesseract-ocr-rus=1:4\.1\.0-2/u);

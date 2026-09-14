@@ -215,6 +215,66 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "11000000-0000-4000-8000-000000000206",
+              "leftValue": "={{ $json.documents.download_url }}",
+              "rightValue": "http://tender-archive-extractor:8080/v1/artifacts/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        -260
+      ],
+      "id": "11000000-0000-4000-8000-000000000206",
+      "name": "Внутренний документ runner?"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.documents.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        -260
+      ],
+      "id": "11000000-0000-4000-8000-000000000207",
+      "name": "Скачать внутренний оригинал",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
         "method": "GET",
         "url": "={{ $json.documents.download_url }}",
         "options": {
@@ -800,7 +860,43 @@
         ],
         [
           {
+            "node": "Внутренний документ runner?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Внутренний документ runner?": {
+      "main": [
+        [
+          {
+            "node": "Скачать внутренний оригинал",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Скачать оригинал",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Скачать внутренний оригинал": {
+      "main": [
+        [
+          {
+            "node": "Загрузить оригинал в runner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать download failure",
             "type": "main",
             "index": 0
           }
