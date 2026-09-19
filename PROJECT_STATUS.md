@@ -1,8 +1,28 @@
 # PROJECT STATUS — Tender Analysis
 
-**Snapshot date:** 2026-09-06
+**Snapshot date:** 2026-09-07
 **Status:** Active development / test hardening before client report
-**Branch at snapshot:** `codex/dw23-three-way-integration`
+**Branch at snapshot:** `main`
+
+## Client-confirmed 27-field semantics — documentation recorded, runtime pending
+
+Dmitry answered the field-meaning questionnaire on 2026-09-07. The normalized
+decisions are now recorded in `FIELD_CATALOG.md`; presentation decisions are
+recorded in `REPORT_FIELD_MAPPING.md`; the design and implementation sequence
+are in `docs/superpowers/specs/2026-09-07-client-confirmed-field-semantics-design.md`
+and `docs/superpowers/plans/2026-09-07-client-confirmed-field-semantics.md`.
+
+This checkpoint changes documentation only. Canonical/live Worker, Aggregator,
+Targeted Recheck and Report Generation runtime rules have not yet been aligned
+or verified against the new business contract. Until focused regressions and a
+fresh 27/27 runtime canary pass, reports must not be described as implementing
+the 2026-09-07 semantics.
+
+Highest-risk required alignments are `results_date`, `delivery_term`,
+`government_contract`, `national_regime`, `licenses_certificates` and
+`similar_supply_experience`. Existing false-resolved containment and the
+four-key Targeted Recheck Round 2 allow-list remain mandatory. Platform-tariff
+lookup for `participation_cost` is a separate unresolved integration contract.
 
 ## DW-24 ActiveX GroupName NUL containment — runtime GREEN
 

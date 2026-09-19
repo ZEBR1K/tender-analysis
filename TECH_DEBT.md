@@ -1,7 +1,7 @@
 # TECH\_DEBT — Tender Analysis System
 
 **Статус:** Active backlog  
-**Последнее обновление:** 2026-09-06
+**Последнее обновление:** 2026-09-07
 **Назначение:** единый приоритизированный список технического долга всей системы тендерного анализа.
 
 \---
@@ -46,6 +46,51 @@ FIELD\\\\\\\\\\\\\\\_CATALOG.md
 * ломать произвольные поля.
 
 Исправлять до production и желательно до первого стабильного MVP.
+
+### `SEM-1` — client-confirmed field semantics are not synchronized to runtime
+
+**Evidence:** Дмитрий подтвердил трактовки и формат полей 2026-09-07;
+authoritative решения перенесены в `FIELD_CATALOG.md` и
+`REPORT_FIELD_MAPPING.md`.
+
+**Проблема:** текущие canonical/live semantic rules создавались до этих ответов.
+Особенно существенные расхождения возможны для:
+
+```text
+results_date
+delivery_term
+government_contract
+national_regime
+licenses_certificates
+similar_supply_experience
+```
+
+Presentation также требует раздельных НМЦ/НДС, двух типов контактов,
+структурированных условий оплаты, номера извещения в реквизитах и кратких
+клиентских значений без потери полного evidence/audit.
+
+**Риск:** технически успешный 27/27 run может дать результат, не соответствующий
+подтверждённому клиентскому смыслу, то есть business-level false resolved или
+неверный формат отчёта.
+
+**Regression gate:** выполнить план
+`docs/superpowers/plans/2026-09-07-client-confirmed-field-semantics.md`, сохранить
+27 существующих `field_key`, отрицательные значения только при прямом evidence,
+existing containment и exact four-key Round 2 allow-list; затем focused tests,
+full offline suite без новых failures и fresh 27/27 runtime canary с ручным
+semantic review.
+
+**Приоритет:** `P0` до следующего автоматического клиентского отчёта.
+
+### `SEM-2` — participation cost platform-tariff source is undefined
+
+Дмитрий подтвердил, что комиссия/тариф площадки входит в `participation_cost`,
+но сведения могут отсутствовать в КД и находиться только на площадке. До
+implementation нужны authoritative source, procurement/platform matching,
+effective-at date, winner-only applicability, snapshot/audit и failure policy.
+Отсутствие тарифа в документах не означает бесплатное участие.
+
+**Приоритет:** `P1`; отдельный integration design, не prompt-only fix.
 
 \---
 

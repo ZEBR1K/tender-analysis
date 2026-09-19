@@ -1,0 +1,1739 @@
+
+╭────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                     │
+│                                                │
+│ model:     gpt-5.6-sol high   /model to change │
+│ directory: F:\Vibe-projects\Tender-blind-test  │
+╰────────────────────────────────────────────────╯
+
+  Tip: This is GPT-6, a new generation of intelligence. Astra is state-of-the-art in coding, computer use, science, and
+  professional work. Give it a hard problem, a half-formed idea, or anything you've been meaning to build. See where it
+  takes you.
+
+│ Visit https://chatgpt.com/codex/settings/usage for up-to-date                          │
+│ information on rate limits and credits                                                 │
+│                                                                                        │
+│  Model:                       gpt-5.6-sol (reasoning high, summaries auto)             │
+│  Directory:                   F:\Vibe-projects\Tender-blind-test                       │
+│  Permissions:                 Workspace (Ask for approval)                             │
+│  Agents.md:                   <none>                                                   │
+│  Account:                     banderov52@gmail.com (Pro)                               │
+│  Collaboration mode:          Default                                                  │
+│  Session:                     01a07d6d-7b30-7c53-a53e-bb2da2fc1b9e                     │
+│                                                                                        │
+│  Weekly limit:                [██████████████████░░] 89% left (resets 07:15 on 14 Sep) │
+│  GPT-5.3-Codex-Spark limit:                                                            │
+│  5h limit:                    [████████████████████] 100% left (resets 03:52 on 8 Sep) │
+│  Weekly limit:                [███████████████████░] 96% left (resets 10:39 on 13 Sep) │
+╰────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+› Проведи независимый полный анализ закупки по всем файлам в папке documents.
+
+  Это слепой тест. Не используй интернет, другие каталоги компьютера, существующие отчёты, результаты других моделей
+
+  1. Изучи каждый документ полностью.
+  2. Для PDF-сканов при необходимости преобразуй страницы в изображения и проверь их визуально.
+  3. Для DOCX при необходимости исследуй внутреннюю структуру OOXML, включая элементы управления и переключатели.
+  4. Не делай вывод только по наличию общего текста. Учитывай, выбран ли конкретный вариант, флажок или переключатель.
+  5. Для каждого установленного значения укажи:
+     - field_key;
+     - status: resolved, requires_review или not_found;
+     - итоговое значение;
+     - имя исходного файла;
+     - страницу, раздел или структурный элемент;
+     - точную подтверждающую цитату;
+     - краткое объяснение вывода.
+  6. not_found означает только то, что значение не удалось установить после проверки всех документов. Не трактуй
+  отсутствие сведений как «нет», «не применяется» или «не требуется».
+  7. Если документы противоречат друг другу, не выбирай молча один вариант. Зафиксируй конфликт.
+  8. Не изменяй исходные документы.
+  9. Итог сохрани в файле codex-result.md.
+  10. Если какой-либо формат невозможно исследовать доступными инструментами, явно укажи это вместо предположения.
+
+
+⚠ Falling back from WebSockets to HTTPS transport. unexpected status 403 Forbidden: 19ea
+<html>
+  <head>
+    <meta
+  name="viewport" content="width=device-width, initial-scale=1" />
+      <style
+  global>body{font-family:Arial,Helvetica,sans-ser, url: wss://chatgpt.com/backend-api/codex/responses, cf-ray:
+  a3784a4c1ee0e846-DME
+
+• Использую навыки работы с документами и PDF, чтобы полностью извлечь содержимое, проверить разметку и визуально
+  верифицировать сканы. Интернет не использую; анализ будет основан только на FIELD_CATALOG.md и файлах папки documents,
+  исходники останутся неизменными.
+
+• Ran Get-Content -LiteralPath 'C:\Users\kosty\.codex\skills\using-superpowers\SKILL.md' -Raw; Get-Content -LiteralPath
+  │ 'C:\Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md'
+  │ -Raw; Get-Content -LiteralPath 'C:
+  │ … +1 lines
+  └ ---
+    name: using-superpowers
+    … +812 lines (ctrl + t to view transcript)
+    locators. Never cite rendered PNGs, scratch files, builders, or QA intermediates unless asked.
+
+
+• Ran $p='C:\Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $lines=Get-Content -LiteralPath $p; "LINES=$($lines.Count)"; $lines[0..249]
+  └ LINES=540
+    ---
+    … +249 lines (ctrl + t to view transcript)
+      return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64");
+    }
+
+• Ran $p='C:\Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $lines=Get-Content -LiteralPath $p; $lines[250..539]
+  └
+    async function latexToPng(latex, outputPath, display = true) {
+    … +287 lines (ctrl + t to view transcript)
+    Document locators support only `page_number`; otherwise use a plain citation. Do not guess or add object, label,
+    paragraph, table, or cell IDs. Do not cite intermediates unless asked.
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\tasks\read_review
+  │ .md' -Raw; Get-Content -LiteralPath 'C:\Users\kosty\.codex\skills\graphify\SKILL.md' -Raw
+  └ # Task: Read / review an existing DOCX
+
+    … +768 lines (ctrl + t to view transcript)
+    - Never run HTML viz on a graph with more than 5,000 nodes without warning the user.
+
+
+• Ran Write-Output 'ROOT'; Get-ChildItem -LiteralPath . -Force | Select-Object Mode,Length,Name; Write-Output
+  │ 'DOCUMENTS'; Get-ChildItem -LiteralPath .\documents -File -Recurse | Select-Object FullName,Length,Extension;
+  │ Write-Output 'CATALOG'; Get-Content -LiteralPath .\FIELD_CATALOG.md -Raw
+  └ ROOT
+
+    … +1433 lines (ctrl + t to view transcript)
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Начинаю с инвентаризации форматов и каталога полей. Затем для каждого файла сделаю полный текстовый/структурный
+  разбор, а PDF и DOCX дополнительно проверю постранично, чтобы отличить выбранные флажки и переключатели от простого
+  упоминания вариантов.
+
+• Ran $files=Get-ChildItem -LiteralPath .\documents -File -Recurse; $files | ForEach-Object
+  │ { [pscustomobject]@{RelativePath=$_.FullName.Substring((Get-Location).Path.Length+1); Bytes=$_.Length;
+  │ Extension=$_.Extension} } | ConvertTo-Json -Depth 3; $cat=Get-Content -LiteralPath .\FIELD_CATALOG.md -Encoding
+  │ … +1 lines
+  └ [
+        {
+    … +219 lines (ctrl + t to view transcript)
+    # 6. Детальное описание полей
+
+
+• Ran Select-String -LiteralPath .\FIELD_CATALOG.md -Encoding UTF8 -Pattern '^## ([0-9]+)\. `|^# 7\.' | ForEach-Object
+  │ { "{0}: {1}" -f $_.LineNumber,$_.Line }
+  └ 161: ## 1. `procurement_subject`
+    204: ## 2. `nm_price_with_vat`
+    … +24 lines (ctrl + t to view transcript)
+    1214: ## 27. `application_documents`
+    1253: # 7. Решения Дмитрия от 2026-09-07
+
+• Ran $c=Get-Content -LiteralPath .\FIELD_CATALOG.md -Encoding UTF8; $c[160..699]
+  └ ## 1. `procurement_subject`
+
+    … +536 lines (ctrl + t to view transcript)
+
+    Не менять `field_key`.
+
+• Ran $c=Get-Content -LiteralPath .\FIELD_CATALOG.md -Encoding UTF8; $c[700..1251]
+  └
+    До появления отдельной структурированной schema presentation layer должна
+    … +548 lines (ctrl + t to view transcript)
+    ---
+
+
+• Ran $names=@('python','py','pdftotext','pdftoppm','pdfinfo','libreoffice','soffice'); foreach($n in $names)
+  │ { $cmd=Get-Command $n -ErrorAction SilentlyContinue; if($cmd){"$n`t$($cmd.Source)"} else {"$n`tMISSING"} }; python
+  │ --version 2>&1; py --version 2>&1
+  └ python    MISSING
+    py    MISSING
+    … +19 lines (ctrl + t to view transcript)
+        + FullyQualifiedErrorId : CommandNotFoundException
+
+
+• Ran Get-ChildItem -LiteralPath 'C:\Users\kosty\.cache\codex-runtimes' -Directory -ErrorAction SilentlyContinue |
+  │ Select-Object FullName; Get-ChildItem -LiteralPath 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime'
+  │ -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -in
+  │ … +1 lines
+  └
+    FullName
+    … +19 lines (ctrl + t to view transcript)
+
+
+
+• Ran Get-ChildItem -LiteralPath 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native'
+  │ -Directory | Select-Object Name,FullName; Get-ChildItem -LiteralPath 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native' -Recurse -File -Filter
+  │ … +1 lines
+  └
+    Name       FullName
+    … +6 lines (ctrl + t to view transcript)
+
+
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import sys;
+  │ print(sys.version); import docx,pypdf,pdfplumber,PIL,lxml; print('imports ok')"
+  └ 3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]
+    imports ok
+
+• Ran Select-String -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\render_docx.py'
+  │ -Pattern 'soffice|libre|word|convert' -Context 2,2; Get-ChildItem -LiteralPath 'C:\Program Files' -Filter
+  │ … +1 lines
+  └
+      C:
+    … +407 lines (ctrl + t to view transcript)
+
+
+
+• Ran $candidates=@('C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE','C:\Program Files (x86)\Microsoft
+  │ Office\root\Office16\WINWORD.EXE','C:\Program Files\LibreOffice\program\soffice.exe','C:\Program Files
+  │ (x86)\LibreOffice\program\soffice.exe'); foreach($p in $candidates){ if(Test-Path -LiteralPath $p){$p} };
+  │ … +4 lines
+  └ C:\Program Files\LibreOffice\program\soffice.exe
+
+    … +9 lines (ctrl + t to view transcript)
+
+
+
+• Ran $t=Get-Command tesseract -ErrorAction SilentlyContinue; if($t){$t.Source}else{'tesseract missing'}; & 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import
+  │ importlib.util; print('pytesseract', bool(importlib.util.find_spec('pytesseract'))); print('ocrmypdf',
+  │ … +1 lines
+  └ tesseract missing
+    pytesseract False
+    ocrmypdf False
+    fitz False
+
+• Added tmp\analysis\extract_corpus.py (+245 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import json
+      4 +import re
+      5 +import sys
+      6 +import zipfile
+      7 +from pathlib import Path
+      8 +
+      9 +from lxml import etree
+     10 +from pypdf import PdfReader
+     11 +
+     12 +
+     13 +NS = {
+     14 +    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+     15 +    "w14": "http://schemas.microsoft.com/office/word/2010/wordml",
+     16 +    "w15": "http://schemas.microsoft.com/office/word/2012/wordml",
+     17 +    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+     18 +    "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+     19 +    "v": "urn:schemas-microsoft-com:vml",
+     20 +    "o": "urn:schemas-microsoft-com:office:office",
+     21 +}
+     22 +W = "{" + NS["w"] + "}"
+     23 +
+     24 +
+     25 +def safe_stem(path: Path) -> str:
+     26 +    return re.sub(r"[^0-9A-Za-zА-Яа-яЁё._-]+", "_", path.stem)
+     27 +
+     28 +
+     29 +def attr_local(el: etree._Element, name: str, default=None):
+     30 +    for key, value in el.attrib.items():
+     31 +        if key.split("}")[-1] == name:
+     32 +            return value
+     33 +    return default
+     34 +
+     35 +
+     36 +def paragraph_text(p: etree._Element) -> str:
+     37 +    out: list[str] = []
+     38 +    for el in p.iter():
+     39 +        local = etree.QName(el).localname
+     40 +        if local in {"t", "delText", "instrText"} and el.text:
+     41 +            out.append(el.text)
+     42 +        elif local == "tab":
+     43 +            out.append("\t")
+     44 +        elif local in {"br", "cr"}:
+     45 +            out.append("\n")
+     46 +        elif local == "noBreakHyphen":
+     47 +            out.append("-")
+     48 +        elif local == "lastRenderedPageBreak":
+     49 +            out.append("<LAST_RENDERED_PAGE_BREAK>")
+     50 +        elif local == "sym":
+     51 +            font = attr_local(el, "font", "")
+     52 +            char = attr_local(el, "char", "")
+     53 +            out.append(f"<SYM font={font} char={char}>")
+     54 +    return "".join(out).strip()
+     55 +
+     56 +
+     57 +def paragraph_location(p: etree._Element, part: str, index: int) -> str:
+     58 +    tc = p.getparent()
+     59 +    while tc is not None and etree.QName(tc).localname != "tc":
+     60 +        tc = tc.getparent()
+     61 +    if tc is None:
+     62 +        return f"{part}:paragraph[{index}]"
+     63 +    tr = tc.getparent()
+     64 +    tbl = tr.getparent() if tr is not None else None
+     65 +    row = list(tbl).index(tr) + 1 if tbl is not None and tr in tbl else None
+     66 +    col = list(tr).index(tc) + 1 if tr is not None and tc in tr else None
+     67 +    tbl_num = 0
+     68 +    root = p.getroottree().getroot()
+     69 +    tables = root.xpath(".//w:tbl", namespaces=NS)
+     70 +    try:
+     71 +        tbl_num = tables.index(tbl) + 1
+     72 +    except ValueError:
+     73 +        pass
+     74 +    return f"{part}:table[{tbl_num}]/row[{row}]/cell[{col}]/paragraph[{index}]"
+     75 +
+     76 +
+     77 +def extract_controls(root: etree._Element, part: str) -> list[dict]:
+     78 +    controls: list[dict] = []
+     79 +    for i, sdt in enumerate(root.xpath(".//w:sdt", namespaces=NS), 1):
+     80 +        pr = sdt.find("w:sdtPr", NS)
+     81 +        content = sdt.find("w:sdtContent", NS)
+     82 +        item = {
+     83 +            "part": part,
+     84 +            "kind": "content_control",
+     85 +            "index": i,
+     86 +            "alias": None,
+     87 +            "tag": None,
+     88 +            "id": None,
+     89 +            "type": None,
+     90 +            "checked": None,
+     91 +            "text": "",
+     92 +            "list_items": [],
+     93 +            "raw_xml": etree.tostring(pr, encoding="unicode") if pr is not None else "",
+     94 +        }
+     95 +        if pr is not None:
+     96 +            for key in ("alias", "tag", "id"):
+     97 +                found = pr.find(f"w:{key}", NS)
+     98 +                if found is not None:
+     99 +                    item[key] = attr_local(found, "val")
+    100 +            for ctype in ("checkBox", "comboBox", "dropDownList", "date", "text", "picture", "richText"):
+    101 +                nodes = pr.xpath(f".//*[local-name()='{ctype}']")
+    102 +                if nodes:
+    103 +                    item["type"] = ctype
+    104 +                    break
+    105 +            checked = pr.xpath(".//*[local-name()='checked']")
+    106 +            if checked:
+    107 +                item["checked"] = attr_local(checked[0], "val")
+    108 +            for li in pr.xpath(".//*[local-name()='listItem']"):
+    109 +                item["list_items"].append({"displayText": attr_local(li, "displayText"), "value": attr_local(li
+         , "value")})
+    110 +        if content is not None:
+    111 +            texts = [paragraph_text(p) for p in content.xpath(".//w:p", namespaces=NS)]
+    112 +            item["text"] = " | ".join(t for t in texts if t)
+    113 +        controls.append(item)
+    114 +
+    115 +    for i, ffdata in enumerate(root.xpath(".//w:ffData", namespaces=NS), 1):
+    116 +        name = ffdata.find("w:name", NS)
+    117 +        checked = ffdata.find(".//w:checkBox/w:checked", NS)
+    118 +        default = ffdata.find(".//w:checkBox/w:default", NS)
+    119 +        ddl_default = ffdata.find(".//w:ddList/w:default", NS)
+    120 +        entries = [attr_local(e, "val") for e in ffdata.xpath(".//w:listEntry", namespaces=NS)]
+    121 +        p = ffdata
+    122 +        while p is not None and etree.QName(p).localname != "p":
+    123 +            p = p.getparent()
+    124 +        controls.append({
+    125 +            "part": part,
+    126 +            "kind": "legacy_form_field",
+    127 +            "index": i,
+    128 +            "name": attr_local(name, "val") if name is not None else None,
+    129 +            "type": "checkbox" if ffdata.find("w:checkBox", NS) is not None else ("dropdown" if ffdata.find("w:
+         ddList", NS) is not None else "text"),
+    130 +            "checked": attr_local(checked, "val") if checked is not None else None,
+    131 +            "default": attr_local(default, "val") if default is not None else (attr_local(ddl_default, "val") i
+         f ddl_default is not None else None),
+    132 +            "entries": entries,
+    133 +            "context": paragraph_text(p) if p is not None else "",
+    134 +            "raw_xml": etree.tostring(ffdata, encoding="unicode"),
+    135 +        })
+    136 +    return controls
+    137 +
+    138 +
+    139 +def extract_docx(path: Path, out_dir: Path) -> dict:
+    140 +    result = {
+    141 +        "file": path.name,
+    142 +        "format": "docx",
+    143 +        "parts": {},
+    144 +        "controls": [],
+    145 +        "symbol_contexts": [],
+    146 +        "drawings": [],
+    147 +        "package_entries": [],
+    148 +        "embedded_objects": [],
+    149 +        "media": [],
+    150 +        "errors": [],
+    151 +    }
+    152 +    with zipfile.ZipFile(path) as z:
+    153 +        result["package_entries"] = z.namelist()
+    154 +        result["embedded_objects"] = [n for n in z.namelist() if n.startswith("word/embeddings/") or n.startswi
+         th("word/activeX/")]
+    155 +        result["media"] = [{"name": n, "bytes": z.getinfo(n).file_size} for n in z.namelist() if n.startswith("
+         word/media/")]
+    156 +        xml_names = [n for n in z.namelist() if n.startswith("word/") and n.endswith(".xml") and re.search(r"(d
+         ocument|header\d*|footer\d*|footnotes|endnotes|comments|glossary|activeX|customXml)", n, re.I)]
+    157 +        for name in sorted(set(xml_names)):
+    158 +            try:
+    159 +                root = etree.fromstring(z.read(name))
+    160 +            except Exception as exc:
+    161 +                result["errors"].append(f"{name}: {exc}")
+    162 +                continue
+    163 +            paragraphs = []
+    164 +            for i, p in enumerate(root.xpath(".//w:p", namespaces=NS), 1):
+    165 +                text = paragraph_text(p)
+    166 +                if text or p.xpath(".//w:sym|.//w:lastRenderedPageBreak|.//w:br[@w:type='page']", namespaces=NS
+         ):
+    167 +                    paragraphs.append({"locator": paragraph_location(p, name, i), "text": text})
+    168 +                    if re.search(r"[☐☑☒□■✓✔✕✖◉○●]", text) or "<SYM " in text:
+    169 +                        result["symbol_contexts"].append({"part": name, "locator": paragraph_location(p, name,
+         i), "text": text})
+    170 +            result["parts"][name] = {
+    171 +                "paragraph_count": len(root.xpath(".//w:p", namespaces=NS)),
+    172 +                "table_count": len(root.xpath(".//w:tbl", namespaces=NS)),
+    173 +                "paragraphs": paragraphs,
+    174 +            }
+    175 +            result["controls"].extend(extract_controls(root, name))
+    176 +            for i, prop in enumerate(root.xpath(".//wp:docPr|.//a:cNvPr|.//v:shape", namespaces=NS), 1):
+    177 +                result["drawings"].append({
+    178 +                    "part": name,
+    179 +                    "index": i,
+    180 +                    "element": etree.QName(prop).localname,
+    181 +                    "name": attr_local(prop, "name") or attr_local(prop, "id"),
+    182 +                    "title": attr_local(prop, "title"),
+    183 +                    "description": attr_local(prop, "descr") or attr_local(prop, "alt"),
+    184 +                    "type": attr_local(prop, "type"),
+    185 +                    "style": attr_local(prop, "style"),
+    186 +                })
+    187 +    return result
+    188 +
+    189 +
+    190 +def extract_pdf(path: Path) -> dict:
+    191 +    reader = PdfReader(str(path))
+    192 +    pages = []
+    193 +    for i, page in enumerate(reader.pages, 1):
+    194 +        text = page.extract_text() or ""
+    195 +        annots = []
+    196 +        for ref in page.get("/Annots", []) or []:
+    197 +            try:
+    198 +                obj = ref.get_object()
+    199 +                annots.append({"subtype": str(obj.get("/Subtype")), "field_type": str(obj.get("/FT")), "name":
+         str(obj.get("/T")), "value": str(obj.get("/V")), "rect": [float(x) for x in obj.get("/Rect", [])]})
+    200 +            except Exception as exc:
+    201 +                annots.append({"error": str(exc)})
+    202 +        pages.append({"page": i, "chars": len(text), "text": text, "annotations": annots})
+    203 +    fields = {}
+    204 +    for key, val in (reader.get_fields() or {}).items():
+    205 +        fields[key] = {k: str(v) for k, v in val.items() if k in {"/FT", "/V", "/DV", "/TU", "/Ff"}}
+    206 +    return {"file": path.name, "format": "pdf", "pages": pages, "fields": fields, "metadata": {str(k): str(v) f
+         or k, v in (reader.metadata or {}).items()}}
+    207 +
+    208 +
+    209 +def main() -> None:
+    210 +    root = Path(sys.argv[1]).resolve()
+    211 +    out_dir = Path(sys.argv[2]).resolve()
+    212 +    out_dir.mkdir(parents=True, exist_ok=True)
+    213 +    summary = []
+    214 +    for path in sorted(root.iterdir(), key=lambda p: p.name.lower()):
+    215 +        if path.suffix.lower() == ".docx":
+    216 +            data = extract_docx(path, out_dir)
+    217 +        elif path.suffix.lower() == ".pdf":
+    218 +            data = extract_pdf(path)
+    219 +        else:
+    220 +            summary.append({"file": path.name, "status": "unsupported", "format": path.suffix})
+    221 +            continue
+    222 +        out_path = out_dir / f"{safe_stem(path)}.json"
+    223 +        out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    224 +        summary.append({
+    225 +            "file": path.name,
+    226 +            "format": data["format"],
+    227 +            "output": out_path.name,
+    228 +            "pages": len(data.get("pages", [])),
+    229 +            "text_chars": sum(p.get("chars", 0) for p in data.get("pages", [])),
+    230 +            "parts": len(data.get("parts", {})),
+    231 +            "paragraphs": sum(x.get("paragraph_count", 0) for x in data.get("parts", {}).values()),
+    232 +            "tables": sum(x.get("table_count", 0) for x in data.get("parts", {}).values()),
+    233 +            "controls": len(data.get("controls", [])),
+    234 +            "symbols": len(data.get("symbol_contexts", [])),
+    235 +            "drawings": len(data.get("drawings", [])),
+    236 +            "media": len(data.get("media", [])),
+    237 +            "embedded": len(data.get("embedded_objects", [])),
+    238 +            "errors": data.get("errors", []),
+    239 +        })
+    240 +    (out_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    241 +    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    242 +
+    243 +
+    244 +if __name__ == "__main__":
+    245 +    main()
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\extract_corpus.py .\documents .\tmp\analysis\extracted
+  └ [
+      {
+    … +190 lines (ctrl + t to view transcript)
+      }
+    ]
+
+• Ran $pop='C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\poppler\Library\bin';
+  │ New-Item -ItemType Directory -Force -Path .\tmp\analysis\pdf_pages\itt | Out-Null; New-Item -ItemType Directory
+  │ -Force -Path .\tmp\analysis\pdf_pages\nmc | Out-Null; & "$pop\pdftoppm.exe" -png -r 160 '.
+  │ … +3 lines
+  └ Syntax Error: No display font for 'Symbol'
+    Syntax Error: No display font for 'ArialNarrow'
+    … +33 lines (ctrl + t to view transcript)
+
+
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-2.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-1.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-4.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-3.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-5.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-6.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-7.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-8.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\nmc\page-1.png
+
+• Ran $env:Path='C:\Program Files\LibreOffice\program;C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\poppler\Library\bin;'+$env:Path;
+  │ $py='C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'; $renderer='C:
+  │ … +8 lines
+  └ RENDER 1: 0_Общая_часть_зо.docx
+    Traceback (most recent call last):
+    … +218 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $env:Path='C:\Program Files\LibreOffice\program;'+$env:Path; where.exe soffice.exe; & 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import os,shutil;
+  │ print(os.environ.get('PATH')); print(shutil.which('soffice.exe'))"
+  └ C:\Program Files\LibreOffice\program\soffice.exe
+    C:\Users\kosty\.codex\tmp\arg0\codex-arg0YXcIJb;C:
+    … +16 lines (ctrl + t to view transcript)
+    \Users\kosty\.local\bin
+    None
+
+• Added tmp\analysis\render_with_runtime.py (+26 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import importlib.util
+     4 +import os
+     5 +import sys
+     6 +from pathlib import Path
+     7 +
+     8 +
+     9 +RENDERER = Path(r"C:\Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\docum
+        ents\render_docx.py")
+    10 +LIBREOFFICE = Path(r"C:\Program Files\LibreOffice\program\soffice.exe")
+    11 +POPPLER_BIN = Path(r"C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\poppler\Libr
+        ary\bin")
+    12 +
+    13 +
+    15 +    os.environ["PATH"] = os.pathsep.join([str(LIBREOFFICE.parent), str(POPPLER_BIN), os.environ.get("PATH", "")]
+        )
+    16 +    spec = importlib.util.spec_from_file_location("codex_render_docx", RENDERER)
+    17 +    if spec is None or spec.loader is None:
+    18 +        raise RuntimeError(f"Could not load {RENDERER}")
+    19 +    module = importlib.util.module_from_spec(spec)
+    20 +    spec.loader.exec_module(module)
+    21 +    module._resolve_soffice = lambda: str(LIBREOFFICE)
+    22 +    module.main()
+    23 +
+    24 +
+    25 +if __name__ == "__main__":
+    26 +    main()
+
+  │ \tmp\analysis\render_with_runtime.py '.\documents\0_Общая_часть_зо.docx' --output_dir '.
+  │ \tmp\analysis\docx_render\doc1' --emit_pdf --verbose
+  └ [render_docx] $ C:\Program Files\LibreOffice\program\soffice.exe -env:UserInstallation=file:///C:/Users/kosty/
+    AppData/Local/Temp/soffice_profile_f8que70l --invisible --headless --norestore --convert-to pdf --outdir C:
+    … +6 lines (ctrl + t to view transcript)
+
+    Pages rendered to F:\Vibe-projects\Tender-blind-test\tmp\analysis\docx_render\doc1
+
+• Waited for background terminal · $py='C:\Users\kosty\.cache\codex-runtimes\codex-primary-
+runtime\dependencies\python\python.exe'; $render=(Resolve-Path .\tmp\analysis\render_with_runtime.py).Path; $docs=Get-
+ChildItem -LiteralPath .\documents -Filter *.docx | Sort-Object Name; for($i=1;$i -lt $docs.Count;$i++){ $out=Join-Path
+(Get-Location).Path ('tmp\analysis\docx_render\doc'+($i+1)); Write-Output ("RENDER {0}: {1}" -f ($i+1),$docs[$i].Name);
+& $py $render $docs[$i].FullName --output_dir $out --emit_pdf; if($LASTEXITCODE -ne 0){ Write-Output ("FAILED {0}" -f
+$docs[$i].Name) } }; Get-ChildItem -LiteralPath .\tmp\analysis\docx_render -Directory | Sort-Object Name | ForEach-
+Object { [pscustomobject]@{Dir=$_.Name; Pngs=(Get-ChildItem -LiteralPath $_.FullName -Filter *.png).Count; Pdfs=(Get-
+ChildItem -LiteralPath $_.FullName -Filter *.pdf).Count } } | ConvertTo-Json
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Два PDF уже проверены визуально: приложение ИТТ — восьмистраничный скан без текстового слоя, поэтому каждая страница
+  прочитана по изображению; расчёт НМЦ — одностраничный PDF с отдельными строками «без НДС» и «с НДС». Сейчас завершаю
+  постраничный рендер десяти DOCX и сопоставление с их OOXML-состояниями.
+
+• Waited for background terminal · $py='C:\Users\kosty\.cache\codex-runtimes\codex-primary-
+runtime\dependencies\python\python.exe'; $render=(Resolve-Path .\tmp\analysis\render_with_runtime.py).Path; $docs=Get-
+ChildItem -LiteralPath .\documents -Filter *.docx | Sort-Object Name; for($i=1;$i -lt $docs.Count;$i++){ $out=Join-Path
+(Get-Location).Path ('tmp\analysis\docx_render\doc'+($i+1)); Write-Output ("RENDER {0}: {1}" -f ($i+1),$docs[$i].Name);
+& $py $render $docs[$i].FullName --output_dir $out --emit_pdf; if($LASTEXITCODE -ne 0){ Write-Output ("FAILED {0}" -f
+$docs[$i].Name) } }; Get-ChildItem -LiteralPath .\tmp\analysis\docx_render -Directory | Sort-Object Name | ForEach-
+Object { [pscustomobject]@{Dir=$_.Name; Pngs=(Get-ChildItem -LiteralPath $_.FullName -Filter *.png).Count; Pdfs=(Get-
+ChildItem -LiteralPath $_.FullName -Filter *.pdf).Count } } | ConvertTo-Json
+
+• Ran $py='C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe';
+  │ $render=(Resolve-Path .\tmp\analysis\render_with_runtime.py).Path; $docs=Get-ChildItem -LiteralPath .\documents
+  │ -Filter *.docx | Sort-Object Name; for($i=1;$i -lt $docs.Count;$i++){ $out=Join-Path (Get-Location).Path
+  │ … +5 lines
+  └ RENDER 2: Блок_1_Извещение.docx
+    [render_docx] NOTE: multiple section page sizes/orientations detected; DPI is computed from the first section only.
+    … +73 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Added tmp\analysis\extract_activex.py (+151 -0)
+      1 +from __future__ import annotations
+      2 +
+      3 +import json
+      4 +import posixpath
+      5 +import re
+      6 +import sys
+      7 +import zipfile
+      8 +from pathlib import Path
+      9 +
+     10 +from lxml import etree
+     11 +
+     12 +
+     13 +NS = {
+     14 +    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+     15 +    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+     16 +    "pr": "http://schemas.openxmlformats.org/package/2006/relationships",
+     17 +}
+     18 +
+     19 +
+     20 +def alocal(el, name, default=None):
+     21 +    if el is None:
+     22 +        return default
+     23 +    for k, v in el.attrib.items():
+     24 +        if k.split("}")[-1] == name:
+     25 +            return v
+     26 +    return default
+     27 +
+     28 +
+     29 +def ptext(el):
+     30 +    out = []
+     31 +    for node in el.iter():
+     32 +        local = etree.QName(node).localname
+     33 +        if local in {"t", "delText", "instrText"} and node.text:
+     34 +            out.append(node.text)
+     35 +        elif local == "tab":
+     36 +            out.append("\t")
+     37 +        elif local in {"br", "cr"}:
+     38 +            out.append("\n")
+     39 +    return "".join(out).strip()
+     40 +
+     41 +
+     42 +def cell_context(node):
+     43 +    cur = node
+     44 +    while cur is not None and etree.QName(cur).localname != "tc":
+     45 +        cur = cur.getparent()
+     46 +    if cur is None:
+     47 +        p = node
+     48 +        while p is not None and etree.QName(p).localname != "p":
+     49 +            p = p.getparent()
+     50 +        return ptext(p) if p is not None else "", None
+     51 +    row = cur.getparent()
+     52 +    table = row.getparent() if row is not None else None
+     53 +    cells = [x for x in row if etree.QName(x).localname == "tc"] if row is not None else []
+     54 +    rows = [x for x in table if etree.QName(x).localname == "tr"] if table is not None else []
+     55 +    loc = {
+     56 +        "table_index": None,
+     57 +        "row": rows.index(row) + 1 if row in rows else None,
+     58 +        "cell": cells.index(cur) + 1 if cur in cells else None,
+     59 +    }
+     60 +    root = node.getroottree().getroot()
+     61 +    tables = root.xpath(".//*[local-name()='tbl']")
+     62 +    if table in tables:
+     63 +        loc["table_index"] = tables.index(table) + 1
+     64 +    text = " | ".join(ptext(p) for p in cur.xpath(".//*[local-name()='p']") if ptext(p))
+     65 +    return text, loc
+     66 +
+     67 +
+     68 +def part_rels_name(part: str) -> str:
+     69 +    folder, name = posixpath.split(part)
+     70 +    return posixpath.join(folder, "_rels", name + ".rels")
+     71 +
+     72 +
+     73 +def parse_activex(z: zipfile.ZipFile, target: str):
+     74 +    try:
+     75 +        root = etree.fromstring(z.read(target))
+     76 +    except Exception as exc:
+     77 +        return {"target": target, "error": str(exc)}
+     78 +    props = []
+     79 +    for p in root.xpath(".//*[local-name()='ocxPr']"):
+     80 +        props.append({
+     81 +            "name": alocal(p, "name"),
+     82 +            "value": alocal(p, "value"),
+     83 +            "children": [{"tag": etree.QName(c).localname, "attributes": {k.split('}')[-1]: v for k, v in c.att
+         rib.items()}} for c in p],
+     84 +        })
+     85 +    return {
+     86 +        "target": target,
+     87 +        "root": etree.QName(root).localname,
+     88 +        "attributes": {k.split("}")[-1]: v for k, v in root.attrib.items()},
+     89 +        "properties": props,
+     90 +        "raw_xml": etree.tostring(root, encoding="unicode"),
+     91 +    }
+     92 +
+     93 +
+     94 +def extract(path: Path):
+     95 +    out = {"file": path.name, "controls": [], "unlinked_activex": []}
+     96 +    with zipfile.ZipFile(path) as z:
+     97 +        linked = set()
+     98 +        word_parts = [n for n in z.namelist() if re.fullmatch(r"word/(document|header\d+|footer\d+)\.xml", n)]
+     99 +        for part in word_parts:
+    100 +            root = etree.fromstring(z.read(part))
+    101 +            rels_name = part_rels_name(part)
+    102 +            relmap = {}
+    103 +            if rels_name in z.namelist():
+    104 +                relroot = etree.fromstring(z.read(rels_name))
+    105 +                for rel in relroot.xpath(".//*[local-name()='Relationship']"):
+    106 +                    rid = alocal(rel, "Id")
+    107 +                    target = alocal(rel, "Target")
+    108 +                    if rid and target:
+    109 +                        relmap[rid] = posixpath.normpath(posixpath.join(posixpath.dirname(part), target))
+    110 +            for i, control in enumerate(root.xpath(".//*[local-name()='control']"), 1):
+    111 +                rid = alocal(control, "id")
+    112 +                target = relmap.get(rid)
+    113 +                context, cell = cell_context(control)
+    114 +                record = {
+    115 +                    "part": part,
+    116 +                    "control_index": i,
+    117 +                    "relationship_id": rid,
+    118 +                    "name": alocal(control, "name"),
+    119 +                    "shape_id": alocal(control, "shapeid"),
+    120 +                    "context": context,
+    121 +                    "cell": cell,
+    122 +                    "target": target,
+    123 +                }
+    124 +                if target and target in z.namelist():
+    125 +                    record["activex"] = parse_activex(z, target)
+    126 +                    linked.add(target)
+    127 +                out["controls"].append(record)
+    128 +        all_ax = [n for n in z.namelist() if re.fullmatch(r"word/activeX/activeX\d+\.xml", n)]
+    129 +        out["unlinked_activex"] = [parse_activex(z, n) for n in all_ax if n not in linked]
+    130 +    return out
+    131 +
+    132 +
+    133 +def main():
+    134 +    docs = Path(sys.argv[1])
+    135 +    out_dir = Path(sys.argv[2])
+    136 +    out_dir.mkdir(parents=True, exist_ok=True)
+    137 +    summary = []
+    138 +    for path in sorted(docs.glob("*.docx"), key=lambda p: p.name.lower()):
+    139 +        data = extract(path)
+    140 +        name = re.sub(r"[^0-9A-Za-zА-Яа-яЁё._-]+", "_", path.stem) + ".json"
+    141 +        (out_dir / name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    142 +        values = []
+    143 +        for c in data["controls"]:
+    144 +            props = c.get("activex", {}).get("properties", [])
+    145 +            values.append({p.get("name"): p.get("value") for p in props})
+    146 +        summary.append({"file": path.name, "linked_controls": len(data["controls"]), "unlinked": len(data["unli
+         nked_activex"]), "value_samples": values[:5]})
+    147 +    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    148 +
+    149 +
+    150 +if __name__ == "__main__":
+    151 +    main()
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\extract_activex.py .\documents .\tmp\analysis\activex
+  └ [
+      {
+    … +81 lines (ctrl + t to view transcript)
+      }
+    ]
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import
+  │ importlib.util; print('olefile',bool(importlib.util.find_spec('olefile')));
+  │ print('oletools',bool(importlib.util.find_spec('oletools')));
+  │ … +1 lines
+  └ olefile False
+    oletools False
+    msoffcrypto False
+
+• Ran $f=Get-ChildItem -LiteralPath .\tmp\analysis\activex -Filter '*.json' | Where-Object Name -Like '*Блок_1*' |
+  │ Select-Object -First 1; $j=Get-Content -LiteralPath $f.FullName -Encoding UTF8 -Raw | ConvertFrom-Json -Depth 100;
+  │ $j.controls[0..2] | ConvertTo-Json -Depth 20
+  └ ConvertFrom-Json : Не удается найти параметр, соответствующий имени параметра "Depth".
+    строка:2 знак:213
+    … +10 lines (ctrl + t to view transcript)
+        + FullyQualifiedErrorId : NullArray
+
+
+• Ran $f=Get-ChildItem -LiteralPath .\tmp\analysis\activex -Filter '*.json' | Where-Object Name -Like '*Блок_1*' |
+  │ Select-Object -First 1; $j=Get-Content -LiteralPath $f.FullName -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ $j.controls[0..2] | ConvertTo-Json -Depth 20
+  └ [
+        {
+    … +81 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Added tmp\analysis\extract_rendered_pdfs.py (+32 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import json
+     4 +from pathlib import Path
+     5 +
+     6 +from pypdf import PdfReader
+     7 +
+     8 +
+     9 +ROOT = Path(__file__).resolve().parents[2]
+    10 +DOCS = sorted((ROOT / "documents").glob("*.docx"), key=lambda p: p.name.lower())
+    11 +RENDER = ROOT / "tmp" / "analysis" / "docx_render"
+    12 +OUT = ROOT / "tmp" / "analysis" / "rendered_text"
+    13 +OUT.mkdir(parents=True, exist_ok=True)
+    14 +
+    15 +summary = []
+    16 +for index, source in enumerate(DOCS, 1):
+    17 +    pdfs = list((RENDER / f"doc{index}").glob("*.pdf"))
+    18 +    if len(pdfs) != 1:
+    19 +        summary.append({"file": source.name, "error": f"expected 1 PDF, found {len(pdfs)}"})
+    20 +        continue
+    21 +    reader = PdfReader(str(pdfs[0]))
+    22 +    pages = []
+    23 +    for page_no, page in enumerate(reader.pages, 1):
+    24 +        text = page.extract_text() or ""
+    25 +        pages.append({"page": page_no, "chars": len(text), "text": text})
+    26 +    data = {"file": source.name, "rendered_pdf": pdfs[0].name, "pages": pages}
+    27 +    target = OUT / f"doc{index}.json"
+    28 +    target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    29 +    summary.append({"index": index, "file": source.name, "pages": len(pages), "chars": sum(p["chars"] for p in p
+        ages), "output": target.name})
+    30 +
+    31 +(OUT / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    32 +print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\extract_rendered_pdfs.py
+  └ [
+      {
+    … +68 lines (ctrl + t to view transcript)
+      }
+    ]
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc2.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages){ "`n===== PAGE $($p.page) ====="; $p.text }
+  └
+    ===== PAGE 1 =====
+    … +529 lines (ctrl + t to view transcript)
+    Используемый метод определения НМЦ: рыночный
+    Расчет НМЦ: Представлен отдельным файлом
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc2\page-2.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc2\page-3.png
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc3.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages | Where-Object {$_.page -le 10}){ "`n===== PAGE $($p.page) ====="; $p.text }
+  └
+    ===== PAGE 1 =====
+    … +556 lines (ctrl + t to view transcript)
+    23. 3.13.1 Требования относительно минимального срока действия заявки:
+    180 дней с даты окончания срока подачи заявок;
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-2.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-4.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-5.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-6.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-7.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-8.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-9.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-10.png
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc3.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages | Where-Object {$_.page -ge 11}){ "`n===== PAGE $($p.page) ====="; $p.text }
+  └
+    ===== PAGE 11 =====
+    … +616 lines (ctrl + t to view transcript)
+    - подписанный, заполненный проект договора (Блок 6 закупочной документации);
+    - письмо о подаче заявки (по Форме 9 Блока 4 закупочной документации)..
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-12.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-13.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-15.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-16.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-20.png
+
+• Added tmp\analysis\search_pages.py (+20 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import json
+     4 +import re
+     5 +import sys
+     6 +from pathlib import Path
+     7 +
+     8 +
+     9 +root = Path(sys.argv[1])
+    10 +patterns = [re.compile(arg, re.I | re.S) for arg in sys.argv[2:]]
+    11 +for file in sorted(root.glob("doc*.json"), key=lambda p: int(re.search(r"\d+", p.stem).group())):
+    12 +    data = json.loads(file.read_text(encoding="utf-8"))
+    13 +    for page in data["pages"]:
+    14 +        text = page["text"].replace("\r", "")
+    15 +        for pat in patterns:
+    16 +            for match in pat.finditer(text):
+    17 +                start = max(0, match.start() - 450)
+    18 +                end = min(len(text), match.end() + 900)
+    19 +                snippet = text[start:end]
+    20 +                print(f"\n===== {data['file']} | PAGE {page['page']} | {pat.pattern} =====\n{snippet}")
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\search_pages.py .\tmp\analysis\rendered_text 'срок(?:и|) поставк' 'поставк.{0,80}(?:дн|месяц|год|
+  │ дат)' 'график поставк' 'не позднее.{0,100}постав' 'срок исполнения договора'
+  └
+    ===== ����_2_��������������_�����.docx | PAGE 12 | ����(?:�|) ������� =====
+    … +22 lines (ctrl + t to view transcript)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    UnicodeEncodeError: 'charmap' codec can't encode character '\uf02d' in position 861: character maps to <undefined>
+
+• Edited tmp\analysis\search_pages.py (+1 -0)
+     8
+     9 +sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    10  root = Path(sys.argv[1])
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc8.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages){ "`n===== PAGE $($p.page) ====="; $p.text }
+  └
+    ===== PAGE 1 =====
+    … +222 lines (ctrl + t to view transcript)
+    Пункт № 0668 Плана закупки товаров, работ, услуг ООО «ССК «Звезда» на 2026 год.
+    Зав. Заказ № 056001
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\search_pages.py .\tmp\analysis\rendered_text 'срок поставк' 'казнач' 'спец(?:иальн|)\w*\s+сч'
+  │ 'банковск\w* сопровожд' 'государственн\w* контракт' 'государственн\w* заказ' 'оборонн\w* заказ' 'гарантийн\w*
+  │ … +1 lines
+  └
+    ===== Блок_1_Извещение.docx | PAGE 2 | оборонн\w* заказ =====
+    … +1021 lines (ctrl + t to view transcript)
+    № Требования Подтверждающие документы
+    10. [требов
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc7.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages | Where-Object {$_.page -ge 3 -and $_.page -le 7}){ "`n===== PAGE $($p.page) =====";
+  │ $p.text }
+  └
+    ===== PAGE 3 =====
+    … +246 lines (ctrl + t to view transcript)
+    получения  документов  Покупателем,  а  также  скан  копию  указанных  документов  по
+    электронной почте (адрес почты указан в Разделе 15 Договора).
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\search_pages.py .\tmp\analysis\rendered_text 'банковск\w*\s+сопровожд'
+  │ 'сопровождени\w*\s+(?:договора|контракта)'
+  └ (no output)
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-18.png
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .
+  │ \tmp\analysis\search_pages.py .\tmp\analysis\rendered_text 'обеспечени\w* гарантийн\w* обязательств' 'банковск\w*
+  │ гарант\w*.{0,250}гарантийн\w* обязательств' 'гарантийн\w* обязательств.{0,250}банковск\w* гарант' 'гарантийн\w*
+  │ … +1 lines
+  └
+    ===== Блок_2_Информационная_карта.docx | PAGE 17 | гарантийн\w* удержан =====
+    … +60 lines (ctrl + t to view transcript)
+    5 Бенефициарный владелец – владелец, совокупная доля прямого и (или) косвенного участия которого составляет не менее
+    25 процентов.
+
+• Ran $j=Get-Content -LiteralPath .\tmp\analysis\rendered_text\doc10.json -Encoding UTF8 -Raw | ConvertFrom-Json;
+  │ foreach($p in $j.pages | Where-Object {$_.page -le 15}){ "`n===== PAGE $($p.page) ====="; $p.text }
+  └
+    ===== PAGE 1 =====
+    … +756 lines (ctrl + t to view transcript)
+    Индекс  кредитоспособности
+    Альтмана ≥ 3,00 2,40 - 2,99 1,81 - 2,39 ≤ 1,80
+
+• Context compacted
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Я завершил инвентаризацию и техническое раскрытие всех 12 документов: оба PDF отрендерены постранично, а DOCX
+  проверены как через визуальный рендер, так и через OOXML, включая состояния элементов выбора. Сейчас свожу
+  квалификационные требования и полный состав заявки, после чего проверю, что в итоговом файле ровно 27 полей.
+
+• Ran Get-ChildItem -LiteralPath 'tmp\analysis' | Select-Object Name,Length | Format-Table -AutoSize; Get-Content
+  │ -LiteralPath 'tmp\analysis\search_pages.py' -TotalCount 240
+  └
+    Name                     Length
+    … +32 lines (ctrl + t to view transcript)
+                    snippet = text[start:end]
+                    print(f"\n===== {data['file']} | PAGE {page['page']} | {pat.pattern} =====\n{snippet}")
+
+• Edited tmp\analysis\search_pages.py (+9 -2)
+    10  root = Path(sys.argv[1])
+    11 -patterns = [re.compile(arg, re.I | re.S) for arg in sys.argv[2:]]
+    12 -for file in sorted(root.glob("doc*.json"), key=lambda p: int(re.search(r"\d+", p.stem).group())):
+    11 +raw_patterns = sys.argv[2:]
+    12 +doc_filter = None
+    13 +if raw_patterns and raw_patterns[0].startswith("--doc="):
+    14 +    doc_filter = int(raw_patterns.pop(0).split("=", 1)[1])
+    15 +patterns = [re.compile(arg, re.I | re.S) for arg in raw_patterns]
+    16 +files = sorted(root.glob("doc*.json"), key=lambda p: int(re.search(r"\d+", p.stem).group()))
+    17 +if doc_filter is not None:
+    18 +    files = [p for p in files if int(re.search(r"\d+", p.stem).group()) == doc_filter]
+    19 +for file in files:
+    20      data = json.loads(file.read_text(encoding="utf-8"))
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\search_pages.py' 'tmp\analysis\rendered_text' '--doc=10' 'лицензи' 'сертификат' 'выписк' 'справк'
+  │ 'опыт' 'аналогич' 'ЕГРЮЛ|ЕГРИП|реестр'
+  └
+    ===== Блок_9_Требования.docx | PAGE 2 | справк =====
+    … +1954 lines (ctrl + t to view transcript)
+    информацию о владельце блокирующего пакета акций.
+    70 Форма не заполняется Индивидуальными предпринимателями
+
+• Ran Get-ChildItem -LiteralPath 'tmp\analysis\pdf_pages' -Recurse | Select-Object FullName,Length | Format-Table
+  │ -AutoSize
+  └
+    FullName                                                                 Length
+    … +12 lines (ctrl + t to view transcript)
+
+
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-5.png
+
+• Ran Select-String -LiteralPath 'FIELD_CATALOG.md' -Pattern '^## 22\.|^## 23\.|field_key: licenses_certificates|
+  │ field_key: required_official_certificates' -Context 0,45 | ForEach-Object { $_.Context.PreContext; $_.Line;
+  │ $_.Context.PostContext }
+  └ ## 22. `licenses_certificates`
+
+    … +88 lines (ctrl + t to view transcript)
+    автоматически выписки ЕГРЮЛ/ЕГРИП, реестр МСП, документы о регистрации/постановке
+    на учёт и иные обязательные официальные подтверждения, даже если часть материала
+
+• Ran $lines=Get-Content -LiteralPath 'FIELD_CATALOG.md'; $start=($lines | Select-String -Pattern '^## 23\.' |
+  │ Select-Object -First 1).LineNumber; $lines[($start-1)..([Math]::Min($lines.Count-1,$start+100))]
+  └ ## 23. `required_official_certificates`
+
+    … +100 lines (ctrl + t to view transcript)
+    РјР°СЂРєРёСЂРѕРІРєРё.
+
+
+• Added tmp\analysis\dump_pages.py (+15 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import json
+     4 +import sys
+     5 +from pathlib import Path
+     6 +
+     7 +
+     8 +sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+     9 +path = Path(sys.argv[1])
+    10 +start = int(sys.argv[2])
+    11 +end = int(sys.argv[3])
+    12 +data = json.loads(path.read_text(encoding="utf-8"))
+    13 +for page in data["pages"]:
+    14 +    if start <= page["page"] <= end:
+    15 +        print(f"\n===== {data['file']} | PAGE {page['page']} =====\n{page['text']}")
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc10.json' 1 10
+  └
+    ===== Блок_9_Требования.docx | PAGE 1 =====
+    … +572 lines (ctrl + t to view transcript)
+    13 Неприменимо в случае отсутствия у Индивидуального предпринимателя печати (средства индивидуализации).
+    14 Неприменимо в случае отсутствия у Индивидуального предпринимателя печати (средства индивидуализации).
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc10.json' 43 50
+  └
+    ===== Блок_9_Требования.docx | PAGE 43 =====
+    … +339 lines (ctrl + t to view transcript)
+    на иностранное юридическое лицо (головную компанию), создавшее филиал/открывшее представительство, и документы от
+    филиала / представительства.
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\search_pages.py' 'tmp\analysis\rendered_text' '--doc=4' 'част[ьи]\s+заявк' 'техническ\w*\s+част'
+  │ 'коммерческ\w*\s+част' 'квалификац\w*\s+част' 'должн\w*\s+содерж' 'в состав\w* заявк'
+  └
+    ===== Блок_3_Инструкция.docx | PAGE 2 | част[ьи]\s+заявк =====
+    … +1854 lines (ctrl + t to view transcript)
+    отчетность за предшествующий отчетный год, которая также будет использована при проведении
+    проверки.  Итоговые  результаты  проверки  определяются  путем  выбора
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc4.json' 4 8
+  └
+    ===== Блок_3_Инструкция.docx | PAGE 4 =====
+    … +259 lines (ctrl + t to view transcript)
+    или
+    ‒ Форма  подтверждения  отсутствия  принадлежности  Поставщика  /  Участника
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc4.json' 9 12
+  └
+    ===== Блок_3_Инструкция.docx | PAGE 9 =====
+    … +204 lines (ctrl + t to view transcript)
+    4) представленные  файлы  не  должны  иметь  защиты  от  открытия,  копирования
+    содержимого или печати; при этом информация должна быть защищена от изменения;
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\search_pages.py' 'tmp\analysis\rendered_text' 'сертификат\w*'
+  └
+    ===== Блок_1_Извещение.docx | PAGE 8 | сертификат\w* =====
+    … +777 lines (ctrl + t to view transcript)
+    в [ООО «ССК «Звезда»]
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\search_pages.py' 'tmp\analysis\rendered_text' 'обеспечени\w*\s+гарантийн\w*\s+обязательств'
+  │ 'гарантийн\w*\s+обязательств\w*\s+обеспеч' 'банковск\w*\s+сопровожд' 'плат\w*\s+за\s+участ' 'стоимост\w*\s+участ'
+  └ (no output)
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc3.json' 12 14
+  └
+    ===== Блок_2_Информационная_карта.docx | PAGE 12 =====
+    … +207 lines (ctrl + t to view transcript)
+    ед.измерения;
+    на шаг аукциона в диапазоне от ______ до ______ ед. измерения;
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc3.json' 16 20
+  └
+    ===== Блок_2_Информационная_карта.docx | PAGE 16 =====
+    … +284 lines (ctrl + t to view transcript)
+    - подписанный, заполненный проект договора (Блок 6 закупочной документации);
+    - письмо о подаче заявки (по Форме 9 Блока 4 закупочной документации)..
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc9.json' 1 4
+  └
+    ===== Блок_8_Аудит.docx | PAGE 1 =====
+    … +134 lines (ctrl + t to view transcript)
+    Согласовано:
+    ________________ ФИО руководителя службы [наименование ОГК]
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc2.json' 2 4; & 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ … +1 lines
+  └
+    ===== Блок_1_Извещение.docx | PAGE 2 =====
+    … +361 lines (ctrl + t to view transcript)
+    Используемый метод определения НМЦ: рыночный
+    Расчет НМЦ: Представлен отдельным файлом
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc8.json' 2 4; & 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ … +1 lines
+  └
+    ===== Блок_7_Техническое_задание.docx | PAGE 2 =====
+    … +456 lines (ctrl + t to view transcript)
+    получения  документов  Покупателем,  а  также  скан  копию  указанных  документов  по
+    электронной почте (адрес почты указан в Разделе 15 Договора).
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc7.json' 4 5
+  └
+    ===== Блок_6_Проект_договора.docx | PAGE 4 =====
+    … +109 lines (ctrl + t to view transcript)
+    3.6. Расчеты по Договору подлежат казначейскому сопровождению в соответствии со статьей
+    5 Федерального закона от 28.11.2025 № 426-ФЗ «О федеральном бюджете на 2026 год и на
+
+• Ran Get-ChildItem -LiteralPath 'tmp\analysis\docx_render\doc3' | Select-Object Name,Length | Format-Table -AutoSize
+  └
+    Name                            Length
+    … +22 lines (ctrl + t to view transcript)
+
+
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-7.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-13.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-16.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-18.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-20.png
+
+• Viewed Image
+  └ tmp\analysis\docx_render\doc3\page-2.png
+
+• Viewed Image
+  └ tmp\analysis\pdf_pages\itt\page-4.png
+
+• Ran Select-String -LiteralPath 'FIELD_CATALOG.md' -Pattern '^## 25\.|^## 26\.' -Context 0,65 | ForEach-Object
+  │ { $_.Line; $_.Context.PostContext }
+  └ ## 25. `analog_allowed`
+
+    … +128 lines (ctrl + t to view transcript)
+    Extractor: ✅
+    Round 1: ✅
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\dump_pages.py' 'tmp\analysis\rendered_text\doc2.json' 6 6
+  └
+    ===== Блок_1_Извещение.docx | PAGE 6 =====
+    … +68 lines (ctrl + t to view transcript)
+    Решение о внесении изменений в Извещение и/или Документацию о закупке может быть принято
+    Заказчиком (Организатором закупки) в любой момент до окончания срока подачи заявок. Заказчик
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Обнаружены две важные коллизии, которые я не буду сглаживать: в карте выбран вариант «национальный режим не
+  применимо», но одновременно отмечено требование подтвердить российское происхождение; кроме того, общий перечень
+  заявки требует формы по опыту/ресурсам, тогда как специальный Блок 9 прямо говорит, что такие требования не
+  установлены. Эти расхождения будут отмечены как требующие проверки, а не превращены в молчаливый выбор.
+
+• Added codex-result.md (+278 -0)
+      1 +# Независимый анализ закупки
+      2 +
+      3 +Анализ выполнен только по `FIELD_CATALOG.md` и 12 исходным файлам из папки `documents`; интернет, иные каталоги
+         , существующие отчёты и результаты других моделей не использовались. Исходные документы не изменялись.
+      4 +
+      5 +Проверены полностью: `0_Общая_часть_зо.docx`, блоки 1–9 в формате DOCX, `Приложение_к_Блоку_7._ИТТ.pdf` и `РАСЧ
+         ЕТ_НМЦ.pdf`. Все DOCX были раскрыты как OOXML (основной текст, таблицы, колонтитулы, вложенные части, элементы
+         управления и ActiveX-переключатели) и отрендерены постранично. Оба PDF отрендерены в изображения; все 9 PDF-стр
+         аниц проверены визуально. `Приложение_к_Блоку_7._ИТТ.pdf` является сканом без текстового слоя, поэтому его цита
+         ты сняты с изображений страниц.
+      6 +
+      7 +Статусы: `resolved` — значение подтверждено; `requires_review` — есть содержательная коллизия; `not_found` — по
+         дтверждающее условие не найдено после проверки всего комплекта.
+      8 +
+      9 +## 1. procurement_subject
+     10 +
+     11 +- **field_key:** `procurement_subject`
+     12 +- **status:** `resolved`
+     13 +- **value:** Поставка стандартных закрытий палуб для ледокола-лидера пр. 10510, заводской № 056001; один компле
+         кт (10 крышек шести позиций и ЗИП согласно спецификации).
+     14 +- **source:** `Блок_1_Извещение.docx`; `Блок_7_Техническое_задание.docx`.
+     15 +- **location:** Блок 1, стр. 2, п. 2; Блок 7, стр. 2, раздел 1 «Спецификация».
+     16 +- **quote:** «Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.»; «Стандартные зак
+         рытия палуб в составе: Компл. 1».
+     17 +- **rationale:** Извещение определяет предмет, а техническое задание подтверждает состав и количество.
+     18 +
+     19 +## 2. nm_price_with_vat
+     20 +
+     21 +- **field_key:** `nm_price_with_vat`
+     22 +- **status:** `resolved`
+     23 +- **value:** НМЦ без НДС — 2 607 605,00 руб.; НДС 22% — 573 673,10 руб.; всего с НДС — 3 181 278,10 руб.
+     24 +- **source:** `Блок_1_Извещение.docx`; `РАСЧЕТ_НМЦ.pdf`.
+     25 +- **location:** Блок 1, стр. 8, «Сведения о лоте/лотах»; расчёт НМЦ, стр. 1.
+     26 +- **quote:** «2 607 605 ... рублей 00 копеек, кроме того НДС 22% – 573 673 ... рубля 10 копеек, всего 3 181 278
+          ... рублей 10 копеек».
+     27 +- **rationale:** Одинаковые сумма, ставка и итог приведены в извещении и отдельном расчёте НМЦ; конфликта нет.
+     28 +
+     29 +## 3. platform
+     30 +
+     31 +- **field_key:** `platform`
+     32 +- **status:** `resolved`
+     33 +- **value:** ЭТП «ГПБ», `https://etpgpb.ru/`.
+     34 +- **source:** `Блок_1_Извещение.docx`.
+     35 +- **location:** стр. 2, пп. 3–4; визуально подтверждено состояние переключателей в OOXML/ActiveX.
+     36 +- **quote:** «ЭТП „ГПБ“»; «https://etpgpb.ru/».
+     37 +- **rationale:** В форме выбраны именно площадка ГПБ и соответствующий адрес; остальные варианты не отмечены.
+     38 +
+     39 +## 4. procedure_type
+     40 +
+     41 +- **field_key:** `procedure_type`
+     42 +- **status:** `resolved`
+     43 +- **value:** Запрос оферт; одноэтапная процедура; электронная и закрытая форма; право подачи заявки — неогранич
+         енный круг лиц.
+     44 +- **source:** `Блок_1_Извещение.docx`.
+     45 +- **location:** стр. 2, п. 1 и нижняя часть таблицы; визуально подтверждены состояния переключателей.
+     46 +- **quote:** «Запрос оферт»; «Одноэтапная процедура»; «Электронная форма»; «В закрытой форме»; «Неограниченный
+         круг лиц».
+     47 +- **rationale:** Значение получено из отмеченных элементов формы, а не из простого присутствия всех шаблонных в
+         ариантов в тексте.
+     48 +
+     49 +## 5. application_deadline
+     50 +
+     51 +- **field_key:** `application_deadline`
+     52 +- **status:** `resolved`
+     53 +- **value:** 14 августа 2026 г., 17:00, часовой пояс Организатора; единый срок для квалификационной, техническо
+         й и коммерческой частей.
+     54 +- **source:** `Блок_1_Извещение.docx`.
+     55 +- **location:** стр. 3, п. 20.
+     56 +- **quote:** «„14“ августа 2026г. „17 ч: 00 м“ (часовой пояс Организатора закупки)».
+     57 +- **rationale:** В форме отмечены все три части заявки. Пересчёт в иной часовой пояс без прямого указания докум
+         ента не выполнялся.
+     58 +
+     59 +## 6. application_review_date
+     60 +
+     61 +- **field_key:** `application_review_date`
+     62 +- **status:** `resolved`
+     63 +- **value:** 16 сентября 2026 г. до 17:00, часовой пояс Организатора; для всех трёх частей заявки.
+     64 +- **source:** `Блок_1_Извещение.docx`.
+     65 +- **location:** стр. 3–4, п. 22.
+     66 +- **quote:** «„16“ сентября 2026г. до „17 ч: 00 м“ (часовой пояс Организатора закупки)».
+     67 +- **rationale:** Дата относится к рассмотрению квалификационной, технической и коммерческой частей, отмеченных
+         в форме.
+     68 +
+     69 +## 7. results_date
+     70 +
+     71 +- **field_key:** `results_date`
+     72 +- **status:** `resolved`
+     73 +- **value:** 23 сентября 2026 г. до 17:00, часовой пояс Организатора.
+     74 +- **source:** `Блок_1_Извещение.docx`.
+     75 +- **location:** стр. 4, п. 24.
+     76 +- **quote:** «„23“ сентября 2026 г. до „17 ч : 00 м“ (часовой пояс Организатора закупки)».
+     77 +- **rationale:** Это прямо обозначенная дата подведения итогов, а не дата аукциона (аукцион неприменим).
+     78 +
+     79 +## 8. customer
+     80 +
+     81 +- **field_key:** `customer`
+     82 +- **status:** `resolved`
+     83 +- **value:** Общество с ограниченной ответственностью «Судостроительный комплекс „Звезда“» (ООО «ССК „Звезда“»)
+         .
+     84 +- **source:** `Блок_1_Извещение.docx`; `Блок_6_Проект_договора.docx`.
+     85 +- **location:** Блок 1, стр. 2–3, пп. 6 и 12; Блок 6, стр. 4, преамбула.
+     86 +- **quote:** «Заказчик является Организатором закупки (сведения приведены в пп. 6-10 Извещения)»; «Общество с о
+         граниченной ответственностью „Судостроительный комплекс „Звезда“ ... именуемое в дальнейшем „Покупатель“».
+     87 +- **rationale:** Извещение прямо приравнивает Заказчика к Организатору, а проект договора подтверждает это юрид
+         ическое лицо как сторону-покупателя.
+     88 +
+     89 +## 9. customer_contacts
+     90 +
+     91 +- **field_key:** `customer_contacts`
+     92 +- **status:** `resolved`
+     93 +- **value:** Контакт по закупке — Фунтова Виктория Николаевна, `Funtova_VN@dcss.ru`, +7 (812) 679-73-71 (доб. 2
+         303). Общие контакты Заказчика: 8 (42335) 4-00-00, `sskzvezda@sskzvezda.ru`; адрес: 692806, Приморский край, г.
+         о. Большой Камень, г. Большой Камень, ул. Аллея Труда, зд. 19В.
+     94 +- **source:** `Блок_1_Извещение.docx`.
+     95 +- **location:** стр. 2–3, пп. 7–10 и 13–15.
+     96 +- **quote:** «Фунтова Виктория Николаевна»; «Funtova_VN@dcss.ru»; «+7 (812) 679 73 71 (доб. 2303)».
+     97 +- **rationale:** Сохранены и персональный контакт процедуры, и общие реквизиты Заказчика.
+     98 +
+     99 +## 10. participation_cost
+    100 +
+    101 +- **field_key:** `participation_cost`
+    102 +- **status:** `not_found`
+    103 +- **value:** Стоимость участия в процедуре не установлена в исследованных документах.
+    104 +- **source:** Все 12 файлов из `documents`; ближайшее, но нерелевантное условие — `Блок_1_Извещение.docx`.
+    105 +- **location:** Полная проверка документов; Блок 1, стр. 6, п. 44.
+    106 +- **quote:** «Размер, порядок и сроки внесения платы за предоставление документации о закупке — Плата не предус
+         мотрена».
+    107 +- **rationale:** Цитата относится только к предоставлению документации и по каталогу не доказывает бесплатное у
+         частие или отсутствие тарифа ЭТП. Иного прямого условия о стоимости участия нет.
+    108 +
+    109 +## 11. participation_guarantee
+    110 +
+    111 +- **field_key:** `participation_guarantee`
+    112 +- **status:** `resolved`
+    113 +- **value:** Обеспечение заявки не предусмотрено.
+    114 +- **source:** `Блок_2_Информационная_карта.docx`.
+    115 +- **location:** стр. 7, п. 14; состояние радиокнопки проверено визуально и по структуре элемента управления.
+    116 +- **quote:** «Требования к обеспечению заявки: Не предусмотрены».
+    117 +- **rationale:** Отмечен отрицательный вариант; поля размера и формы обеспечения не выбраны.
+    118 +
+    119 +## 12. evaluation_criteria
+    120 +
+    121 +- **field_key:** `evaluation_criteria`
+    122 +- **status:** `resolved`
+    123 +- **value:** Многокритериальная оценка: цена договора — 99% (коэффициент 0,99; максимум 100 баллов), статус уча
+         стника «производитель/не производитель» — 1% (коэффициент 0,01; максимум 100 баллов). По цене: `БЦi = Цmin / Цi
+          × 100`; производитель — 100 баллов, не производитель — 0 баллов. Итог: `Ri = БЦi × Vц + БСтi × VСт`.
+    124 +- **source:** `Блок_2_Информационная_карта.docx`.
+    125 +- **location:** стр. 13–14, п. 31; выбранный переключатель «Многокритериальная оценка» проверен визуально.
+    126 +- **quote:** «Цена договора, Ц — 99% — 0,99»; «Статус участника, Ст — 1% — 0,01»; «Участник процедуры закупки я
+         вляется производителем — 100 баллов».
+    127 +- **rationale:** Перечень п. 30 содержит возможные параметры, но отмечены только цена и статус; формулы и шкала
+          приведены в выбранном варианте п. 31.
+    128 +
+    129 +## 13. delivery_term
+    130 +
+    131 +- **field_key:** `delivery_term`
+    132 +- **status:** `resolved`
+    133 +- **value:** В течение 10 месяцев с даты подписания договора; доставка непосредственно до склада Покупателя по
+         адресу: 692806, Приморский край, г.о. Большой Камень, г. Большой Камень, ул. Аллея Труда, зд. 19В, ООО «ССК „Зв
+         езда“».
+    134 +- **source:** `Блок_7_Техническое_задание.docx`.
+    135 +- **location:** стр. 3, строки 2–4 таблицы требований.
+    136 +- **quote:** «Срок поставки Товара: В течение 10 месяцев с даты подписания Договора»; «Поставщик поставляет Тов
+         ар непосредственно до склада Покупателя».
+    137 +- **rationale:** Техническое задание даёт прямой срок и место; проект договора отсылает к спецификации и не соз
+         даёт другого срока.
+    138 +
+    139 +## 14. payment_terms
+    140 +
+    141 +- **field_key:** `payment_terms`
+    142 +- **status:** `resolved`
+    143 +- **value:** Аванс 30% цены договора — не ранее 45 и не позднее 60 дней после подписания договора, выставления
+         счёта и приёмки оригинала банковской гарантии возврата аванса (срок считается по более позднему событию). Оконч
+         ательные 70% — через 45–60 дней после подписания ТОРГ-12/УПД, при наличии счёта и счёта-фактуры; для субъектов
+         МСП — не позднее 7 рабочих дней. Если документы на аванс не представлены до начала поставки, аванс не выплачива
+         ется, а 100% оплачиваются на условиях окончательного платежа.
+    144 +- **source:** `Блок_6_Проект_договора.docx`.
+    145 +- **location:** стр. 5, раздел 3, пп. 3.1–3.2.
+    146 +- **quote:** «авансовый платеж в размере 30 % от общей цены Договора ... не ранее чем через 45-ть дней, но не п
+         озднее чем через 60-т дней»; «Окончательный платеж в размере 70% ... (для субъектов малого и среднего предприни
+         мательства – не позднее 7-ми рабочих дней)».
+    147 +- **rationale:** Проект договора полностью раскрывает размер, условия и альтернативу при невыплате аванса; выбр
+         анный вариант Блока 2 отсылает именно к разделу 3 проекта договора.
+    148 +
+    149 +## 15. special_account_or_treasury
+    150 +
+    151 +- **field_key:** `special_account_or_treasury`
+    152 +- **status:** `resolved`
+    153 +- **value:** Да — требуется лицевой счёт неучастника бюджетного процесса в территориальном органе Федерального
+         казначейства; расчёты подлежат казначейскому сопровождению.
+    154 +- **source:** `Блок_6_Проект_договора.docx`.
+    155 +- **location:** стр. 5–6, пп. 3.3 и 3.6.
+    156 +- **quote:** «Поставщик обязуется до момента проведения расчетов открыть в территориальном органе Федерального
+         казначейства лицевой счет неучастника бюджетного процесса»; «Расчеты по Договору подлежат казначейскому сопрово
+         ждению».
+    157 +- **rationale:** Прямо установлены и вид счёта, и режим сопровождения.
+    158 +
+    159 +## 16. bank_support
+    160 +
+    161 +- **field_key:** `bank_support`
+    162 +- **status:** `not_found`
+    163 +- **value:** Банковское сопровождение договора не установлено.
+    164 +- **source:** Все 12 файлов из `documents`; сопоставлен `Блок_6_Проект_договора.docx`.
+    165 +- **location:** Полнотекстовая и структурная проверка; Блок 6, стр. 5–6, пп. 3.3–3.6.
+    166 +- **quote:** Подтверждающей цитаты о банковском сопровождении нет; найдено только: «Расчеты по Договору подлежа
+         т казначейскому сопровождению».
+    167 +- **rationale:** Казначейское сопровождение и банковская гарантия аванса не являются банковским сопровождением
+         договора. Прямого условия о последнем нет.
+    168 +
+    169 +## 17. government_contract
+    170 +
+    171 +- **field_key:** `government_contract`
+    172 +- **status:** `resolved`
+    173 +- **value:** Закупаемый договор заключается во исполнение государственного контракта № 213/3133-Д от 23.04.2020
+          между ООО «ССК „Звезда“» и ФГУП «Атомфлот»; ИГК 17706413348200000550. Сам закупаемый договор не назван государ
+         ственным контрактом.
+    174 +- **source:** `Блок_6_Проект_договора.docx`.
+    175 +- **location:** стр. 4, п. 1.5.
+    176 +- **quote:** «Договор заключен во исполнение условий Государственного контракта № 213/3133-Д от 23.04.2020 ...
+         заключенного между ООО „ССК „Звезда“ и ФГУП „Атомфлот“»; «Идентификатор Государственного контракта (ИГК): 17706
+         413348200000550».
+    177 +- **rationale:** Документ прямо устанавливает связь с государственным контрактом и позволяет точно классифициро
+         вать закупаемый договор как договор во его исполнение.
+    178 +
+    179 +## 18. rebidding
+    180 +
+    181 +- **field_key:** `rebidding`
+    182 +- **status:** `resolved`
+    183 +- **value:** Переторжка предусмотрена по результатам отбора. После неё требуется загрузить скорректированные по
+          новой цене коммерческое предложение (форма 10а), подписанный заполненный проект договора и письмо о подаче зая
+         вки (форма 9).
+    184 +- **source:** `Блок_2_Информационная_карта.docx`.
+    185 +- **location:** стр. 20, п. 42; выбранный переключатель проверен визуально.
+    186 +- **quote:** «Предусмотрены: Возможность проведения переторжки (по результатам отбора)».
+    187 +- **rationale:** Отмечен положительный вариант, и непосредственно под ним приведён обязательный комплект обновл
+         яемых документов.
+    188 +
+    189 +## 19. national_regime
+    190 +
+    191 +- **field_key:** `national_regime`
+    192 +- **status:** `requires_review`
+    193 +- **value:** Предварительное значение по явному переключателю — `не применяется`; однако комплект содержит прот
+         иворечащие этому признаки применения требований о российском происхождении.
+    194 +- **source:** `Блок_2_Информационная_карта.docx`; `Блок_3_Инструкция.docx`.
+    195 +- **location:** Блок 2, стр. 2, п. 1.1; стр. 10, п. 20; стр. 14, п. 31; Блок 3, стр. 9–10, п. 3.10.
+    196 +- **quote:** [выбрано] «Не применимо»; одновременно [выбрано] «Подтверждение российского происхождения товаров,
+          выполнения работ/оказания услуг российскими лицами», а в критериях указано «Применение национального режима ..
+         . № 223-ФЗ ... № 1875».
+    197 +- **rationale:** Явный классифицирующий элемент говорит «не применимо», но отмеченный документ о российском про
+         исхождении и текст оценки указывают в другую сторону. Без разъяснения Организатора нельзя надёжно выбрать между
+          `не применяется` и конкретной мерой (`запрет`/`ограничение`/`преимущество`).
+    198 +
+    199 +## 20. advance_contract_guarantee
+    200 +
+    201 +- **field_key:** `advance_contract_guarantee`
+    202 +- **status:** `resolved`
+    203 +- **value:** Обеспечение исполнения договора в целом — не применяется. Отдельно обеспечение возврата аванса — о
+         бязательно в форме банковской гарантии; банк должен иметь лицензию ЦБ РФ и соответствовать Приложению № 8 проек
+         та договора.
+    204 +- **source:** `Блок_2_Информационная_карта.docx`; `Блок_6_Проект_договора.docx`.
+    205 +- **location:** Блок 2, стр. 16 и 18, пп. 37–38; Блок 6, стр. 5, п. 3.1.
+    206 +- **quote:** [выбрано] «Требования к обеспечению Договора: ... Не применимо»; [выбрано] «Предоставление банковс
+         кой гарантии возврата авансового платежа»; «приемки Покупателем оригинала Банковской гарантии возврата авансово
+         го платежа».
+    207 +- **rationale:** Каталог требует раздельно показать два компонента, поэтому отсутствие общего обеспечения не от
+         меняет специальную гарантию аванса. Редакционная нестыковка: Блок 9 допускает крайне неустойчивое финансовое со
+         стояние «при условии предоставления обеспечения» со ссылкой на пп. 37–39, но в п. 37 выбран вариант «не примени
+         мо» и размер такого обеспечения не задан; применимого требования из этого шаблонного условия вывести нельзя.
+    208 +
+    209 +## 21. warranty_obligations_guarantee
+    210 +
+    211 +- **field_key:** `warranty_obligations_guarantee`
+    212 +- **status:** `not_found`
+    213 +- **value:** Отдельное обеспечение гарантийных обязательств не установлено.
+    214 +- **source:** Все 12 файлов из `documents`; ближайшее, но нерелевантное условие — `Блок_7_Техническое_задание.d
+         ocx`.
+    215 +- **location:** Полнотекстовая и структурная проверка; Блок 7, стр. 4, п. 8.
+    216 +- **quote:** «Гарантийный срок (период) на товар составляет 24-ре месяца с даты подписания Акта приемки-передач
+         и Судна Государственным заказчиком».
+    217 +- **rationale:** Найден гарантийный срок, но не денежное удержание, гарантия или иная форма обеспечения именно
+         гарантийных обязательств. По каталогу эти понятия не смешиваются.
+    218 +
+    219 +## 22. licenses_certificates
+    220 +
+    221 +- **field_key:** `licenses_certificates`
+    222 +- **status:** `resolved`
+    223 +- **value:** Лицензии участника для допуска не требуются. Для товара при исполнении обязательны: свидетельства
+         и сертификаты по правилам РС; все сертификаты/свидетельства в объёме РМРС либо надзорных организаций; паспорт и
+         /или сертификат соответствия, действующий в РФ. В графике документации отдельно назван сертификат РМРС (и свиде
+         тельство о типовом одобрении РС) с передачей одновременно с товаром. Фактические сертификаты не включены в заяв
+         ку: в заявке соответствие подтверждается подписанным проектом договора.
+    224 +- **source:** `Блок_9_Требования.docx`; `Блок_6_Проект_договора.docx`; `Блок_7_Техническое_задание.docx`.
+    225 +- **location:** Блок 9, стр. 8, п. 1.2.1; Блок 6, стр. 8, п. 5.7.2, и стр. 111–112, приложение 11; Блок 7, стр.
+          3, п. 5.
+    226 +- **quote:** «Требования к наличию разрешений (лицензий...) — 1.2.1 Не установлено, не требуется»; «все сертифи
+         каты и свидетельства на Товар в объеме и виде, требуемом Классификационным обществом (РМРС)»; «Товар должен име
+         ть паспорт и/или сертификат соответствия на русском языке, действующий на территории Российской Федерации».
+    227 +- **rationale:** Разграничены квалификационные лицензии участника и сертификаты товара на стадии исполнения; до
+         кументы, названные лишь «свидетельством» или «разрешением», сами по себе не переименованы в лицензии/сертификат
+         ы.
+    228 +
+    229 +## 23. required_official_certificates
+    230 +
+    231 +- **field_key:** `required_official_certificates`
+    232 +- **status:** `resolved`
+    233 +- **value:** Для российского юридического лица обязательны как минимум: лист записи ЕГРЮЛ о создании/свидетельс
+         тво о госрегистрации; свидетельство о постановке на налоговый учёт; свежая выписка ЕГРЮЛ (не старше месяца); КН
+         Д-1151111 за последние два календарных года с отметкой ФНС; справка ФНС об исполнении обязанности по налогам ли
+         бо о состоянии расчётов (не старше месяца); бухгалтерская отчётность за два года с отметкой/подтверждением приё
+         ма ФНС. Для статуса МСП — выписка из реестра МСП не старше месяца либо предусмотренная документацией декларация
+         /форма отсутствия статуса. Для АО в цепочке собственников — реестр акционеров от реестродержателя не старше мес
+         яца. Для ИП вместо ЕГРЮЛ предусмотрены документ о госрегистрации, свидетельство о налоговом учёте и свежая выпи
+         ска ЕГРИП; для нерезидента — выписка из торгового реестра и сведения о налоговой регистрации (TIN/VIN или анало
+         г) с переводом.
+    234 +- **source:** `Блок_9_Требования.docx`.
+    235 +- **location:** стр. 44–50, пп. 3.1.2.2, 3.1.2.4, 3.1.3.1–3.1.3.2.
+    236 +- **quote:** «Копия выписки из Единого государственного реестра юридических лиц, полученная не позднее 1 (одног
+         о) месяца от даты подачи документов»; «Копия Справки об исполнении налогоплательщиком обязанности ... или ... С
+         правки о состоянии расчетов ... Дата выдачи справки не более 1 (одного) месяца»; «Копии Бухгалтерской отчетност
+         и за последние 2 (два) года (с отметкой налоговых органов о принятии)».
+    237 +- **rationale:** Перечень собран по всем материальным типам участника и включает не только налоговую справку, н
+         о и обязательные документы из реестров/официальных сервисов. Необязательная справка из п. 1.1.1 («вправе ... пр
+         едставить») отдельно не считалась обязательной; обязательность следует из раздела 3.1.3.
+    238 +
+    239 +## 24. similar_supply_experience
+    240 +
+    241 +- **field_key:** `similar_supply_experience`
+    242 +- **status:** `resolved`
+    243 +- **value:** Требование к опыту аналогичных поставок не установлено; опыт не является ни допусковым, ни оценочн
+         ым критерием этой закупки.
+    244 +- **source:** `Блок_9_Требования.docx`; сопоставлен `Блок_2_Информационная_карта.docx` и `Блок_3_Инструкция.doc
+         x`.
+    245 +- **location:** Блок 9, стр. 8, п. 1.3.1; Блок 2, стр. 12–14, пп. 30–31; Блок 3, стр. 9, п. 3.8.2(е).
+    246 +- **quote:** «1.3. ТРЕБОВАНИЯ К ОПЫТУ — 1.3.1 Не установлено, не требуется, не требуется».
+    247 +- **rationale:** Специальный Блок 9 прямо исключает опыт, а выбранные критерии оценки — только цена и статус пр
+         оизводителя. Общая инструкция при этом шаблонно перечисляет форму 3 «Сведения об опыте» среди документов заявки
+         ; это формальная коллизия состава заявки, отражённая в поле `application_documents`, но она не устанавливает по
+         рог, период, сумму или баллы за аналогичный опыт.
+    248 +
+    249 +## 25. analog_allowed
+    250 +
+    251 +- **field_key:** `analog_allowed`
+    252 +- **status:** `resolved`
+    253 +- **value:** Да, но только как прямо названная точечная замена: крышку «Епи» допускается заменить на «Еш» по ГО
+         СТ 25309-94. Общего разрешения на любые аналоги нет.
+    254 +- **source:** `Приложение_к_Блоку_7._ИТТ.pdf`.
+    255 +- **location:** стр. 4, примечание под таблицей 2.1.1.1; проверено визуально на изображении скана.
+    256 +- **quote:** «Примечание — допускается замена крышки „Епи“ на „Еш“ по ГОСТ 25309-94».
+    257 +- **rationale:** Это прямая положительная формулировка о допустимой замене. Выбранное в Блоке 2 условие «альтер
+         нативные предложения не предусмотрены» регулирует самостоятельные альтернативные заявки, а не указанную Заказчи
+         ком эквивалентную замену, поэтому прямого конфликта нет.
+    258 +
+    259 +## 26. analog_definition
+    260 +
+    261 +- **field_key:** `analog_definition`
+    262 +- **status:** `resolved`
+    263 +- **value:** Допустимым аналогом считается только крышка типа «Еш» взамен позиции «Епи», изготовленная по ГОСТ
+         25309-94; иных критериев эквивалентности или допустимых отклонений не установлено.
+    264 +- **source:** `Приложение_к_Блоку_7._ИТТ.pdf`; `Блок_7_Техническое_задание.docx`.
+    265 +- **location:** ИТТ, стр. 4, примечание к таблице 2.1.1.1; Блок 7, стр. 2, позиция 1.2 спецификации.
+    266 +- **quote:** «допускается замена крышки „Епи“ на „Еш“ по ГОСТ 25309-94»; исходная позиция — «Крышка I Eпи Ст 80
+         0х800х110/6-2,5 ГОСТ 25309-94».
+    267 +- **rationale:** Критерий определён самим разрешённым типом замены и обязательным ГОСТ. Прочие характеристики з
+         акупаемых крышек не объявлены универсальными критериями аналога и потому не добавлены.
+    268 +
+    269 +## 27. application_documents
+    270 +
+    271 +- **field_key:** `application_documents`
+    272 +- **status:** `requires_review`
+    273 +- **value:** Заявка состоит из трёх частей. **Квалификационная:** форма 1а/1б; форма 2 о цепочке собственников;
+          согласия по формам 6 и 7; документы о полномочиях подписанта; подтверждение статуса/отсутствия статуса МСП; де
+         кларации соответствия общим требованиям и письмо/реестр судебных разбирательств; документы Блока 9 для должной
+         осмотрительности и финансовой устойчивости (либо реквизиты действующей успешной квалификации, когда это допуска
+         ется), включая анкету-заявку, регистрационные, налоговые и финансовые документы, перечисленные в поле 23. **Тех
+         ническая:** техническое предложение по форме 8/8а с наименованием, типом, моделью и маркой; зарегистрированная
+         участником техническая спецификация с номером и датой, соответствующая ТЗ и ИТТ и указывающая завод-изготовител
+         ь. **Коммерческая:** письмо о подаче заявки (форма 9); коммерческое предложение (для этой закупки — форма 10а);
+          заполненный и подписанный проект договора со всеми приложениями; отмеченное в карте подтверждение российского
+         происхождения; документы только для оценки статуса производителя. Условно: для коллективного участника — соглаш
+    274 +- **source:** `Блок_3_Инструкция.docx`; `Блок_2_Информационная_карта.docx`; `Блок_7_Техническое_задание.docx`;
+         `Блок_9_Требования.docx`.
+    275 +- **location:** Блок 3, стр. 2–4 и 8–10, пп. 3.2, 3.8–3.10; Блок 2, стр. 8–10, пп. 18–20, и стр. 20, п. 42; Бло
+         к 7, стр. 2–4, пп. 1–8; Блок 9, стр. 44–50, п. 3.1.
+    276 +- **quote:** «Заявка должна содержать: а. квалификационную часть ... б. техническую часть ... в. коммерческую ч
+         асть»; «В состав технической части заявки обязательно должно входить техническое предложение, сформированное по
+          форме 8»; «Техническая спецификация должна иметь номер и дату»; «Участник закупки должен представить в составе
+          коммерческой части заявки ... письмо о подаче заявки по форме 9; ... коммерческое предложение по форме 10».
+    277 +- **rationale:** Включены только документы, подаваемые в заявке, и сохранены условия применимости; сертификаты
+         товара, передаваемые при поставке, не включены. Требуется разъяснение Организатора по двум коллизиям: (1) Блок
+         3, п. 3.8.2(е–з), формально включает формы 3–5 по опыту, материальным и кадровым ресурсам, тогда как специальны
+         й Блок 9, пп. 1.3–1.5, прямо говорит «Не установлено / не требуется»; (2) Блок 2 одновременно выбирает «национа
+         льный режим — не применимо» и подтверждение российского происхождения. До разъяснения безопасно подготовить фор
+         мы 3–5 либо получить подтверждение, что они не требуются, и уточнить вид документа о происхождении.
+    278 +
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Перехожу к финальной проверке результата: применяю навык верификации, чтобы подтвердить не по формулировке, а
+  фактически — наличие ровно 27 ключей, допустимые статусы, полноту обязательных атрибутов и отсутствие лишних полей.
+
+• Explored
+  └ Read SKILL.md (verification-before-completion skill)
+
+• Added tmp\analysis\validate_result.py (+49 -0)
+     1 +from __future__ import annotations
+     2 +
+     3 +import re
+     4 +import sys
+     5 +from pathlib import Path
+     6 +
+     7 +
+     8 +sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+     9 +root = Path(__file__).resolve().parents[2]
+    10 +catalog = (root / "FIELD_CATALOG.md").read_text(encoding="utf-8")
+    11 +result = (root / "codex-result.md").read_text(encoding="utf-8")
+    12 +
+    13 +expected = re.findall(r"^##\s+\d+\.\s+`([^`]+)`", catalog, re.M)
+    14 +headings = re.findall(r"^##\s+(\d+)\.\s+([^\n]+)$", result, re.M)
+    15 +keys = re.findall(r"^- \*\*field_key:\*\* `([^`]+)`$", result, re.M)
+    16 +statuses = re.findall(r"^- \*\*status:\*\* `([^`]+)`$", result, re.M)
+    17 +
+    18 +errors: list[str] = []
+    19 +if len(expected) != 27:
+    20 +    errors.append(f"catalog keys: expected 27, got {len(expected)}")
+    21 +if len(headings) != 27 or [int(n) for n, _ in headings] != list(range(1, 28)):
+    22 +    errors.append(f"result headings invalid: {len(headings)}")
+    23 +if keys != expected:
+    24 +    errors.append(f"key mismatch: expected={expected!r}; got={keys!r}")
+    25 +if len(statuses) != 27 or any(s not in {"resolved", "requires_review", "not_found"} for s in statuses):
+    26 +    errors.append(f"invalid statuses: {statuses!r}")
+    27 +
+    28 +sections = re.split(r"(?=^##\s+\d+\.)", result, flags=re.M)[1:]
+    29 +required_labels = ["field_key", "status", "value", "source", "location", "quote", "rationale"]
+    30 +for index, section in enumerate(sections, 1):
+    31 +    for label in required_labels:
+    32 +        if f"**{label}:**" not in section:
+    33 +            errors.append(f"section {index}: missing {label}")
+    34 +
+    35 +if errors:
+    36 +    print("FAIL")
+    37 +    for error in errors:
+    38 +        print(f"- {error}")
+    39 +    raise SystemExit(1)
+    40 +
+    41 +from collections import Counter
+    42 +
+    43 +counts = Counter(statuses)
+    44 +print("PASS")
+    45 +print(f"catalog_fields={len(expected)}")
+    46 +print(f"result_headings={len(headings)}")
+    47 +print(f"result_keys={len(keys)}")
+    48 +print(f"status_counts={dict(counts)}")
+    49 +print(f"required_labels_per_section={len(required_labels)}")
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+  │ 'tmp\analysis\validate_result.py'
+  └ PASS
+    catalog_fields=27
+    … +2 lines (ctrl + t to view transcript)
+    status_counts={'resolved': 22, 'not_found': 3, 'requires_review': 2}
+    required_labels_per_section=7
+
+• Ran git status --short; Get-Item -LiteralPath 'codex-result.md' | Select-Object FullName,Length,LastWriteTime;
+  │ Get-ChildItem -LiteralPath 'documents' -File | Measure-Object | Select-Object Count
+  └ ?? FIELD_CATALOG.md
+    ?? codex-result.md
+    … +7 lines (ctrl + t to view transcript)
+
+
+
+• Ran $docs = Get-ChildItem -LiteralPath 'documents' -File; Write-Output ('document_count=' + $docs.Count); $docs |
+  │ Sort-Object Name | Select-Object Name,Length; Write-Output ('result_lines=' + (Get-Content -LiteralPath
+  │ 'codex-result.md').Count)
+  └ document_count=12
+
+    … +15 lines (ctrl + t to view transcript)
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Полный независимый анализ сохранён в codex-result.md.
+
+  Проверено:
+
+  - 12 исходных документов;
+  - ровно 27 полей из FIELD_CATALOG.md;
+  - 22 поля — resolved;
+  - 3 — not_found;
+  - 2 — requires_review из-за документальных коллизий: national_regime и application_documents.
+
+  PDF-сканы проверены визуально, DOCX — также через OOXML и состояния элементов управления. Интернет и сторонние данные
+  не использовались, исходные документы не изменялись. Финальная автоматическая проверка структуры отчёта прошла
+  успешно.
+
+─ Worked for 44m 33s ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+› Ask Codex to do anything
+
+  gpt-5.6-sol high · F:\Vibe-projects\Tender-blind-test

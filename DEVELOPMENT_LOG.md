@@ -5776,3 +5776,33 @@ Repository synchronization added a guarded read-only production export script an
 - post-promotion runtime of production version `a6fbb0f6-…` is intentionally not verified yet.
 
 No production execution, DB query/write, workflow write, credential change or infrastructure mutation was performed by Codex during this synchronization.
+
+---
+
+## 2026-09-07 — Dmitry confirmed the 27-field business semantics
+
+Dmitry returned answers for the general absence rule and all 27 report fields.
+The client DOCX was reviewed read-only and was not copied into the repository.
+Normalized decisions are now recorded in `FIELD_CATALOG.md`, and confirmed
+presentation requirements are recorded in `REPORT_FIELD_MAPPING.md`.
+
+Material decisions include all winner-selection events for `results_date`, a
+labelled general-contract fallback for `delivery_term`, expanded contract/GOZ
+categories for `government_contract`, a four-way `national_regime` client value,
+literal-only licence/certificate scope, and separate mandatory/scored experience.
+Existing field keys, the 27-field count, PostgreSQL schema and FINAL contract do
+not change.
+
+Documentation/design artifacts added:
+
+```text
+docs/superpowers/specs/2026-09-07-client-confirmed-field-semantics-design.md
+docs/superpowers/plans/2026-09-07-client-confirmed-field-semantics.md
+```
+
+This is a documentation checkpoint, not runtime GREEN. Canonical/live Worker,
+Aggregator, Targeted Recheck and Report Generation have not been modified by
+this checkpoint. `SEM-1` remains P0 until TDD alignment, full offline regression
+and a fresh manually reviewed 27/27 runtime canary. Platform tariff acquisition
+for `participation_cost` is tracked separately as `SEM-2` because it requires an
+authoritative external-source and temporal-validity contract.

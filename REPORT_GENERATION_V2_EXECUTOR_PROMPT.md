@@ -108,7 +108,7 @@ label вместо отдельного presentation-слоя
 По поведению n8n читай локальную официальную документацию:
 
 ```text
-F:\Vibe-projects\n8n\references\n8n-docs
+../../../../references/references/n8n-docs
 ```
 
 ## 4. Preflight

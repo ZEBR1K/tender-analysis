@@ -1,0 +1,2162 @@
+Windows PowerShell
+(C) Корпорация Майкрософт (Microsoft Corporation). Все права защищены.
+
+Установите последнюю версию PowerShell для новых функций и улучшения! https://aka.ms/PSWindows
+
+PS F:\Vibe-projects\Tender-blind-test-3> git init
+Initialized empty Git repository in F:/Vibe-projects/Tender-blind-test-3/.git/
+PS F:\Vibe-projects\Tender-blind-test-3> codex
+╭─────────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.153.4)                      │
+│                                                 │
+│ model:     gpt-5.6-sol high   /model to change  │
+│ directory: F:\Vibe-projects\Tender-blind-test-3 │
+╰─────────────────────────────────────────────────╯
+
+  Tip: This is GPT-6, a new generation of intelligence. Astra is state-of-the-art in coding, computer use, science, and
+  professional work. Give it a hard problem, a half-formed idea, or anything you've been meaning to build. See where it
+  takes you.
+
+• You have 2 usage limit resets available. Run /usage to use one.
+
+
+› Проведи независимый полный анализ закупки по всем файлам в папке documents.
+
+  Это слепой тест. Не используй интернет, другие каталоги компьютера, существующие отчёты, результаты других моделей
+  или данные проекта Tender Analysis. Работай только с файлами в текущей папке.
+
+  Определи ровно 27 полей согласно FIELD_CATALOG.md.
+
+  Обязательные правила:
+
+  1. Изучи каждый документ полностью.
+  2. Для PDF-сканов при необходимости преобразуй страницы в изображения и проверь их визуально.
+  3. Для DOCX при необходимости исследуй внутреннюю структуру OOXML, включая элементы управления и переключатели.
+  4. Не делай вывод только по наличию общего текста. Учитывай, выбран ли конкретный вариант, флажок или переключатель.
+  5. Для каждого установленного значения укажи:
+     - field_key;
+     - status: resolved, requires_review или not_found;
+     - итоговое значение;
+     - имя исходного файла;
+     - страницу, раздел или структурный элемент;
+     - точную подтверждающую цитату;
+     - краткое объяснение вывода.
+  6. not_found означает только то, что значение не удалось установить после проверки всех документов. Не трактуй
+  отсутствие сведений как «нет», «не применяется» или «не требуется».
+  7. Если документы противоречат друг другу, не выбирай молча один вариант. Зафиксируй конфликт.
+  8. Не изменяй исходные документы.
+  9. Итог сохрани в файле codex-result.md.
+  10. Если какой-либо формат невозможно исследовать доступными инструментами, явно укажи это вместо предположения.
+
+
+⚠ Falling back from WebSockets to HTTPS transport. unexpected status 403 Forbidden: 19ea
+<html>
+  <head>
+    <meta
+  name="viewport" content="width=device-width, initial-scale=1" />
+      <style
+  global>body{font-family:Arial,Helvetica,san, url: wss://chatgpt.com/backend-api/codex/responses, cf-ray:
+  a378ba636eacec35-DME
+
+• Explored
+  └ Read SKILL.md (using-superpowers skill)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Использую навыки работы с PDF и DOCX: они задают обязательную процедуру полного извлечения, визуальной проверки сканов
+  и контроля структуры OOXML. Сначала прочитаю их инструкции, затем проведу инвентаризацию строго в текущей папке и не
+  буду обращаться к интернету или другим каталогам проекта.
+
+• Explored
+  └ Read SKILL.md (pdf:pdf skill), SKILL.md (documents:documents skill)
+
+• Ran (Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md').Count
+  └ 540
+
+• Ran (Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\tasks\read_review
+  │ .md').Count
+  └ 60
+
+• Ran (Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\tasks\forms_conte
+  │ nt_controls.md').Count
+  └ 49
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $c[0..179]
+  └ ---
+    name: documents
+    … +181 lines (ctrl + t to view transcript)
+    improvements, not a fresh draft unless explicitly requested.
+
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $c[180..359]
+  └ ## Equations: native Word math vs rendered fallback
+
+    … +178 lines (ctrl + t to view transcript)
+    - `scripts/captions_and_crossrefs.py` вЂ” insert Caption paragraphs for tables/figures + optional bookmarks around
+    caption numbers.
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $c[360..539]
+  └ - `scripts/insert_ref_fields.py` вЂ” replace `[[REF:bookmark]]` markers with real `REF` fields (cross-references).
+    - `scripts/internal_nav.py` вЂ” add internal navigation links (static TOC + Top/Bottom + figN/tblN jump links).
+    … +177 lines (ctrl + t to view transcript)
+    Document locators support only `page_number`; otherwise use a plain citation. Do not guess or add object, label,
+    paragraph, table, or cell IDs. Do not cite intermediates unless asked.
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\SKILL.md';
+  │ $c[119..179]
+  └ - Color: Set all document titles, subtitles, headings, subheadings, and page headers to black (`#000000`). Apply
+    black to their styles and remove theme colors or direct formatting that would override it. For table header rows,
+    … +63 lines (ctrl + t to view transcript)
+    improvements, not a fresh draft unless explicitly requested.
+
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\tasks\read_review
+  │ .md'; $c[0..59]
+  └ # Task: Read / review an existing DOCX
+
+    … +57 lines (ctrl + t to view transcript)
+    ## If the doc is huge
+    Render and inspect key pages first (title, TOC, sections with tables, appendices), then spot-check.
+
+• Ran $c=Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\tasks\forms_conte
+  │ nt_controls.md'; $c[0..48]
+  └ # Task: Forms / content controls (SDTs)
+
+    … +47 lines (ctrl + t to view transcript)
+    - Deliver **only the final DOCX** requested by the user.
+    - PNGs / optional PDFs are for internal QA only unless explicitly requested.
+
+• Ran $root=(Get-Location).Path; Write-Output ('ROOT ' + $root); Write-Output 'TOP'; Get-ChildItem -LiteralPath $root
+  │ -Force | Select-Object Name,Length,Mode | Format-Table -AutoSize; Write-Output 'DOCUMENTS'; Get-ChildItem
+  │ -LiteralPath (Join-Path $root 'documents') -Recurse -File | ForEach-Object
+  │ … +2 lines
+  └ ROOT F:\Vibe-projects\Tender-blind-test-3
+    TOP
+    … +24 lines (ctrl + t to view transcript)
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Инвентаризация завершена: 12 исходных документов (10 DOCX и 2 PDF). Сейчас фиксирую точный перечень 27 полей из
+  FIELD_CATALOG.md, после чего отдельно извлеку текст, таблицы, колонтитулы, примечания и состояния элементов управления
+  каждого DOCX; оба PDF проверю постранично, включая визуальный слой.
+
+• Explored
+  └ Read FIELD_CATALOG.md
+
+• Ran $p='.\FIELD_CATALOG.md'; Select-String -LiteralPath $p -Encoding UTF8 -Pattern '^## [0-9]+\. `[^`]+`' |
+  │ ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line }
+  └ 161:## 1. `procurement_subject`
+    204:## 2. `nm_price_with_vat`
+    … +23 lines (ctrl + t to view transcript)
+    1181:## 26. `analog_definition`
+    1214:## 27. `application_documents`
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[0..299]
+  └ # FIELD_CATALOG — tender_fields_v1
+
+    … +296 lines (ctrl + t to view transcript)
+    ```text
+    Extractor: ✅
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[300..599]
+  └ Round 1: ✅
+    Targeted Recheck: ✅
+    … +296 lines (ctrl + t to view transcript)
+
+    ### Runtime synchronization
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[600..899]
+  └
+    ```text
+    … +296 lines (ctrl + t to view transcript)
+
+    Простое упоминание нормативного акта не доказывает конкретную меру.
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[900..1199]
+  └
+    `Не применяется` является отрицательным бизнес-выводом и допустимо только при
+    … +296 lines (ctrl + t to view transcript)
+    ### Критичное правило
+
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[1200..1412]
+  └ Если аналог запрещён, нельзя выдумывать правила определения аналога.
+
+    … +208 lines (ctrl + t to view transcript)
+
+    Этот документ должен оставаться главным human-readable semantic source of truth для `tender_fields_v1`.
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[479..649]
+  └ ```
+
+    … +167 lines (ctrl + t to view transcript)
+
+    ### Канонический смысл
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[650..819]
+  └
+    Приоритет имеет непосредственный срок поставки товара, выполнения работ или
+    … +166 lines (ctrl + t to view transcript)
+    ### Не путать
+
+
+• Ran $c=Get-Content -LiteralPath '.\FIELD_CATALOG.md' -Encoding UTF8; $c[820..929]
+  └ - любой договор госучреждения без подтверждения его статуса;
+    - обычный гражданско-правовой договор.
+    … +106 lines (ctrl + t to view transcript)
+    Обеспечение исполнения договора / контракта: ...
+    Обеспечение обязательств, связанных с авансом: ...
+
+• Ran $names=@('python','python3','pdftotext','pdftoppm','pdfinfo','soffice','libreoffice','tesseract'); foreach($n in
+  │ $names){$c=Get-Command $n -ErrorAction SilentlyContinue; if($c){[pscustomobject]@{Name=$n;Source=$c.Source}} else
+  │ {[pscustomobject]@{Name=$n;Source='MISSING'}}} | Format-Table -AutoSize
+  └ ��ப�:2 ����:275
+    + ... ource}} else {[pscustomobject]@{Name=$n;Source='MISSING'}}} | Format- ...
+    … +3 lines (ctrl + t to view transcript)
+        + FullyQualifiedErrorId : EmptyPipeElement
+
+
+• Ran $rows=@(); $names=@('python','python3','pdftotext','pdftoppm','pdfinfo','soffice','libreoffice','tesseract');
+  │ foreach($n in $names){$c=Get-Command $n -ErrorAction SilentlyContinue; if($c){$rows +=
+  │ [pscustomobject]@{Name=$n;Source=$c.Source}} else {$rows += [pscustomobject]@{Name=$n;Source='MISSING'}}}; $rows |
+  │ … +1 lines
+  └
+    Name        Source
+    … +9 lines (ctrl + t to view transcript)
+
+
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\documents\26.904.11930\skills\documents\render_docx.py'
+  │ -Encoding UTF8 -TotalCount 160
+  └ import argparse
+    import glob
+    … +156 lines (ctrl + t to view transcript)
+
+    def calc_dpi_via_ooxml_docx(input_path: str, max_w_px: int, max_h_px: int) -> int:
+
+• Added tools\extract_ooxml.ps1 (+236 -0)
+      1 +param(
+      2 +    [Parameter(Mandatory = $true)]
+      3 +    [string]$InputDirectory,
+      4 +    [Parameter(Mandatory = $true)]
+      5 +    [string]$OutputDirectory
+      6 +)
+      7 +
+      8 +$ErrorActionPreference = 'Stop'
+      9 +Add-Type -AssemblyName System.IO.Compression.FileSystem
+     10 +
+     11 +$w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+     12 +$w14 = 'http://schemas.microsoft.com/office/word/2010/wordml'
+     13 +$r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+     14 +$a = 'http://schemas.openxmlformats.org/drawingml/2006/main'
+     15 +$v = 'urn:schemas-microsoft-com:vml'
+     16 +
+     17 +function Get-AttrValue {
+     18 +    param($Node, [string]$NamespaceUri, [string]$LocalName)
+     19 +    if ($null -eq $Node) { return $null }
+     20 +    $attr = $Node.Attributes | Where-Object { $_.LocalName -eq $LocalName -and $_.NamespaceURI -eq $NamespaceUr
+         i } | Select-Object -First 1
+     21 +    if ($null -ne $attr) { return $attr.Value }
+     22 +    return $null
+     23 +}
+     24 +
+     25 +function Get-WordText {
+     26 +    param($Node)
+     27 +    if ($null -eq $Node) { return '' }
+     28 +    $parts = New-Object System.Collections.Generic.List[string]
+     29 +    foreach ($n in $Node.SelectNodes('.//*')) {
+     30 +        if ($n.NamespaceURI -eq $w) {
+     31 +            switch ($n.LocalName) {
+     32 +                't' { [void]$parts.Add($n.InnerText) }
+     33 +                'delText' { [void]$parts.Add('[DEL:' + $n.InnerText + ']') }
+     34 +                'instrText' { [void]$parts.Add('[FIELD:' + $n.InnerText + ']') }
+     35 +                'tab' { [void]$parts.Add("`t") }
+     36 +                'br' { [void]$parts.Add(' / ') }
+     37 +                'cr' { [void]$parts.Add(' / ') }
+     38 +                'noBreakHyphen' { [void]$parts.Add('-') }
+     39 +                'sym' {
+     40 +                    $font = Get-AttrValue $n $w 'font'
+     41 +                    $char = Get-AttrValue $n $w 'char'
+     42 +                    [void]$parts.Add("[SYM:$font:$char]")
+     43 +                }
+     44 +            }
+     45 +        }
+     46 +    }
+     47 +    return (($parts -join '') -replace '\s+', ' ').Trim()
+     48 +}
+     49 +
+     50 +function Get-ParagraphStyle {
+     51 +    param($Node, $Ns)
+     52 +    $styleNode = $Node.SelectSingleNode('./w:pPr/w:pStyle', $Ns)
+     53 +    return Get-AttrValue $styleNode $w 'val'
+     54 +}
+     55 +
+     56 +function Convert-Part {
+     57 +    param(
+     58 +        [System.IO.Compression.ZipArchive]$Zip,
+     59 +        [string]$PartName,
+     60 +        [string]$DocOut,
+     61 +        [System.Collections.Generic.List[object]]$Blocks,
+     62 +        [System.Collections.Generic.List[object]]$Controls,
+     63 +        [System.Collections.Generic.List[object]]$Fields
+     64 +    )
+     65 +
+     66 +    $entry = $Zip.GetEntry($PartName)
+     67 +    if ($null -eq $entry) { return }
+     68 +    $stream = $entry.Open()
+     69 +    try {
+     70 +        $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8, $true)
+     71 +        $raw = $reader.ReadToEnd()
+     72 +    } finally {
+     73 +        if ($null -ne $reader) { $reader.Dispose() } else { $stream.Dispose() }
+     74 +    }
+     75 +
+     76 +    $xml = New-Object System.Xml.XmlDocument
+     77 +    $xml.PreserveWhitespace = $true
+     78 +    $xml.LoadXml($raw)
+     79 +    $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+     80 +    $ns.AddNamespace('w', $w)
+     81 +    $ns.AddNamespace('w14', $w14)
+     82 +    $ns.AddNamespace('r', $r)
+     83 +    $ns.AddNamespace('a', $a)
+     84 +    $ns.AddNamespace('v', $v)
+     85 +
+     86 +    $partSafe = $PartName.Replace('/', '__')
+     87 +    [System.IO.File]::WriteAllText((Join-Path $DocOut ($partSafe + '.xml')), $raw, (New-Object System.Text.UTF8
+         Encoding($false)))
+     88 +
+     89 +    $root = $xml.DocumentElement
+     90 +    $blockIndex = 0
+     91 +    $tableIndex = 0
+     92 +    foreach ($child in $root.ChildNodes) {
+     93 +        $container = $child
+     94 +        if ($child.LocalName -eq 'body' -and $child.NamespaceURI -eq $w) {
+     95 +            foreach ($bodyChild in $child.ChildNodes) {
+     96 +                $blockIndex++
+     97 +                if ($bodyChild.LocalName -eq 'p' -and $bodyChild.NamespaceURI -eq $w) {
+     98 +                    $text = Get-WordText $bodyChild
+     99 +                    $style = Get-ParagraphStyle $bodyChild $ns
+    100 +                    $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type='paragraph'; style=$s
+         tyle; table=$null; row=$null; cell=$null; text=$text})
+    101 +                } elseif ($bodyChild.LocalName -eq 'tbl' -and $bodyChild.NamespaceURI -eq $w) {
+    102 +                    $tableIndex++
+    103 +                    $rowIndex = 0
+    104 +                    foreach ($tr in $bodyChild.SelectNodes('./w:tr', $ns)) {
+    105 +                        $rowIndex++
+    106 +                        $cellIndex = 0
+    107 +                        foreach ($tc in $tr.SelectNodes('./w:tc', $ns)) {
+    108 +                            $cellIndex++
+    109 +                            $text = Get-WordText $tc
+    110 +                            $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type='table_cell';
+          style=$null; table=$tableIndex; row=$rowIndex; cell=$cellIndex; text=$text})
+    111 +                        }
+    112 +                    }
+    113 +                } elseif ($bodyChild.LocalName -eq 'sectPr' -and $bodyChild.NamespaceURI -eq $w) {
+    114 +                    $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type='section_properties';
+          style=$null; table=$null; row=$null; cell=$null; text=(Get-WordText $bodyChild)})
+    115 +                } else {
+    116 +                    $text = Get-WordText $bodyChild
+    117 +                    $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type=$bodyChild.LocalName;
+          style=$null; table=$null; row=$null; cell=$null; text=$text})
+    118 +                }
+    119 +            }
+    120 +        } elseif ($PartName -notmatch '^word/document\.xml$') {
+    121 +            if ($child.LocalName -in @('p','tbl')) {
+    122 +                $blockIndex++
+    123 +                if ($child.LocalName -eq 'p') {
+    124 +                    $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type='paragraph'; style=(G
+         et-ParagraphStyle $child $ns); table=$null; row=$null; cell=$null; text=(Get-WordText $child)})
+    125 +                } else {
+    126 +                    $tableIndex++
+    127 +                    $rowIndex = 0
+    128 +                    foreach ($tr in $child.SelectNodes('./w:tr', $ns)) {
+    129 +                        $rowIndex++
+    130 +                        $cellIndex = 0
+    131 +                        foreach ($tc in $tr.SelectNodes('./w:tc', $ns)) {
+    132 +                            $cellIndex++
+    133 +                            $Blocks.Add([pscustomobject]@{part=$PartName; block=$blockIndex; type='table_cell';
+          style=$null; table=$tableIndex; row=$rowIndex; cell=$cellIndex; text=(Get-WordText $tc)})
+    134 +                        }
+    135 +                    }
+    136 +                }
+    137 +            }
+    138 +        }
+    139 +    }
+    140 +
+    141 +    $sdtIndex = 0
+    142 +    foreach ($sdt in $xml.SelectNodes('//w:sdt', $ns)) {
+    143 +        $sdtIndex++
+    144 +        $pr = $sdt.SelectSingleNode('./w:sdtPr', $ns)
+    145 +        $tag = Get-AttrValue ($pr.SelectSingleNode('./w:tag', $ns)) $w 'val'
+    146 +        $alias = Get-AttrValue ($pr.SelectSingleNode('./w:alias', $ns)) $w 'val'
+    147 +        $id = Get-AttrValue ($pr.SelectSingleNode('./w:id', $ns)) $w 'val'
+    148 +        $checkedNode = $pr.SelectSingleNode('./w14:checkbox/w14:checked', $ns)
+    149 +        $checked = Get-AttrValue $checkedNode $w14 'val'
+    150 +        $type = 'text'
+    151 +        if ($null -ne $pr.SelectSingleNode('./w14:checkbox', $ns)) { $type = 'checkbox' }
+    152 +        elseif ($null -ne $pr.SelectSingleNode('./w:dropDownList', $ns)) { $type = 'dropdown' }
+    153 +        elseif ($null -ne $pr.SelectSingleNode('./w:comboBox', $ns)) { $type = 'combobox' }
+    154 +        elseif ($null -ne $pr.SelectSingleNode('./w:date', $ns)) { $type = 'date' }
+    155 +        elseif ($null -ne $pr.SelectSingleNode('./w:picture', $ns)) { $type = 'picture' }
+    156 +        $items = @()
+    157 +        foreach ($li in $pr.SelectNodes('./w:dropDownList/w:listItem|./w:comboBox/w:listItem', $ns)) {
+    158 +            $items += [pscustomobject]@{display=Get-AttrValue $li $w 'displayText'; value=Get-AttrValue $li $w
+         'value'}
+    159 +        }
+    160 +        $dateNode = $pr.SelectSingleNode('./w:date', $ns)
+    161 +        $Controls.Add([pscustomobject]@{
+    162 +            part=$PartName; index=$sdtIndex; id=$id; tag=$tag; alias=$alias; type=$type;
+    163 +            checked=$checked; showing_placeholder=($null -ne $pr.SelectSingleNode('./w:showingPlcHdr', $ns));
+    164 +            date_full=Get-AttrValue $dateNode $w 'fullDate'; items=$items;
+    165 +            text=Get-WordText $sdt.SelectSingleNode('./w:sdtContent', $ns)
+    166 +        })
+    167 +    }
+    168 +
+    169 +    $ffIndex = 0
+    170 +    foreach ($ff in $xml.SelectNodes('//w:ffData', $ns)) {
+    171 +        $ffIndex++
+    172 +        $name = Get-AttrValue ($ff.SelectSingleNode('./w:name', $ns)) $w 'val'
+    173 +        $checked = Get-AttrValue ($ff.SelectSingleNode('./w:checkBox/w:checked', $ns)) $w 'val'
+    174 +        $default = Get-AttrValue ($ff.SelectSingleNode('./w:checkBox/w:default', $ns)) $w 'val'
+    175 +        $Fields.Add([pscustomobject]@{part=$PartName; index=$ffIndex; kind='legacy_form'; name=$name; checked=$
+         checked; default=$default; text=(Get-WordText $ff.ParentNode.ParentNode)})
+    176 +    }
+    177 +    $fieldIndex = 0
+    178 +    foreach ($instr in $xml.SelectNodes('//w:instrText|//w:fldSimple', $ns)) {
+    179 +        $fieldIndex++
+    180 +        $Fields.Add([pscustomobject]@{part=$PartName; index=$fieldIndex; kind='field_code'; name=$null; checked
+         =$null; default=$null; text=($instr.InnerText -replace '\s+', ' ').Trim()})
+    181 +    }
+    182 +}
+    183 +
+    184 +$inRoot = (Resolve-Path -LiteralPath $InputDirectory).Path
+    185 +New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+    186 +$outRoot = (Resolve-Path -LiteralPath $OutputDirectory).Path
+    187 +$manifest = New-Object System.Collections.Generic.List[object]
+    188 +
+    189 +foreach ($doc in Get-ChildItem -LiteralPath $inRoot -Filter '*.docx' -File | Sort-Object Name) {
+    190 +    $docOut = Join-Path $outRoot $doc.BaseName
+    191 +    New-Item -ItemType Directory -Path $docOut -Force | Out-Null
+    192 +    $zip = [System.IO.Compression.ZipFile]::OpenRead($doc.FullName)
+    193 +    try {
+    194 +        $blocks = New-Object 'System.Collections.Generic.List[object]'
+    195 +        $controls = New-Object 'System.Collections.Generic.List[object]'
+    196 +        $fields = New-Object 'System.Collections.Generic.List[object]'
+    197 +        $parts = $zip.Entries | Where-Object { $_.FullName -match '^word/(document|header\d*|footer\d*|footnote
+         s|endnotes|comments|glossary/document)\.xml$' } | Select-Object -ExpandProperty FullName
+    198 +        foreach ($part in $parts) { Convert-Part -Zip $zip -PartName $part -DocOut $docOut -Blocks $blocks -Con
+         trols $controls -Fields $fields }
+    199 +
+    200 +        $settingsEntry = $zip.GetEntry('word/settings.xml')
+    201 +        $settings = [pscustomobject]@{track_revisions=$false; document_protection=$null}
+    202 +        if ($null -ne $settingsEntry) {
+    203 +            $sr = New-Object System.IO.StreamReader($settingsEntry.Open(), [System.Text.Encoding]::UTF8, $true)
+    204 +            try { $settingsRaw = $sr.ReadToEnd() } finally { $sr.Dispose() }
+    205 +            $sx = New-Object System.Xml.XmlDocument
+    206 +            $sx.LoadXml($settingsRaw)
+    207 +            $sns = New-Object System.Xml.XmlNamespaceManager($sx.NameTable)
+    208 +            $sns.AddNamespace('w',$w)
+    209 +            $settings.track_revisions = $null -ne $sx.SelectSingleNode('//w:trackRevisions',$sns)
+    210 +            $prot = $sx.SelectSingleNode('//w:documentProtection',$sns)
+    211 +            if ($null -ne $prot) { $settings.document_protection = $prot.OuterXml }
+    212 +        }
+    213 +
+    214 +        $media = @($zip.Entries | Where-Object { $_.FullName -match '^word/media/' } | ForEach-Object { [pscust
+         omobject]@{name=$_.FullName; bytes=$_.Length} })
+    215 +        $embeddings = @($zip.Entries | Where-Object { $_.FullName -match '^word/embeddings/' } | ForEach-Object
+          { [pscustomobject]@{name=$_.FullName; bytes=$_.Length} })
+    216 +        $summary = [pscustomobject]@{
+    217 +            source_file=$doc.Name; bytes=$doc.Length; parts=@($parts); blocks=$blocks.Count;
+    218 +            controls=$controls; fields=$fields; settings=$settings; media=$media; embeddings=$embeddings
+    219 +        }
+    220 +        [System.IO.File]::WriteAllText((Join-Path $docOut 'structure.json'), ($summary | ConvertTo-Json -Depth
+         12), (New-Object System.Text.UTF8Encoding($false)))
+    221 +        [System.IO.File]::WriteAllText((Join-Path $docOut 'blocks.json'), ($blocks | ConvertTo-Json -Depth 8),
+         (New-Object System.Text.UTF8Encoding($false)))
+    222 +
+    223 +        $lines = New-Object System.Collections.Generic.List[string]
+    224 +        foreach ($b in $blocks) {
+    225 +            $loc = if ($b.type -eq 'table_cell') { "part=$($b.part); block=$($b.block); table=$($b.table); row=
+         $($b.row); cell=$($b.cell)" } else { "part=$($b.part); block=$($b.block); style=$($b.style)" }
+    226 +            [void]$lines.Add("[$loc] $($b.text)")
+    227 +        }
+    228 +        [System.IO.File]::WriteAllLines((Join-Path $docOut 'blocks.txt'), $lines, (New-Object System.Text.UTF8E
+         ncoding($false)))
+    229 +        $manifest.Add([pscustomobject]@{file=$doc.Name; blocks=$blocks.Count; controls=$controls.Count; fields=
+         $fields.Count; media=$media.Count; embeddings=$embeddings.Count; track_revisions=$settings.track_revisions})
+    230 +    } finally {
+    231 +        $zip.Dispose()
+    232 +    }
+    233 +}
+    234 +
+    235 +[System.IO.File]::WriteAllText((Join-Path $outRoot 'manifest.json'), ($manifest | ConvertTo-Json -Depth 8), (Ne
+         w-Object System.Text.UTF8Encoding($false)))
+    236 +$manifest | Format-Table -AutoSize
+
+• Ran & '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents' -OutputDirectory '.\tmp\ooxml'
+  └ & : Невозможно загрузить файл F:\Vibe-projects\Tender-blind-test-3\tools\extract_ooxml.ps1, так как выполнение
+    сценарие
+    … +6 lines (ctrl + t to view transcript)
+        + CategoryInfo          : Ошибка безопасности: (:) [], PSSecurityException
+        + FullyQualifiedErrorId : UnauthorizedAccess
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └ At F:\Vibe-projects\Tender-blind-test-3\tools\extract_ooxml.ps1:42 char:44
+    +                     [void]$parts.Add("[SYM:$font:$char]")
+    … +5 lines (ctrl + t to view transcript)
+        + FullyQualifiedErrorId : InvalidVariableReferenceWithDrive
+
+
+• Edited tools\extract_ooxml.ps1 (+1 -1)
+    41                      $char = Get-AttrValue $n $w 'char'
+    42 -                    [void]$parts.Add("[SYM:$font:$char]")
+    42 +                    [void]$parts.Add("[SYM:${font}:${char}]")
+    43                  }
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └
+    file                             blocks controls fields media embeddings track_revisions
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran $word=$null; try {$word=New-Object -ComObject Word.Application; $word.Visible=$false; Write-Output ('WORD_VERSION
+  │ ' + $word.Version)} finally {if($null -ne $word){$word.Quit()}}
+  └ New-Object : Не удалось получить фабрику класса COM для компонента с CLSID {00000000-0000-0000-0000-000000000000}
+    из-за
+    … +5 lines (ctrl + t to view transcript)
+        + FullyQualifiedErrorId : NoCOMClassIdentified,Microsoft.PowerShell.Commands.NewObjectCommand
+
+
+• Ran Get-ChildItem -LiteralPath 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies' -Force |
+  │ Select-Object Name,Mode | Format-Table -AutoSize; Get-ChildItem -LiteralPath 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\override' -ErrorAction SilentlyContinue
+  │ … +1 lines
+  └
+    Name   Mode
+    … +12 lines (ctrl + t to view transcript)
+
+
+
+• Ran Get-ChildItem -LiteralPath 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python' -Force
+  │ | Select-Object Name,Mode,Length | Format-Table -AutoSize; Get-ChildItem -LiteralPath 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native' -Force | Select-Object Name,Mode |
+  │ … +1 lines
+  └
+    Name               Mode   Length
+    … +24 lines (ctrl + t to view transcript)
+
+
+
+• Edited tools\extract_ooxml.ps1 (+18 -2)
+    213
+    214 -        $media = @($zip.Entries | Where-Object { $_.FullName -match '^word/media/' } | ForEach-Object { [pscust
+         omobject]@{name=$_.FullName; bytes=$_.Length} })
+    215 -        $embeddings = @($zip.Entries | Where-Object { $_.FullName -match '^word/embeddings/' } | ForEach-Object
+          { [pscustomobject]@{name=$_.FullName; bytes=$_.Length} })
+    214 +        $media = @($zip.Entries | Where-Object { $_.FullName -match '^word/media/' } | ForEach-Object {
+    215 +            $targetDir = Join-Path $docOut 'media'
+    216 +            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    217 +            $target = Join-Path $targetDir ([System.IO.Path]::GetFileName($_.FullName))
+    218 +            $sourceStream = $_.Open()
+    219 +            $targetStream = [System.IO.File]::Create($target)
+    220 +            try { $sourceStream.CopyTo($targetStream) } finally { $targetStream.Dispose(); $sourceStream.Dispos
+         e() }
+    221 +            [pscustomobject]@{name=$_.FullName; bytes=$_.Length; extracted=$target}
+    222 +        })
+    223 +        $embeddings = @($zip.Entries | Where-Object { $_.FullName -match '^word/embeddings/' } | ForEach-Object
+          {
+    224 +            $targetDir = Join-Path $docOut 'embeddings'
+    225 +            New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    226 +            $target = Join-Path $targetDir ([System.IO.Path]::GetFileName($_.FullName))
+    227 +            $sourceStream = $_.Open()
+    228 +            $targetStream = [System.IO.File]::Create($target)
+    229 +            try { $sourceStream.CopyTo($targetStream) } finally { $targetStream.Dispose(); $sourceStream.Dispos
+         e() }
+    230 +            [pscustomobject]@{name=$_.FullName; bytes=$_.Length; extracted=$target}
+    231 +        })
+    232          $summary = [pscustomobject]@{
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └
+    file                             blocks controls fields media embeddings track_revisions
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran Add-Type -AssemblyName System.Drawing; $rows=@(); Get-ChildItem -LiteralPath '.\tmp\ooxml' -Recurse -File |
+  │ Where-Object {$_.DirectoryName -like '*\media'} | ForEach-Object
+  │ {try{$img=[System.Drawing.Image]::FromFile($_.FullName); $rows +=
+  │ … +4 lines
+  └
+    File                                                    Width Height Format
+    … +84 lines (ctrl + t to view transcript)
+
+
+
+• Added tools\make_contact_sheets.ps1 (+51 -0)
+     1 +param(
+     2 +    [Parameter(Mandatory = $true)] [string]$Root,
+     3 +    [Parameter(Mandatory = $true)] [string]$OutputDirectory
+     4 +)
+     5 +
+     6 +$ErrorActionPreference = 'Stop'
+     7 +Add-Type -AssemblyName System.Drawing
+     8 +New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+     9 +
+    10 +$groups = Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object {
+    11 +    $_.DirectoryName -like '*\media' -and $_.Extension -match '^\.(png|jpe?g|bmp|gif|tif?f)$'
+    12 +} | Group-Object DirectoryName
+    13 +
+    14 +foreach ($group in $groups) {
+    15 +    $files = @($group.Group | Sort-Object Name)
+    16 +    if ($files.Count -eq 0) { continue }
+    17 +    $thumbW = 360
+    18 +    $thumbH = 470
+    19 +    $labelH = 34
+    20 +    $cols = 3
+    21 +    $rows = [Math]::Ceiling($files.Count / $cols)
+    22 +    $canvas = New-Object System.Drawing.Bitmap ($cols * $thumbW), ($rows * ($thumbH + $labelH))
+    23 +    $g = [System.Drawing.Graphics]::FromImage($canvas)
+    24 +    $g.Clear([System.Drawing.Color]::White)
+    25 +    $font = New-Object System.Drawing.Font('Arial', 12)
+    26 +    $brush = [System.Drawing.Brushes]::Black
+    27 +    try {
+    28 +        for ($i=0; $i -lt $files.Count; $i++) {
+    29 +            $img = [System.Drawing.Image]::FromFile($files[$i].FullName)
+    30 +            try {
+    31 +                $col = $i % $cols
+    32 +                $row = [Math]::Floor($i / $cols)
+    33 +                $x = $col * $thumbW
+    34 +                $y = $row * ($thumbH + $labelH)
+    35 +                $scale = [Math]::Min(($thumbW - 16) / $img.Width, ($thumbH - 16) / $img.Height)
+    36 +                $drawW = [Math]::Max(1, [int]($img.Width * $scale))
+    37 +                $drawH = [Math]::Max(1, [int]($img.Height * $scale))
+    38 +                $dx = $x + [int](($thumbW - $drawW) / 2)
+    39 +                $dy = $y + [int](($thumbH - $drawH) / 2)
+    40 +                $g.DrawImage($img, $dx, $dy, $drawW, $drawH)
+    41 +                $g.DrawString($files[$i].Name, $font, $brush, $x + 8, $y + $thumbH + 4)
+    42 +            } finally { $img.Dispose() }
+    43 +        }
+    44 +        $docName = Split-Path (Split-Path $group.Name -Parent) -Leaf
+    45 +        $out = Join-Path $OutputDirectory ($docName + '.png')
+    46 +        $canvas.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+    47 +        Write-Output $out
+    48 +    } finally {
+    49 +        $font.Dispose(); $g.Dispose(); $canvas.Dispose()
+    50 +    }
+    51 +}
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\make_contact_sheets.ps1' -Root '.\tmp\ooxml'
+  │ -OutputDirectory '.\tmp\contact_sheets'
+  └ .\tmp\contact_sheets\Блок_6_Проект_договора.png
+    .\tmp\contact_sheets\Блок_9_Требования.png
+
+• Viewed Image
+  └ tmp\contact_sheets\Блок_6_Проект_договора.png
+
+• Viewed Image
+  └ tmp\contact_sheets\Блок_9_Требования.png
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -c "import
+  │ importlib.util as u; print({n:bool(u.find_spec(n)) for n in
+  │ ['PIL','pdfplumber','pypdf','pdf2image','pytesseract','easyocr','rapidocr_onnxruntime','fitz','docx','openpyxl','o
+  │ … +1 lines
+  └ {'PIL': True, 'pdfplumber': True, 'pypdf': True, 'pdf2image': True, 'pytesseract': False, 'easyocr': False,
+    'rapidocr_onnxruntime': False, 'fitz': False, 'docx': True, 'openpyxl': True, 'olefile': False}
+
+• Ran Get-ChildItem -LiteralPath 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\poppler' -Recurse -File |
+  │ Where-Object {$_.Name -in @('pdfinfo.exe','pdftotext.exe','pdftoppm.exe','pdftocairo.exe')} | Select-Object
+  │ … +1 lines
+  └
+    Name         FullName
+    … +5 lines (ctrl + t to view transcript)
+
+
+
+• Added tools\extract_pdfs.py (+71 -0)
+     1 +import json
+     2 +import sys
+     3 +from pathlib import Path
+     4 +
+     5 +from pypdf import PdfReader
+     6 +from pdf2image import convert_from_path
+     7 +
+     8 +
+     9 +def main() -> None:
+    10 +    if len(sys.argv) != 4:
+    11 +        raise SystemExit("usage: extract_pdfs.py INPUT_DIR OUTPUT_DIR POPPLER_BIN")
+    12 +    input_dir = Path(sys.argv[1]).resolve()
+    13 +    output_dir = Path(sys.argv[2]).resolve()
+    14 +    poppler_bin = Path(sys.argv[3]).resolve()
+    15 +    output_dir.mkdir(parents=True, exist_ok=True)
+    16 +    manifest = []
+    17 +    for pdf in sorted(input_dir.glob("*.pdf")):
+    18 +        doc_out = output_dir / pdf.stem
+    19 +        pages_out = doc_out / "pages"
+    20 +        pages_out.mkdir(parents=True, exist_ok=True)
+    21 +        reader = PdfReader(str(pdf))
+    22 +        fields = reader.get_fields() or {}
+    23 +        page_records = []
+    24 +        all_text = []
+    25 +        for idx, page in enumerate(reader.pages, start=1):
+    26 +            text = page.extract_text(extraction_mode="layout") or ""
+    27 +            images = []
+    28 +            try:
+    29 +                for image in page.images:
+    30 +                    images.append({"name": image.name, "bytes": len(image.data)})
+    31 +            except Exception as exc:
+    32 +                images.append({"error": str(exc)})
+    33 +            annots = []
+    34 +            for annot_ref in page.get("/Annots", []) or []:
+    35 +                try:
+    36 +                    annot = annot_ref.get_object()
+    37 +                    annots.append({
+    38 +                        "subtype": str(annot.get("/Subtype")),
+    39 +                        "field_type": str(annot.get("/FT")),
+    40 +                        "name": str(annot.get("/T")),
+    41 +                        "value": str(annot.get("/V")),
+    42 +                    })
+    43 +                except Exception as exc:
+    44 +                    annots.append({"error": str(exc)})
+    45 +            record = {"page": idx, "chars": len(text), "images": images, "annotations": annots}
+    46 +            page_records.append(record)
+    47 +            all_text.append(f"\n\n===== PAGE {idx} =====\n{text}")
+    48 +            (doc_out / f"page-{idx:03d}.txt").write_text(text, encoding="utf-8")
+    49 +        rendered = convert_from_path(
+    50 +            str(pdf), dpi=160, poppler_path=str(poppler_bin), fmt="png", thread_count=2
+    51 +        )
+    52 +        for idx, image in enumerate(rendered, start=1):
+    53 +            image.save(pages_out / f"page-{idx:03d}.png")
+    54 +        summary = {
+    55 +            "file": pdf.name,
+    56 +            "bytes": pdf.stat().st_size,
+    57 +            "pages": len(reader.pages),
+    58 +            "encrypted": reader.is_encrypted,
+    59 +            "metadata": {str(k): str(v) for k, v in (reader.metadata or {}).items()},
+    60 +            "fields": {str(k): {str(fk): str(fv) for fk, fv in v.items()} for k, v in fields.items()},
+    61 +            "page_records": page_records,
+    62 +        }
+    63 +        (doc_out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8
+        ")
+    64 +        (doc_out / "all-pages.txt").write_text("".join(all_text), encoding="utf-8")
+    65 +        manifest.append({"file": pdf.name, "pages": len(reader.pages), "fields": len(fields), "rendered": len(re
+        ndered)})
+    66 +    (output_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-
+        8")
+    67 +    print(json.dumps(manifest, ensure_ascii=False, indent=2))
+    68 +
+    69 +
+    70 +if __name__ == "__main__":
+    71 +    main()
+
+• Ran & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' '.
+  │ \tools\extract_pdfs.py' '.\documents' '.\tmp\pdfs' 'C:
+  │ \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\poppler\Library\bin'
+  └ [
+      {
+    … +10 lines (ctrl + t to view transcript)
+      }
+    ]
+
+• Ran $m=Get-Content -LiteralPath '.\tmp\pdfs\manifest.json' -Encoding UTF8 -Raw | ConvertFrom-Json; $m | Format-Table
+  │ -AutoSize; Get-ChildItem -LiteralPath '.\tmp\pdfs' -Directory | ForEach-Object {$s=Get-Content -LiteralPath
+  │ (Join-Path $_.FullName 'summary.json') -Encoding UTF8 -Raw | ConvertFrom-Json; Write-Output ('DOC ' + $s.file);
+  │ … +2 lines
+  └
+    file                          pages fields rendered
+    … +24 lines (ctrl + t to view transcript)
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• OOXML-проверка показала важную особенность: в проекте договора есть 175 элементов управления и 8 полноформатных
+  сканированных страниц технического приложения; в требованиях — встроенные изображения и один OLE-объект. Поэтому я не
+  ограничиваюсь видимым текстом: проверяю фактические состояния чекбоксов/полей, сканы и вложение отдельно. PDF-
+  приложение на 8 страниц полностью состоит из изображений; расчёт НМЦ имеет извлекаемый текст.
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-001.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-002.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-003.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-004.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-005.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-006.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-007.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-008.png
+
+• Viewed Image
+  └ tmp\pdfs\РАСЧЕТ_НМЦ\pages\page-001.png
+
+• Ran $root='.\tmp\ooxml'; Get-ChildItem -LiteralPath $root -Directory | ForEach-Object {$p=Join-Path $_.FullName
+  │ 'blocks.txt'; $lines=Get-Content -LiteralPath $p -Encoding UTF8;
+  │ [pscustomobject]@{Doc=$_.Name;Lines=$lines.Count;NonEmpty=@($lines|Where-Object{$_ -notmatch '\]
+  │ … +1 lines
+  └
+    Doc                         Lines NonEmpty  Chars
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran Get-ChildItem -LiteralPath '.\tmp\ooxml' -Directory | ForEach-Object {$s=Get-Content -LiteralPath (Join-Path
+  │ $_.FullName 'structure.json') -Encoding UTF8 -Raw | ConvertFrom-Json; if($s.controls.Count -gt 0){Write-Output
+  │ ('DOC ' + $s.source_file); $s.controls | Group-Object type | Select-Object Name,Count | Format-Table -AutoSize;
+  │ … +2 lines
+  └ DOC Блок_4_Образцы_форм.docx
+
+    … +29 lines (ctrl + t to view transcript)
+
+    CHECKBOX STATES
+
+• Ran Get-ChildItem -LiteralPath '.\tmp\ooxml' -Directory | ForEach-Object {$s=Get-Content -LiteralPath (Join-Path
+  │ $_.FullName 'structure.json') -Encoding UTF8 -Raw | ConvertFrom-Json; if($s.fields.Count -gt 0){Write-Output ('DOC
+  │ ' + $s.source_file); $s.fields | Group-Object kind | Select-Object Name,Count | Format-Table -AutoSize; $s.fields
+  │ … +1 lines
+  └ DOC 0_Общая_часть_зо.docx
+
+    … +197 lines (ctrl + t to view transcript)
+
+
+
+• Edited tools\extract_ooxml.ps1 (+8 -2)
+    174          $default = Get-AttrValue ($ff.SelectSingleNode('./w:checkBox/w:default', $ns)) $w 'val'
+    175 -        $Fields.Add([pscustomobject]@{part=$PartName; index=$ffIndex; kind='legacy_form'; name=$name; checked=$
+         checked; default=$default; text=(Get-WordText $ff.ParentNode.ParentNode)})
+    175 +        $legacyType = if ($null -ne $ff.SelectSingleNode('./w:checkBox', $ns)) {'checkbox'} elseif ($null -ne $
+         ff.SelectSingleNode('./w:ddList', $ns)) {'dropdown'} elseif ($null -ne $ff.SelectSingleNode('./w:textInput', $n
+         s)) {'text_input'} else {'unknown'}
+    176 +        $dropResult = Get-AttrValue ($ff.SelectSingleNode('./w:ddList/w:result', $ns)) $w 'val'
+    177 +        $dropEntries = @($ff.SelectNodes('./w:ddList/w:listEntry', $ns) | ForEach-Object { Get-AttrValue $_ $w
+         'val' })
+    178 +        $textDefault = Get-AttrValue ($ff.SelectSingleNode('./w:textInput/w:default', $ns)) $w 'val'
+    179 +        $ancestorP = $ff.SelectSingleNode('ancestor::w:p[1]', $ns)
+    180 +        $ancestorTc = $ff.SelectSingleNode('ancestor::w:tc[1]', $ns)
+    181 +        $Fields.Add([pscustomobject]@{part=$PartName; index=$ffIndex; kind='legacy_form'; legacy_type=$legacyTy
+         pe; name=$name; checked=$checked; default=$default; dropdown_result=$dropResult; dropdown_entries=$dropEntries;
+          text_default=$textDefault; paragraph_text=(Get-WordText $ancestorP); cell_text=(Get-WordText $ancestorTc); tex
+         t=(Get-WordText $ff.ParentNode.ParentNode)})
+    182      }
+        ⋮
+    185          $fieldIndex++
+    180 -        $Fields.Add([pscustomobject]@{part=$PartName; index=$fieldIndex; kind='field_code'; name=$null; checked
+         =$null; default=$null; text=($instr.InnerText -replace '\s+', ' ').Trim()})
+    186 +        $Fields.Add([pscustomobject]@{part=$PartName; index=$fieldIndex; kind='field_code'; legacy_type=$null;
+         name=$null; checked=$null; default=$null; dropdown_result=$null; dropdown_entries=@(); text_default=$null; para
+         graph_text=(Get-WordText $instr.SelectSingleNode('ancestor::w:p[1]', $ns)); cell_text=(Get-WordText $instr.Sele
+         ctSingleNode('ancestor::w:tc[1]', $ns)); text=($instr.InnerText -replace '\s+', ' ').Trim()})
+    187      }
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └
+    file                             blocks controls fields media embeddings track_revisions
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran $s=Get-Content -LiteralPath '.\tmp\ooxml\Блок_6_Проект_договора\structure.json' -Encoding UTF8 -Raw |
+  │ ConvertFrom-Json; $legacy=@($s.fields|Where-Object {$_.kind -eq 'legacy_form'}); $legacy | Group-Object
+  │ legacy_type | Select-Object Name,Count | Format-Table -AutoSize; Write-Output 'CHECKBOXES'; $legacy | Where-Object
+  │ … +3 lines
+  └
+    Name       Count
+    … +34 lines (ctrl + t to view transcript)
+
+    DROPDOWNS
+
+• Ran rg -n -C 6 --encoding utf-8 "Оговорка применяется" '.\tmp\ooxml\Блок_6_Проект_договора\blocks.txt'
+  └ 719-[part=word/document.xml; block=481; style=]
+    720-[part=word/document.xml; block=482; style=] СТАНДАРТНЫЕ НАЛОГОВЫЕ ОГОВОРКИ
+    … +59 lines (ctrl + t to view transcript)
+    [FIELD: FORMTEXT ]Поставщик оказывает [FIELD: FORMTEXT ]Покупателю необходимое содействие.
+    764-[part=word/document.xml; block=526; style=]
+
+• Ran Add-Type -AssemblyName System.Drawing; $outRoot='.\tmp\wmf_png'; New-Item -ItemType Directory -Path $outRoot
+  │ -Force | Out-Null; Get-ChildItem -LiteralPath '.\tmp\ooxml' -Recurse -File | Where-Object {$_.Extension -in
+  │ @('.wmf','.emf')} | ForEach-Object {$doc=Split-Path (Split-Path $_.DirectoryName -Parent) -Leaf; $d=Join-Path
+  │ … +7 lines
+  └
+    FullName                                                                                 Length
+    … +61 lines (ctrl + t to view transcript)
+
+
+
+• Edited tools\make_contact_sheets.ps1 (+2 -2)
+    10  $groups = Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object {
+    11 -    $_.DirectoryName -like '*\media' -and $_.Extension -match '^\.(png|jpe?g|bmp|gif|tif?f)$'
+    11 +    $_.Extension -match '^\.(png|jpe?g|bmp|gif|tif?f)$'
+    12  } | Group-Object DirectoryName
+       ⋮
+    43          }
+    44 -        $docName = Split-Path (Split-Path $group.Name -Parent) -Leaf
+    44 +        $docName = if ((Split-Path $group.Name -Leaf) -eq 'media') { Split-Path (Split-Path $group.Name -Parent)
+         -Leaf } else { Split-Path $group.Name -Leaf }
+    45          $out = Join-Path $OutputDirectory ($docName + '.png')
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\make_contact_sheets.ps1' -Root '.\tmp\wmf_png'
+  │ -OutputDirectory '.\tmp\wmf_sheets'
+  └ .\tmp\wmf_sheets\Блок_1_Извещение.png
+    .\tmp\wmf_sheets\Блок_2_Информационная_карта.png
+    .\tmp\wmf_sheets\Блок_7_Техническое_задание.png
+    .\tmp\wmf_sheets\Блок_9_Требования.png
+
+• Viewed Image
+  └ tmp\wmf_sheets\Блок_1_Извещение.png
+
+• Viewed Image
+  └ tmp\wmf_sheets\Блок_2_Информационная_карта.png
+
+• Viewed Image
+  └ tmp\wmf_sheets\Блок_7_Техническое_задание.png
+
+• Viewed Image
+  └ tmp\wmf_sheets\Блок_9_Требования.png
+
+• Edited tools\extract_ooxml.ps1 (+36 -3)
+     62          [System.Collections.Generic.List[object]]$Controls,
+     63 -        [System.Collections.Generic.List[object]]$Fields
+     63 +        [System.Collections.Generic.List[object]]$Fields,
+     64 +        [System.Collections.Generic.List[object]]$Placements
+     65      )
+        ⋮
+     86
+     87 +    $partDir = [System.IO.Path]::GetDirectoryName($PartName).Replace('\','/')
+     88 +    $partFile = [System.IO.Path]::GetFileName($PartName)
+     89 +    $relsName = if ([string]::IsNullOrWhiteSpace($partDir)) { "_rels/$partFile.rels" } else { "$partDir/_rels/$
+         partFile.rels" }
+     90 +    $relMap = @{}
+     91 +    $relsEntry = $Zip.GetEntry($relsName)
+     92 +    if ($null -ne $relsEntry) {
+     93 +        $relsReader = New-Object System.IO.StreamReader($relsEntry.Open(), [System.Text.Encoding]::UTF8, $true)
+     94 +        try { $relsRaw = $relsReader.ReadToEnd() } finally { $relsReader.Dispose() }
+     95 +        $relsXml = New-Object System.Xml.XmlDocument
+     96 +        $relsXml.LoadXml($relsRaw)
+     97 +        foreach ($rel in $relsXml.DocumentElement.ChildNodes) {
+     98 +            if ($rel.LocalName -eq 'Relationship') {
+     99 +                $relMap[$rel.GetAttribute('Id')] = [pscustomobject]@{target=$rel.GetAttribute('Target'); type=$
+         rel.GetAttribute('Type'); target_mode=$rel.GetAttribute('TargetMode')}
+    100 +            }
+    101 +        }
+    102 +    }
+    103 +
+    104      $partSafe = $PartName.Replace('/', '__')
+        ⋮
+    205      }
+    206 +
+    207 +    $placementIndex = 0
+    208 +    foreach ($node in $xml.SelectNodes('//*[@r:embed or @r:id]', $ns)) {
+    209 +        $relId = Get-AttrValue $node $r 'embed'
+    210 +        if ([string]::IsNullOrWhiteSpace($relId)) { $relId = Get-AttrValue $node $r 'id' }
+    211 +        if ([string]::IsNullOrWhiteSpace($relId) -or -not $relMap.ContainsKey($relId)) { continue }
+    212 +        $rel = $relMap[$relId]
+    213 +        if ($rel.target -notmatch '(media|embeddings)/') { continue }
+    214 +        $placementIndex++
+    215 +        $ancestorP = $node.SelectSingleNode('ancestor::w:p[1]', $ns)
+    216 +        $ancestorTc = $node.SelectSingleNode('ancestor::w:tc[1]', $ns)
+    217 +        $ancestorTr = $node.SelectSingleNode('ancestor::w:tr[1]', $ns)
+    218 +        $Placements.Add([pscustomobject]@{part=$PartName; index=$placementIndex; rel_id=$relId; target=$rel.tar
+         get; relationship_type=$rel.type; node=$node.LocalName; paragraph_text=(Get-WordText $ancestorP); cell_text=(Ge
+         t-WordText $ancestorTc); row_text=(Get-WordText $ancestorTr)})
+    219 +    }
+    220  }
+        ⋮
+    234          $fields = New-Object 'System.Collections.Generic.List[object]'
+    235 +        $placements = New-Object 'System.Collections.Generic.List[object]'
+    236          $parts = $zip.Entries | Where-Object { $_.FullName -match '^word/(document|header\d*|footer\d*|footnote
+         s|endnotes|comments|glossary/document)\.xml$' } | Select-Object -ExpandProperty FullName
+    204 -        foreach ($part in $parts) { Convert-Part -Zip $zip -PartName $part -DocOut $docOut -Blocks $blocks -Con
+         trols $controls -Fields $fields }
+    237 +        foreach ($part in $parts) { Convert-Part -Zip $zip -PartName $part -DocOut $docOut -Blocks $blocks -Con
+         trols $controls -Fields $fields -Placements $placements }
+    238
+        ⋮
+    272              source_file=$doc.Name; bytes=$doc.Length; parts=@($parts); blocks=$blocks.Count;
+    240 -            controls=$controls; fields=$fields; settings=$settings; media=$media; embeddings=$embeddings
+    273 +            controls=$controls; fields=$fields; placements=$placements; settings=$settings; media=$media; embed
+         dings=$embeddings
+    274          }
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └
+    file                             blocks controls fields media embeddings track_revisions
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran foreach($d in
+  │ @('Блок_1_Извещение','Блок_2_Информационная_карта','Блок_7_Техническое_задание','Блок_9_Требования'))
+  │ {$s=Get-Content -LiteralPath (Join-Path (Join-Path '.\tmp\ooxml' $d) 'structure.json') -Encoding UTF8 -Raw |
+  │ … +2 lines
+  └ DOC Блок_1_Извещение
+
+    … +910 lines (ctrl + t to view transcript)
+
+
+
+• Ran $s=Get-Content -LiteralPath '.\tmp\ooxml\Блок_2_Информационная_карта\structure.json' -Encoding UTF8 -Raw |
+  │ ConvertFrom-Json; $sel=@('media/image1.wmf','media/image5.wmf','media/image6.wmf','media/image8.wmf','media/
+  │ image10.wmf','media/image11.wmf','media/image17.wmf','media/image22.wmf','media/image24.wmf','media/
+  │ … +3 lines
+  └ [
+        {
+    … +320 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $c=Get-Content -LiteralPath '.\tmp\ooxml\Блок_2_Информационная_карта\blocks.txt' -Encoding UTF8; $c[0..84]
+  └ [part=word/document.xml; block=1; style=afffa] Блок 2 «Информационная карта»
+    [part=word/document.xml; block=2; style=] (блок 2 из 9)
+    … +90 lines (ctrl + t to view transcript)
+    [part=word/document.xml; block=7; table=1; row=34; cell=1]
+    [part=word/document.xml; block=7; table=1; row=34; cell=2] 3.10
+
+• Ran $c=Get-Content -LiteralPath '.\tmp\ooxml\Блок_2_Информационная_карта\blocks.txt' -Encoding UTF8; $c[85..169]
+  └ [part=word/document.xml; block=7; table=1; row=34; cell=3] Предоставление сведений и документов, установленных в
+    п.п. 10, 13 Информационной карты, а также соблюдение иных требований, предусмотренных в п.3.10 Блока 3 настоящего
+    … +123 lines (ctrl + t to view transcript)
+    «НК «РОСНЕФТЬ»
+    [part=word/header2.xml; block=2; style=]
+
+• Edited tools\extract_ooxml.ps1 (+3 -1)
+    217          $ancestorTr = $node.SelectSingleNode('ancestor::w:tr[1]', $ns)
+    218 -        $Placements.Add([pscustomobject]@{part=$PartName; index=$placementIndex; rel_id=$relId; target=$rel.tar
+         get; relationship_type=$rel.type; node=$node.LocalName; paragraph_text=(Get-WordText $ancestorP); cell_text=(Ge
+         t-WordText $ancestorTc); row_text=(Get-WordText $ancestorTr)})
+    218 +        $rowIndex = if ($null -ne $ancestorTr) { $ancestorTr.SelectNodes('preceding-sibling::w:tr', $ns).Count
+         + 1 } else { $null }
+    219 +        $cellIndex = if ($null -ne $ancestorTc) { $ancestorTc.SelectNodes('preceding-sibling::w:tc', $ns).Count
+          + 1 } else { $null }
+    220 +        $Placements.Add([pscustomobject]@{part=$PartName; index=$placementIndex; rel_id=$relId; target=$rel.tar
+         get; relationship_type=$rel.type; node=$node.LocalName; row=$rowIndex; cell=$cellIndex; paragraph_text=(Get-Wor
+         dText $ancestorP); cell_text=(Get-WordText $ancestorTc); row_text=(Get-WordText $ancestorTr)})
+    221      }
+
+• Ran powershell.exe -NoProfile -ExecutionPolicy Bypass -File '.\tools\extract_ooxml.ps1' -InputDirectory '.\documents'
+  │ -OutputDirectory '.\tmp\ooxml'
+  └
+    file                             blocks controls fields media embeddings track_revisions
+    … +11 lines (ctrl + t to view transcript)
+
+
+
+• Ran $s=Get-Content -LiteralPath '.\tmp\ooxml\Блок_2_Информационная_карта\structure.json' -Encoding UTF8 -Raw |
+  │ ConvertFrom-Json; $sel=@('media/image1.wmf','media/image5.wmf','media/image6.wmf','media/image8.wmf','media/
+  │ image10.wmf','media/image11.wmf','media/image17.wmf','media/image22.wmf','media/image24.wmf','media/
+  │ … +5 lines
+  └
+    row cell target            text
+    … +61 lines (ctrl + t to view transcript)
+
+
+
+• Ran $c=Get-Content -LiteralPath '.\tmp\ooxml\Блок_1_Извещение\blocks.txt' -Encoding UTF8; $c[0..154]
+  └ [part=word/document.xml; block=1; style=afffa] Блок [FIELD: SEQ Блок \* ARABIC ]1 «Извещение о конкурентной закупке»
+    [part=word/document.xml; block=2; style=] (блок 1 из 9)
+    … +153 lines (ctrl + t to view transcript)
+    [part=word/document.xml; block=7; table=1; row=53; cell=3] Не применимо.«____» _______________ 20___ г. «00 ч : 00
+    м» (часовой пояс Организатора закупки) в отношении Коммерческой части заявок
+
+• Ran $c=Get-Content -LiteralPath '.\tmp\ooxml\Блок_1_Извещение\blocks.txt' -Encoding UTF8; $c[155..309]
+  └ [part=word/document.xml; block=7; table=1; row=54; cell=1] Предоставление Документации о закупке/Извещения об
+    осуществлении запроса котировок
+    … +157 lines (ctrl + t to view transcript)
+    [part=word/header5.xml; block=2; style=]
+    [part=word/header1.xml; block=1; style=a8]
+
+• Added tools\annotate_ooxml_options.py (+64 -0)
+     1 +import json
+     2 +import sys
+     3 +import zipfile
+     4 +from pathlib import Path
+     5 +from xml.etree import ElementTree as ET
+     6 +
+     7 +W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+     8 +R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+     9 +PKG = "http://schemas.openxmlformats.org/package/2006/relationships"
+    10 +
+    11 +
+    12 +def local(tag: str) -> str:
+    13 +    return tag.rsplit("}", 1)[-1]
+    14 +
+    15 +
+    16 +def main() -> None:
+    17 +    if len(sys.argv) != 3:
+    18 +        raise SystemExit("usage: annotate_ooxml_options.py INPUT_DOCX OUTPUT_JSON")
+    19 +    source = Path(sys.argv[1]).resolve()
+    20 +    output = Path(sys.argv[2]).resolve()
+    21 +    with zipfile.ZipFile(source) as zf:
+    22 +        root = ET.fromstring(zf.read("word/document.xml"))
+    23 +        rel_root = ET.fromstring(zf.read("word/_rels/document.xml.rels"))
+    24 +        rels = {e.attrib["Id"]: e.attrib.get("Target", "") for e in rel_root.findall(f"{{{PKG}}}Relationship")}
+    25 +
+    26 +    def tokens(node: ET.Element):
+    27 +        name = local(node.tag)
+    28 +        if node.tag in (f"{{{W}}}t", f"{{{W}}}delText"):
+    29 +            yield node.text or ""
+    30 +        elif node.tag == f"{{{W}}}instrText":
+    31 +            yield f"[FIELD:{(node.text or '').strip()}]"
+    32 +        elif node.tag == f"{{{W}}}tab":
+    33 +            yield "\t"
+    34 +        elif node.tag in (f"{{{W}}}br", f"{{{W}}}cr"):
+    35 +            yield " / "
+    36 +        for key in (f"{{{R}}}embed", f"{{{R}}}id"):
+    37 +            rid = node.attrib.get(key)
+    38 +            if rid and rid in rels and ("media/" in rels[rid] or "embeddings/" in rels[rid]):
+    39 +                yield f"[OBJ:{rels[rid]}]"
+    40 +        for child in node:
+    41 +            yield from tokens(child)
+    42 +        if name == "p":
+    43 +            yield " | "
+    44 +
+    45 +    records = []
+    46 +    table_index = 0
+    47 +    for table in root.iter(f"{{{W}}}tbl"):
+    48 +        # Only assign each cell to its nearest table, preventing nested-table duplicates.
+    49 +        table_index += 1
+    50 +        rows = [c for c in table if c.tag == f"{{{W}}}tr"]
+    51 +        for row_index, row in enumerate(rows, 1):
+    52 +            cells = [c for c in row if c.tag == f"{{{W}}}tc"]
+    53 +            for cell_index, cell in enumerate(cells, 1):
+    54 +                out = "".join(tokens(cell))
+    55 +                out = " ".join(out.split())
+    56 +                if "[OBJ:" in out:
+    57 +                    records.append({"table": table_index, "row": row_index, "cell": cell_index, "content": out})
+    58 +    output.parent.mkdir(parents=True, exist_ok=True)
+    59 +    output.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
+    60 +    print(f"{source.name}: {len(records)} cells with embedded objects")
+    61 +
+    62 +
+    63 +if __name__ == "__main__":
+    64 +    main()
+
+• Ran $py='C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'; New-Item
+  │ -ItemType Directory -Path '.\tmp\annotated' -Force | Out-Null; Get-ChildItem -LiteralPath '.\documents' -Filter
+  │ '*.docx' | ForEach-Object {& $py '.\tools\annotate_ooxml_options.py' $_.FullName (Join-Path '.
+  │ … +1 lines
+  └ 0_�����_�����_��.docx: 0 cells with embedded objects
+    ����_1_���������.docx: 160 cells with embedded objects
+    … +6 lines (ctrl + t to view transcript)
+    ����_8_�����.docx: 0 cells with embedded objects
+    ����_9_����������.docx: 5 cells with embedded objects
+
+• Ran $b1=Get-Content -LiteralPath '.\tmp\annotated\Блок_1_Извещение.json' -Encoding UTF8 -Raw | ConvertFrom-Json; $b1 |
+  │ Where-Object {$_.content -match 'Запрос цен|ЭТП «ГПБ»|Совместная закупка|Конкурентная процедура закупки является'}
+  │ | ConvertTo-Json -Depth 4
+  └ [
+        {
+    … +26 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $b1=Get-Content -LiteralPath '.\tmp\annotated\Блок_1_Извещение.json' -Encoding UTF8 -Raw | ConvertFrom-Json; $b1 |
+  │ Where-Object {$_.table -eq 1 -and (($_.row -eq 5 -and $_.cell -in 4,5) -or ($_.row -eq 7))} | ConvertTo-Json
+  │ -Depth 4
+  └ [
+        {
+    … +23 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $b1=Get-Content -LiteralPath '.\tmp\annotated\Блок_1_Извещение.json' -Encoding UTF8 -Raw | ConvertFrom-Json; $b1 |
+  │ Where-Object {$_.table -eq 1 -and $_.row -in 19,20,26,37,38,39,41,42,43,44,45,46} | ConvertTo-Json -Depth 4
+  └ [
+        {
+    … +71 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $b=Get-Content -LiteralPath '.\tmp\annotated\Блок_2_Информационная_карта.json' -Encoding UTF8 -Raw |
+  │ ConvertFrom-Json; $pat='национальн|Форма, сроки|аванс|обеспечени[ея] заявк|критери|коммерческой части заявки|
+  │ технической части заявки|переторж|специальн|казнач|банковск|оплат|документы|состав заявк'; $b | Where-Object
+  │ … +1 lines
+  └ [
+        {
+    … +111 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran $b=Get-Content -LiteralPath '.\tmp\annotated\Блок_2_Информационная_карта.json' -Encoding UTF8 -Raw |
+  │ ConvertFrom-Json; $b | Where-Object {$_.table -eq 1 -and $_.row -in
+  │ 4,6,9,10,13,15,17,19,20,23,25,26,27,28,30,31,32,60,62,63,64,68} | Select-Object table,row,cell,content |
+  │ … +1 lines
+  └ [
+        {
+    … +129 lines (ctrl + t to view transcript)
+        }
+    ]
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "банковск(ое|ого) сопровожд|казначейск|специальн(ый|ого) счет" '.
+  │ \tmp\ooxml'
+  └ .\tmp\ooxml\Блок_6_Проект_договора\blocks.txt:169:[part=word/document.xml; block=125; style=ab] Расчеты по Договору
+    подлежат казначейскому сопровождению в соответствии со статьей 5 Федерального закона от 28.11.2025 № 426-ФЗ «О
+    … +29 lines (ctrl + t to view transcript)
+    пунктом 3.6 настоящего Договора. (Не применяется при условии – субпоставщик – иностранный производитель – нерезидент
+    РФ).
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "обеспечени.{0,50}гарантийн|гарантийн.{0,50}обеспечени" '.
+  │ \tmp\ooxml'
+  └ (no output)
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "аналог|эквивалент|замена" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_3_Инструкция\blocks.txt:86:[part=word/document.xml; block=86; style=afa] запрет: не допускается
+    замена такого товара на происходящий из иностранного государства товар;
+    … +45 lines (ctrl + t to view transcript)
+    не ниже установленных в тексте настоящего Соглашения, которые должны быть закреплены в виде соглашения, аналогичного
+    настоящему Соглашению, и согласованы с Передающей стороной.
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "опыт.{0,40}(постав|работ|услуг|договор)|аналогичн.{0,40}(постав|
+  │ работ|услуг|договор)" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_3_Инструкция\blocks.txt:131:[part=word/document.xml; block=131; style=] Сведения об опыте
+    выполнения Договоров, аналогичных предмету закупки, по форме 3 (Блок 4 «Образцы форм документов, включаемых в заявку
+    … +21 lines (ctrl + t to view transcript)
+    .\tmp\ooxml\Блок_6_Проект_договора\blocks.txt:3258:[part=word/document.xml; block=786; table=31; row=26; cell=3]
+    Опытно-конструкторские работы; подготовка и освоение производства; cерийное производство
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "лицензи|сертификат|свидетельств|справк|выписк|ЕГРЮЛ|ЕГРИП|реестр"
+  │ '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:253:[part=word/document.xml; block=14; table=3; row=3; cell=8] Начальная
+    (максимальная) цена договора по данному лоту составляет: 2 607 605 (Два миллиона шестьсот семь тысяч шестьсот пять)
+    … +160 lines (ctrl + t to view transcript)
+    стороны любого органа управления, Государственного Органа в отношении (1) заключения Договора и (2) законности или
+    действительности Договора;
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "государственн(ый|ого) контракт|муниципальн(ый|ого) контракт|
+  │ государственн(ый|ого) оборонн|ГОЗ" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:37:[part=word/document.xml; block=7; table=1; row=9; cell=3] ЭТП «ГПБ»ЭТП
+    «Единая электронная торговая площадка»ЭТП «Автоматизированная система торгов государственного оборонного заказа»
+    … +63 lines (ctrl + t to view transcript)
+    реестре документов-оснований идентификатора Государственного контракта, порядок формирования которого установлен
+    Федеральным казначейством. (Не применяется при условии – субпоставщик – иностранный производитель – нерезидент РФ).
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "техническ(ий|ого) специалист|контактн(ое|ая) лиц|телефон|
+  │ электронн(ая|ой) почт" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:42:[part=word/document.xml; block=7; table=1; row=11; cell=2] Адрес
+    электронной почты для подачи заявок
+    … +69 lines (ctrl + t to view transcript)
+    Организатору закупки посредством почтового отправления/курьерской службы подписанный со своей стороны протокол и
+    документ, подтверждающий право на подписание данного протокола (устав, доверенность и т.д.).
+
+• Ran Get-ChildItem -LiteralPath '.\tmp\ooxml' -Directory | ForEach-Object {$b=Get-Content -LiteralPath (Join-Path
+  │ $_.FullName 'blocks.json') -Encoding UTF8 -Raw | ConvertFrom-Json; Write-Output ('DOC '+$_.Name); $b |
+  │ Where-Object {$_.text -and ($_.type -eq 'paragraph') -and ($_.style -or $_.text -match '^(Блок|Раздел|Приложение|
+  │ … +3 lines
+  └ DOC 0_Общая_часть_зо
+
+    … +513 lines (ctrl + t to view transcript)
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Встроенный объект в Блоке 9 оказался книгой Excel «Анкета-формуляр.xlsx». Для проверки этого вложения применяю навык
+  анализа электронных таблиц: он нужен, чтобы прочитать все листы, формулы и заполненные/пустые поля, а не судить по
+  иконке или скриншотам в DOCX.
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\spreadsheets\26.904.11930\skills\spreadsheets\SKILL.md'
+  │ -Encoding UTF8 -Raw
+  └ ---
+    name: "Spreadsheets"
+    … +218 lines (ctrl + t to view transcript)
+    - Bundled JS libraries available for document/PDF work include `docx`, `pdf-lib`, and `pdfjs-dist`.
+
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\spreadsheets\26.904.11930\skills\spreadsheets\artifact_to
+  │ ol_docs\API_QUICK_START.md' -Encoding UTF8 -Raw
+  └ # Using artifact_tool APIs (JavaScript)
+
+    … +423 lines (ctrl + t to view transcript)
+    ```
+
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\spreadsheets\26.904.11930\skills\spreadsheets\style_guide
+  │ lines.md' -Encoding UTF8 -Raw
+  └ # Style and Formatting Instructions
+
+    … +63 lines (ctrl + t to view transcript)
+    and unclipped content. Verify live states, conditional-format ranges, effective fonts and saved freeze panes.
+
+
+• Ran Get-Content -LiteralPath 'C:
+  │ \Users\kosty\.codex\plugins\cache\openai-primary-runtime\spreadsheets\26.904.11930\skills\spreadsheets\references\
+  │ read_only_qna.md' -Encoding UTF8 -Raw
+  └ ## Handling queries and questions
+    The user may ask questions about the sheet instead of requesting an edit or a change.
+    … +9 lines (ctrl + t to view transcript)
+    evidence. Do not retain/disclose restricted values, raw formulas, company names or source identifiers.
+
+
+• Added tools\inspect_xlsx.py (+63 -0)
+     1 +import json
+     2 +import sys
+     3 +from pathlib import Path
+     4 +
+     5 +import openpyxl
+     6 +
+     7 +
+     8 +def main() -> None:
+     9 +    if len(sys.argv) != 3:
+    10 +        raise SystemExit("usage: inspect_xlsx.py INPUT_XLSX OUTPUT_JSON")
+    11 +    src = Path(sys.argv[1]).resolve()
+    12 +    out = Path(sys.argv[2]).resolve()
+    13 +    wb = openpyxl.load_workbook(src, data_only=False, read_only=False)
+    14 +    result = {
+    15 +        "file": src.name,
+    16 +        "sheets": [],
+    17 +        "defined_names": [str(x) for x in wb.defined_names.values()],
+    18 +    }
+    19 +    for ws in wb.worksheets:
+    20 +        cells = []
+    21 +        formulas = []
+    22 +        for row in ws.iter_rows():
+    23 +            for cell in row:
+    24 +                if cell.value is None:
+    25 +                    continue
+    26 +                rec = {
+    27 +                    "cell": cell.coordinate,
+    28 +                    "value": str(cell.value),
+    29 +                    "data_type": cell.data_type,
+    30 +                    "number_format": cell.number_format,
+    31 +                }
+    32 +                cells.append(rec)
+    33 +                if cell.data_type == "f":
+    34 +                    formulas.append(rec)
+    35 +        validations = []
+    36 +        if ws.data_validations is not None:
+    37 +            for dv in ws.data_validations.dataValidation:
+    38 +                validations.append({
+    39 +                    "type": dv.type,
+    40 +                    "sqref": str(dv.sqref),
+    41 +                    "formula1": dv.formula1,
+    42 +                    "formula2": dv.formula2,
+    43 +                })
+    44 +        result["sheets"].append({
+    45 +            "title": ws.title,
+    46 +            "state": ws.sheet_state,
+    47 +            "max_row": ws.max_row,
+    48 +            "max_column": ws.max_column,
+    49 +            "merged_ranges": [str(r) for r in ws.merged_cells.ranges],
+    50 +            "freeze_panes": str(ws.freeze_panes) if ws.freeze_panes else None,
+    51 +            "cells": cells,
+    52 +            "formulas": formulas,
+    53 +            "data_validations": validations,
+    54 +            "images": len(getattr(ws, "_images", [])),
+    55 +            "charts": len(getattr(ws, "_charts", [])),
+    56 +        })
+    57 +    out.parent.mkdir(parents=True, exist_ok=True)
+    58 +    out.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    59 +    print(json.dumps({"file": result["file"], "sheets": [{"title": s["title"], "state": s["state"], "cells": len
+        (s["cells"]), "formulas": len(s["formulas"]), "validations": len(s["data_validations"])} for s in result["sheets
+        "]]}, ensure_ascii=False, indent=2))
+    60 +
+    61 +
+    62 +if __name__ == "__main__":
+    63 +    main()
+
+• Ran $f=Get-ChildItem -LiteralPath '.\tmp\ooxml\Блок_9_Требования\embeddings' -Filter '*.xlsx' | Select-Object -First
+  │ 1; & 'C:\Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' '.
+  │ \tools\inspect_xlsx.py' $f.FullName '.\tmp\embedded-xlsx.json'
+  └ C:
+    \Users\kosty\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\site-packages\openpyxl\worksheet\_r
+    … +72 lines (ctrl + t to view transcript)
+      ]
+    }
+
+• Ran $x=Get-Content -LiteralPath '.\tmp\embedded-xlsx.json' -Encoding UTF8 -Raw | ConvertFrom-Json; $x.sheets |
+  │ Select-Object
+  │ title,state,max_row,max_column,@{n='cells';e={$_.cells.Count}},@{n='formulas';e={$_.formulas.Count}},images,charts
+  │ … +1 lines
+  └
+    title           state   max_row max_column cells formulas images charts
+    … +10 lines (ctrl + t to view transcript)
+
+
+
+• Ran $x=Get-Content -LiteralPath '.\tmp\embedded-xlsx.json' -Encoding UTF8 -Raw | ConvertFrom-Json; foreach($s in
+  │ $x.sheets | Select-Object -First 6){Write-Output ('SHEET '+$s.title); $s.cells | Select-Object
+  │ cell,value,data_type | Format-Table -Wrap -AutoSize}
+  └ SHEET 1. Главная
+
+    … +768 lines (ctrl + t to view transcript)
+
+
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "техническ(им|ие|их) вопрос" '.\tmp\ooxml'
+  └ (no output)
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "контактн(ое|ая) лицо" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:69:[part=word/document.xml; block=7; table=1; row=22; cell=2] Контактное
+    лицо (ФИО)
+    … +6 lines (ctrl + t to view transcript)
+    .\tmp\ooxml\Блок_4_Образцы_форм\blocks.txt:483:[part=word/document.xml; block=311; table=11; row=1; cell=3]
+    Наименование Заказчика,адрес и контактный телефон/факс Заказчика,контактное лицо
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "Фунтова" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:70:[part=word/document.xml; block=7; table=1; row=22; cell=3] Фунтова
+    Виктория Николаевна
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "Березина|Павлов|Рыжков|телефон" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:55:[part=word/document.xml; block=7; table=1; row=16; cell=2] Контактный
+    телефон
+    … +43 lines (ctrl + t to view transcript)
+    .\tmp\ooxml\Блок_6_Проект_договора\blocks.txt:3220:[part=word/document.xml; block=786; table=31; row=14; cell=2]
+    Номер телефона
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "стоимость участия|плата.{0,40}участ|комисси|тариф" '.\tmp\ooxml'
+  └ .\tmp\ooxml\0_Общая_часть_зо\blocks.txt:6:[part=word/document.xml; block=6; style=] Решением Закупочной комиссии
+    .\tmp\ooxml\Блок_5_Образцы_иных_форм\blocks.txt:507:[part=word/document.xml; block=216; style=] Конфликтной комиссии
+    … +7 lines (ctrl + t to view transcript)
+    направляется на имя Председателя Конфликтной комиссии в соответствии с типовой формой, которая представлена в Блоке
+    5 «Образец оформления конвертов и иных документов, оформляемых в ходе проведения закупки и/или по ее результатам».
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "10 месяцев|Срок поставки Товара|срок поставки" '.
+  │ \tmp\ooxml\Блок_6_Проект_договора' '.\tmp\ooxml\Блок_7_Техническое_задание'
+  └ .\tmp\ooxml\Блок_7_Техническое_задание\blocks.txt:70:[part=word/document.xml; block=23; table=2; row=1; cell=2]
+    Продукция должна соответствовать следующим требованиям к безопасности, качеству, техническим характеристикам,
+    … +38 lines (ctrl + t to view transcript)
+    .\tmp\ooxml\Блок_6_Проект_договора\blocks.txt:493:[part=word/document.xml; block=338; table=3; row=14; cell=2] В
+    течение 10 месяцев с даты подписания Договора.
+
+• Ran $c=Get-Content -LiteralPath '.\tmp\ooxml\Блок_6_Проект_договора\blocks.txt' -Encoding UTF8; $c[145..182]
+  └ [part=word/document.xml; block=102; style=ab] ЦЕНА ДОГОВОРА
+    [part=word/document.xml; block=103; style=ab] Общая цена Договора составляет [ ] руб., в том числе НДС 22% [ ] руб.
+    … +49 lines (ctrl + t to view transcript)
+    Договору). Поставщик может осуществить досрочную или частичную поставку Товара по предварительному письменному
+    согласованию с Покупателем если в Спецификации не оговорен иной порядок.
+
+• Ran rg -n -i --encoding utf-8 --glob 'blocks.txt' "государственн(ого|ый|ому) контракт|муниципальн(ого|ый) контракт|
+  │ государственн(ого|ый) оборонн|ГОЗ|выполнени.{0,60}государственн" '.\tmp\ooxml'
+  └ .\tmp\ooxml\Блок_1_Извещение\blocks.txt:37:[part=word/document.xml; block=7; table=1; row=9; cell=3] ЭТП «ГПБ»ЭТП
+    «Единая электронная торговая площадка»ЭТП «Автоматизированная система торгов государственного оборонного заказа»
+    … +102 lines (ctrl + t to view transcript)
+    допуска. До начала работы с документами, имеющими ограничение допуска, представители Государственного заказчика,
+    Покупателя или его специализированной организации подписывают соглашение о конфиденциальности.
+
+• Ran rg -n -i --encoding utf-8 "лицензи|сертификат" '.\tmp\ooxml\Блок_9_Требования\blocks.txt' '.
+  │ \tmp\ooxml\Блок_7_Техническое_задание\blocks.txt' '.\tmp\ooxml\Блок_2_Информационная_карта\blocks.txt' '.
+  │ \tmp\ooxml\Блок_6_Проект_договора\blocks.txt'
+  └ .\tmp\ooxml\Блок_7_Техническое_задание\blocks.txt:65:[part=word/document.xml; block=19; style=] стоимость
+    изготовления и оформления паспортов качества, свидетельств и сертификатов;
+    … +66 lines (ctrl + t to view transcript)
+    стороны любого органа управления, Государственного Органа в отношении (1) заключения Договора и (2) законности или
+    действительности Договора;
+
+• Context compacted
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Я завершил техническое чтение всех 12 исходных файлов, включая визуальную проверку каждой страницы двух PDF, состояния
+  графических переключателей в DOCX и встроенную XLSX-анкету. Сейчас свожу последние квалификационные требования и
+  перечень документов заявки, затем проверю, что в отчёте ровно 27 полей и у каждого есть трассировка к источнику.
+
+• Ran rg -n -i --glob '*.txt' --glob '*.json' "лиценз|сертификат|свидетельств|выписк|справк|аналогич|опыт постав|
+  │ эквивалент|аналог|документ.*заявк|состав заявк" tmp/ooxml tmp/annotated
+  └ tmp/annotated\Блок_1_Извещение.json:78:    "content": "[OBJ:media/image6.wmf] | « 31 » июля 2026 г. в отношении: |
+    [OBJ:media/image8.wmf] | Квалификационной части заявок | [OBJ:media/image9.wmf] | Технической части заявок |
+    … +553 lines (ctrl + t to view transcript)
+    FORMTEXT ]Поставщика, ИНН или аналог, название налога, сумму дохода, с которого был удержан налог, ставку и сумму
+    уплаченного налога, а также копии подтверждающих документов.",
+
+• Ran rg -n -i "лиценз|сертификат|свидетельств|выписк|справк|аналогич|опыт постав|эквивалент|аналог" "tmp/ooxml/
+  │ Блок_9_Требования/blocks.txt"
+  └ 17:[part=word/document.xml; block=9; table=1; row=3; cell=3] Декларация Участника закупки о соответствии данному
+    требованию за подписью руководителя Участника закупки по форме 1а/1б. Копия Бухгалтерского баланса за последний
+    … +90 lines (ctrl + t to view transcript)
+    1014:[part=word/document.xml; block=450; style=] Свидетельство о государственной регистрации:
+    _______________________________________________________________________________.
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_9_Требования/blocks.txt' -Encoding UTF8 | Select-Object -First 120
+  └ [part=word/document.xml; block=1; style=] Блок 9 «Квалификационные требования к Поставщику/Участнику закупки»
+    [part=word/document.xml; block=2; style=] (блок 9 из 9)
+    … +121 lines (ctrl + t to view transcript)
+    Крайне неустойчивое ФC. Допускается при условии предоставления обеспечения в соответствии с требованиями, указанными
+    в п.п. 37, 38, 39 Блока 2 настоящего документа.
+
+• Ran $j=Get-Content -LiteralPath 'tmp/annotated/Блок_2_Информационная_карта.json' -Raw -Encoding UTF8 |
+  │ ConvertFrom-Json; $j | Select-Object index,table,row,cell,content | Format-List
+  └
+
+    … +2474 lines (ctrl + t to view transcript)
+
+
+
+• Ran $j=Get-Content -LiteralPath 'tmp/annotated/Блок_2_Информационная_карта.json' -Raw -Encoding UTF8 |
+  │ ConvertFrom-Json; $j | Where-Object { $_.table -eq 1 -and $_.row -in
+  │ @(25,26,30,31,32,33,34,35,36,37,38,39,60,61,62,63,64,65,66,67,68) } | ForEach-Object { "TABLE=$($_.table)
+  │ … +1 lines
+  └ TABLE=1 ROW=25 CELL=3
+    Требования к обеспечению заявки: | [OBJ:media/image1.wmf] | Не предусмотрены; | [OBJ:media/image2.wmf] |
+    … +58 lines (ctrl + t to view transcript)
+    закупочной документации).. | |
+
+
+• Ran rg -n "Критерии оценки|99|статус участника|Вес критерия|Перечень критериев" "tmp/ooxml/
+  │ Блок_2_Информационная_карта/blocks.txt"
+  └ 125:[part=word/document.xml; block=7; table=1; row=51; cell=3] Порядок проверки соответствия заявок Участников
+    критериям отбора:Проверка осуществляется на основании критериев отбора, указанных в п. 28 Информационной карты, и в
+    … +46 lines (ctrl + t to view transcript)
+    учета снижения либо увеличения ценового предложения.Иной порядок
+    __________________________________________________________.
+
+• Ran rg -n "3\.8|3\.9|3\.10|квалификационн.*част|техническ.*част|коммерческ.*част" "tmp/ooxml/Блок_3_Инструкция/
+  │ blocks.txt"
+  └ 32:[part=word/document.xml; block=32; style=] Все документы, подтверждающие соответствие Участника квалификационным
+    требованиям, Участник закупки должен предоставить в составе квалификационной части заявки. В случае изменения с
+    … +74 lines (ctrl + t to view transcript)
+    требований раздела 2 Блока 9 настоящего документа Поставщику / Участнику закупки необходимо предоставить в составе
+    квалификационной части заявки:
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_3_Инструкция/blocks.txt' -Encoding UTF8 | Select-Object -Skip 118 -First
+  │ 36
+  └ [part=word/document.xml; block=119; style=] Требования к содержанию, форме, оформлению и составу квалификационной
+    части заявки устанавливаются в п. 18 Блока 2 настоящего документа, разделах 3.2, 3.13 Блока 3, Блоке 9 настоящего
+    … +59 lines (ctrl + t to view transcript)
+    Документации о закупке и не позднее, чем за 3 рабочих дня до окончания срока подачи заявок, включая день направления
+    запроса.
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_9_Требования/blocks.txt' -Encoding UTF8 | Select-Object -Skip 515 -First
+  │ 80
+  └ [part=word/document.xml; block=107; style=] Требования к представлению информации для проверки на соответствие
+    требованиям в рамках должной осмотрительности
+    … +84 lines (ctrl + t to view transcript)
+    орган почтового отправления с описью вложения, содержащего отчетность, сопровождаемой подписанной усиленной
+    квалифицированной электронной подписью налогового органа квитанцией о приеме отчетности).
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_1_Извещение/blocks.txt' -Encoding UTF8 | Select-Object -First 80;
+  │ Get-Content -LiteralPath 'tmp/ooxml/Блок_7_Техническое_задание/blocks.txt' -Encoding UTF8 | Select-Object -First
+  │ 80
+  └ [part=word/document.xml; block=1; style=afffa] Блок [FIELD: SEQ Блок \* ARABIC ]1 «Извещение о конкурентной закупке»
+    [part=word/document.xml; block=2; style=] (блок 1 из 9)
+    … +167 lines (ctrl + t to view transcript)
+    основаниях предлагать продукцию в срок и на условиях, указанных в Документации о закупке:№ТребованияПодтверждающие
+    документы[требование][подтверждающий документ]
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_1_Извещение/blocks.txt' -Encoding UTF8 | Select-Object -Skip 75 -First 55
+  └ [part=word/document.xml; block=7; table=1; row=24; cell=3] +7 (812) 679 73 71 (доб. 2303)
+    [part=word/document.xml; block=7; table=1; row=25; cell=1]
+    … +53 lines (ctrl + t to view transcript)
+    [part=word/document.xml; block=7; table=1; row=44; cell=3] Не применимо.«____» _______________ 20___ г. «00 ч : 00
+    м» (часовой пояс Организатора закупки) в отношении Коммерческой части заявок
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_6_Проект_договора/blocks.txt' -Encoding UTF8 | Select-Object -Skip 90
+  │ -First 55; Get-Content -LiteralPath 'tmp/ooxml/Блок_6_Проект_договора/blocks.txt' -Encoding UTF8 | Select-Object
+  │ -Skip 330 -First 12
+  └ [part=word/document.xml; block=55; table=1; row=13; cell=1]
+    [part=word/document.xml; block=55; table=1; row=13; cell=2] БУХГАЛТЕРСКАЯ (ФИНАНСОВАЯ) ОТЧЕТНОСТЬ
+    … +68 lines (ctrl + t to view transcript)
+    проверок.
+    [part=word/document.xml; block=298; style=ab] Ответственность сторон:
+
+• Ran rg -n "авансовый платеж|Окончательный платеж|100% от Цены|лицевой счет|казначейскому сопровождению|банковскому
+  │ сопровождению|Гарантийн.*срок|обеспечени.*гарантийн" "tmp/ooxml/Блок_6_Проект_договора/blocks.txt"
+  └ 161:[part=word/document.xml; block=117; style=ab] Покупатель перечисляет Поставщику авансовый платеж в размере 30 %
+    от общей цены Договора, указанной в пункте 2.1 Договора, что составляет ___ руб., в том числе НДС 22 % в размере ___
+    … +29 lines (ctrl + t to view transcript)
+    Покупателем третьему лицу (Эксплуатанту) после уведомления Поставщика. Такая уступка или передача не будет влиять на
+    обязательства Сторон, в том числе на платежные и гарантийные обязательства по Договору.
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_6_Проект_договора/blocks.txt' -Encoding UTF8 | Select-Object -Skip 156
+  │ -First 17
+  └ [part=word/document.xml; block=113; style=ab] иные расходы, связанные с исполнением Поставщиком своих обязательств
+    по Договору.
+    … +40 lines (ctrl + t to view transcript)
+    финансового года);
+    [part=word/document.xml; block=129; style=ab] На счета, открытые Поставщику в банке, за исключением:
+
+• Ran rg --files tmp/pdfs
+  └ tmp/pdfs\РАСЧЕТ_НМЦ\summary.json
+    tmp/pdfs\manifest.json
+    … +19 lines (ctrl + t to view transcript)
+    tmp/pdfs\Приложение_к_Блоку_7._ИТТ\all-pages.txt
+    tmp/pdfs\РАСЧЕТ_НМЦ\pages\page-001.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-004.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-005.png
+
+• Viewed Image
+  └ tmp\pdfs\Приложение_к_Блоку_7._ИТТ\pages\page-007.png
+
+• Ran Get-Content -LiteralPath 'tmp/ooxml/Блок_9_Требования/blocks.txt' -Encoding UTF8 | Select-Object -Skip 176 -First
+  │ 125
+  └ [part=word/document.xml; block=66; style=] Копия финансовой отчетности за последний отчетный период и за последний
+    отчетный год по разделам, приведенным в соответствие со стандартами, применимыми для Бухгалтерской отчетности на
+    … +127 lines (ctrl + t to view transcript)
+    [part=word/document.xml; block=92; table=7; row=3; cell=2] ≥ 0,80
+    [part=word/document.xml; block=92; table=7; row=3; cell=3] 0,40 - 0,79
+
+• Viewed Image
+  └ tmp\wmf_sheets\Блок_2_Информационная_карта.png
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Для финальной проверки применяю навык verification-before-completion: после записи отчёта машинно сверю каталог
+  ключей, число полей, допустимые статусы и наличие всех обязательных реквизитов. Это не меняет выводы, а защищает от
+  пропуска или лишнего поля.
+
+• Ran Get-Content -LiteralPath 'C:\Users\kosty\.codex\skills\verification-before-completion\SKILL.md' -Raw -Encoding
+  │ UTF8
+  └ ---
+    name: verification-before-completion
+    … +138 lines (ctrl + t to view transcript)
+    This is non-negotiable.
+
+
+• Added codex-result.md (+281 -0)
+      1 +# Независимый анализ закупки
+      2 +
+      3 +Проверены все 12 файлов каталога `documents`: 10 DOCX и 2 PDF. Оба PDF просмотрены постранично; 8-страничное ИТ
+         Т является сканом без текстового слоя, поэтому цитаты с него транскрибированы при визуальной проверке. Для DOCX
+          исследованы основной текст, таблицы, OOXML-структура, связи, встроенные объекты и состояния графических перекл
+         ючателей/флажков; встроенная в Блок 9 книга XLSX также прочитана по всем листам. Внешние источники и иные катал
+         оги не использовались.
+      4 +
+      5 +Итог: 23 поля имеют статус `resolved`, 1 — `requires_review`, 3 — `not_found`.
+      6 +
+      7 +## 1. procurement_subject
+      8 +
+      9 +- field_key: `procurement_subject`
+     10 +- status: `resolved`
+     11 +- Итоговое значение: Поставка стандартных закрытий палуб для ледокола-лидера проекта 10510, заводской № 056001;
+          один комплект, включающий 11 крышек шести позиций и ЗИП.
+     12 +- Исходный файл: `Блок_1_Извещение.docx`; детализация — `Блок_7_Техническое_задание.docx`.
+     13 +- Страница/раздел/структурный элемент: Блок 1, таблица 1, строка 8, ячейка 3; Блок 7, раздел «Спецификация», та
+         блица 1, строки 2–10.
+     14 +- Точная подтверждающая цитата: «Поставка стандартных закрытий палуб для ледокола-лидера пр.10510 зав № 056001.
+         »; «Стандартные закрытия палуб в составе:»; «ИТОГО: Компл. 1».
+     15 +- Краткое объяснение: предмет прямо указан в извещении, а состав и количество раскрыты в техническом задании.
+     16 +
+     17 +## 2. nm_price_with_vat
+     18 +
+     19 +- field_key: `nm_price_with_vat`
+     20 +- status: `resolved`
+     21 +- Итоговое значение: НМЦ без НДС — 2 607 605,00 руб.; НДС 22% — 573 673,10 руб.; НМЦ с НДС — 3 181 278,10 руб.
+     22 +- Исходный файл: `Блок_7_Техническое_задание.docx`; подтверждение — `РАСЧЕТ_НМЦ.pdf`.
+     23 +- Страница/раздел/структурный элемент: Блок 7, абзац сразу после спецификации (OOXML-блок 9); PDF, страница 1,
+         итоговая строка расчёта.
+     24 +- Точная подтверждающая цитата: «Начальная (максимальная) цена договора (цена лота): 2 607 605 (Два миллиона ше
+         стьсот семь тысяч шестьсот пять) рублей 00 копеек, кроме того НДС 22% – 573 673 (Пятьсот семьдесят три тысячи ш
+         естьсот семьдесят три) рубля 10 копеек, всего 3 181 278 (Три миллиона сто восемьдесят одна тысяча двести семьде
+         сят восемь) рублей 10 копеек.»
+     25 +- Краткое объяснение: одинаковые суммы указаны в ТЗ и отдельном расчёте НМЦ; противоречий нет.
+     26 +
+     27 +## 3. platform
+     28 +
+     29 +- field_key: `platform`
+     30 +- status: `resolved`
+     31 +- Итоговое значение: ЭТП «ГПБ», https://etpgpb.ru/.
+     32 +- Исходный файл: `Блок_1_Извещение.docx`.
+     33 +- Страница/раздел/структурный элемент: таблица 1, строки 9–10, ячейка 3; OOXML-объект `word/media/image6.wmf` у
+          варианта «ЭТП „ГПБ“» — выбранный радиопереключатель, у двух альтернатив — пустые.
+     34 +- Точная подтверждающая цитата: «ЭТП „ГПБ“»; «https://etpgpb.ru/».
+     35 +- Краткое объяснение: значение установлено не по общему перечню вариантов, а по графически выбранному переключа
+         телю и соответствующему первому URL.
+     36 +
+     37 +## 4. procedure_type
+     38 +
+     39 +- field_key: `procedure_type`
+     40 +- status: `resolved`
+     41 +- Итоговое значение: запрос оферт; одноэтапная процедура в электронной форме, сведения распространяются в закры
+         той форме, право подачи заявки — у неограниченного круга лиц.
+     42 +- Исходный файл: `Блок_1_Извещение.docx`.
+     43 +- Страница/раздел/структурный элемент: таблица 1, строки 4–7; в OOXML/графических объектах выбранный радиоперек
+         лючатель `image2.wmf` стоит у «Запрос оферт», выбранные состояния также стоят у «Одноэтапная процедура», «Элект
+         ронная форма», «В закрытой форме» и «Неограниченный круг лиц».
+     44 +- Точная подтверждающая цитата: «Запрос оферт»; «Одноэтапная процедура»; «Электронная форма»; «В закрытой форме
+         »; «Неограниченный круг лиц».
+     45 +- Краткое объяснение: остальные перечисленные способы и формы имеют пустые переключатели и не приняты за услови
+         я закупки.
+     46 +
+     47 +## 5. application_deadline
+     48 +
+     49 +- field_key: `application_deadline`
+     50 +- status: `resolved`
+     51 +- Итоговое значение: 14 августа 2026 г., 17:00 по часовому поясу Организатора — одновременно для квалификационн
+         ой, технической и коммерческой частей.
+     52 +- Исходный файл: `Блок_1_Извещение.docx`.
+     53 +- Страница/раздел/структурный элемент: таблица 1, строка 30, ячейка 3.
+     54 +- Точная подтверждающая цитата: «„14“ августа 2026г. „17 ч: 00 м“ (часовой пояс Организатора закупки) в отношен
+         ии Квалификационной части заявок Технической части заявок Коммерческой части заявок».
+     55 +- Краткое объяснение: это прямо обозначенная дата и время окончания подачи всех частей заявки.
+     56 +
+     57 +## 6. application_review_date
+     58 +
+     59 +- field_key: `application_review_date`
+     60 +- status: `resolved`
+     61 +- Итоговое значение: 16 сентября 2026 г. до 17:00 по часовому поясу Организатора.
+     62 +- Исходный файл: `Блок_1_Извещение.docx`.
+     63 +- Страница/раздел/структурный элемент: таблица 1, строка 32, ячейка 3.
+     64 +- Точная подтверждающая цитата: «„16“ сентября 2026г. до „17 ч: 00 м“ (часовой пояс Организатора закупки) в отн
+         ошении: Квалификационной части заявок Технической части заявок Коммерческой части заявок».
+     65 +- Краткое объяснение: дата относится к рассмотрению всех трёх частей заявок.
+     66 +
+     67 +## 7. results_date
+     68 +
+     69 +- field_key: `results_date`
+     70 +- status: `resolved`
+     71 +- Итоговое значение: 23 сентября 2026 г. до 17:00 по часовому поясу Организатора.
+     72 +- Исходный файл: `Блок_1_Извещение.docx`.
+     73 +- Страница/раздел/структурный элемент: таблица 1, строка 34, ячейка 3.
+     74 +- Точная подтверждающая цитата: «„23“ сентября 2026 г. до „17ч : 00 м“ (часовой пояс Организатора закупки)».
+     75 +- Краткое объяснение: строка прямо названа «Дата и время подведения итогов».
+     76 +
+     77 +## 8. customer
+     78 +
+     79 +- field_key: `customer`
+     80 +- status: `resolved`
+     81 +- Итоговое значение: Общество с ограниченной ответственностью «Судостроительный комплекс „Звезда“» (ООО «ССК „З
+         везда“»); Заказчик одновременно является Организатором закупки.
+     82 +- Исходный файл: `Блок_1_Извещение.docx`; подтверждение стороны договора — `Блок_6_Проект_договора.docx`.
+     83 +- Страница/раздел/структурный элемент: Блок 1, таблица 1, строки 13 и 20; у варианта «Заказчик является Организ
+         атором закупки» выбран `image6.wmf`; Блок 6, преамбула, OOXML-блок 89.
+     84 +- Точная подтверждающая цитата: «Общество с ограниченной ответственностью „Судостроительный комплекс „Звезда“»;
+          «Заказчик является Организатором закупки (сведения приведены в пп. 6-10 Извещения)»; «ООО „ССК „Звезда“), имен
+         уемое в дальнейшем „Покупатель“».
+     85 +- Краткое объяснение: выбранный вариант в извещении связывает сведения Организатора с Заказчиком; проект догово
+         ра подтверждает то же юридическое лицо как Покупателя.
+     86 +
+     87 +## 9. customer_contacts
+     88 +
+     89 +- field_key: `customer_contacts`
+     90 +- status: `resolved`
+     91 +- Итоговое значение: контакт по закупке — Фунтова Виктория Николаевна, Funtova_VN@dcss.ru, +7 (812) 679-73-71,
+         доб. 2303. Общие контакты ООО «ССК „Звезда“»: 8 (42335) 4-00-00, sskzvezda@sskzvezda.ru. Отдельный технический
+         контакт не указан; «Дополнительная контактная информация» отмечена как неприменимая.
+     92 +- Исходный файл: `Блок_1_Извещение.docx`.
+     93 +- Страница/раздел/структурный элемент: таблица 1, строки 16–17 и 22–26; у «Не применимо» в строке 26 выбран пер
+         еключатель.
+     94 +- Точная подтверждающая цитата: «Фунтова Виктория Николаевна»; «Funtova_VN@dcss.ru»; «+7 (812) 679 73 71 (доб.
+         2303)»; «8 (42335) 4-00-00»; «sskzvezda@sskzvezda.ru»; «Дополнительная контактная информация — Не применимо».
+     95 +- Краткое объяснение: приведены все фактически заполненные контакты; шаблонный незаполненный факс и невыбранные
+          варианты исключены.
+     96 +
+     97 +## 10. participation_cost
+     98 +
+     99 +- field_key: `participation_cost`
+    100 +- status: `not_found`
+    101 +- Итоговое значение: не установлено.
+    102 +- Исходный файл: все 12 файлов в `documents`.
+    103 +- Страница/раздел/структурный элемент: полная проверка текста, таблиц, графических объектов и встроенной XLSX;
+         отдельного условия о плате/тарифе/стоимости участия не обнаружено.
+    104 +- Точная подтверждающая цитата: подтверждающая цитата отсутствует во всех проверенных документах.
+    105 +- Краткое объяснение: отсутствие сведений не преобразовано в вывод «бесплатно».
+    106 +
+    107 +## 11. participation_guarantee
+    108 +
+    109 +- field_key: `participation_guarantee`
+    110 +- status: `resolved`
+    111 +- Итоговое значение: обеспечение заявки не предусмотрено.
+    112 +- Исходный файл: `Блок_2_Информационная_карта.docx`.
+    113 +- Страница/раздел/структурный элемент: таблица 1, строка 25, ячейка 3; у «Не предусмотрены» выбран `image1.wmf`
+         , у «Предусмотрены» — пустой `image2.wmf`.
+    114 +- Точная подтверждающая цитата: «Требования к обеспечению заявки: Не предусмотрены».
+    115 +- Краткое объяснение: отрицательное значение основано на явно выбранном варианте, а не на молчании документа.
+    116 +
+    117 +## 12. evaluation_criteria
+    118 +
+    119 +- field_key: `evaluation_criteria`
+    120 +- status: `resolved`
+    121 +- Итоговое значение: многокритериальная оценка: цена договора — 99% (коэффициент 0,99), статус участника «произ
+         водитель/не производитель» — 1% (0,01). По цене максимум 100 баллов, формула `БЦi = Цmin / Цi × 100`; производи
+         тель получает 100 баллов, непроизводитель — 0. Итоговый рейтинг: `Ri = БЦi × Vц + БСтi × VСт`.
+    122 +- Исходный файл: `Блок_2_Информационная_карта.docx`.
+    123 +- Страница/раздел/структурный элемент: таблица 1, пункт о порядке оценки и сопоставления заявок (структурная ст
+         рока 51, ячейка 3); выбран вариант «Многокритериальная оценка».
+    124 +- Точная подтверждающая цитата: «Цена договора, Ц — 99% — 0,99»; «Статус участника, Ст — 1% — 0,01»; «Ri = БЦi
+         * Vц + БСтi* VСт»; «Участник процедуры закупки не является производителем — 0 баллов»; «Участник процедуры заку
+         пки является производителем — 100 баллов».
+    125 +- Краткое объяснение: учтён именно отмеченный вариант оценки; невыбранные варианты «минимальная цена», «минимал
+         ьная приведённая цена» и стоимость жизненного цикла не приняты за условия.
+    126 +
+    127 +## 13. delivery_term
+    128 +
+    129 +- field_key: `delivery_term`
+    130 +- status: `resolved`
+    131 +- Итоговое значение: в течение 10 месяцев с даты подписания договора; доставка непосредственно до склада ООО «С
+         СК „Звезда“» по адресу: 692806, Приморский край, г.о. Большой Камень, г. Большой Камень, ул. Аллея Труда, зд. 1
+         9В.
+    132 +- Исходный файл: `Блок_7_Техническое_задание.docx`; подтверждение — `Блок_6_Проект_договора.docx`.
+    133 +- Страница/раздел/структурный элемент: Блок 7, раздел «Требования к продукции…», таблица 2, строка 1, ячейка 2;
+          Блок 6, Приложение № 1 «Спецификация».
+    134 +- Точная подтверждающая цитата: «Срок поставки Товара: В течение 10 месяцев с даты подписания Договора»; «Поста
+         вщик поставляет Товар непосредственно до склада Покупателя по адресу: 692806, Приморский край, Г.О. Большой Кам
+         ень, г. Большой Камень, ул. Аллея Труда зд.19В, ООО „ССК „Звезда“».
+    135 +- Краткое объяснение: срок и место прямо установлены в ТЗ и согласованы с проектом договора.
+    136 +
+    137 +## 14. payment_terms
+    138 +
+    139 +- field_key: `payment_terms`
+    140 +- status: `resolved`
+    141 +- Итоговое значение: возможен аванс 30% после подписания договора и приёмки оригинала банковской гарантии возвр
+         ата аванса — не ранее 45 и не позднее 60 дней от более позднего события; окончательный платёж 70% — через 45–60
+          дней после подписания ТОРГ-12/УПД и получения счёта и счёта-фактуры (для МСП — не позднее 7 рабочих дней). Есл
+         и документы на аванс не поданы до начала поставки, аванс не выплачивается и 100% оплачивается после поставки в
+         те же сроки.
+    142 +- Исходный файл: `Блок_6_Проект_договора.docx`; выбранность аванса подтверждает `Блок_2_Информационная_карта.do
+         cx`.
+    143 +- Страница/раздел/структурный элемент: Блок 6, раздел «Условия платежа», OOXML-блоки 117–121; Блок 2, таблица 1
+         , строка 17, ячейка 3 — выбран «Предоставление аванса возможно».
+    144 +- Точная подтверждающая цитата: «Покупатель перечисляет Поставщику авансовый платеж в размере 30 % … не ранее ч
+         ем через 45-ть дней, но не позднее чем через 60-т дней … и приемки Покупателем оригинала Банковской гарантии во
+         зврата авансового платежа»; «Окончательный платеж в размере 70% … не ранее чем через 45-ть дней, но не позднее
+         чем через 60-т дней (для субъектов малого и среднего предпринимательства – не позднее 7-ми рабочих дней)»; «При
+          условии невыплаты авансового платежа … платеж в размере 100 %».
+    145 +- Краткое объяснение: коммерческая карта отсылает к разделу 3 договора; приведена вся связанная схема, включая
+         резервный сценарий без аванса.
+    146 +
+    147 +## 15. special_account_or_treasury
+    148 +
+    149 +- field_key: `special_account_or_treasury`
+    150 +- status: `resolved`
+    151 +- Итоговое значение: да — казначейское сопровождение; Поставщик до расчётов обязан открыть в территориальном ор
+         гане Федерального казначейства лицевой счёт неучастника бюджетного процесса.
+    152 +- Исходный файл: `Блок_6_Проект_договора.docx`.
+    153 +- Страница/раздел/структурный элемент: раздел «Условия платежа», OOXML-блоки 122 и 125.
+    154 +- Точная подтверждающая цитата: «Поставщик обязуется до момента проведения расчетов открыть в территориальном о
+         ргане Федерального казначейства лицевой счет неучастника бюджетного процесса»; «Расчеты по Договору подлежат ка
+         значейскому сопровождению».
+    155 +- Краткое объяснение: документ прямо определяет и тип сопровождения, и вид обязательного счёта.
+    156 +
+    157 +## 16. bank_support
+    158 +
+    159 +- field_key: `bank_support`
+    160 +- status: `not_found`
+    161 +- Итоговое значение: не установлено.
+    162 +- Исходный файл: все 12 файлов в `documents`.
+    163 +- Страница/раздел/структурный элемент: полностью проверены условия договора, информационная карта, приложения,
+         формы и ИТТ; обнаружены банковская гарантия аванса и казначейское сопровождение, но отдельного условия именно о
+          банковском сопровождении договора нет.
+    164 +- Точная подтверждающая цитата: подтверждающая цитата о банковском сопровождении отсутствует; ближайшее, но ино
+         е по смыслу условие: «Расчеты по Договору подлежат казначейскому сопровождению» (`Блок_6_Проект_договора.docx`,
+          блок 125).
+    165 +- Краткое объяснение: казначейское сопровождение и банковская гарантия не приравнены к банковскому сопровождени
+         ю.
+    166 +
+    167 +## 17. government_contract
+    168 +
+    169 +- field_key: `government_contract`
+    170 +- status: `resolved`
+    171 +- Итоговое значение: да — договор заключается во исполнение государственного контракта № 213/3133-Д от 23.04.20
+         20 на строительство головного атомного ледокола проекта 10510 «Лидер»; ИГК 17706413348200000550.
+    172 +- Исходный файл: `Блок_6_Проект_договора.docx`.
+    173 +- Страница/раздел/структурный элемент: раздел «Предмет договора», OOXML-блоки 96–97.
+    174 +- Точная подтверждающая цитата: «Договор заключен во исполнение условий Государственного контракта / № 213/3133
+         -Д от 23.04.2020 на выполнение работ по строительству головного атомного ледокола проекта 10510 „Лидер“ … заклю
+         ченного между ООО „ССК „Звезда“ и ФГУП „Атомфлот“»; «Идентификатор Государственного контракта (ИГК): 1770641334
+         8200000550».
+    175 +- Краткое объяснение: связь с государственным контрактом и идентификатор указаны прямо.
+    176 +
+    177 +## 18. rebidding
+    178 +
+    179 +- field_key: `rebidding`
+    180 +- status: `resolved`
+    181 +- Итоговое значение: предусмотрена возможность переторжки по результатам отбора; после неё участник должен повт
+         орно приложить скорректированные коммерческое предложение, проект договора и письмо о подаче заявки.
+    182 +- Исходный файл: `Блок_2_Информационная_карта.docx`.
+    183 +- Страница/раздел/структурный элемент: таблица 1, строка 68, ячейка 3; у «Предусмотрены» выбран `image1.wmf`, у
+          «Не предусмотрены» — пустой `image2.wmf`.
+    184 +- Точная подтверждающая цитата: «Предусмотрены: Возможность проведения переторжки (по результатам отбора)»; «Уч
+         астнику необходимо прикрепить откорректированные с учетом новой цены документы … коммерческое предложение … под
+         писанный, заполненный проект договора … письмо о подаче заявки».
+    185 +- Краткое объяснение: значение следует из отмеченного переключателя и заполненного описания процедуры.
+    186 +
+    187 +## 19. national_regime
+    188 +
+    189 +- field_key: `national_regime`
+    190 +- status: `resolved`
+    191 +- Итоговое значение: не применяется.
+    192 +- Исходный файл: `Блок_2_Информационная_карта.docx`.
+    193 +- Страница/раздел/структурный элемент: таблица 1, строка 6, ячейка 3; отмечен флажок `image5.wmf` у «Не примени
+         мо», флажки у запрета, ограничения и преимущества пусты.
+    194 +- Точная подтверждающая цитата: «В отношении закупаемой продукции установлен: … Не применимо.»
+    195 +- Краткое объяснение: выбран ровно вариант «Не применимо». При этом в коммерческой части отдельно отмечено пред
+         ставление подтверждения российского происхождения; это требование к документу заявки создаёт смысловую несоглас
+         ованность, но само по себе не выбирает запрет, ограничение или преимущество и потому не заменяет явное состояни
+         е переключателя национального режима.
+    196 +
+    197 +## 20. advance_contract_guarantee
+    198 +
+    199 +- field_key: `advance_contract_guarantee`
+    200 +- status: `resolved`
+    201 +- Итоговое значение: обеспечение исполнения договора как самостоятельное требование — не применяется; обеспечен
+         ие возврата авансового платежа — обязательная банковская гарантия. Гарантия должна быть представлена в оригинал
+         е до выплаты 30%-го аванса и соответствовать приложениям № 8 и № 9 к договору.
+    202 +- Исходный файл: `Блок_2_Информационная_карта.docx`; `Блок_6_Проект_договора.docx`.
+    203 +- Страница/раздел/структурный элемент: Блок 2, таблица 1, строка 62, ячейка 3 — выбран `image1.wmf` у «Не приме
+         нимо» для обеспечения договора и `image35.wmf` у банковской гарантии возврата аванса; Блок 6, раздел «Условия п
+         латежа», блоки 117–118.
+    204 +- Точная подтверждающая цитата: «Требования к обеспечению Договора: … Не применимо»; «Предоставление банковской
+          гарантии возврата авансового платежа»; «приемки Покупателем оригинала Банковской гарантии возврата авансового
+         платежа, оформленной в соответствии с требованиями, указанными в Приложении № 8 к Договору по форме, указанной
+         в Приложении № 9».
+    205 +- Краткое объяснение: два разных вида обеспечения разведены; невыбранные таблицы размеров/форм обеспечения испо
+         лнения договора не приняты за действующие условия.
+    206 +
+    207 +## 21. warranty_obligations_guarantee
+    208 +
+    209 +- field_key: `warranty_obligations_guarantee`
+    210 +- status: `not_found`
+    211 +- Итоговое значение: не установлено.
+    212 +- Исходный файл: все 12 файлов в `documents`; связанное условие о гарантии найдено в `Блок_7_Техническое_задани
+         е.docx` и `Блок_6_Проект_договора.docx`.
+    213 +- Страница/раздел/структурный элемент: Блок 7, таблица 2, строка 5; Блок 6, раздел о гарантиях, OOXML-блок 204;
+          отдельной суммы, процента, удержания или банковской/независимой гарантии именно для обеспечения гарантийных об
+         язательств нет.
+    214 +- Точная подтверждающая цитата: «Гарантийный срок (период) на товар составляет 24-ре месяца с даты подписания А
+         кта приемки-передачи Судна Государственным заказчиком».
+    215 +- Краткое объяснение: найденная цитата устанавливает срок гарантии на товар, но не способ обеспечения гарантийн
+         ых обязательств; поэтому отсутствие такого обеспечения не трактуется как «не предусмотрено».
+    216 +
+    217 +## 22. licenses_certificates
+    218 +
+    219 +- field_key: `licenses_certificates`
+    220 +- status: `resolved`
+    221 +- Итоговое значение: специальная лицензия/разрешение самого участника для допуска не установлена. Для продукции
+          требуются свидетельства Российского морского регистра судоходства и иные соответствующие свидетельства о соблю
+         дении применимых правил; после заключения договора поставщик передаёт сертификат качества поставщика. Для банка
+         , выдающего гарантию возврата аванса, требуется лицензия ЦБ РФ на банковские операции и банковскую деятельность
+         .
+    222 +- Исходный файл: `Блок_9_Требования.docx`; `Приложение_к_Блоку_7._ИТТ.pdf`; `Блок_2_Информационная_карта.docx`.
+    223 +- Страница/раздел/структурный элемент: Блок 9, раздел 1.2, таблица 1, строки 10–11; ИТТ, страница 5, пункты 2.6
+         .1–2.6.2 и страница 7, пункт 4.1; Блок 2, таблица 1, строка 63, выбранные `image38.wmf` и `image10.wmf`.
+    224 +- Точная подтверждающая цитата: «ТРЕБОВАНИЯ К НАЛИЧИЮ РАЗРЕШЕНИЙ (лицензий, свидетельств о допуске …) … Не уста
+         новлено … не требуется»; «Изготовитель должен гарантировать соответствие проекта, изготовления и испытания изде
+         лий требованиям Правил РС, что должно быть подтверждено свидетельствами РС»; «сертификат качества поставщика»;
+         «Наличие лицензии на осуществление банковских операций и банковской деятельности, выданной Центральным банком Р
+         оссийской Федерации».
+    225 +- Краткое объяснение: разграничены требования к участнику, поставляемому товару/документам после заключения дог
+         овора и банку-гаранту; общие заголовки и невыбранные варианты не считались требованиями.
+    226 +
+    227 +## 23. required_official_certificates
+    228 +
+    229 +- field_key: `required_official_certificates`
+    230 +- status: `resolved`
+    231 +- Итоговое значение: в квалификационной части, в зависимости от статуса участника, требуются официальные регист
+         рационные и налоговые документы: для российского юрлица — свидетельство о госрегистрации либо лист записи ЕГРЮЛ
+         , свидетельство о постановке на налоговый учёт, свежая выписка ЕГРЮЛ, налоговая справка; для ИП — документ о го
+         срегистрации, свидетельство о налоговом учёте, свежая выписка ЕГРИП и налоговая справка; для нерезидента — свеж
+         ая выписка из торгового реестра и сведения о налоговой регистрации с переводом. Для резидентов также представля
+         ются сведения/выписка из Единого реестра субъектов МСП либо предусмотренная альтернатива. Для АО — свежая копия
+          реестра акционеров от реестродержателя.
+    232 +- Исходный файл: `Блок_9_Требования.docx`; общая отсылка — `Блок_3_Инструкция.docx`.
+    233 +- Страница/раздел/структурный элемент: Блок 9, раздел 3.1.2, OOXML-блоки 117–134; раздел «Регистрационные и ины
+         е документы», блоки 144–174; Блок 3, раздел 3.8, блоки 125–130.
+    234 +- Точная подтверждающая цитата: «„Сведения из единого реестра субъектов малого и среднего предпринимательства“
+         (информация в виде выписки …) полученные не позднее 1 (одного) месяца от даты подачи документов»; «Копия свидет
+         ельства о государственной регистрации или копия Листа записи в Единый государственный реестр юридических лиц»;
+         «Копия выписки из Единого государственного реестра юридических лиц, полученная не позднее 1 (одного) месяца»; «
+         Копия Справки об исполнении налогоплательщиком обязанности по уплате налогов, сборов, пеней, штрафов или копия
+         Справки о состоянии расчетов»; «Выписка из Единого государственного реестра индивидуальных предпринимателей»; «
+         в виде выписки из торгового реестра, с приложением перевода на русский язык».
+    235 +- Краткое объяснение: перечислены именно официальные справки, свидетельства и реестровые выписки; частноправовы
+         е письма и обычные формы заявки сюда не включены.
+    236 +
+    237 +## 24. similar_supply_experience
+    238 +
+    239 +- field_key: `similar_supply_experience`
+    240 +- status: `requires_review`
+    241 +- Итоговое значение: количественный/содержательный порог опыта не установлен, но общая инструкция одновременно
+         требует включить в квалификационную часть форму 3 со сведениями об аналогичных договорах. Это внутреннее против
+         оречие документации требует разъяснения Организатора: является ли форма 3 обязательной при значении «Опыт — не
+         установлено».
+    242 +- Исходный файл: `Блок_9_Требования.docx`; `Блок_3_Инструкция.docx`.
+    243 +- Страница/раздел/структурный элемент: Блок 9, раздел 1.3 «Требования к опыту», таблица 1, строки 12–13; Блок 3
+         , раздел 3.8, OOXML-блок 131.
+    244 +- Точная подтверждающая цитата: «ТРЕБОВАНИЯ К ОПЫТУ … 1.3.1 Не установлено … не требуется»; одновременно: «В со
+         став квалификационной части заявки должны входить: … Сведения об опыте выполнения Договоров, аналогичных предме
+         ту закупки, по форме 3».
+    245 +- Краткое объяснение: специальный блок квалификации отменяет порог опыта, но императивный перечень состава заяв
+         ки сохраняет форму; один вариант молча не выбран.
+    246 +
+    247 +## 25. analog_allowed
+    248 +
+    249 +- field_key: `analog_allowed`
+    250 +- status: `resolved`
+    251 +- Итоговое значение: да, но только для одной прямо указанной замены — крышку типа «Епи» разрешено заменить на «
+         Еш» по ГОСТ 25309-94.
+    252 +- Исходный файл: `Приложение_к_Блоку_7._ИТТ.pdf`.
+    253 +- Страница/раздел/структурный элемент: страница 4, раздел 2.1 «Комплектность», примечание под таблицей 2.1.1.1;
+          страница визуально проверена как скан.
+    254 +- Точная подтверждающая цитата: «Примечание – допускается замена крышки „Епи“ на „Еш“ по ГОСТ 25309-94.»
+    255 +- Краткое объяснение: разрешение является прямым и ограниченным; оно не распространено на иные позиции или прои
+         звольные эквиваленты.
+    256 +
+    257 +## 26. analog_definition
+    258 +
+    259 +- field_key: `analog_definition`
+    260 +- status: `resolved`
+    261 +- Итоговое значение: допустимый аналог определён как крышка «Еш» по ГОСТ 25309-94 вместо позиции «Крышка I Епи
+         Ст 800×800×110/6-2,5 ГОСТ 25309-94» (код SFI 304.2105.001, 1 шт.). Общего определения эквивалентности для прочи
+         х товаров нет.
+    262 +- Исходный файл: `Приложение_к_Блоку_7._ИТТ.pdf`; идентификация позиции подтверждается `Блок_7_Техническое_зада
+         ние.docx`.
+    263 +- Страница/раздел/структурный элемент: ИТТ, страница 4, таблица 2.1.1.1, позиция 2 и примечание; Блок 7, специф
+         икация, таблица 1, строка 4.
+    264 +- Точная подтверждающая цитата: «Крышка I Епи Ст 800х800х110/6-2,5 ГОСТ 25309-94»; «допускается замена крышки „
+         Епи“ на „Еш“ по ГОСТ 25309-94».
+    265 +- Краткое объяснение: определение аналога выведено только из связки конкретной позиции и прямого примечания; по
+         слепоставочная замена товара по согласованию из проекта договора не принята за правило допуска аналогов в заявк
+         е.
+    266 +
+    267 +## 27. application_documents
+    268 +
+    269 +- field_key: `application_documents`
+    270 +- status: `resolved`
+    271 +- Итоговое значение: заявка состоит из квалификационной, технической и коммерческой частей.
+    272 +
+    273 +  **Квалификационная часть:** форма 1а или 1б со сведениями/декларациями участника; форма 2 о цепочке собственн
+         иков и бенефициарах; согласия на обработку персональных данных по формам 6 и 7; устав, решение/приказ о руковод
+         ителе и доверенность при подписании представителем; один из документов о наличии/отсутствии статуса МСП; форма
+         3 об аналогичных договорах (с оговоркой конфликта из поля 24); формы 4 и 5 о материальных и кадровых ресурсах;
+         анкета-заявка, сведения о собственниках, письмо о крупной непогашенной задолженности и формуляр для загрузки да
+         нных в формате XLS; применимые регистрационные, налоговые и финансовые документы по Блоку 9 (включая отчётность
+          за требуемые периоды). Для коллективного участника — соглашение участников; для каждого лица/субподрядчика — п
+         рименимый комплект подтверждений. Дополнительные документы к пункту 18 Информационной карты отмечены как не пре
+         дусмотренные, а обеспечение заявки не требуется.
+    274 +
+    275 +  **Техническая часть:** техническое предложение по формам 8 и 8а с оригинальным наименованием продукции/компон
+         ентов, типом, моделью и маркой; техническая спецификация, соответствующая ТЗ и ИТТ, с заводом-изготовителем, но
+         мером, датой и регистрацией у участника. Дополнительный перечень пункта 19 Информационной карты отмечен как не
+         предусмотренный.
+    276 +
+    277 +  **Коммерческая часть:** письмо о подаче заявки по форме 9; коммерческое предложение по форме 10/10а; заполнен
+         ный и подписанный участником проект договора со всеми приложениями и документ о полномочиях подписанта. Отдельн
+         ым отмеченным флажком запрошено подтверждение российского происхождения товаров/работ/услуг, несмотря на выбран
+         ное «Не применимо» для национального режима; также отмечены документы только для оценки по критериям пункта 30/
+         31 (в частности техническая спецификация с заводом-изготовителем для критерия «Статус участника»). Калькуляция,
+          график платежей, сводная таблица затрат, антидемпинговое обоснование и планы распределения по формам 11/11а им
+         еют пустые флажки и не включены как безусловно обязательные.
+    278 +- Исходный файл: `Блок_3_Инструкция.docx`; `Блок_2_Информационная_карта.docx`; `Блок_7_Техническое_задание.docx
+         `; `Блок_9_Требования.docx`; встроенный объект `Блок_9_Требования.docx/word/embeddings/…Microsoft_Excel.xlsx`.
+    279 +- Страница/раздел/структурный элемент: Блок 3, разделы 3.8–3.10, OOXML-блоки 119–152; Блок 2, таблица 1, строки
+          30, 32 и 34 с визуально проверенными флажками; Блок 7, таблица 2, строка 1, ячейка 2; Блок 9, разделы 3.1.2–3.
+         1.3; встроенная XLSX-книга, лист `1. Главная` и связанные листы.
+    280 +- Точная подтверждающая цитата: «В состав квалификационной части заявки должны входить»; «В состав технической
+         части заявки обязательно должно входить техническое предложение, сформированное по форме 8»; «Участник закупки
+         должен представить в составе коммерческой части заявки следующие документы: письмо о подаче заявки по форме 9;
+         коммерческое предложение по форме 10»; «Техническое предложение по форме 8, 8а … В описании товара указывается
+         оригинальное наименование продукции/ компонентов, тип, модель, марка»; «Техническая спецификация должна иметь н
+         омер и дату (должна быть зарегистрирована Участником закупки …)»; «Подписанный со стороны Участника закупки про
+         ект Договора … а также документ, подтверждающий полномочия лица, подписавшего Договор»; во встроенной книге: «Ф
+         орма предоставляется в формате *.xls с пакетом документов (заполняется на русском языке…)».
+    281 +- Краткое объяснение: итог собран из базового состава заявки, специальных требований ТЗ и Блока 9 и только отме
+         ченных дополнительных пунктов Информационной карты. Невыбранные шаблонные варианты исключены; условные документ
+         ы применяются лишь к соответствующему типу участника или ситуации.
+
+• Ran $report='codex-result.md'; $catalog='FIELD_CATALOG.md'; $reportKeys=@(Select-String -LiteralPath $report -Pattern
+  │ '^- field_key: `([^`]+)`$' | ForEach-Object {$_.Matches[0].Groups[1].Value}); $catalogKeys=@(Select-String
+  │ -LiteralPath $catalog -Pattern '^###\s+\d+\.\s+`([^`]+)`' | ForEach-Object {$_.Matches[0].Groups[1].Value});
+  │ … +13 lines
+  └ {
+        "report_exists":  true,
+    … +55 lines (ctrl + t to view transcript)
+        "size_bytes":  47743
+    }
+
+• Ran Get-Content -LiteralPath 'FIELD_CATALOG.md' -Encoding UTF8 | Select-Object -First 80
+  └ # FIELD_CATALOG — tender_fields_v1
+
+    … +76 lines (ctrl + t to view transcript)
+
+    ---
+
+• Ran rg -n "procurement_subject|nm_price_with_vat|application_documents" FIELD_CATALOG.md
+  └ 129:| 1 | `procurement_subject` | Предмет закупки | CLIENT_CONFIRMED | text | `title` | ✅ | ✅ | ✅ |
+    130:| 2 | `nm_price_with_vat` | НМЦ (с НДС) | CLIENT_CONFIRMED | amount + separate VAT presentation | `max_price`
+    … +9 lines (ctrl + t to view transcript)
+    1384:procurement_subject
+    1385:nm_price_with_vat
+
+• Ran $reportKeys=@(Select-String -LiteralPath 'codex-result.md' -Pattern '^- field_key: `([^`]+)`$' | ForEach-Object
+  │ {$_.Matches[0].Groups[1].Value}); $catalogKeys=@(Select-String -LiteralPath 'FIELD_CATALOG.md' -Pattern '^##\s+\d+
+  │ \.\s+`([^`]+)`' | ForEach-Object {$_.Matches[0].Groups[1].Value});
+  │ … +3 lines
+  └ {
+        "report_fields":  27,
+    … +7 lines (ctrl + t to view transcript)
+                  ]
+    }
+
+• Edited codex-result.md (+1 -1)
+    2
+    3 -Проверены все 12 файлов каталога `documents`: 10 DOCX и 2 PDF. Оба PDF просмотрены постранично; 8-страничное ИТТ
+       является сканом без текстового слоя, поэтому цитаты с него транскрибированы при визуальной проверке. Для DOCX исс
+       ледованы основной текст, таблицы, OOXML-структура, связи, встроенные объекты и состояния графических переключател
+       ей/флажков; встроенная в Блок 9 книга XLSX также прочитана по всем листам. Внешние источники и иные каталоги не и
+       спользовались.
+    3 +Проверены все 12 файлов каталога `documents`: `0_Общая_часть_зо.docx`, блоки 1–9 (`Блок_1_Извещение.docx` … `Блок
+       _9_Требования.docx`), `Приложение_к_Блоку_7._ИТТ.pdf` и `РАСЧЕТ_НМЦ.pdf`. Оба PDF просмотрены постранично; 8-стра
+       ничное ИТТ является сканом без текстового слоя, поэтому цитаты с него транскрибированы при визуальной проверке. Д
+       ля DOCX исследованы основной текст, таблицы, OOXML-структура, связи, встроенные объекты и состояния графических п
+       ереключателей/флажков; встроенная в Блок 9 книга XLSX также прочитана по всем листам. Недоступных для исследовани
+       я форматов не осталось. Внешние источники, иные каталоги, существующие отчёты и данные проекта Tender Analysis не
+        использовались.
+    4
+
+• Ran $report='codex-result.md'; $reportKeys=@(Select-String -LiteralPath $report -Pattern '^- field_key: `([^`]+)`$' |
+  │ ForEach-Object {$_.Matches[0].Groups[1].Value}); $catalogKeys=@(Select-String -LiteralPath 'FIELD_CATALOG.md'
+  │ -Pattern '^##\s+\d+\.\s+`([^`]+)`' | ForEach-Object {$_.Matches[0].Groups[1].Value}); $statuses=@(Select-String
+  │ … +17 lines
+  └ {
+        "verification_passed":  true,
+    … +9 lines (ctrl + t to view transcript)
+        "bytes":  48122
+    }
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Полный независимый анализ сохранён в codex-result.md.
+
+  Проверка отчёта:
+
+  - ровно 27 полей, порядок полностью совпадает с FIELD_CATALOG.md;
+  - 23 — resolved;
+  - 1 — requires_review: противоречие по обязательности сведений об опыте аналогичных поставок;
+  - 3 — not_found: стоимость участия, банковское сопровождение, обеспечение гарантийных обязательств;
+  - у каждого поля присутствуют значение, источник, локатор, точная цитата и обоснование.
+
+─ Worked for 46m 20s ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+› Ask Codex to do anything
+
+  gpt-5.6-sol high · F:\Vibe-projects\Tender-blind-test-3

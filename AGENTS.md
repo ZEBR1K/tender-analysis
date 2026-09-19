@@ -634,9 +634,9 @@ n8n Credentials
 
 # 24. Official n8n documentation
 
-Актуальная локальная копия официальной документации n8n находится здесь:
+Актуальная локальная копия официальной документации n8n находится относительно корня этого проекта здесь:
 
-F:\Vibe-projects\n8n\references\n8n-docs
+`../../../../references/references/n8n-docs`
 
 При вопросах о поведении n8n не полагайся только на знания модели.
 
@@ -656,7 +656,7 @@ F:\Vibe-projects\n8n\references\n8n-docs
 
 сначала проверь официальную документацию n8n в:
 
-F:\Vibe-projects\n8n\references\n8n-docs
+`../../../../references/references/n8n-docs`
 
 Правила использования:
 
@@ -664,7 +664,7 @@ F:\Vibe-projects\n8n\references\n8n-docs
    workflows/n8n-exports/*.json
 
 2. Ожидаемое поведение самой платформы n8n проверяй по:
-   F:\Vibe-projects\n8n\references\n8n-docs
+   `../../../../references/references/n8n-docs`
 
 3. Если workflow JSON и официальная документация расходятся:
    - не делай предположений;
@@ -677,7 +677,7 @@ F:\Vibe-projects\n8n\references\n8n-docs
 5. Используй n8n-docs только как read-only reference.
 
 6. Не изменяй файлы в:
-   F:\Vibe-projects\n8n\references\n8n-docs
+   `../../../../references/references/n8n-docs`
 
 7. Не считай n8n-docs source of truth для архитектуры нашего проекта. Он описывает платформу n8n, а не нашу бизнес-логику.
 
@@ -762,3 +762,12 @@ Database role:
 9. Не использовать `rejectUnauthorized=false`.
 10. При диагностике production state live PostgreSQL имеет приоритет над устаревшими локальными runtime assumptions.
 11. Если live PostgreSQL противоречит `DATA_MODEL.md`, явно сообщить о расхождении и не менять schema без отдельного запроса.
+
+## Portable paths
+
+- Treat the directory containing this `AGENTS.md` as the project root on every machine.
+- Use repository-relative paths in active instructions, code, tests, and configuration.
+- Do not introduce drive letters, usernames, or machine-specific home directories.
+- Shared AIOS resources must be referenced relative to the project root, as in `../../../../references/references/n8n-docs`.
+- If a runtime tool requires an absolute path, read it from an environment variable or an untracked local configuration file.
+- Absolute paths inside historical logs, old handoffs, and captured test evidence describe the machine used at that time. They are not current locations and must not be reused as operational instructions.

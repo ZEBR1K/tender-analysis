@@ -1,0 +1,91 @@
+{
+  "generated_at": "2026-09-17T11:23:38.067414+00:00",
+  "nodes": {
+    "data_model_tender_analysis_documents": {
+      "code_fingerprint": "d10fa314ffcf1a6b7ee8604f737a80d96965030fc605001feb249da035e8e9d8",
+      "label": "tender_analysis_documents",
+      "last": "2026-09-07T20:22:12.887765+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T20:22:12.887765+00:00",
+          "outcome": "useful",
+          "q": "Ещё раз, ну что ты сейчас хочешь сделать? То есть основная сейчас работа выполнена, правильно я понимаю? То есть уже готов функционал, когда ставится метка на закупку и она начинается анализироваться, правильно я понимаю? Или как? Или что вообще происходит?"
+        }
+      ],
+      "score": 0.800589059,
+      "source_file": "DATA_MODEL.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "scripts_export_aggregator_e2e_pin_runner_files": {
+      "code_fingerprint": "782a86e186a263de3997fe7ecfa40d4ce169593c7267c37751a29e24238907d0",
+      "label": "files",
+      "last": "2026-09-11T19:37:33.356572+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-11T19:37:33.356572+00:00",
+          "outcome": "useful",
+          "q": "Есть ли сейчас функционал для ручной загрузки файлов? Если, например, куда-то Дмитрий бы мог их загрузить, и они бы тоже проанализировались. То есть чтобы не только с tender plan можно было работать."
+        }
+      ],
+      "score": 0.877477092,
+      "source_file": "scripts/export-aggregator-e2e-pin-runner.mjs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "tests_document_worker_docx_option_state_test_binarypartitems": {
+      "code_fingerprint": "3063c6da84faeb9dde25932c58e75b68d2be65761b5ebc09ea62fd54e91e7e71",
+      "label": "binaryPartItems()",
+      "last": "2026-09-11T19:37:33.356572+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-11T19:37:33.356572+00:00",
+          "outcome": "useful",
+          "q": "Есть ли сейчас функционал для ручной загрузки файлов? Если, например, куда-то Дмитрий бы мог их загрузить, и они бы тоже проанализировались. То есть чтобы не только с tender plan можно было работать."
+        }
+      ],
+      "score": 0.877477092,
+      "source_file": "tests/document-worker-docx-option-state.test.mjs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "workflows_document_worker_deterministic_evidence_validation": {
+      "code_fingerprint": "f003bcfaf3f5980358345b7557b60b0c4e9b5c25770ef90f88bd0c81826afdb6",
+      "label": "Deterministic Evidence Validation",
+      "last": "2026-09-07T21:45:52.805295+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-07T21:45:52.805295+00:00",
+          "outcome": "useful",
+          "q": "Действительно ли три параллельных агентских анализа Codex стабильно дают хороший результат и достаточно ли этого для перехода системы?"
+        }
+      ],
+      "score": 0.801664504,
+      "source_file": "workflows/document-worker.md",
+      "status": "tentative",
+      "uses": 1
+    },
+    "workflows_orchestrator_orchestrator_workflow": {
+      "code_fingerprint": "47d55d1a6fed1a3fdcb5ba18c03c5a43a1d6f7257c1d98662c78b30cd7db71af",
+      "label": "Tender Analysis Orchestrator Workflow",
+      "last": "2026-09-11T19:37:33.356572+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-11T19:37:33.356572+00:00",
+          "outcome": "useful",
+          "q": "Есть ли сейчас функционал для ручной загрузки файлов? Если, например, куда-то Дмитрий бы мог их загрузить, и они бы тоже проанализировались. То есть чтобы не только с tender plan можно было работать."
+        },
+        {
+          "date": "2026-09-07T20:22:12.887765+00:00",
+          "outcome": "useful",
+          "q": "Ещё раз, ну что ты сейчас хочешь сделать? То есть основная сейчас работа выполнена, правильно я понимаю? То есть уже готов функционал, когда ставится метка на закупку и она начинается анализироваться, правильно я понимаю? Или как? Или что вообще происходит?"
+        }
+      ],
+      "score": 1.678066151,
+      "source_file": "workflows/orchestrator.md",
+      "status": "preferred",
+      "uses": 2
+    }
+  },
+  "version": 1
+}
