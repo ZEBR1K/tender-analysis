@@ -52,14 +52,6 @@
           "cachedResultUrl": "/workflow/ckPnP3hRhKu4Mf9u",
           "cachedResultName": "TENDER — Генерация отчета"
         },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
         "mode": "each",
         "options": {
           "waitForSubWorkflow": true
@@ -80,14 +72,6 @@
           "__rl": true,
           "value": "__BITRIX_DELIVERY_WORKFLOW_ID__",
           "mode": "id"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
         },
         "mode": "each",
         "options": {

@@ -63,7 +63,8 @@ test('retry regenerates one report and forwards each item unchanged to delivery'
   assert.equal(delivery.parameters.workflowId.value, '__BITRIX_DELIVERY_WORKFLOW_ID__');
   assert.equal(delivery.parameters.mode, 'each');
   assert.equal(delivery.parameters.options.waitForSubWorkflow, true);
-  assert.deepEqual(delivery.parameters.workflowInputs.value, {});
+  assert.equal(Object.hasOwn(report.parameters, 'workflowInputs'), false);
+  assert.equal(Object.hasOwn(delivery.parameters, 'workflowInputs'), false);
 
   assert.deepEqual(targets('Каждую минуту'), ['Выбрать доставки для повтора']);
   assert.deepEqual(targets('Выбрать доставки для повтора'), ["Call 'TENDER — Генерация отчета'"]);
