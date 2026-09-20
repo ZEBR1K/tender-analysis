@@ -165,6 +165,49 @@ test('delivery preflight rejects invalid statistics and non-PDF bytes', async ()
   );
 });
 
+test('delivery entry path validates, registers, claims, and branches exactly once', () => {
+  assert.deepEqual(targets('When Executed by Another Workflow'), ['Конфигурация Bitrix']);
+  assert.deepEqual(targets('Конфигурация Bitrix'), ['Проверить и подготовить доставку Bitrix']);
+  assert.deepEqual(targets('Проверить и подготовить доставку Bitrix'), ['Зарегистрировать доставку']);
+  assert.deepEqual(targets('Зарегистрировать доставку'), ['Захватить доставку']);
+  assert.deepEqual(targets('Захватить доставку'), ['Доставка захвачена?']);
+  assert.deepEqual(targets('Доставка захвачена?', 1), []);
+  assert.equal(targets('Доставка захвачена?', 1).includes('Отправить PDF в Bitrix'), false);
+});
+
+test('delivery registration uses the immutable destination identity', () => {
+  const node = byName('Зарегистрировать доставку');
+  const sql = node.parameters.query;
+  assert.match(sql, /ON CONFLICT \(analysis_run_id, channel, dialog_id\)/u);
+  assert.match(sql, /d[.]analysis_run_id = \$1::uuid/u);
+  assert.match(sql, /d[.]channel = 'bitrix'/u);
+  assert.match(sql, /d[.]dialog_id = \$2/u);
+  assert.match(
+    node.parameters.options.queryReplacement,
+    /Проверить и подготовить доставку Bitrix/u,
+  );
+});
+
+test('delivery claim is atomic, bounded, due-aware, and records the execution', () => {
+  const node = byName('Захватить доставку');
+  const sql = node.parameters.query;
+  assert.match(sql, /UPDATE public[.]tender_analysis_deliveries/u);
+  assert.match(sql, /status = 'sending'/u);
+  assert.match(sql, /attempt_count = attempt_count \+ 1/u);
+  assert.match(sql, /attempt_count < 4/u);
+  assert.match(sql, /status = 'pending'/u);
+  assert.match(sql, /status = 'retry_wait'/u);
+  assert.match(sql, /next_attempt_at <= now\(\)/u);
+  assert.match(sql, /NOT EXISTS \(SELECT 1 FROM claimed\)/u);
+  assert.match(node.parameters.options.queryReplacement, /\$execution[.]id/u);
+
+  const branch = byName('Доставка захвачена?');
+  assert.equal(
+    branch.parameters.conditions.conditions[0].leftValue,
+    '={{ $json.claim_succeeded }}',
+  );
+});
+
 export {
   byName,
   fixture,

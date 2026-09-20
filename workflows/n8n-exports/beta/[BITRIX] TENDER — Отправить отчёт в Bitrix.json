@@ -1,0 +1,243 @@
+{
+  "name": "[BITRIX] TENDER — Отправить отчёт в Bitrix",
+  "description": "Stateful one-way Bitrix delivery. Input: one validated report item with binary.report_pdf. Output: delivery_status, analysis_run_id, delivery_id, attempt_count, message_id, file_id, error_code.",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "16915a1c-e921-44ba-99eb-75813a93921c",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e3ab3fb9-a174-4bc1-bfa4-a8994a07307c",
+              "name": "bitrix_bot_id",
+              "value": "__BITRIX_BOT_ID__",
+              "type": "string"
+            },
+            {
+              "id": "11f6248a-37d3-4b37-b51d-9823c7b6b646",
+              "name": "bitrix_dialog_id",
+              "value": "__BITRIX_DIALOG_ID__",
+              "type": "string"
+            },
+            {
+              "id": "3aad4f16-5150-498a-b36c-16f32232fbcb",
+              "name": "bitrix_bot_token",
+              "value": "__BITRIX_BOT_TOKEN__",
+              "type": "string"
+            },
+            {
+              "id": "c09e01ca-d91d-45fa-906e-582b1bc6414e",
+              "name": "bitrix_channel",
+              "value": "bitrix",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "1552cb36-8caf-466d-a262-9a6c97c5c022",
+      "name": "Конфигурация Bitrix"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst input = item.json ?? {};\nconst pdf = item.binary?.report_pdf;\nconst analysisRunId = input.analysis_run_id ?? input.internal?.analysis_run_id;\n\nfunction missingText(value, fallback) {\n  if (value === null || value === undefined || String(value).trim() === '') {\n    return fallback;\n  }\n  return String(value).trim();\n}\n\nfunction formatPrice(value) {\n  if (value === null || value === undefined || value === '') return 'Не указана';\n  const numericValue = Number(value);\n  return Number.isFinite(numericValue)\n    ? new Intl.NumberFormat('ru-RU').format(numericValue) + ' ₽'\n    : String(value).trim();\n}\n\nif (!analysisRunId) {\n  throw new Error('BITRIX_ANALYSIS_RUN_ID_MISSING');\n}\nif (input.pdf_artifact_validation?.valid !== true) {\n  throw new Error('BITRIX_PDF_NOT_VALIDATED');\n}\nif (!pdf || pdf.mimeType !== 'application/pdf') {\n  throw new Error('BITRIX_PDF_BINARY_MISSING');\n}\nif (typeof pdf.fileName !== 'string' || !/[.]pdf$/iu.test(pdf.fileName.trim())) {\n  throw new Error('BITRIX_PDF_FILENAME_INVALID');\n}\n\nconst statistics = input.statistics;\nconst counts = [\n  statistics?.resolved,\n  statistics?.requires_review,\n  statistics?.not_found,\n];\n\nif (\n  statistics?.total !== 27\n  || counts.some((value) => !Number.isInteger(value) || value < 0)\n  || counts.reduce((sum, value) => sum + value, 0) !== 27\n) {\n  throw new Error('BITRIX_STATISTICS_INVALID');\n}\n\nconst botId = Number(input.bitrix_bot_id);\nconst dialogId = String(input.bitrix_dialog_id ?? '');\nconst botToken = String(input.bitrix_bot_token ?? '');\n\nif (!Number.isInteger(botId) || botId <= 0) {\n  throw new Error('BITRIX_BOT_ID_NOT_CONFIGURED');\n}\nif (!/^chat[0-9]+$/u.test(dialogId)) {\n  throw new Error('BITRIX_DIALOG_ID_NOT_CONFIGURED');\n}\nif (!botToken || botToken === '__BITRIX_BOT_TOKEN__') {\n  throw new Error('BITRIX_BOT_TOKEN_NOT_CONFIGURED');\n}\n\nconst pdfBuffer = await this.helpers.getBinaryDataBuffer(0, 'report_pdf');\nif (pdfBuffer.length <= 5) {\n  throw new Error('BITRIX_PDF_EMPTY');\n}\nif (pdfBuffer.length > 104857600) {\n  throw new Error('BITRIX_PDF_TOO_LARGE');\n}\nif (pdfBuffer.subarray(0, 5).toString('ascii') !== '%PDF-') {\n  throw new Error('BITRIX_PDF_SIGNATURE_INVALID');\n}\nif (input.pdf_artifact_validation.size_bytes !== pdfBuffer.length) {\n  throw new Error('BITRIX_PDF_SIZE_MISMATCH');\n}\n\nconst procurement = input.procurement ?? {};\nconst message = [\n  'Отчёт по закупке №' + missingText(procurement.number, 'не указан'),\n  'Предмет: ' + missingText(procurement.subject, 'Не указано'),\n  'Заказчик: ' + missingText(procurement.customer, 'Не указан'),\n  'Начальная цена: ' + formatPrice(procurement.price),\n  '',\n  'Результаты: подтверждено — ' + statistics.resolved\n    + '; требуют проверки — ' + statistics.requires_review\n    + '; не найдено — ' + statistics.not_found + '.',\n].join('\\n');\n\nreturn [{\n  json: {\n    analysis_run_id: analysisRunId,\n    channel: 'bitrix',\n    dialog_id: dialogId,\n    file_name: pdf.fileName.trim(),\n    file_size: pdfBuffer.length,\n    statistics,\n    procurement,\n    bitrix_request: {\n      botId,\n      botToken,\n      dialogId,\n      fields: {\n        name: pdf.fileName.trim(),\n        content: pdfBuffer.toString('base64'),\n        message,\n      },\n    },\n  },\n  binary: {\n    report_pdf: pdf,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "43092b33-11f4-45e4-8607-576f74593054",
+      "name": "Проверить и подготовить доставку Bitrix"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH inserted AS (\n    INSERT INTO public.tender_analysis_deliveries (\n        analysis_run_id,\n        channel,\n        dialog_id,\n        status,\n        attempt_count,\n        file_name,\n        file_size\n    )\n    VALUES (\n        $1::uuid,\n        'bitrix',\n        $2,\n        'pending',\n        0,\n        $3,\n        $4::bigint\n    )\n    ON CONFLICT (analysis_run_id, channel, dialog_id)\n    DO NOTHING\n    RETURNING *\n)\nSELECT * FROM inserted\nUNION ALL\nSELECT d.*\nFROM public.tender_analysis_deliveries AS d\nWHERE d.analysis_run_id = $1::uuid\n  AND d.channel = 'bitrix'\n  AND d.dialog_id = $2\n  AND NOT EXISTS (SELECT 1 FROM inserted);",
+        "options": {
+          "queryReplacement": "={{ [ $('Проверить и подготовить доставку Bitrix').item.json.analysis_run_id, $('Проверить и подготовить доставку Bitrix').item.json.dialog_id, $('Проверить и подготовить доставку Bitrix').item.json.file_name, $('Проверить и подготовить доставку Bitrix').item.json.file_size ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        672,
+        0
+      ],
+      "id": "5cc21f46-d00c-46db-8323-e4436ea0ffbe",
+      "name": "Зарегистрировать доставку",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH claimed AS (\n    UPDATE public.tender_analysis_deliveries\n    SET\n        status = 'sending',\n        attempt_count = attempt_count + 1,\n        n8n_execution_id = $3,\n        next_attempt_at = NULL,\n        last_error_code = NULL,\n        last_error_message = NULL,\n        updated_at = now()\n    WHERE analysis_run_id = $1::uuid\n      AND channel = 'bitrix'\n      AND dialog_id = $2\n      AND attempt_count < 4\n      AND (\n          status = 'pending'\n          OR (\n              status = 'retry_wait'\n              AND next_attempt_at <= now()\n          )\n      )\n    RETURNING *\n)\nSELECT\n    c.*,\n    true AS claim_succeeded,\n    'send'::text AS claim_decision\nFROM claimed AS c\n\nUNION ALL\n\nSELECT\n    d.*,\n    false AS claim_succeeded,\n    CASE\n        WHEN d.status = 'sent' THEN 'skip_sent'\n        WHEN d.status = 'sending' THEN 'skip_in_progress'\n        WHEN d.status = 'retry_wait' THEN 'skip_not_due'\n        WHEN d.status = 'failed' THEN 'terminal_failed'\n        WHEN d.status = 'unknown' THEN 'terminal_unknown'\n        ELSE 'blocked'\n    END AS claim_decision\nFROM public.tender_analysis_deliveries AS d\nWHERE d.analysis_run_id = $1::uuid\n  AND d.channel = 'bitrix'\n  AND d.dialog_id = $2\n  AND NOT EXISTS (SELECT 1 FROM claimed);",
+        "options": {
+          "queryReplacement": "={{ [ $('Проверить и подготовить доставку Bitrix').item.json.analysis_run_id, $('Проверить и подготовить доставку Bitrix').item.json.dialog_id, $execution.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "3015b92b-a11c-41cb-82b7-f73c80945dc0",
+      "name": "Захватить доставку",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d96c6e43-b4d7-4e4e-812c-ef8a3f91fc00",
+              "leftValue": "={{ $json.claim_succeeded }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "f24f3550-a6bc-40f4-8478-1ce1b6256eab",
+      "name": "Доставка захвачена?"
+    },
+    {
+      "parameters": {
+        "url": "__BITRIX_WEBHOOK_FILE_UPLOAD_URL__",
+        "authentication": "none",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        -112
+      ],
+      "id": "f523c14e-2e11-492c-ab4a-ab6c7a37a755",
+      "name": "Отправить PDF в Bitrix",
+      "notesInFlow": true,
+      "notes": "Неподключённый каркас. Маршрут и обработка ответа добавляются следующим этапом."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Конфигурация Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Конфигурация Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Проверить и подготовить доставку Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить и подготовить доставку Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Зарегистрировать доставку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Зарегистрировать доставку": {
+      "main": [
+        [
+          {
+            "node": "Захватить доставку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Захватить доставку": {
+      "main": [
+        [
+          {
+            "node": "Доставка захвачена?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Доставка захвачена?": {
+      "main": [
+        [],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}
