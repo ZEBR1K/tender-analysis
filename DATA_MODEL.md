@@ -28,7 +28,7 @@ completed_at заполнен Finalization workflow
 
 Все 27 FINAL rows в проверенном run имели `field_catalog_version=tender_fields_v1`, `result_contract_version=tender_field_final_v1` и audit metadata.
 
-Текущая модель данных состоит из пяти основных таблиц:
+Текущая модель анализа состоит из пяти основных таблиц. Локальная Bitrix-кандидатура добавляет шестую таблицу журнала доставки; migration ещё не применена к production:
 
 ```text
 tender_analysis_runs
@@ -39,7 +39,9 @@ tender_analysis_runs
         |                 |
         |                 +-- tender_analysis_facts
         |
-        `-- tender_analysis_field_results
+        +-- tender_analysis_field_results
+        |
+        `-- tender_analysis_deliveries (local migration candidate)
 ```
 
 Логический поток данных:
@@ -67,6 +69,7 @@ candidate facts
 | `tender_analysis_units` | Нормализованные смысловые части документов, отправляемые в AI |
 | `tender_analysis_facts` | Candidate facts, найденные Extractor и проверенные Validator |
 | `tender_analysis_field_results` | Финальные результаты 27 полей после Aggregator / Targeted Recheck |
+| `tender_analysis_deliveries` | Идемпотентный журнал односторонней доставки PDF в Bitrix; пока только local migration candidate |
 
 ---
 
@@ -81,7 +84,9 @@ tender_analysis_runs.id
     |
     +-- 1:N --> tender_analysis_facts.analysis_run_id
     |
-    `-- logical 1:N --> tender_analysis_field_results.analysis_run_id
+    +-- logical 1:N --> tender_analysis_field_results.analysis_run_id
+    |
+    `-- 1:N --> tender_analysis_deliveries.analysis_run_id
 ```
 
 Документы и units связаны composite FK:
@@ -1226,9 +1231,62 @@ tender_analysis_field_results_unique
 
 ---
 
-# 9. Referential integrity
+# 9. `tender_analysis_deliveries`
 
-## 9.1. Реальные FK
+## 9.1. Назначение
+
+Одна строка фиксирует одну попытку доставить PDF одного `analysis_run` в один Bitrix-канал и диалог. Таблица является persistent state и synchronization layer: atomic claim не позволяет двум execution отправить одно сообщение одновременно, а `UNIQUE (analysis_run_id, channel, dialog_id)` исключает повторную регистрацию той же доставки.
+
+Migration: `database/migrations/20260920_create_tender_analysis_deliveries.sql`. Пока migration не применена к production.
+
+## 9.2. Колонки
+
+| Колонка | Тип | Контракт |
+|---|---|---|
+| `id` | `uuid` | PRIMARY KEY, `gen_random_uuid()` |
+| `analysis_run_id` | `uuid` | NOT NULL, FK на `tender_analysis_runs(id)`, `ON DELETE CASCADE` |
+| `channel` | `text` | NOT NULL, фиксировано `bitrix` |
+| `dialog_id` | `text` | NOT NULL, фиксированный чат назначения |
+| `status` | `text` | `pending`, `sending`, `retry_wait`, `sent`, `failed`, `unknown` |
+| `attempt_count` | `integer` | Число HTTP-вызовов, от 0 до 4 |
+| `n8n_execution_id` | `text` | Execution, владеющий текущим состоянием `sending` |
+| `next_attempt_at` | `timestamptz` | Заполняется только для `retry_wait` |
+| `message_id` | `text` | Bitrix `messageId` после подтверждённого успеха |
+| `file_id` | `text` | Bitrix `file.id` после подтверждённого успеха |
+| `file_name` | `text` | Проверенное имя PDF |
+| `file_size` | `bigint` | Проверенный размер PDF, 6–104857600 байт |
+| `last_error_code` | `text` | Последний безопасный код провайдера/transport |
+| `last_error_message` | `text` | Ограниченная диагностическая строка без секретов |
+| `created_at` | `timestamptz` | DEFAULT `now()` |
+| `updated_at` | `timestamptz` | Обновляется при каждом переходе |
+| `sent_at` | `timestamptz` | Заполняется только для `sent` |
+
+## 9.3. Constraints и индексы
+
+- `UNIQUE (analysis_run_id, channel, dialog_id)` задаёт identity доставки.
+- `sent` требует `message_id`, `file_id` и `sent_at`.
+- `retry_wait` требует `next_attempt_at`; остальные состояния требуют `next_attempt_at IS NULL`.
+- `idx_tender_analysis_deliveries_due_retry (next_attempt_at, id) WHERE status='retry_wait'` обслуживает только очередь явных повторов.
+- `idx_tender_analysis_deliveries_execution (n8n_execution_id) WHERE status='sending'` обслуживает fail-closed error workflow.
+
+## 9.4. Lifecycle
+
+```text
+pending -> sending
+sending -> sent
+sending -> retry_wait
+sending -> failed
+sending -> unknown
+retry_wait -> sending
+```
+
+`attempt_count` считает фактические HTTP-вызовы. Значения 1–4 означают первоначальную отправку и максимум три разрешённых повтора. `sent`, `failed` и `unknown` terminal для автоматизации.
+
+---
+
+# 10. Referential integrity
+
+## 10.1. Реальные FK
 
 ```text
 runs
@@ -1256,7 +1314,7 @@ facts
 
 ---
 
-## 9.2. `field_results` — исключение
+## 10.2. `field_results` — исключение
 
 В текущей схеме нет:
 
@@ -1279,7 +1337,7 @@ field_result.analysis_run_id
 
 ---
 
-# 10. Основные DB invariants
+# 11. Основные DB invariants
 
 1. Один `analysis_run` идентифицируется UUID `runs.id`.
 2. Один document принадлежит ровно одному run.
@@ -1306,7 +1364,7 @@ field_result.analysis_run_id
 
 ---
 
-# 11. Типичный путь записи данных
+# 12. Типичный путь записи данных
 
 ```text
 1. Orchestrator
@@ -1357,7 +1415,7 @@ completed_at = NOW()
 
 ---
 
-# 12. Типичный путь чтения данных
+# 13. Типичный путь чтения данных
 
 ## Document Worker
 
@@ -1403,7 +1461,7 @@ Workflow читает эти таблицы одним read-only snapshot query,
 
 ---
 
-# 13. Индексная стратегия — текущая оценка
+# 14. Индексная стратегия — текущая оценка
 
 Для MVP текущие индексы в целом соответствуют основным query patterns:
 
@@ -1458,7 +1516,7 @@ WHERE analysis_run_id = ...
 
 ---
 
-# 14. Known Data Model Technical Debt
+# 15. Known Data Model Technical Debt
 
 ## DM-0 — у `tender_analysis_field_results` отсутствует FK на run
 
@@ -1589,7 +1647,7 @@ evidence
 
 ---
 
-# 15. Safe DB Change Checklist
+# 16. Safe DB Change Checklist
 
 Перед изменением схемы:
 
@@ -1610,7 +1668,7 @@ evidence
 
 ---
 
-# 16. Regression Checklist после DB migration
+# 17. Regression Checklist после DB migration
 
 ### DB1 — create run
 
