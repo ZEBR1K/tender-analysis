@@ -1,0 +1,7 @@
+{
+  "statusCode": 400,
+  "body": {
+    "error": "FILE_SEND_FAILED",
+    "error_description": "Message sending error"
+  }
+}

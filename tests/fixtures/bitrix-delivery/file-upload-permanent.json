@@ -1,0 +1,7 @@
+{
+  "statusCode": 401,
+  "body": {
+    "error": "INVALID_CREDENTIALS",
+    "error_description": "Invalid request credentials"
+  }
+}

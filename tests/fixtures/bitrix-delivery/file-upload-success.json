@@ -1,0 +1,14 @@
+{
+  "statusCode": 200,
+  "body": {
+    "result": {
+      "file": {
+        "id": 138,
+        "name": "Анализ закупки 10293451.pdf",
+        "size": 12
+      },
+      "messageId": 123,
+      "dialogId": "chat5"
+    }
+  }
+}
