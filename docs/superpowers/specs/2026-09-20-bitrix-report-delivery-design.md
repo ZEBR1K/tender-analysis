@@ -19,7 +19,7 @@ Bitrix delivery must be prepared locally before production credentials are avail
 - Retry only when Bitrix explicitly confirms a temporary non-delivery.
 - Persist delivery state and the Bitrix response identifiers in PostgreSQL.
 - Support complete offline validation without real Bitrix credentials or external side effects.
-- Keep all secrets out of workflow JSON, repository files, logs, and test fixtures.
+- Keep real webhook values out of repository exports, logs, and test fixtures. By explicit owner decision, the production inbound-webhook URL and `botToken` are entered directly into the live n8n workflow nodes and therefore exist in the live workflow definition.
 
 ## 3. Non-goals
 
@@ -67,7 +67,7 @@ Request inputs:
 - `fields.name`: validated readable PDF filename;
 - `fields.content`: PDF bytes encoded as Base64 without a data-URL prefix;
 - `fields.message`: the short summary;
-- `botToken`: required only for inbound-webhook authorization and supplied through the credential layer, never workflow data.
+- `botToken`: required for inbound-webhook authorization; by explicit owner decision it is entered in the live n8n configuration node, while repository exports retain only a sentinel and tests use synthetic values.
 
 Successful response fields persisted by the system:
 
@@ -157,6 +157,7 @@ Add table `tender_analysis_deliveries`:
 | `dialog_id` | `text` | Required fixed destination |
 | `status` | `text` | `pending`, `sending`, `retry_wait`, `sent`, `failed`, or `unknown` |
 | `attempt_count` | `integer` | Non-negative, starts at zero |
+| `n8n_execution_id` | `text` | Current sending execution; used by the error workflow to fail closed to `unknown` |
 | `next_attempt_at` | `timestamptz` | Only populated for `retry_wait` |
 | `message_id` | `text` | Populated only after confirmed success |
 | `file_id` | `text` | Populated only after confirmed success |
@@ -172,7 +173,7 @@ Required constraints:
 
 - `UNIQUE (analysis_run_id, channel, dialog_id)`;
 - status CHECK over the six allowed values;
-- `attempt_count >= 0`;
+- `attempt_count BETWEEN 0 AND 4`;
 - `sent` requires `message_id`, `file_id`, and `sent_at`;
 - `retry_wait` requires `next_attempt_at`;
 - other terminal states must have `next_attempt_at IS NULL`.
@@ -216,28 +217,27 @@ Workflow name: `TENDER — Повторить доставки Bitrix`.
 The scheduled workflow:
 
 1. Selects only due rows with `status='retry_wait'` and `next_attempt_at <= now()`.
-2. Claims each row atomically.
-3. Invokes Report Generation with its `analysis_run_id` to regenerate the deterministic HTML/PDF artifact.
-4. Calls the delivery sub-workflow with the regenerated binary.
+2. Invokes Report Generation with each `analysis_run_id` to regenerate the deterministic HTML/PDF artifact.
+3. Calls the delivery sub-workflow with the regenerated binary.
+4. Relies on the delivery sub-workflow's atomic `pending`/due-`retry_wait` to `sending` claim before any HTTP call; concurrent workers may regenerate the same PDF but cannot both send it.
 5. Never selects `sent`, `failed`, or `unknown`.
 
-The worker has a workflow-level error workflow and structured per-node error handling. Unexpected worker failure must leave the row recoverable rather than silently marking it sent.
+The worker and delivery sub-workflow use `TENDER — Ошибка доставки Bitrix` as their workflow-level error workflow. An unhandled delivery execution recorded in `n8n_execution_id` is changed from `sending` to terminal `unknown`, never back to an automatically retryable state.
 
 ## 11. Credentials and Configuration
 
-No credential values appear in repository files, workflow parameters, Code nodes, n8n variables, logs, or fixtures.
+The selected production authorization is a Bitrix24 inbound webhook. By explicit owner decision, the full webhook method URL is entered into the live HTTP Request node and `botToken` into the live configuration node instead of using an n8n credential. They must never be copied into repository exports, logs, fixtures, screenshots, or evaluation artifacts.
 
-The local workflow is built inactive against a mock endpoint and contains only a credential binding placeholder. When Bitrix access is provided:
+The repository workflow remains inactive and uses the exact sentinels `__BITRIX_WEBHOOK_FILE_UPLOAD_URL__` and `__BITRIX_BOT_TOKEN__`. A sanitized export script must replace live values with those sentinels before writing any workflow JSON to the repository. When Bitrix access is provided:
 
-1. Determine whether the supplied access is OAuth or an inbound webhook.
-2. Create the matching encrypted n8n credential in the UI.
-3. Register a regular bot with stable `fields.code` and retain the returned `botId`.
-4. Add the bot to the existing fixed chat and obtain its `dialogId`.
-5. Bind the credential to the delivery HTTP node.
-6. Populate the non-secret `botId` and `dialogId` configuration.
-7. Run one controlled canary and verify the returned message/file IDs and visible chat result.
+1. Create an inbound webhook with the `imbot` scope and retain its secret URL outside the repository.
+2. Register a regular bot with stable `fields.code`, set its `fields.botToken`, and retain the returned `botId`.
+3. Add the bot to the existing fixed chat and obtain its `dialogId`.
+4. Enter the full `imbot.v2.File.upload` webhook URL in the live HTTP Request node and `botToken` in the live configuration node.
+5. Populate the non-secret `botId` and `dialogId` configuration.
+6. Run one controlled canary and verify the returned message/file IDs and visible chat result.
 
-For webhook authorization, both the webhook token in the endpoint and the registration `botToken` are secrets. For OAuth, the access/refresh token lifecycle stays in the credential layer and `botToken` is not sent. The exact credential type is selected only when the delivered access format is known; this does not change the delivery contract or tests.
+This is an accepted security tradeoff: users with permission to inspect the live workflow can see the webhook URL and `botToken`. Repository safety is maintained through placeholder-only candidates, mandatory sanitization, and secret scans.
 
 ## 12. Offline Test Strategy
 
