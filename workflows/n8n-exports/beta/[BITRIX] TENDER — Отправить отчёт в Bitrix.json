@@ -153,9 +153,36 @@
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "__BITRIX_WEBHOOK_FILE_UPLOAD_URL__",
         "authentication": "none",
-        "options": {}
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Проверить и подготовить доставку Bitrix').item.json.bitrix_request }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
@@ -165,8 +192,288 @@
       ],
       "id": "f523c14e-2e11-492c-ab4a-ab6c7a37a755",
       "name": "Отправить PDF в Bitrix",
-      "notesInFlow": true,
-      "notes": "Неподключённый каркас. Маршрут и обработка ответа добавляются следующим этапом."
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const response = $input.first().json ?? {};\nconst claim = $('Захватить доставку').first().json;\nconst prepared = $('Проверить и подготовить доставку Bitrix').first().json;\nconst statusCode = Number(response.statusCode ?? 0);\nconst body = response.body && typeof response.body === 'object'\n  ? response.body\n  : response;\nconst result = body.result;\nconst messageId = result?.messageId;\nconst fileId = result?.file?.id;\nconst returnedDialogId = result?.dialogId;\nconst returnedFileName = result?.file?.name;\nconst returnedFileSize = Number(result?.file?.size);\nconst errorCode = typeof body.error === 'string' && body.error\n  ? body.error\n  : null;\n\nconst retryableCodes = new Set([\n  'FILE_FOLDER_ERROR',\n  'FILE_UPLOAD_FAILED',\n  'FILE_SEND_FAILED',\n  'INTERNAL_SERVER_ERROR',\n  'ERROR_UNEXPECTED_ANSWER',\n  'QUERY_LIMIT_EXCEEDED',\n  'OPERATION_TIME_LIMIT',\n]);\n\nfunction sanitizedMessage(value) {\n  if (typeof value !== 'string') return null;\n  return value\n    .replace(/https?:[/][/][^\\s]+/giu, '[redacted-url]')\n    .slice(0, 500);\n}\n\nlet deliveryStatus;\nlet nextDelayMinutes = null;\n\nif (\n  statusCode >= 200\n  && statusCode < 300\n  && !errorCode\n  && messageId !== null\n  && messageId !== undefined\n  && fileId !== null\n  && fileId !== undefined\n  && returnedDialogId === prepared.dialog_id\n  && returnedFileName === prepared.file_name\n  && returnedFileSize === prepared.file_size\n) {\n  deliveryStatus = 'sent';\n} else if (errorCode && retryableCodes.has(errorCode)) {\n  if (claim.attempt_count >= 4) {\n    deliveryStatus = 'failed';\n  } else {\n    deliveryStatus = 'retry_wait';\n    nextDelayMinutes = [1, 5, 15][claim.attempt_count - 1];\n  }\n} else if (errorCode) {\n  deliveryStatus = 'failed';\n} else {\n  deliveryStatus = 'unknown';\n}\n\nreturn [{\n  json: {\n    delivery_status: deliveryStatus,\n    analysis_run_id: prepared.analysis_run_id,\n    delivery_id: claim.id,\n    attempt_count: claim.attempt_count,\n    message_id: deliveryStatus === 'sent' ? String(messageId) : null,\n    file_id: deliveryStatus === 'sent' ? String(fileId) : null,\n    provider_file_name: deliveryStatus === 'sent' ? returnedFileName : null,\n    provider_file_size: deliveryStatus === 'sent' ? returnedFileSize : null,\n    error_code: deliveryStatus === 'sent'\n      ? null\n      : (errorCode ?? 'BITRIX_RESPONSE_AMBIGUOUS'),\n    error_message: deliveryStatus === 'sent'\n      ? null\n      : sanitizedMessage(body.error_description),\n    next_delay_minutes: nextDelayMinutes,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        -208
+      ],
+      "id": "32f4d468-8d2b-41b2-8fbf-4f7ae757896c",
+      "name": "Классифицировать ответ Bitrix"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claim = $('Захватить доставку').first().json;\nconst prepared = $('Проверить и подготовить доставку Bitrix').first().json;\n\nreturn [{\n  json: {\n    delivery_status: 'unknown',\n    analysis_run_id: prepared.analysis_run_id,\n    delivery_id: claim.id,\n    attempt_count: claim.attempt_count,\n    message_id: null,\n    file_id: null,\n    error_code: 'BITRIX_TRANSPORT_OUTCOME_UNKNOWN',\n    error_message: 'Transport outcome is unknown; automatic retry is disabled',\n    next_delay_minutes: null,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        16
+      ],
+      "id": "9df84bfc-c638-4de1-b7e6-237a796e275d",
+      "name": "Сформировать unknown после transport error"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tender_analysis_deliveries\nSET\n    status = $3,\n    next_attempt_at = CASE\n        WHEN $3 = 'retry_wait'\n            THEN now() + make_interval(mins => $8::integer)\n        ELSE NULL\n    END,\n    message_id = $4,\n    file_id = $5,\n    file_name = COALESCE($9, file_name),\n    file_size = COALESCE($10::bigint, file_size),\n    last_error_code = $6,\n    last_error_message = $7,\n    sent_at = CASE WHEN $3 = 'sent' THEN now() ELSE NULL END,\n    updated_at = now()\nWHERE id = $1::uuid\n  AND n8n_execution_id = $2\n  AND status = 'sending'\nRETURNING\n    id AS delivery_id,\n    analysis_run_id,\n    status AS delivery_status,\n    attempt_count,\n    message_id,\n    file_id,\n    last_error_code AS error_code;",
+        "options": {
+          "queryReplacement": "={{ [ $('Захватить доставку').item.json.id, $execution.id, $('Классифицировать ответ Bitrix').item.json.delivery_status, $('Классифицировать ответ Bitrix').item.json.message_id, $('Классифицировать ответ Bitrix').item.json.file_id, $('Классифицировать ответ Bitrix').item.json.error_code, $('Классифицировать ответ Bitrix').item.json.error_message, $('Классифицировать ответ Bitrix').item.json.next_delay_minutes ?? 0, $('Классифицировать ответ Bitrix').item.json.provider_file_name, $('Классифицировать ответ Bitrix').item.json.provider_file_size ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        -208
+      ],
+      "id": "5222ecf5-0095-4e46-9682-b93445ae0065",
+      "name": "Сохранить результат ответа Bitrix",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tender_analysis_deliveries\nSET\n    status = $3,\n    next_attempt_at = CASE\n        WHEN $3 = 'retry_wait'\n            THEN now() + make_interval(mins => $8::integer)\n        ELSE NULL\n    END,\n    message_id = $4,\n    file_id = $5,\n    file_name = COALESCE($9, file_name),\n    file_size = COALESCE($10::bigint, file_size),\n    last_error_code = $6,\n    last_error_message = $7,\n    sent_at = CASE WHEN $3 = 'sent' THEN now() ELSE NULL END,\n    updated_at = now()\nWHERE id = $1::uuid\n  AND n8n_execution_id = $2\n  AND status = 'sending'\nRETURNING\n    id AS delivery_id,\n    analysis_run_id,\n    status AS delivery_status,\n    attempt_count,\n    message_id,\n    file_id,\n    last_error_code AS error_code;",
+        "options": {
+          "queryReplacement": "={{ [ $('Захватить доставку').item.json.id, $execution.id, $('Сформировать unknown после transport error').item.json.delivery_status, null, null, $('Сформировать unknown после transport error').item.json.error_code, $('Сформировать unknown после transport error').item.json.error_message, 0, null, null ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1808,
+        16
+      ],
+      "id": "e78924c8-2974-4680-bca1-cb3c9cb547f8",
+      "name": "Сохранить unknown transport",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nif (!item.json?.delivery_id || !item.json?.delivery_status) {\n  throw new Error('BITRIX_DELIVERY_STATE_UPDATE_FAILED');\n}\nreturn [item];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        -208
+      ],
+      "id": "d87bc26e-729b-4abf-98da-c40190fa81a8",
+      "name": "Проверить сохранение ответа Bitrix"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nif (!item.json?.delivery_id || !item.json?.delivery_status) {\n  throw new Error('BITRIX_DELIVERY_STATE_UPDATE_FAILED');\n}\nreturn [item];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2032,
+        16
+      ],
+      "id": "06a55f36-2a72-4ee1-9f86-448fe2622408",
+      "name": "Проверить сохранение unknown transport"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4f07d93c-2176-4d11-9d27-91e01f52f52f",
+              "name": "delivery_status",
+              "value": "={{ $json.delivery_status }}",
+              "type": "string"
+            },
+            {
+              "id": "38343250-caa8-4fd6-b3fc-79330bcaed43",
+              "name": "analysis_run_id",
+              "value": "={{ $json.analysis_run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "05b940b7-3980-417a-a6bc-a8cf595e01ae",
+              "name": "delivery_id",
+              "value": "={{ $json.delivery_id }}",
+              "type": "string"
+            },
+            {
+              "id": "0d3186e9-d9f1-47b6-95fc-702ed252b347",
+              "name": "attempt_count",
+              "value": "={{ $json.attempt_count }}",
+              "type": "number"
+            },
+            {
+              "id": "863747b6-ab90-48d7-8662-51ab2f0e2295",
+              "name": "message_id",
+              "value": "={{ $json.message_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "cc3b4c63-3685-4a49-947b-6a01c06edfa8",
+              "name": "file_id",
+              "value": "={{ $json.file_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "fe4b219d-7e45-48ee-9e70-55fca42643f2",
+              "name": "error_code",
+              "value": "={{ $json.error_code ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        -208
+      ],
+      "id": "74f2bc7a-8599-4a46-9a22-eec8f18c2181",
+      "name": "Вернуть результат ответа Bitrix"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "64324e46-226c-4297-80aa-205d80999939",
+              "name": "delivery_status",
+              "value": "={{ $json.delivery_status }}",
+              "type": "string"
+            },
+            {
+              "id": "f921c1ea-268c-412e-9340-5e444f49ac03",
+              "name": "analysis_run_id",
+              "value": "={{ $json.analysis_run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "70fe64c3-cb51-4266-b9e4-24666e15f104",
+              "name": "delivery_id",
+              "value": "={{ $json.delivery_id }}",
+              "type": "string"
+            },
+            {
+              "id": "de628671-5d9e-4d82-980d-21fbd51284f5",
+              "name": "attempt_count",
+              "value": "={{ $json.attempt_count }}",
+              "type": "number"
+            },
+            {
+              "id": "b873fbe3-4acc-467a-8e41-aead22298d04",
+              "name": "message_id",
+              "value": "={{ $json.message_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "208fcdca-0de8-4e3e-aef6-0f1a29215a69",
+              "name": "file_id",
+              "value": "={{ $json.file_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "9572e6c9-20bc-4325-b24c-af2d930a8ace",
+              "name": "error_code",
+              "value": "={{ $json.error_code ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        16
+      ],
+      "id": "b3f7c961-0860-4f08-84d2-7e562835872c",
+      "name": "Вернуть unknown transport"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b753e784-6e93-44e5-bc05-75db3ab68121",
+              "name": "delivery_status",
+              "value": "={{ ['skip_sent', 'skip_in_progress', 'skip_not_due'].includes($json.claim_decision) ? 'skipped' : ($json.claim_decision === 'terminal_failed' ? 'failed' : 'unknown') }}",
+              "type": "string"
+            },
+            {
+              "id": "0f337f04-b857-4d8e-900e-d160901b2145",
+              "name": "analysis_run_id",
+              "value": "={{ $json.analysis_run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "09449e1c-14ed-4667-82a7-02a47714587c",
+              "name": "delivery_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f4248afc-ce8f-44e4-b865-16a4fb7c576f",
+              "name": "attempt_count",
+              "value": "={{ $json.attempt_count }}",
+              "type": "number"
+            },
+            {
+              "id": "c3fd5bde-d22f-4aec-9b00-b45dc37c11bb",
+              "name": "message_id",
+              "value": "={{ $json.message_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "be27e62e-19f5-4f18-9f1b-3f4e4cb01b94",
+              "name": "file_id",
+              "value": "={{ $json.file_id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "c32dde39-43b2-4cc9-815a-7bcb85966863",
+              "name": "error_code",
+              "value": "={{ $json.last_error_code ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1360,
+        160
+      ],
+      "id": "2fe2644d-a0b3-42d9-a260-f8bb356783dd",
+      "name": "Вернуть результат без отправки"
     }
   ],
   "pinData": {},
@@ -228,8 +535,104 @@
     },
     "Доставка захвачена?": {
       "main": [
-        [],
-        []
+        [
+          {
+            "node": "Отправить PDF в Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Вернуть результат без отправки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Отправить PDF в Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Классифицировать ответ Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Сформировать unknown после transport error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Классифицировать ответ Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Сохранить результат ответа Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сформировать unknown после transport error": {
+      "main": [
+        [
+          {
+            "node": "Сохранить unknown transport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить результат ответа Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Проверить сохранение ответа Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сохранить unknown transport": {
+      "main": [
+        [
+          {
+            "node": "Проверить сохранение unknown transport",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить сохранение ответа Bitrix": {
+      "main": [
+        [
+          {
+            "node": "Вернуть результат ответа Bitrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Проверить сохранение unknown transport": {
+      "main": [
+        [
+          {
+            "node": "Вернуть unknown transport",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

@@ -59,6 +59,26 @@ function reportItem(overrides = {}, pdfBytes = Buffer.from('%PDF-fixture')) {
   };
 }
 
+async function classify(fixtureName, attemptCount) {
+  const [result] = await runCodeNode(
+    'Классифицировать ответ Bitrix',
+    { json: fixture(fixtureName) },
+    {
+      'Захватить доставку': {
+        id: '22222222-2222-4222-8222-222222222222',
+        attempt_count: attemptCount,
+      },
+      'Проверить и подготовить доставку Bitrix': {
+        analysis_run_id: '11111111-1111-4111-8111-111111111111',
+        dialog_id: 'chat5',
+        file_name: 'Анализ закупки 10293451.pdf',
+        file_size: 12,
+      },
+    },
+  );
+  return result.json;
+}
+
 async function runCodeNode(name, inputItem, sources = {}) {
   const node = byName(name);
   assert.equal(node.type, 'n8n-nodes-base.code');
@@ -171,7 +191,6 @@ test('delivery entry path validates, registers, claims, and branches exactly onc
   assert.deepEqual(targets('Проверить и подготовить доставку Bitrix'), ['Зарегистрировать доставку']);
   assert.deepEqual(targets('Зарегистрировать доставку'), ['Захватить доставку']);
   assert.deepEqual(targets('Захватить доставку'), ['Доставка захвачена?']);
-  assert.deepEqual(targets('Доставка захвачена?', 1), []);
   assert.equal(targets('Доставка захвачена?', 1).includes('Отправить PDF в Bitrix'), false);
 });
 
@@ -206,6 +225,122 @@ test('delivery claim is atomic, bounded, due-aware, and records the execution', 
     branch.parameters.conditions.conditions[0].leftValue,
     '={{ $json.claim_succeeded }}',
   );
+});
+
+test('confirmed response becomes sent with provider identifiers', async () => {
+  const result = await classify('file-upload-success.json', 1);
+  assert.equal(result.delivery_status, 'sent');
+  assert.equal(result.message_id, '123');
+  assert.equal(result.file_id, '138');
+  assert.equal(result.provider_file_name, 'Анализ закупки 10293451.pdf');
+  assert.equal(result.provider_file_size, 12);
+  assert.equal(result.next_delay_minutes, null);
+});
+
+test('only documented explicit temporary failures schedule retries', async () => {
+  assert.equal((await classify('file-upload-retryable.json', 1)).next_delay_minutes, 1);
+  assert.equal((await classify('file-upload-retryable.json', 2)).next_delay_minutes, 5);
+  assert.equal((await classify('file-upload-retryable.json', 3)).next_delay_minutes, 15);
+  assert.equal((await classify('file-upload-retryable.json', 4)).delivery_status, 'failed');
+});
+
+test('permanent and ambiguous outcomes never schedule a retry', async () => {
+  const permanent = await classify('file-upload-permanent.json', 1);
+  assert.equal(permanent.delivery_status, 'failed');
+  assert.equal(permanent.next_delay_minutes, null);
+
+  const malformed = await classify('file-upload-malformed.json', 1);
+  assert.equal(malformed.delivery_status, 'unknown');
+  assert.equal(malformed.next_delay_minutes, null);
+});
+
+test('HTTP delivery has no node retry and splits response from transport error', () => {
+  const node = byName('Отправить PDF в Bitrix');
+  assert.equal(node.typeVersion, 4.4);
+  assert.equal(node.retryOnFail ?? false, false);
+  assert.equal(node.onError, 'continueErrorOutput');
+  assert.equal(node.parameters.options.response.response.fullResponse, true);
+  assert.equal(node.parameters.options.response.response.neverError, true);
+  assert.equal(node.parameters.options.timeout, 120000);
+  assert.deepEqual(targets('Доставка захвачена?', 0), ['Отправить PDF в Bitrix']);
+  assert.deepEqual(targets('Доставка захвачена?', 1), ['Вернуть результат без отправки']);
+  assert.deepEqual(targets('Отправить PDF в Bitrix', 0), ['Классифицировать ответ Bitrix']);
+  assert.deepEqual(targets('Отправить PDF в Bitrix', 1), ['Сформировать unknown после transport error']);
+});
+
+test('transport error is fail-closed and never leaks or schedules a retry', async () => {
+  const [result] = await runCodeNode(
+    'Сформировать unknown после transport error',
+    {
+      json: {
+        message: 'POST https://portal.example/rest/1/secret/im.disk.file.upload.json failed',
+      },
+    },
+    {
+      'Захватить доставку': {
+        id: '22222222-2222-4222-8222-222222222222',
+        attempt_count: 1,
+      },
+      'Проверить и подготовить доставку Bitrix': {
+        analysis_run_id: '11111111-1111-4111-8111-111111111111',
+      },
+    },
+  );
+  assert.equal(result.json.delivery_status, 'unknown');
+  assert.equal(result.json.next_delay_minutes, null);
+  assert.equal(result.json.error_code, 'BITRIX_TRANSPORT_OUTCOME_UNKNOWN');
+  assert.doesNotMatch(JSON.stringify(result), /portal[.]example|secret/u);
+});
+
+test('both response branches persist through guarded execution-owned updates', () => {
+  for (const name of ['Сохранить результат ответа Bitrix', 'Сохранить unknown transport']) {
+    const node = byName(name);
+    assert.equal(node.alwaysOutputData, true);
+    assert.match(node.parameters.query, /AND n8n_execution_id = \$2/u);
+    assert.match(node.parameters.query, /AND status = 'sending'/u);
+    assert.match(node.parameters.query, /WHEN \$3 = 'retry_wait'/u);
+    assert.match(node.parameters.query, /WHEN \$3 = 'sent'/u);
+    assert.match(node.parameters.options.queryReplacement, /\$execution[.]id/u);
+  }
+  assert.deepEqual(targets('Классифицировать ответ Bitrix'), ['Сохранить результат ответа Bitrix']);
+  assert.deepEqual(targets('Сформировать unknown после transport error'), ['Сохранить unknown transport']);
+});
+
+test('persistence guards reject a lost execution-owned update', async () => {
+  for (const name of [
+    'Проверить сохранение ответа Bitrix',
+    'Проверить сохранение unknown transport',
+  ]) {
+    await assert.rejects(
+      runCodeNode(name, { json: {} }),
+      /BITRIX_DELIVERY_STATE_UPDATE_FAILED/u,
+    );
+  }
+});
+
+test('all terminal paths expose only the stable delivery result contract', () => {
+  const expectedFields = [
+    'analysis_run_id',
+    'attempt_count',
+    'delivery_id',
+    'delivery_status',
+    'error_code',
+    'file_id',
+    'message_id',
+  ];
+  for (const name of [
+    'Вернуть результат ответа Bitrix',
+    'Вернуть unknown transport',
+    'Вернуть результат без отправки',
+  ]) {
+    const node = byName(name);
+    assert.equal(node.type, 'n8n-nodes-base.set');
+    assert.deepEqual(
+      node.parameters.assignments.assignments.map(({ name: field }) => field).sort(),
+      expectedFields,
+    );
+    assert.equal(node.parameters.includeOtherFields ?? false, false);
+  }
 });
 
 export {
