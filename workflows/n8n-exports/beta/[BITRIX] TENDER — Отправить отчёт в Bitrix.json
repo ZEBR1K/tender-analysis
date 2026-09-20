@@ -640,6 +640,7 @@
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
+    "errorWorkflow": "__BITRIX_ERROR_WORKFLOW_ID__",
     "availableInMCP": false
   },
   "tags": []

@@ -1,0 +1,61 @@
+{
+  "name": "[BITRIX] TENDER — Ошибка доставки Bitrix",
+  "description": "Fail-closed error workflow for Bitrix delivery executions. It marks only an execution-owned sending row as unknown and never schedules a retry.",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e2dce7f1-6940-4f68-b73a-3179cc62ebd2",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE public.tender_analysis_deliveries\nSET\n    status = 'unknown',\n    next_attempt_at = NULL,\n    last_error_code = 'BITRIX_UNHANDLED_WORKFLOW_FAILURE',\n    last_error_message = 'Unhandled delivery workflow failure; automatic retry is disabled',\n    updated_at = now()\nWHERE n8n_execution_id = $1\n  AND status = 'sending'\nRETURNING\n    id AS delivery_id,\n    analysis_run_id,\n    status AS delivery_status,\n    attempt_count;",
+        "options": {
+          "queryReplacement": "={{ [ $('Error Trigger').item.json.execution.id ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "ee090544-7feb-4245-8984-aa88991051f8",
+      "name": "Зафиксировать неоднозначный исход доставки",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Зафиксировать неоднозначный исход доставки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}

@@ -129,6 +129,7 @@ async function runCodeNode(name, inputItem, sources = {}) {
 
 test('delivery candidate is inactive, binary-passthrough, and credential free', () => {
   assert.equal(workflow().active, false);
+  assert.equal(workflow().settings.errorWorkflow, '__BITRIX_ERROR_WORKFLOW_ID__');
   assert.equal(byName('When Executed by Another Workflow').parameters.inputSource, 'passthrough');
   assert.equal(byName('Отправить PDF в Bitrix').parameters.url, '__BITRIX_WEBHOOK_FILE_UPLOAD_URL__');
   assert.equal(Object.hasOwn(byName('Отправить PDF в Bitrix'), 'credentials'), false);

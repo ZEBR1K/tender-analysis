@@ -1,0 +1,151 @@
+{
+  "name": "[BITRIX] TENDER — Повторить доставки Bitrix",
+  "description": "Bounded retry worker for explicit temporary Bitrix delivery failures. Regenerates a validated PDF and calls the stateful delivery workflow only for due retry_wait rows.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b898fd3d-f6f1-43ef-b270-a2e644600909",
+      "name": "Каждую минуту"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH expected_fields(field_index, field_key) AS (\n    VALUES\n        (1, 'procurement_subject'),\n        (2, 'nm_price_with_vat'),\n        (3, 'platform'),\n        (4, 'procedure_type'),\n        (5, 'application_deadline'),\n        (6, 'application_review_date'),\n        (7, 'results_date'),\n        (8, 'customer'),\n        (9, 'customer_contacts'),\n        (10, 'participation_cost'),\n        (11, 'participation_guarantee'),\n        (12, 'evaluation_criteria'),\n        (13, 'delivery_term'),\n        (14, 'payment_terms'),\n        (15, 'special_account_or_treasury'),\n        (16, 'bank_support'),\n        (17, 'government_contract'),\n        (18, 'rebidding'),\n        (19, 'national_regime'),\n        (20, 'advance_contract_guarantee'),\n        (21, 'warranty_obligations_guarantee'),\n        (22, 'licenses_certificates'),\n        (23, 'required_official_certificates'),\n        (24, 'similar_supply_experience'),\n        (25, 'analog_allowed'),\n        (26, 'analog_definition'),\n        (27, 'application_documents')\n),\ndue AS (\n    SELECT d.id, d.analysis_run_id, d.dialog_id\n    FROM public.tender_analysis_deliveries AS d\n    WHERE d.channel = 'bitrix'\n      AND d.status = 'retry_wait'\n      AND d.next_attempt_at <= now()\n    ORDER BY d.next_attempt_at, d.id\n    LIMIT 10\n),\nvalid_runs AS (\n    SELECT\n        due.id AS delivery_id,\n        due.analysis_run_id,\n        due.dialog_id,\n        COUNT(fr.field_key)::integer AS final_count,\n        COUNT(*) FILTER (\n            WHERE fr.status IN ('resolved', 'requires_review', 'not_found')\n        )::integer AS valid_status_count,\n        COUNT(*) FILTER (\n            WHERE fr.field_catalog_version = 'tender_fields_v1'\n              AND fr.result_contract_version = 'tender_field_final_v1'\n        )::integer AS valid_contract_count\n    FROM due\n    JOIN public.tender_analysis_runs AS r\n      ON r.id = due.analysis_run_id\n     AND r.status = 'completed'\n    JOIN public.tender_analysis_field_results AS fr\n      ON fr.analysis_run_id = due.analysis_run_id\n    JOIN expected_fields AS e\n      ON e.field_index = fr.field_index\n     AND e.field_key = fr.field_key\n    GROUP BY due.id, due.analysis_run_id, due.dialog_id\n)\nSELECT\n    delivery_id,\n    analysis_run_id,\n    dialog_id,\n    final_count,\n    true AS barrier_ready,\n    true AS completion_claimed,\n    'retry_regeneration'::text AS finalization_state\nFROM valid_runs\nWHERE final_count = 27\n  AND valid_status_count = 27\n  AND valid_contract_count = 27;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "fb344b82-6a86-4c34-8e12-d7871d523315",
+      "name": "Выбрать доставки для повтора",
+      "credentials": {
+        "postgres": {
+          "id": "RFpUr3McElcwyoxy",
+          "name": "KITATEH Tenders"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ckPnP3hRhKu4Mf9u",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ckPnP3hRhKu4Mf9u",
+          "cachedResultName": "TENDER — Генерация отчета"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        0
+      ],
+      "id": "41f89b38-9848-4e59-92d4-70b268932cb6",
+      "name": "Call 'TENDER — Генерация отчета'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "__BITRIX_DELIVERY_WORKFLOW_ID__",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "67ad9397-77ad-42ab-a0bc-427c0a9b9ce6",
+      "name": "Call 'TENDER — Отправить отчёт в Bitrix'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Каждую минуту": {
+      "main": [
+        [
+          {
+            "node": "Выбрать доставки для повтора",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Выбрать доставки для повтора": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Генерация отчета'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'TENDER — Генерация отчета'": {
+      "main": [
+        [
+          {
+            "node": "Call 'TENDER — Отправить отчёт в Bitrix'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "__BITRIX_ERROR_WORKFLOW_ID__",
+    "availableInMCP": false
+  },
+  "tags": []
+}
