@@ -5806,3 +5806,36 @@ this checkpoint. `SEM-1` remains P0 until TDD alignment, full offline regression
 and a fresh manually reviewed 27/27 runtime canary. Platform tariff acquisition
 for `participation_cost` is tracked separately as `SEM-2` because it requires an
 authoritative external-source and temporal-validity contract.
+
+---
+
+## 2026-09-20 — Bitrix one-way PDF delivery prepared locally
+
+Implemented an inactive, credential-free repository contour for sending the validated PDF and a short Russian summary to one fixed Bitrix24 group chat.
+
+Implementation artifacts:
+
+```text
+database/migrations/20260920_create_tender_analysis_deliveries.sql
+workflows/n8n-exports/beta/[BITRIX] TENDER — Ошибка доставки Bitrix.json
+workflows/n8n-exports/beta/[BITRIX] TENDER — Отправить отчёт в Bitrix.json
+workflows/n8n-exports/beta/[BITRIX] TENDER — Повторить доставки Bitrix.json
+workflows/n8n-exports/beta/[BITRIX] TENDER — Финализация анализа.json
+scripts/sanitize-bitrix-workflow-export.mjs
+workflows/bitrix-delivery.md
+workflows/bitrix-retry.md
+deploy/bitrix/README.md
+```
+
+The delivery journal uses `(analysis_run_id, channel, dialog_id)` identity and an execution-owned atomic claim. The HTTP node performs no internal retry. Only documented explicit Bitrix temporary-failure codes produce `retry_wait` with 1/5/15 minute delays; `sent`, `failed`, and ambiguous `unknown` are never selected automatically. Unhandled claimed executions fail closed from `sending` to `unknown` through a separate error workflow.
+
+The exact approved message has one compact results line and no duplicate warning line. The PDF preflight verifies the 27-count invariant, binary property, MIME, `.pdf` filename, `%PDF-` signature, byte size, and 100 MB bound.
+
+Verification evidence:
+
+```text
+node --test tests/bitrix-*.test.mjs tests/report-generation-pdf.test.mjs
+33 total / 33 pass / 0 fail
+```
+
+Production boundary: no live n8n workflow, PostgreSQL schema/data, credential, bot, chat membership, publish state, or Bitrix message was changed. Canonical production Finalization remains active and unwired to Bitrix. The SQL migration and all four `[BITRIX]` candidates remain local-only and inactive pending credentials, separate DB authorization, import, one controlled canary, and explicit promotion.

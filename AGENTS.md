@@ -180,6 +180,18 @@ workflows/\*.md
 
 Описывает архитектурно ожидаемое и документированное поведение workflow.
 
+Для локальной односторонней доставки в Bitrix:
+
+* `workflows/bitrix-delivery.md` — вход, atomic claim, классификация ответа и стабильный выход;
+* `workflows/bitrix-retry.md` — due-only retry worker и fail-closed boundary.
+
+Следующие exports являются только неактивными beta-кандидатами и не описывают текущий production runtime:
+
+* `workflows/n8n-exports/beta/[BITRIX] TENDER — Финализация анализа.json`;
+* `workflows/n8n-exports/beta/[BITRIX] TENDER — Отправить отчёт в Bitrix.json`;
+* `workflows/n8n-exports/beta/[BITRIX] TENDER — Повторить доставки Bitrix.json`;
+* `workflows/n8n-exports/beta/[BITRIX] TENDER — Ошибка доставки Bitrix.json`.
+
 ## 2.5. System architecture
 
 ```text

@@ -1172,3 +1172,40 @@ DW-18 / AG-11 execution-derived RED на исходном DOCX (14350–14352)
 Текущий test PIN-data contour готов по согласованному gate: fresh canary и три последовательных подтверждения дошли до отчёта, каждый semantic audit дал `27/27 acceptable` и zero observed critical false statuses. Ограничение: это replay сохранённых Aggregator PIN data, сформированных после ранее согласованного обхода одного failed документа; это не новый clean full run всех `12/12` документов.
 
 Immediate business state: предварительный отчёт можно отправить Дмитрию только как partial `11/12` с перечислением известных ограничений. Технический следующий шаг для Hermes — не новый model benchmark, а promotion-grade sanitized full-payload replay и post-fix Worker/Aggregator canary `DW-18 / AG-11`; local Stage 1 GREEN не является production runtime GREEN.
+
+## 9. Bitrix one-way delivery — local-only checkpoint — 2026-09-20
+
+Локально подготовлен, но не импортирован и не активирован полный односторонний contour:
+
+```text
+[BITRIX] Finalization candidate
+→ Report Generation
+→ [BITRIX] Delivery
+→ fixed Bitrix group chat
+
+[BITRIX] Retry worker
+→ due retry_wait only
+→ Report Generation
+→ [BITRIX] Delivery
+```
+
+Добавлены journal migration, delivery/retry/error workflows, beta Finalization caller, deterministic response fixtures, fail-closed classification, secret sanitizer и deployment runbook.
+
+Focused verification:
+
+```text
+node --test tests/bitrix-*.test.mjs tests/report-generation-pdf.test.mjs
+33 total / 33 pass / 0 fail
+```
+
+Подтверждено локально:
+
+- сообщение содержит только согласованную короткую строку результатов без второго предупреждения;
+- PDF bytes, MIME, имя, signature, size и invariant 27 проверяются до HTTP;
+- duplicate send блокируется atomic claim;
+- retry возможен только по явному allowlist временных ошибок Bitrix и ограничен четырьмя HTTP-вызовами;
+- transport/malformed outcome terminal `unknown` без автоматического повтора;
+- canonical production Finalization не изменён и не связан с Bitrix;
+- repository export не содержит live webhook/token.
+
+Не выполнено: SQL migration не применялась, реальные credentials не получены, бот не зарегистрирован и не добавлен в чат, workflows не импортировались/не публиковались, canary и реальная отправка не запускались. Все четыре `[BITRIX]` export-а остаются `active=false`.

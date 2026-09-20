@@ -280,11 +280,36 @@ Workflow ID: `cSsh9yjpS7t5p0OO`.
 
 ## `TENDER — Генерация отчета`
 
-Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` конвертирует этот же HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX, XLSX и automatic delivery/Telegram пока не реализованы. Изолированный runtime gate и visual QA пройдены, post-promotion production execution намеренно отложен.
+Workflow строит read-only snapshot завершённого run, адаптирует 27 FINAL fields, валидирует Report Model, генерирует self-contained HTML и создаёт binary artifact `report_html`. Опубликованная production-версия `a6fbb0f6-eed0-4656-9c4c-de4bbc30aa3b` конвертирует этот же HTML через внутренний Gotenberg и возвращает второй artifact `report_pdf`; DOCX и XLSX пока не реализованы. Изолированный runtime gate и visual QA пройдены, post-promotion production execution намеренно отложен. Bitrix delivery подготовлен только как отдельный неактивный beta-кандидат и не встроен в production Report Generation.
 
 Workflow ID: `ckPnP3hRhKu4Mf9u`.
 
 Подробный фактический контракт: `workflows/report-generation.md`.
+
+---
+
+## `[BITRIX]` one-way report delivery — local beta only
+
+Локально подготовлена будущая post-report цепочка:
+
+```text
+Finalization: completed
+→ Report Generation
+→ validated binary.report_pdf
+→ atomic Bitrix delivery claim
+→ imbot.v2.File.upload
+→ sent / retry_wait / failed / unknown
+```
+
+Report Generation остаётся pure artifact boundary и ничего не отправляет. Повтор допускается только после явного временного отказа Bitrix; `sent`, `failed` и `unknown` автоматически не повторяются. Отдельного входящего или операторского workflow нет.
+
+Четыре `[BITRIX]` export-а находятся только в `workflows/n8n-exports/beta/`, имеют `active=false` и содержат sentinels вместо production access. Канонический `TENDER — Финализация анализа` не изменён и к Bitrix не подключён.
+
+Документация:
+
+- `workflows/bitrix-delivery.md`;
+- `workflows/bitrix-retry.md`;
+- `deploy/bitrix/README.md`.
 
 ---
 

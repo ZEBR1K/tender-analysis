@@ -2396,3 +2396,43 @@ fan-out 27 FINAL fields
 → completed
 → report
 ```
+
+---
+
+# 83. Local Bitrix post-report delivery candidate
+
+Односторонняя доставка в Bitrix подготовлена только как неактивный local beta contour. Она не является частью текущего production runtime.
+
+Архитектурная граница:
+
+```text
+Finalization completion owner
+→ Report Generation
+→ validated report_html + report_pdf
+→ Bitrix Delivery
+→ fixed group chat
+```
+
+`TENDER — Генерация отчета` остаётся pure read-only artifact producer: он не знает о Bitrix, не регистрирует доставку и не инициирует HTTP side effect. Координация `Report Generation → Bitrix Delivery` находится только в beta-кандидате Finalization. Retry worker может поэтому безопасно регенерировать PDF без рекурсивной отправки.
+
+Bitrix Delivery — stateful side effect boundary:
+
+- PostgreSQL identity: `(analysis_run_id, channel, dialog_id)`;
+- atomic claim: только `pending` или due `retry_wait` переходят в `sending`;
+- `n8n_execution_id` связывает claim с guarded persistence и error workflow;
+- `sent`, `failed` и `unknown` terminal для автоматизации;
+- transport ambiguity всегда `unknown`, поэтому система сама не делает потенциальный дубликат;
+- только явный временный код Bitrix создаёт `retry_wait`;
+- начальный вызов и три backoff-повтора дают максимум четыре HTTP-вызова.
+
+Локальные компоненты:
+
+```text
+[BITRIX] TENDER — Финализация анализа
+[BITRIX] TENDER — Отправить отчёт в Bitrix
+[BITRIX] TENDER — Повторить доставки Bitrix
+[BITRIX] TENDER — Ошибка доставки Bitrix
+tender_analysis_deliveries migration
+```
+
+Все четыре exports неактивны. Канонический production Finalization, live n8n, PostgreSQL schema, credentials и target chat этим checkpoint не изменены.

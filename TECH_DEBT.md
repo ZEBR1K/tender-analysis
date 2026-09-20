@@ -2458,3 +2458,23 @@ tender\\\\\\\\\\\\\\\_id
 → XLSX
 → Telegram
 ```
+
+---
+
+# 26. `BITRIX-SEC-1` — secrets stored in live workflow by owner decision
+
+Статус: accepted security limitation, production setup pending.
+
+В live n8n полный inbound-webhook URL и `botToken` будут записаны непосредственно в ноды `[BITRIX] TENDER — Отправить отчёт в Bitrix`. Это сознательное решение владельца вместо n8n credential и означает, что пользователи с правом просмотра workflow смогут увидеть оба секрета.
+
+Обязательные compensating controls:
+
+- repository exports содержат только `__BITRIX_WEBHOOK_FILE_UPLOAD_URL__` и `__BITRIX_BOT_TOKEN__`;
+- `botId` и `dialogId` также заменяются sentinels при sanitization;
+- любой live export до Git проходит `scripts/sanitize-bitrix-workflow-export.mjs`;
+- secret-safety test сканирует tracked JSON/Markdown/JavaScript/SQL вне `graphify-out`;
+- raw transport errors, request URL, node parameters и stack traces не сохраняются в journal;
+- screenshots, fixtures, логи и чат не должны содержать live URL/token;
+- при подозрении на утечку webhook и `botToken` ротируются до повторного publish.
+
+Ограничение нельзя считать закрытым, пока секреты хранятся прямо в live workflow. Его можно устранить только отдельным согласованным переходом на credential/secret store без изменения send semantics.

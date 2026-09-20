@@ -1,7 +1,7 @@
 # Bitrix Report Delivery Design
 
 **Date:** 2026-09-20
-**Status:** Approved for implementation planning
+**Status:** Implemented as inactive local beta candidates; credential-time setup, DB migration, canary, and production promotion pending
 **Scope:** One-way automatic delivery of a short tender summary and the validated PDF report to one fixed Bitrix24 group chat.
 
 ## 1. Context
@@ -39,7 +39,7 @@ Bitrix delivery must be prepared locally before production credentials are avail
 Finalization: completed
     -> Report Generation
     -> PDF technical validation succeeds
-    -> TENDER — Send report to Bitrix
+    -> [BITRIX] TENDER — Отправить отчёт в Bitrix
         -> validate input and PDF
         -> claim delivery row atomically
         -> skip an already completed delivery
@@ -48,10 +48,10 @@ Finalization: completed
         -> persist sent/retry_wait/failed/unknown
 
 Scheduled trigger
-    -> TENDER — Retry Bitrix report deliveries
+    -> [BITRIX] TENDER — Повторить доставки Bitrix
         -> select due retry_wait rows
         -> rerun deterministic Report Generation by analysis_run_id
-        -> call TENDER — Send report to Bitrix
+        -> call [BITRIX] TENDER — Отправить отчёт в Bitrix
 ```
 
 Delivery is not appended inside Report Generation. The caller coordinates the sequence `Report Generation -> Bitrix Delivery`. This preserves the current report boundary and lets the retry workflow regenerate the same report without recursively triggering delivery.
@@ -77,7 +77,7 @@ Successful response fields persisted by the system:
 - `result.file.size`;
 - `result.dialogId`.
 
-The integration rejects an empty PDF, an invalid `%PDF-` signature, a missing readable filename, and files larger than the documented Bitrix limit before making the API call.
+The integration rejects an empty PDF, an invalid `%PDF-` signature, a missing readable filename, and files larger than 100 MB before making the API call.
 
 Official references:
 
@@ -106,7 +106,7 @@ Rules:
 
 ## 7. Delivery Sub-workflow Contract
 
-Workflow name: `TENDER — Отправить отчёт в Bitrix`.
+Workflow name: `[BITRIX] TENDER — Отправить отчёт в Bitrix`.
 
 The `Execute Workflow Trigger` uses passthrough mode because typed `Define Below` inputs cannot carry n8n binary data.
 
@@ -114,6 +114,7 @@ Expected item:
 
 ```text
 json.analysis_run_id
+or json.internal.analysis_run_id
 json.procurement
 json.statistics
 json.pdf_artifact_validation.valid = true
@@ -127,7 +128,7 @@ The sub-workflow:
 3. Atomically claims the delivery row.
 4. Returns an idempotent skip result when the row is already `sent`.
 5. Rejects automatic execution for rows in `failed` or `unknown`.
-6. Sends the summary and PDF through a credentialed HTTP Request node.
+6. Sends the summary and PDF through the directly configured HTTP Request node selected by the owner.
 7. Validates the Bitrix response before marking the row `sent`.
 8. Classifies explicit failures and persists the resulting state.
 
@@ -212,7 +213,7 @@ Bitrix does not document an idempotency key for `imbot.v2.File.upload`; therefor
 
 ## 10. Retry Worker
 
-Workflow name: `TENDER — Повторить доставки Bitrix`.
+Workflow name: `[BITRIX] TENDER — Повторить доставки Bitrix`.
 
 The scheduled workflow:
 
@@ -222,13 +223,13 @@ The scheduled workflow:
 4. Relies on the delivery sub-workflow's atomic `pending`/due-`retry_wait` to `sending` claim before any HTTP call; concurrent workers may regenerate the same PDF but cannot both send it.
 5. Never selects `sent`, `failed`, or `unknown`.
 
-The worker and delivery sub-workflow use `TENDER — Ошибка доставки Bitrix` as their workflow-level error workflow. An unhandled delivery execution recorded in `n8n_execution_id` is changed from `sending` to terminal `unknown`, never back to an automatically retryable state.
+The worker and delivery sub-workflow use `[BITRIX] TENDER — Ошибка доставки Bitrix` as their workflow-level error workflow. An unhandled delivery execution recorded in `n8n_execution_id` is changed from `sending` to terminal `unknown`, never back to an automatically retryable state.
 
 ## 11. Credentials and Configuration
 
 The selected production authorization is a Bitrix24 inbound webhook. By explicit owner decision, the full webhook method URL is entered into the live HTTP Request node and `botToken` into the live configuration node instead of using an n8n credential. They must never be copied into repository exports, logs, fixtures, screenshots, or evaluation artifacts.
 
-The repository workflow remains inactive and uses the exact sentinels `__BITRIX_WEBHOOK_FILE_UPLOAD_URL__` and `__BITRIX_BOT_TOKEN__`. A sanitized export script must replace live values with those sentinels before writing any workflow JSON to the repository. When Bitrix access is provided:
+The repository workflow remains inactive and uses the exact configuration sentinels `__BITRIX_WEBHOOK_FILE_UPLOAD_URL__`, `__BITRIX_BOT_ID__`, `__BITRIX_DIALOG_ID__`, and `__BITRIX_BOT_TOKEN__`. Workflow-ID sentinels bind the imported error and delivery workflows. A sanitized export script must replace live values before writing any workflow JSON to the repository. When Bitrix access is provided:
 
 1. Create an inbound webhook with the `imbot` scope and retain its secret URL outside the repository.
 2. Register a regular bot with stable `fields.code`, set its `fields.botToken`, and retain the returned `botId`.
@@ -260,21 +261,22 @@ Required scenarios:
 13. Retry worker selects only due `retry_wait` rows.
 14. Workflow exports and test fixtures contain no secrets.
 
-Before publication, validate both workflows, inspect their connection graphs, run pinned/mock tests, and keep real HTTP nodes pinned until the production canary is explicitly authorized.
+Before publication, validate all four inactive candidates, inspect their connection graphs, run pinned/mock tests, and keep real HTTP nodes controlled until the production canary is explicitly authorized.
 
 ## 13. Rollout
 
 ### Local preparation
 
 - Add the PostgreSQL migration and migration contract tests.
-- Create inactive local workflow exports for delivery and retry.
+- Create inactive local workflow exports for error, delivery, retry, and the Finalization caller candidate.
 - Add mock Bitrix fixtures and deterministic workflow tests.
 - Add the caller connection after validated Report Generation output in the local candidate only.
 - Document credential setup, bot registration, chat membership, canary, rollback, and observability.
 
 ### Credential-time setup
 
-- Create and bind the encrypted credential.
+- Create the inbound webhook with `imbot` scope and keep its full URL outside Git/chat.
+- Generate and retain the bot token outside Git/chat; enter both values directly in the live nodes by owner decision.
 - Register the regular bot idempotently using its stable code.
 - Add the bot to the fixed chat.
 - Set `botId` and `dialogId`.
